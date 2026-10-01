@@ -1,37 +1,65 @@
-"""Database session management — M0 scaffold.
+"""Database session management — M2.2 runtime implementation.
 
-M0: engine/session factory signatures only.
-TODO(M1): real SQLAlchemy engine creation from app.core.config.settings.
+Provides SQLAlchemy engine and scoped session lifecycle management for
+FastAPI dependency injection and offline seed/test scripts.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import Engine
-from sqlalchemy.orm import Session
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 
-# TODO(M1): replace with real engine from app.core.config.
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.config import settings
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import DeclarativeBase
+
 _engine: Engine | None = None
+_session_factory: sessionmaker[Session] | None = None
 
 
 def get_engine() -> Engine:
-    """Return the SQLAlchemy engine.
-
-    TODO(M1): instantiate from settings.database_url.
-    """
-    raise NotImplementedError("Database engine not configured in M0.")
-
-
-def get_session() -> Session:
-    """Yield a SQLAlchemy session (M0 stub).
-
-    TODO(M1): dependency-inject a scoped session factory.
-    """
-    raise NotImplementedError("Session factory not configured in M0.")
+    """Return the singleton SQLAlchemy engine configured from settings."""
+    global _engine
+    if _engine is None:
+        _engine = create_engine(
+            settings.database_url,
+            pool_pre_ping=True,
+            future=True,
+        )
+    return _engine
 
 
-def init_db() -> None:
-    """Create all tables defined in app.models (M0 stub).
+def get_session_factory() -> sessionmaker[Session]:
+    """Return the singleton sessionmaker instance."""
+    global _session_factory
+    if _session_factory is None:
+        _session_factory = sessionmaker(
+            autocommit=False,
+            autoflush=False,
+            bind=get_engine(),
+            expire_on_commit=False,
+        )
+    return _session_factory
 
-    TODO(M1): call metadata.create_all(engine) after models are wired.
-    """
-    raise NotImplementedError("init_db() is not implemented in M0.")
+
+def get_session() -> Generator[Session, None, None]:
+    """FastAPI dependency yielding a database session per request."""
+    factory = get_session_factory()
+    session = factory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+def init_db(target_base: type[DeclarativeBase] | None = None) -> None:
+    """Create tables on the current engine (primarily for testing/local setups)."""
+    from app.models.base import Base
+    import app.models  # noqa: F401 - ensure all ORM models are registered
+
+    base = target_base or Base
+    base.metadata.create_all(bind=get_engine())

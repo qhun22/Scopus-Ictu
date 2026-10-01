@@ -1,32 +1,107 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { ApiError } from "../../api/client";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
+
+const LOGIN_TRANSITION_MS = 3500;
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const toast = useToast();
+
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleNotice, setGoogleNotice] = useState(false);
   const [logoSrc, setLogoSrc] = useState("/logoictu.png");
 
+  // Redirect if already authenticated
+  if (isAuthenticated && !isAuthLoading && !loading) {
+    return <Navigate to="/home" replace />;
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    if (errors[name as keyof typeof errors]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!form.email || !form.password) return;
+    if (loading) return;
 
+    const trimmedEmail = form.email.trim();
+    const newErrors: { email?: string; password?: string } = {};
+
+    if (!trimmedEmail) {
+      newErrors.email = "Vui lòng nhập email.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      newErrors.email = "Email không đúng định dạng.";
+    }
+
+    if (!form.password) {
+      newErrors.password = "Vui lòng nhập mật khẩu.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
     setLoading(true);
-    // Chuẩn bị điều hướng đến /home khi hoàn thành xác thực
-    setTimeout(() => {
+    const startedAt = Date.now();
+
+    try {
+      await login({
+        email: trimmedEmail,
+        password: form.password,
+      });
+
+      const remainingTransitionTime = LOGIN_TRANSITION_MS - (Date.now() - startedAt);
+      if (remainingTransitionTime > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remainingTransitionTime));
+      }
+
+      navigate("/home", { replace: true });
+      toast.success("Đăng nhập thành công", "Chào mừng bạn quay lại.");
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          toast.error("Đăng nhập thất bại", err.message || "Email hoặc mật khẩu không đúng.");
+        } else if (err.status === 403) {
+          toast.error(
+            "Tài khoản bị vô hiệu hóa",
+            "Tài khoản của bạn hiện không thể đăng nhập."
+          );
+        } else if (err.status >= 500) {
+          toast.error(
+            "Có lỗi xảy ra",
+            "Không thể kết nối hoặc máy chủ đang gặp sự cố. Vui lòng thử lại sau."
+          );
+        } else {
+          toast.error(
+            "Không thể kết nối",
+            "Không thể kết nối đến máy chủ backend (127.0.0.1:8000). Vui lòng kiểm tra lại dịch vụ uvicorn."
+          );
+        }
+      } else {
+        toast.error(
+          "Không thể kết nối",
+          "Không thể kết nối đến máy chủ backend. Vui lòng kiểm tra lại dịch vụ uvicorn."
+        );
+      }
+    } finally {
       setLoading(false);
-      navigate("/home");
-    }, 500);
+    }
   };
 
   const handleGoogleClick = () => {
@@ -34,11 +109,11 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#ffffff] px-4 py-8 sm:px-6">
-      <div className="w-full max-w-[880px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+    <main className="flex min-h-screen items-center justify-center bg-[#eef2f7] px-4 py-10 sm:px-6">
+      <div className="w-full max-w-[960px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Cột trái: Branding ICTU */}
-          <section className="flex flex-col items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100/70 p-8 text-center md:border-r md:border-slate-200/80 md:p-12">
+          <section className="flex flex-col items-center justify-center bg-[#fbfcfe] p-10 text-center md:border-r md:border-slate-200/80 md:p-14">
             <div className="relative flex items-center justify-center">
               <img
                 src={logoSrc}
@@ -50,22 +125,22 @@ export default function LoginPage() {
                     setLogoSrc("/assets/ictu.png");
                   }
                 }}
-                className="h-24 w-24 rounded-full bg-white object-contain shadow-md ring-4 ring-white"
+                className="h-28 w-28 rounded-full bg-white object-contain shadow-md ring-4 ring-white"
               />
             </div>
 
-            <p className="mt-6 text-xs font-semibold uppercase leading-relaxed tracking-wider text-[#334155] sm:text-sm sm:tracking-widest">
+            <p className="mt-7 text-xs font-semibold uppercase leading-relaxed tracking-wider text-[#334155] sm:text-sm sm:tracking-widest">
               ĐẠI HỌC CÔNG NGHỆ THÔNG TIN & TRUYỀN THÔNG THÁI NGUYÊN
             </p>
 
-            <h1 className="mt-2 text-lg font-black uppercase tracking-wide text-[#3A5FC3] md:text-xl">
+            <h1 className="brand-title mt-3 font-black uppercase tracking-wide text-[#3A5FC3]">
               CỔNG THÔNG TIN SCOPUS ICTU
             </h1>
           </section>
 
           {/* Cột phải: Form Đăng nhập */}
-          <section className="flex flex-col justify-center bg-white p-8 md:p-10">
-            <h2 className="text-center text-2xl font-bold uppercase tracking-tight text-slate-800">
+          <section className="flex flex-col justify-center bg-white p-8 sm:p-10 md:p-12">
+            <h2 className="text-center text-2xl font-bold uppercase tracking-tight text-slate-800 md:text-[26px]">
               ĐĂNG NHẬP TÀI KHOẢN
             </h2>
 
@@ -83,17 +158,17 @@ export default function LoginPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-              {/* Trường 1: Email ICTU */}
+            <form noValidate onSubmit={handleSubmit} className="mt-7 space-y-5">
+              {/* Trường 1: Email */}
               <div>
                 <label
                   htmlFor="email"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-slate-700"
                 >
-                  Email ICTU
+                  Email
                 </label>
                 <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
                     {/* User Icon */}
                     <svg
                       className="h-5 w-5"
@@ -116,11 +191,25 @@ export default function LoginPage() {
                     type="email"
                     autoComplete="email"
                     required
+                    disabled={loading}
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="youname@ictu.edu.vn"
-                    className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                    placeholder="Nhập địa chỉ email"
+                    className={`h-12 w-full rounded-lg border ${
+                      errors.email
+                        ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
+                        : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
+                    } bg-white pl-11 pr-4 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-400 sm:text-base`}
                   />
+                </div>
+                <div className="min-h-5 overflow-hidden">
+                  <p
+                    className={`validation-message text-xs font-medium text-rose-500 ${
+                      errors.email ? "validation-message-visible" : ""
+                    }`}
+                  >
+                    {errors.email || "\u00a0"}
+                  </p>
                 </div>
               </div>
 
@@ -128,12 +217,12 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="password"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-sm font-semibold text-slate-700"
                 >
                   Mật khẩu
                 </label>
                 <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
                     {/* Lock Icon */}
                     <svg
                       className="h-5 w-5"
@@ -156,15 +245,20 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
+                    disabled={loading}
                     value={form.password}
                     onChange={handleChange}
-                    placeholder="Nhập mật khẩu"
-                    className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-11 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                    placeholder="••••••••"
+                    className={`h-12 w-full rounded-lg border ${
+                      errors.password
+                        ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
+                        : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
+                    } bg-white pl-11 pr-12 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:outline-none focus:ring-2 disabled:bg-slate-50 disabled:text-slate-400 sm:text-base`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition-colors hover:text-slate-600 focus:outline-none"
+                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400 transition-colors hover:text-slate-600 focus:outline-none"
                     aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                   >
                     {showPassword ? (
@@ -208,6 +302,15 @@ export default function LoginPage() {
                     )}
                   </button>
                 </div>
+                <div className="min-h-5 overflow-hidden">
+                  <p
+                    className={`validation-message text-xs font-medium text-rose-500 ${
+                      errors.password ? "validation-message-visible" : ""
+                    }`}
+                  >
+                    {errors.password || "\u00a0"}
+                  </p>
+                </div>
               </div>
 
               {/* Nút Đăng nhập */}
@@ -215,7 +318,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#3A5FC3] text-sm font-bold text-white shadow-sm transition-all duration-200 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#3A5FC3] text-base font-bold text-white shadow-sm transition-all duration-200 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/40 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {loading && (
                     <svg
@@ -256,11 +359,12 @@ export default function LoginPage() {
               {/* Nút Đăng nhập bằng Google */}
               <button
                 type="button"
+                disabled
                 onClick={handleGoogleClick}
-                className="flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-medium text-slate-400 shadow-sm transition-all duration-200 opacity-80 sm:text-base"
               >
                 {/* Google Multi-Color SVG Icon */}
-                <svg className="h-5 w-5" viewBox="0 0 24 24">
+                <svg className="h-5 w-5 opacity-60" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"

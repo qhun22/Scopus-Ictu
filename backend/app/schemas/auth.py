@@ -1,26 +1,45 @@
-"""Authentication schemas — M0 scaffold.
+"""Authentication Pydantic schemas — M2.2 contract.
 
-JWT logic is prohibited in M0. These are empty stubs.
+Defines input payloads for login requests, and public safe user response models
+that strictly omit sensitive fields such as password_hash.
 """
 
 from __future__ import annotations
 
-from pydantic import BaseModel
-
-
-class TokenPayload(BaseModel):
-    """M0 stub. TODO(M1): define JWT payload fields."""
-
-    pass
+import uuid
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LoginRequest(BaseModel):
-    """M0 stub. TODO(M1): email + password fields."""
+    """Payload for user login."""
 
-    pass
+    email: str = Field(..., description="Email address of the user")
+    password: str = Field(..., description="Plaintext password submitted by user")
 
 
-class LoginResponse(BaseModel):
-    """M0 stub. TODO(M1): access_token + token_type."""
+class UserResponse(BaseModel):
+    """Public authenticated user profile representation."""
 
-    pass
+    id: uuid.UUID
+    email: str
+    display_name: str
+    role: str
+    lecturer_id: uuid.UUID | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TokenPayload(BaseModel):
+    """Internal JWT decoded claims."""
+
+    sub: str
+    email: str
+    role: str
+    exp: int
+    iat: int | None = None
+
+
+class MessageResponse(BaseModel):
+    """Generic status/message response."""
+
+    message: str

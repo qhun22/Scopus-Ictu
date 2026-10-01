@@ -31,23 +31,29 @@ class Settings(BaseSettings):
     # Database — components only (no full URL committed to source).
     # The composed URL is exposed via the `database_url` computed field.
     # ------------------------------------------------------------------
-    db_user: str = Field(..., validation_alias="DB_USER")
-    db_password: str = Field(..., validation_alias="DB_PASSWORD")
-    db_host: str = Field(..., validation_alias="DB_HOST")
+    db_user: str = Field("postgres", validation_alias="DB_USER")
+    db_password: str = Field("postgres", validation_alias="DB_PASSWORD")
+    db_host: str = Field("localhost", validation_alias="DB_HOST")
     db_port: int = Field(5432, validation_alias="DB_PORT")
-    db_name: str = Field(..., validation_alias="DB_NAME")
+    db_name: str = Field("scopus_ictu", validation_alias="DB_NAME")
     db_driver: str = Field("postgresql+psycopg2", validation_alias="DB_DRIVER")
 
     # ------------------------------------------------------------------
     # CORS — comma-separated list sourced from environment.
     # MUST NOT be hard-coded origins in source.
     # ------------------------------------------------------------------
-    backend_cors_origins: str = Field(..., validation_alias="BACKEND_CORS_ORIGINS")
+    backend_cors_origins: str = Field(
+        "http://localhost:5173,http://127.0.0.1:5173",
+        validation_alias="BACKEND_CORS_ORIGINS",
+    )
 
     # ------------------------------------------------------------------
-    # Security — placeholder fields for M0; real JWT logic deferred to M1.
+    # Security — JWT secret key and token expiration.
     # ------------------------------------------------------------------
-    secret_key: str = Field(..., validation_alias="SECRET_KEY")
+    secret_key: str = Field(
+        "insecure-dev-secret-key-change-in-production",
+        validation_alias="SECRET_KEY",
+    )
     access_token_expire_minutes: int = Field(
         60, validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
@@ -55,13 +61,17 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Environment flag — local | dev | prod.
     # ------------------------------------------------------------------
-    environment: str = Field(..., validation_alias="ENVIRONMENT")
+    environment: str = Field("local", validation_alias="ENVIRONMENT")
 
     # ------------------------------------------------------------------
     # Offline file paths (never HTTP URLs).
     # ------------------------------------------------------------------
-    dspace_snapshot_path: str = Field(..., validation_alias="DSPACE_SNAPSHOT_PATH")
-    scopus_raw_dir: str = Field(..., validation_alias="SCOPUS_RAW_DIR")
+    dspace_snapshot_path: str = Field(
+        "./data/snapshots/", validation_alias="DSPACE_SNAPSHOT_PATH"
+    )
+    scopus_raw_dir: str = Field(
+        "./data/raw_scopus/", validation_alias="SCOPUS_RAW_DIR"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

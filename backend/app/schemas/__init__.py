@@ -1,7 +1,7 @@
 """Pydantic schemas — M0 scaffold."""
 
 from app.schemas.audit import AuditEventResponse
-from app.schemas.auth import LoginRequest, LoginResponse, TokenPayload
+from app.schemas.auth import LoginRequest, TokenPayload
 from app.schemas.common import PageResponse, PaginationParams, TimestampMixin
 from app.schemas.identity_review import (
     CandidateWithEvidenceResponse,
@@ -38,7 +38,6 @@ __all__ = [
     # auth
     "TokenPayload",
     "LoginRequest",
-    "LoginResponse",
     # lecturer
     "LecturerBase",
     "LecturerCreate",
