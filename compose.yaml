@@ -1,0 +1,45 @@
+# compose.yaml — base compose definition (environment-neutral).
+# Concrete host ports, credentials, and domains are defined in:
+#   - compose.local.yaml  (local development)
+#   - compose.prod.yaml   (production reference)
+#   - compose.local.override.yaml  (per-developer overrides, gitignored)
+
+services:
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      # PostgreSQL variables are not hard-coded: they come from the runtime
+      # `POSTGRES_USER` / `POSTGRES_DB` mapped in `compose.local.yaml` /
+      # `compose.prod.yaml` from `DB_*` env vars. Compose expands `$$` to
+      # a literal `$` inside the container, so the shell expands them at
+      # healthcheck time, not at compose-substitution time.
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    # Intentionally NO `env_file` here. The base compose file is
+    # environment-neutral; concrete credentials / config come from
+    # the overlay (compose.local.yaml for local dev, deployment
+    # environment / vault for production).
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

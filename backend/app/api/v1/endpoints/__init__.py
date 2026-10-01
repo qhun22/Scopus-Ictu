@@ -1,0 +1,1 @@
+"""v1 endpoints — M0 scaffold (signatures only)."""

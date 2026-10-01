@@ -1,0 +1,1 @@
+"""Scripts — M0 scaffold."""

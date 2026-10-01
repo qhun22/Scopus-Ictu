@@ -1,0 +1,1 @@
+"""Tests — M0 scaffold."""

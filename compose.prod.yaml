@@ -1,0 +1,52 @@
+# compose.prod.yaml — production reference overrides.
+# Concrete secrets MUST come from the deployment environment, not this file.
+
+services:
+  backend:
+    # Production backend must receive ALL required Settings (see
+    # `backend/app/core/config.py`) from the deployment environment
+    # (CI/CD secrets, vault, etc.). DO NOT use `env_file: .env` here —
+    # production has no committed `.env` file. Every variable below is
+    # interpolated from the deployment environment.
+    #
+    # Optional variables use Compose's `${VAR:-default}` syntax so that
+    # operators who do not explicitly export them still get sensible
+    # values; required variables have NO default and MUST be provided.
+    environment:
+      ENVIRONMENT: prod
+
+      # --- Database (Pydantic Settings `DB_*` aliases) ---
+      DB_DRIVER: ${DB_DRIVER:-postgresql+psycopg2}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME}
+
+      # --- Security ---
+      SECRET_KEY: ${SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+
+      # --- CORS (comma-separated list) ---
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+
+      # --- Offline input paths ---
+      DSPACE_SNAPSHOT_PATH: ${DSPACE_SNAPSHOT_PATH}
+      SCOPUS_RAW_DIR: ${SCOPUS_RAW_DIR}
+    restart: unless-stopped
+
+  frontend:
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  db:
+    restart: unless-stopped
+    # Map the backend-style `DB_*` variables (defined in `.env.example`)
+    # to the variables the `postgres:16-alpine` image consumes natively.
+    # Concrete values MUST come from the deployment environment
+    # (CI/CD secrets, vault, etc.) — DO NOT commit credentials here.
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}

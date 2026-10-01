@@ -1,0 +1,48 @@
+# compose.local.yaml — local development overrides.
+# This file MUST remain environment-neutral.
+# Real credentials MUST be provided via a local .env file or shell
+# environment, NOT committed here.
+
+services:
+  backend:
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      - ENVIRONMENT=local
+      # Database, CORS, and secret values are injected from a local
+      # .env file (see `.env.example`). Do NOT commit credentials here.
+    env_file:
+      - .env
+
+  frontend:
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    command: ["npm", "run", "dev"]
+
+  db:
+    ports:
+      - "5432:5432"
+    # The PostgreSQL image (`postgres:16-alpine`) only recognises the
+    # `POSTGRES_*` variables natively — it does NOT read our backend's
+    # `DB_*` naming. We therefore map explicitly from the backend-style
+    # `DB_*` variables (defined in `.env.example`) to the variables the
+    # PostgreSQL container requires at first boot.
+    #
+    # IMPORTANT: do NOT add `env_file: .env` to this `db` service. Doing
+    # so would forward ALL variables from the local `.env` (including
+    # `BACKEND_CORS_ORIGINS`, `SECRET_KEY`, etc.) into the Postgres
+    # container, where they would only confuse the entrypoint and risk
+    # overriding a `POSTGRES_*` value via accidental name collision.
+    # Compose interpolates `${DB_*}` here from the project-level `.env`
+    # automatically; that is sufficient.
+    #
+    # Values flow from the local `.env` file via project-level
+    # interpolation; do NOT commit any credentials.
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}

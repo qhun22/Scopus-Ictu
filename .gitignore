@@ -1,0 +1,66 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.eggs/
+*.egg-info/
+dist/
+build/
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+build/
+.parcel-cache/
+.next/
+.nuxt/
+.cache/
+
+# --- Environment / Secrets ---
+.env
+.env.local
+.env.*.local
+*.pem
+secrets/
+
+# --- Compose overrides (developer-specific) ---
+compose.local.override.yaml
+
+# --- Data (real source data is NEVER committed) ---
+data/raw_scopus/*
+!data/raw_scopus/.gitkeep
+data/snapshots/*
+!data/snapshots/.gitkeep
+data/test_fixtures/*
+!data/test_fixtures/.gitkeep
+
+# --- IDE / OS ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# --- Logs / temp ---
+*.log
+*.bak
+*.tmp
+
+# --- Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# --- Alembic (only migrations generated under M1 belong in VCS) ---
+# alembic/versions/.gitkeep is intentionally tracked.
+
+data/diagram-skills-package/
