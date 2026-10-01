@@ -1,32 +1,90 @@
-"""Alembic environment — M0 scaffold only.
+"""Alembic environment for the frozen M1.2 schema migration.
 
-The first real migration is intentionally NOT generated in M0.
-M1 will fill in `run_migrations_online` against the real metadata.
+Both online and offline migration modes use the PostgreSQL URL supplied by
+the application's authorized settings object. Configuration failures are
+reported explicitly and never fall back to a connection placeholder.
 """
 
 from __future__ import annotations
 
-# TODO(M1): wire this module to app.core.config and app.models.base.metadata.
-# For M0, we only keep the structural skeleton so Alembic imports cleanly.
+import sys
+from logging.config import fileConfig
+from pathlib import Path
+
+from alembic import context
+from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
+
+# Resolve ``app.*`` from the backend directory regardless of the caller's CWD.
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BACKEND_DIR))
+
+from app.models import Base  # noqa: E402
+
+target_metadata = Base.metadata
+config = context.config
+
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
+
+
+def _resolve_url() -> str:
+    """Return the configured PostgreSQL URL or fail closed."""
+    try:
+        from app.core.config import settings
+
+        url = make_url(settings.database_url)
+    except Exception:
+        raise RuntimeError(
+            "MIGRATION_CONFIG_GAP: authorized application configuration "
+            "could not provide a database URL"
+        ) from None
+
+    if url.get_backend_name() != "postgresql":
+        raise RuntimeError(
+            "MIGRATION_CONFIG_GAP: configured database URL must use PostgreSQL"
+        )
+
+    return url.render_as_string(hide_password=False)
 
 
 def run_migrations_offline() -> None:
-    """M0 stub.
+    """Render migration SQL without opening a database connection."""
+    context.configure(
+        url=_resolve_url(),
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+        include_schemas=True,
+    )
 
-    TODO(M1): generate SQL scripts with `url = config.get_main_option("sqlalchemy.url")`.
-    """
-    raise NotImplementedError("Alembic offline mode is not implemented in M0.")
+    with context.begin_transaction():
+        context.run_migrations()
 
 
 def run_migrations_online() -> None:
-    """M0 stub.
+    """Run migrations through an application-configured PostgreSQL engine."""
+    section = config.get_section(config.config_ini_section) or {}
+    section["sqlalchemy.url"] = _resolve_url()
 
-    TODO(M1): create an engine from app.core.config and run migrations against
-    the SQLAlchemy metadata produced by app.models.
-    """
-    raise NotImplementedError("Alembic online mode is not implemented in M0.")
+    connectable = engine_from_config(
+        section,
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_schemas=True,
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
 
 
-if __name__ == "__main__":
-    # M0: explicit no-op. Real entrypoint wired in M1 via env.py -> alembic.
-    pass
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

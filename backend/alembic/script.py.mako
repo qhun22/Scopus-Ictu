@@ -4,15 +4,16 @@ Revision ID: ${up_revision}
 Revises: ${down_revision | comma,n}
 Create Date: ${create_date}
 
-M0 NOTE: real revisions live in M1. This template is the canonical scaffold.
+M1.2 NOTE: revision template restored to the canonical Alembic form so
+that subsequent revisions (M1.2+, if governance approves) can be
+generated with ``alembic revision --autogenerate``.
 """
 
 from __future__ import annotations
 
-# TODO(M1): replace with real revision imports.
-# from alembic import op
-# import sqlalchemy as sa
-# ${imports if imports else ""}
+from alembic import op
+import sqlalchemy as sa
+${imports if imports else ""}
 
 # revision identifiers, used by Alembic.
 revision = ${repr(up_revision)}
@@ -22,10 +23,10 @@ depends_on = ${repr(depends_on)}
 
 
 def upgrade() -> None:
-    """M0 stub. TODO(M1): apply schema changes."""
-    raise NotImplementedError("M0 has no real migrations.")
+    """Apply schema changes."""
+    ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
-    """M0 stub. TODO(M1): revert schema changes."""
-    raise NotImplementedError("M0 has no real migrations.")
+    """Revert schema changes."""
+    ${downgrades if downgrades else "pass"}
