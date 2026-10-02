@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { ApiError } from "../../api/client";
+import { getApiErrorCode, getApiErrorMessage } from "../../api/errors";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 
@@ -74,29 +75,43 @@ export default function LoginPage() {
       navigate("/home", { replace: true });
       toast.success("Đăng nhập thành công", "Chào mừng bạn quay lại.");
     } catch (err: unknown) {
+      const errorCode = getApiErrorCode(err);
+
       if (err instanceof ApiError) {
-        if (err.status === 401) {
-          toast.error("Đăng nhập thất bại", err.message || "Email hoặc mật khẩu không đúng.");
+        if (errorCode === "ACCOUNT_LOCKED") {
+          toast.error(
+            "Tài khoản đang bị khóa",
+            "Vui lòng liên hệ quản trị viên để được hỗ trợ.",
+          );
+        } else if (errorCode === "PASSWORD_RESET_BY_ADMIN") {
+          toast.warning(
+            "Mật khẩu đã được thay đổi",
+            "Quản trị viên đã cập nhật thông tin đăng nhập của bạn. Vui lòng liên hệ quản trị viên để nhận mật khẩu mới.",
+          );
+        } else if (errorCode === "SESSION_REVOKED") {
+          toast.warning("Phiên đăng nhập đã thay đổi", "Vui lòng đăng nhập lại.");
+        } else if (errorCode === "INVALID_CREDENTIALS" || err.status === 401) {
+          toast.error("Đăng nhập thất bại", "Email hoặc mật khẩu không đúng.");
         } else if (err.status === 403) {
           toast.error(
-            "Tài khoản bị vô hiệu hóa",
-            "Tài khoản của bạn hiện không thể đăng nhập."
+            "Không thể đăng nhập",
+            "Tài khoản của bạn hiện không có quyền truy cập hệ thống.",
           );
         } else if (err.status >= 500) {
           toast.error(
             "Có lỗi xảy ra",
-            "Không thể kết nối hoặc máy chủ đang gặp sự cố. Vui lòng thử lại sau."
+            "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.",
           );
         } else {
           toast.error(
-            "Không thể kết nối",
-            "Không thể kết nối đến máy chủ backend (127.0.0.1:8000). Vui lòng kiểm tra lại dịch vụ uvicorn."
+            "Không thể đăng nhập",
+            getApiErrorMessage(err, "Không thể hoàn tất đăng nhập. Vui lòng thử lại."),
           );
         }
       } else {
         toast.error(
           "Không thể kết nối",
-          "Không thể kết nối đến máy chủ backend. Vui lòng kiểm tra lại dịch vụ uvicorn."
+          "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.",
         );
       }
     } finally {
