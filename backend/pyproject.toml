@@ -7,7 +7,7 @@ name = "scopus-ictu-backend"
 version = "0.1.0"
 description = "Backend service for the Scopus-Ictu identity reconciliation pipeline (M0 skeleton)."
 requires-python = ">=3.11"
-readme = "../README.md"
+readme = {text = "Backend service for the Scopus-Ictu identity reconciliation pipeline.", content-type = "text/plain"}
 
 # --- FROZEN STACK (M0 = placeholders only, no logic) ---
 dependencies = [
