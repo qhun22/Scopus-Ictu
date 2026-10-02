@@ -66,9 +66,17 @@ Out of scope for M0:
 
 ```bash
 cd backend
+# Create backend/.env from the repository template and fill in local values.
+cp ../.env.example .env
 pip install -e .
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+The backend reads `backend/.env` from the location of
+`backend/app/core/config.py`, so starting Uvicorn from `backend` or from the
+repository root uses the same configuration. Required database, CORS, JWT,
+and environment settings have no code defaults; startup fails with a
+validation error when they are missing.
 
 Then open <http://localhost:8000/docs>.
 

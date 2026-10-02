@@ -24,6 +24,7 @@ build/
 
 # --- Environment / Secrets ---
 .env
+backend/.env
 .env.local
 .env.*.local
 *.pem
