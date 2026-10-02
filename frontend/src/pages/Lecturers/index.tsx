@@ -1,14 +1,1216 @@
-import { Card } from "antd";
+import React, { useEffect, useState } from "react";
+import {
+  LecturerForm,
+  LecturerUser,
+  createLecturer,
+  deleteLecturer,
+  getLecturers,
+} from "../../api/lecturers";
+import { ApiError } from "../../api/client";
+import {
+  lockUser,
+  resetUserPassword,
+  unlockUser,
+  updateUser,
+} from "../../api/users";
+import ConfirmModal from "../../components/common/ConfirmModal";
+import ModalPortal from "../../components/common/ModalPortal";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
+import { useI18n } from "../../i18n";
+
+const badgeClassName = "inline-flex h-6 w-36 items-center justify-center rounded-full border px-2.5 text-xs font-bold whitespace-nowrap";
+const PAGE_SIZE = 10;
+const FILTER_DELAY_MS = 350;
 
 export default function LecturersPage() {
+  const toast = useToast();
+  const { user: currentUser } = useAuth();
+  const { t, getRoleLabel, locale } = useI18n();
+
+  const [lecturers, setLecturers] = useState<LecturerUser[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [search, setSearch] = useState<string>("");
+  const [roleFilter, setRoleFilter] = useState<string>("ALL");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [appliedRoleFilter, setAppliedRoleFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
+  const isFiltering = search !== appliedSearch || roleFilter !== appliedRoleFilter;
+  const isTableLoading = loading || isFiltering;
+
+  // Modal states
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedLecturer, setSelectedLecturer] = useState<LecturerUser | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [detailAction, setDetailAction] = useState<
+    "save" | "lock" | "unlock" | "reset" | null
+  >(null);
+  const [confirmAction, setConfirmAction] = useState<"lock" | "unlock" | "reset" | null>(null);
+
+  // Form states for Add
+  const [addForm, setAddForm] = useState<LecturerForm>({
+    full_name: "",
+    email: "",
+    password: "",
+    staff_code: "",
+    role: "LECTURER",
+    academic_degree: "Thạc sĩ",
+    department: "Khoa CNTT",
+  });
+  const [addError, setAddError] = useState<string>("");
+
+  // Form states for Edit / Detail
+  const [editForm, setEditForm] = useState<{
+    full_name: string;
+    email: string;
+    staff_code: string;
+    role: string;
+    academic_degree: string;
+    department: string;
+  }>({
+    full_name: "",
+    email: "",
+    staff_code: "",
+    role: "LECTURER",
+    academic_degree: "Thạc sĩ",
+    department: "Khoa CNTT",
+  });
+  const [editError, setEditError] = useState<string>("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+
+  const isDetailBusy = detailAction !== null;
+  const isCurrentAccount = selectedLecturer?.id === currentUser?.id;
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const data = await getLecturers();
+      setLecturers(data);
+    } catch {
+      toast.error(
+        locale === "vi" ? "Lỗi kết nối" : "Connection Error",
+        locale === "vi"
+          ? "Không thể tải danh sách giảng viên & người dùng."
+          : "Unable to load lecturers and users list.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    if (!isDetailModalOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isDetailBusy && confirmAction === null) {
+        setIsDetailModalOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [confirmAction, isDetailBusy, isDetailModalOpen]);
+
+  useEffect(() => {
+    if (search === appliedSearch && roleFilter === appliedRoleFilter) return;
+
+    const timer = window.setTimeout(() => {
+      setAppliedSearch(search);
+      setAppliedRoleFilter(roleFilter);
+      setPage(1);
+    }, FILTER_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [search, roleFilter, appliedSearch, appliedRoleFilter]);
+
+  const filteredLecturers = lecturers.filter((item) => {
+    const q = appliedSearch.trim().toLowerCase();
+    const matchesSearch =
+      item.display_name.toLowerCase().includes(q) ||
+      item.email.toLowerCase().includes(q) ||
+      (item.department && item.department.toLowerCase().includes(q)) ||
+      (item.faculty && item.faculty.toLowerCase().includes(q)) ||
+      (item.staff_code && item.staff_code.toLowerCase().includes(q)) ||
+      item.id.toLowerCase().includes(q);
+
+    const matchesRole =
+      appliedRoleFilter === "ALL" || item.role.toUpperCase() === appliedRoleFilter;
+
+    return matchesSearch && matchesRole;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredLecturers.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedLecturers = filteredLecturers.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setPage((previousPage) => Math.min(previousPage, totalPages));
+  }, [totalPages]);
+
+  const countByRole = (roleName: string) =>
+    lecturers.filter((l) => l.role.toUpperCase() === roleName.toUpperCase()).length;
+
+  const renderRoleBadge = (role: string) => {
+    const r = role.toUpperCase();
+    const colorClassName =
+      r === "ADMIN"
+        ? "border-blue-200 bg-blue-50 text-[#3A5FC3]"
+        : r === "REVIEWER"
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700";
+
+    return (
+      <span className={`${badgeClassName} ${colorClassName}`}>
+        {getRoleLabel(role)}
+      </span>
+    );
+  };
+
+  const getErrorCode = (error: unknown): string | undefined => {
+    if (!(error instanceof ApiError) || typeof error.body !== "object" || error.body === null) {
+      return undefined;
+    }
+    const code = (error.body as Record<string, unknown>).code;
+    return typeof code === "string" ? code : undefined;
+  };
+
+  const handleVersionConflict = async () => {
+    toast.warning(
+      "Dữ liệu đã thay đổi",
+      "Thông tin người dùng vừa được cập nhật ở nơi khác. Vui lòng tải lại.",
+    );
+    setConfirmAction(null);
+    setIsDetailModalOpen(false);
+    await fetchData();
+  };
+
+  // Open Add Modal
+  const handleOpenAddModal = () => {
+    setAddForm({
+      full_name: "",
+      email: "",
+      password: "",
+      staff_code: "",
+      role: "LECTURER",
+      academic_degree: "Thạc sĩ",
+      department: "Khoa CNTT",
+    });
+    setAddError("");
+    setIsAddModalOpen(true);
+  };
+
+  // Submit Add Lecturer
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addForm.full_name.trim() || !addForm.email.trim() || !addForm.password?.trim() || !addForm.staff_code.trim()) {
+      setAddError(locale === "vi" ? "Vui lòng nhập đầy đủ các thông tin bắt buộc." : "Please fill in all required fields.");
+      return;
+    }
+    if (addForm.password.length < 8) {
+      setAddError(locale === "vi" ? "Mật khẩu phải có ít nhất 8 ký tự." : "Password must be at least 8 characters.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setAddError("");
+    try {
+      await createLecturer({
+        full_name: addForm.full_name.trim(),
+        email: addForm.email.trim(),
+        password: addForm.password,
+        staff_code: addForm.staff_code.trim(),
+        role: addForm.role,
+        academic_degree: addForm.academic_degree,
+        department: addForm.department,
+      });
+      toast.success(
+        locale === "vi" ? "Thêm thành công" : "Success",
+        locale === "vi" ? `Đã thêm giảng viên ${addForm.full_name}` : `Lecturer ${addForm.full_name} has been added.`,
+      );
+      setIsAddModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || (locale === "vi" ? "Không thể thêm giảng viên. Vui lòng thử lại." : "Could not add lecturer.");
+      setAddError(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Open Detail / Edit Modal
+  const handleOpenDetailModal = (lec: LecturerUser) => {
+    setSelectedLecturer(lec);
+    setEditForm({
+      full_name: lec.display_name,
+      email: lec.email,
+      staff_code: lec.staff_code || "",
+      role: lec.role || "LECTURER",
+      academic_degree: lec.academic_degree || "Thạc sĩ",
+      department: lec.department || "Khoa CNTT",
+    });
+    setEditError("");
+    setNewPassword("");
+    setPasswordError("");
+    setShowNewPassword(false);
+    setConfirmAction(null);
+    setIsDetailModalOpen(true);
+  };
+
+  // Submit Edit Lecturer
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedLecturer || isDetailBusy) return;
+    if (
+      !editForm.full_name.trim() ||
+      !editForm.email.trim() ||
+      (selectedLecturer.lecturer_id && !editForm.staff_code.trim())
+    ) {
+      setEditError(
+        locale === "vi"
+          ? "Vui lòng nhập đầy đủ họ tên, email và mã cán bộ."
+          : "Please fill in all required fields.",
+      );
+      return;
+    }
+
+    setDetailAction("save");
+    setEditError("");
+    try {
+      const payload = {
+        version: selectedLecturer.version,
+        display_name: editForm.full_name.trim(),
+        email: editForm.email.trim(),
+        role: editForm.role,
+        ...(selectedLecturer.lecturer_id
+          ? {
+              staff_code: editForm.staff_code.trim(),
+              academic_degree: editForm.academic_degree || null,
+              department: editForm.department || null,
+            }
+          : {}),
+      };
+      await updateUser(selectedLecturer.id, payload);
+      toast.success(
+        locale === "vi" ? "Cập nhật thành công" : "Success",
+        locale === "vi" ? `Đã cập nhật thông tin giảng viên ${editForm.full_name}` : `Lecturer ${editForm.full_name} updated successfully.`,
+      );
+      setIsDetailModalOpen(false);
+      await fetchData();
+    } catch (error: unknown) {
+      if (getErrorCode(error) === "VERSION_CONFLICT") {
+        await handleVersionConflict();
+      } else {
+        toast.error(
+          "Không thể lưu thay đổi",
+          error instanceof ApiError
+            ? error.message
+            : "Không thể cập nhật thông tin người dùng. Vui lòng thử lại.",
+        );
+      }
+    } finally {
+      setDetailAction(null);
+    }
+  };
+
+  const requestPasswordReset = () => {
+    const password = newPassword.trim();
+    if (!password) {
+      setPasswordError("Vui lòng nhập mật khẩu mới.");
+      return;
+    }
+    if (password.length < 8) {
+      setPasswordError("Mật khẩu mới phải có ít nhất 8 ký tự.");
+      return;
+    }
+    if (isCurrentAccount) {
+      toast.warning(
+        "Không thể đặt lại mật khẩu",
+        "Không thể đặt lại mật khẩu quản trị viên đang sử dụng từ màn hình quản trị người dùng.",
+      );
+      return;
+    }
+    setPasswordError("");
+    setConfirmAction("reset");
+  };
+
+  const handleSecurityAction = async () => {
+    if (!selectedLecturer || !confirmAction || isDetailBusy) return;
+
+    const action = confirmAction;
+    setDetailAction(action);
+    try {
+      if (action === "reset") {
+        const result = await resetUserPassword(selectedLecturer.id, {
+          new_password: newPassword,
+          version: selectedLecturer.version,
+        });
+        setSelectedLecturer((previous) =>
+          previous ? { ...previous, version: result.version } : previous,
+        );
+        setLecturers((previous) =>
+          previous.map((item) =>
+            item.id === selectedLecturer.id ? { ...item, version: result.version } : item,
+          ),
+        );
+        setNewPassword("");
+        toast.success(
+          "Đã đặt lại mật khẩu",
+          "Mật khẩu mới đã được cập nhật cho tài khoản.",
+        );
+      } else {
+        const updated =
+          action === "lock"
+            ? await lockUser(selectedLecturer.id, selectedLecturer.version)
+            : await unlockUser(selectedLecturer.id, selectedLecturer.version);
+        setSelectedLecturer(updated);
+        setLecturers((previous) =>
+          previous.map((item) => (item.id === updated.id ? updated : item)),
+        );
+        if (action === "lock") {
+          toast.success(
+            "Đã khóa tài khoản",
+            "Tài khoản không thể đăng nhập cho đến khi được mở khóa.",
+          );
+        } else {
+          toast.success("Đã mở khóa tài khoản", "Người dùng có thể đăng nhập lại.");
+        }
+      }
+      setConfirmAction(null);
+    } catch (error: unknown) {
+      if (getErrorCode(error) === "VERSION_CONFLICT") {
+        await handleVersionConflict();
+      } else if (getErrorCode(error) === "CANNOT_LOCK_CURRENT_USER") {
+        toast.warning(
+          "Không thể khóa tài khoản",
+          "Không thể khóa tài khoản đang sử dụng.",
+        );
+        setConfirmAction(null);
+      } else if (getErrorCode(error) === "CANNOT_RESET_CURRENT_USER") {
+        toast.warning(
+          "Không thể đặt lại mật khẩu",
+          "Không thể đặt lại mật khẩu quản trị viên đang sử dụng từ màn hình này.",
+        );
+        setConfirmAction(null);
+      } else {
+        toast.error(
+          "Không thể thực hiện thao tác",
+          error instanceof ApiError ? error.message : "Vui lòng thử lại sau.",
+        );
+      }
+    } finally {
+      setDetailAction(null);
+    }
+  };
+
+  // Open Delete Modal
+  const handleOpenDeleteModal = (lec: LecturerUser) => {
+    setSelectedLecturer(lec);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Confirm Delete
+  const handleDeleteConfirm = async () => {
+    if (!selectedLecturer) return;
+    setIsSubmitting(true);
+    try {
+      const targetId = selectedLecturer.lecturer_id || selectedLecturer.id;
+      await deleteLecturer(targetId);
+      toast.success(
+        locale === "vi" ? "Xóa thành công" : "Success",
+        locale === "vi" ? `Đã xóa giảng viên ${selectedLecturer.display_name}` : `Lecturer ${selectedLecturer.display_name} has been deleted.`,
+      );
+      setIsDeleteModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || (locale === "vi" ? "Không thể xóa giảng viên." : "Could not delete lecturer.");
+      toast.error(locale === "vi" ? "Lỗi xóa" : "Delete Error", typeof msg === "string" ? msg : JSON.stringify(msg));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Lecturers</h1>
-      <Card>
-        <p className="text-gray-600">
-          M0 skeleton. Lecturer listing and detail pages arrive in M1+.
-        </p>
-      </Card>
+    <div className="mx-auto max-w-7xl space-y-4">
+      {/* Page Header */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">
+            {t.lecturers.title}
+          </h1>
+          <p className="text-xs text-slate-500 sm:text-sm">
+            {t.lecturers.subtitle}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Add Lecturer Button */}
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>{locale === "vi" ? "Thêm giảng viên" : "Add Lecturer"}</span>
+          </button>
+
+        </div>
+      </div>
+
+      {/* KPI Stats Grid */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+          <span className="text-xs font-medium text-slate-500">{t.lecturers.totalUsers}</span>
+          <p className="mt-1 text-2xl font-black text-slate-800">{lecturers.length}</p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+          <span className="text-xs font-medium text-emerald-600">{t.lecturers.lecturerCount}</span>
+          <p className="mt-1 text-2xl font-black text-emerald-600">{countByRole("LECTURER")}</p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+          <span className="text-xs font-medium text-blue-600">{t.lecturers.adminCount}</span>
+          <p className="mt-1 text-2xl font-black text-[#3A5FC3]">{countByRole("ADMIN")}</p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+          <span className="text-xs font-medium text-amber-600">{t.lecturers.reviewerCount}</span>
+          <p className="mt-1 text-2xl font-black text-amber-600">{countByRole("REVIEWER")}</p>
+        </div>
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            aria-label={t.common.search}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t.lecturers.searchPlaceholder}
+            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="lecturers-role-filter" className="text-xs font-medium text-slate-500">{t.common.role}:</label>
+          <select
+            id="lecturers-role-filter"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          >
+            <option value="ALL">{t.roles.ALL}</option>
+            <option value="LECTURER">{t.roles.LECTURER}</option>
+            <option value="ADMIN">{t.roles.ADMIN}</option>
+            <option value="REVIEWER">{t.roles.REVIEWER}</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Lecturers Table */}
+      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+        <div className="relative overflow-x-auto">
+          <table aria-busy={isTableLoading} className="w-full text-left text-xs">
+            <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+              <tr>
+                <th className="px-4 py-3 font-semibold">{t.lecturers.colUser}</th>
+                <th className="px-4 py-3 font-semibold">{t.lecturers.colEmail}</th>
+                <th className="px-4 py-3 font-semibold">{t.lecturers.colDepartment}</th>
+                <th className="px-4 py-3 text-center font-semibold">{t.lecturers.colRole}</th>
+                <th className="px-4 py-3 text-center font-semibold">{t.lecturers.colStaffCode}</th>
+                <th className="px-4 py-3 text-center font-semibold">{t.common.actions}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+                      <span>{t.common.loading}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredLecturers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center gap-1">
+                      <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="font-semibold text-slate-600">{t.lecturers.noData}</span>
+                      <span className="text-[11px] text-slate-400">{t.lecturers.noDataSub}</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                paginatedLecturers.map((lec) => (
+                  <tr key={lec.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-xs">
+                          {lec.display_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <span className="font-bold text-slate-800">{lec.display_name}</span>
+                          <span className="block text-[10px] text-slate-400">
+                            {lec.academic_degree ? `${lec.academic_degree} • ` : ""}{lec.position || (locale === "vi" ? "Cán bộ giảng dạy" : "Faculty Staff")}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 font-medium text-slate-700">
+                      {lec.email}
+                    </td>
+
+                    <td className="px-4 py-3 font-medium text-slate-700">
+                      {lec.department || "Khoa CNTT"}
+                    </td>
+
+                    <td className="px-4 py-3 text-center">
+                      {renderRoleBadge(lec.role)}
+                    </td>
+
+                    <td className="px-4 py-3 text-center">
+                      <span
+                        title={lec.staff_code || lec.id}
+                        className={`${badgeClassName} border-slate-200 bg-slate-50 font-mono text-slate-700`}
+                      >
+                        <span className="truncate">
+                          {lec.staff_code || `${lec.id.slice(0, 8)}...`}
+                        </span>
+                      </span>
+                    </td>
+
+                    {/* Actions Column: [Chi tiết] [Xóa] */}
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDetailModal(lec)}
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>{locale === "vi" ? "Chi tiết" : "Detail"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDeleteModal(lec)}
+                          className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/50 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-100/70 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>{locale === "vi" ? "Xóa" : "Delete"}</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+          {isFiltering && !loading && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-[1px]">
+              <div role="status" className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-4 py-2.5 text-xs font-medium text-slate-600 shadow-sm">
+                <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3] motion-reduce:animate-none" />
+                {t.common.loading}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer info */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+          <span>
+            {t.lecturers.showing} <strong>{paginatedLecturers.length}</strong> {t.lecturers.of} {filteredLecturers.length} {t.lecturers.records}
+          </span>
+          <nav aria-label={t.lecturers.paginationLabel} className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage(currentPage - 1)}
+              disabled={isTableLoading || currentPage === 1}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {t.lecturers.previousPage}
+            </button>
+            <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
+              {t.lecturers.page} <strong>{currentPage}</strong> / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage(currentPage + 1)}
+              disabled={isTableLoading || currentPage === totalPages}
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {t.lecturers.nextPage}
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {/* ====================================================================== */}
+      {/* MODAL 1: THÊM GIẢNG VIÊN */}
+      {/* ====================================================================== */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 sm:text-lg">
+                {locale === "vi" ? "Thêm mới Giảng viên / Người dùng" : "Add New Lecturer / User"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSubmit} className="mt-4 space-y-3.5 text-xs">
+              {addError && (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-rose-700 font-medium">
+                  {addError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Họ tên */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {locale === "vi" ? "Họ và tên" : "Full Name"} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.full_name}
+                    onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })}
+                    placeholder="VD: TS. Nguyễn Văn A"
+                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {locale === "vi" ? "Email tài khoản" : "Email"} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={addForm.email}
+                    onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                    placeholder="example@ictu.edu.vn"
+                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* Mật khẩu */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {locale === "vi" ? "Mật khẩu" : "Password"} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={addForm.password}
+                    onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                    placeholder="••••••••"
+                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                  />
+                </div>
+
+                {/* Mã cán bộ */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {locale === "vi" ? "Mã cán bộ" : "Staff Code"} <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={addForm.staff_code}
+                    onChange={(e) => setAddForm({ ...addForm, staff_code: e.target.value })}
+                    placeholder="VD: CB00123"
+                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                {/* Chọn vai trò */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {locale === "vi" ? "Vai trò" : "Role"}
+                  </label>
+                  <select
+                    value={addForm.role}
+                    onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+                  >
+                    <option value="LECTURER">Giảng viên</option>
+                    <option value="ADMIN">Quản trị viên</option>
+                    <option value="REVIEWER">Phê duyệt viên</option>
+                  </select>
+                </div>
+
+                {/* Học vị */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {locale === "vi" ? "Học vị / Học hàm" : "Degree"}
+                  </label>
+                  <select
+                    value={addForm.academic_degree}
+                    onChange={(e) => setAddForm({ ...addForm, academic_degree: e.target.value })}
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+                  >
+                    <option value="Cử nhân">Cử nhân / Kỹ sư</option>
+                    <option value="Thạc sĩ">Thạc sĩ</option>
+                    <option value="Tiến sĩ">Tiến sĩ</option>
+                    <option value="TS. GVC">TS. GVC</option>
+                    <option value="PGS.TS">PGS.TS</option>
+                    <option value="GS.TS">GS.TS</option>
+                  </select>
+                </div>
+
+                {/* Bộ môn */}
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {locale === "vi" ? "Khoa" : "Department"}
+                  </label>
+                  <input
+                    type="text"
+                    value={addForm.department}
+                    onChange={(e) => setAddForm({ ...addForm, department: e.target.value })}
+                    placeholder="VD: Bộ môn KHMT"
+                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  {t.common.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] disabled:opacity-50 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>{locale === "vi" ? "Đang lưu..." : "Saving..."}</span>
+                    </>
+                  ) : (
+                    <span>{locale === "vi" ? "Tạo giảng viên" : "Create Lecturer"}</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================================== */}
+      {/* MODAL 2: CHI TIẾT & CHỈNH SỬA GIẢNG VIÊN */}
+      {/* ====================================================================== */}
+      {isDetailModalOpen && selectedLecturer && (
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="lecturer-detail-title"
+              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+            >
+              <div className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
+                <h3 id="lecturer-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
+                  {locale === "vi" ? "Chi tiết & Hiệu chỉnh Giảng viên" : "Lecturer Details & Edit"}
+                </h3>
+                <p className="mt-0.5 break-all text-[11px] text-slate-400">
+                  ID: {selectedLecturer.id}
+                </p>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col text-xs">
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-6">
+                  <section aria-labelledby="lecturer-information-heading">
+                    <h4
+                      id="lecturer-information-heading"
+                      className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
+                    >
+                      Thông tin giảng viên
+                    </h4>
+
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="edit-full-name" className="mb-1 block font-semibold text-slate-700">
+                          Họ và tên <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="edit-full-name"
+                          type="text"
+                          required
+                          disabled={isDetailBusy}
+                          value={editForm.full_name}
+                          onChange={(event) =>
+                            setEditForm({ ...editForm, full_name: event.target.value })
+                          }
+                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-email" className="mb-1 block font-semibold text-slate-700">
+                          Email <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          id="edit-email"
+                          type="email"
+                          required
+                          disabled={isDetailBusy}
+                          value={editForm.email}
+                          onChange={(event) => setEditForm({ ...editForm, email: event.target.value })}
+                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-staff-code" className="mb-1 block font-semibold text-slate-700">
+                          Mã cán bộ{selectedLecturer.lecturer_id && <span className="text-rose-500"> *</span>}
+                        </label>
+                        <input
+                          id="edit-staff-code"
+                          type="text"
+                          required={Boolean(selectedLecturer.lecturer_id)}
+                          disabled={isDetailBusy || !selectedLecturer.lecturer_id}
+                          value={editForm.staff_code}
+                          onChange={(event) =>
+                            setEditForm({ ...editForm, staff_code: event.target.value })
+                          }
+                          placeholder={selectedLecturer.lecturer_id ? undefined : "Chưa liên kết hồ sơ giảng viên"}
+                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50 disabled:text-slate-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-role" className="mb-1 block font-semibold text-slate-700">
+                          Vai trò
+                        </label>
+                        <select
+                          id="edit-role"
+                          disabled={isDetailBusy}
+                          value={editForm.role}
+                          onChange={(event) => setEditForm({ ...editForm, role: event.target.value })}
+                          className="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        >
+                          <option value="LECTURER">Giảng viên</option>
+                          <option value="ADMIN">Quản trị viên</option>
+                          <option value="REVIEWER">Phê duyệt viên</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-degree" className="mb-1 block font-semibold text-slate-700">
+                          Học vị / Học hàm
+                        </label>
+                        <select
+                          id="edit-degree"
+                          disabled={isDetailBusy || !selectedLecturer.lecturer_id}
+                          value={editForm.academic_degree}
+                          onChange={(event) =>
+                            setEditForm({ ...editForm, academic_degree: event.target.value })
+                          }
+                          className="h-9 w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        >
+                          <option value="Cử nhân">Cử nhân / Kỹ sư</option>
+                          <option value="Thạc sĩ">Thạc sĩ</option>
+                          <option value="Tiến sĩ">Tiến sĩ</option>
+                          <option value="TS. GVC">TS. GVC</option>
+                          <option value="PGS.TS">PGS.TS</option>
+                          <option value="GS.TS">GS.TS</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-department" className="mb-1 block font-semibold text-slate-700">
+                          Khoa
+                        </label>
+                        <input
+                          id="edit-department"
+                          type="text"
+                          disabled={isDetailBusy || !selectedLecturer.lecturer_id}
+                          value={editForm.department}
+                          onChange={(event) =>
+                            setEditForm({ ...editForm, department: event.target.value })
+                          }
+                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        />
+                      </div>
+                    </div>
+
+                    {editError && <p className="mt-2 text-[11px] font-medium text-rose-600">{editError}</p>}
+                  </section>
+
+                  <section
+                    aria-labelledby="system-account-heading"
+                    className="border-t border-slate-200 pt-4"
+                  >
+                    <h4
+                      id="system-account-heading"
+                      className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
+                    >
+                      Tài khoản hệ thống
+                    </h4>
+
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2.5">
+                      <span className="font-semibold text-slate-600">Trạng thái</span>
+                      <span
+                        className={`inline-flex items-center gap-1.5 font-bold ${
+                          selectedLecturer.is_active ? "text-emerald-700" : "text-rose-700"
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            selectedLecturer.is_active ? "bg-emerald-500" : "bg-rose-500"
+                          }`}
+                        />
+                        {selectedLecturer.is_active ? "Đang hoạt động" : "Đã khóa"}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label htmlFor="new-password" className="mb-1 block font-semibold text-slate-700">
+                        Mật khẩu mới
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="new-password"
+                          type={showNewPassword ? "text" : "password"}
+                          minLength={8}
+                          autoComplete="new-password"
+                          disabled={isDetailBusy || isCurrentAccount}
+                          value={newPassword}
+                          onChange={(event) => {
+                            setNewPassword(event.target.value);
+                            if (passwordError) setPasswordError("");
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              requestPasswordReset();
+                            }
+                          }}
+                          placeholder="Nhập mật khẩu mới"
+                          className={`h-9 w-full rounded-lg border px-3 pr-10 text-slate-800 focus:outline-none focus:ring-2 disabled:bg-slate-50 ${
+                            passwordError
+                              ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
+                              : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          disabled={isDetailBusy || isCurrentAccount}
+                          onClick={() => setShowNewPassword((visible) => !visible)}
+                          aria-label={showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                          className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {showNewPassword ? (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 4.2A10.7 10.7 0 0112 4c5 0 9 4 10 8a11.8 11.8 0 01-2.1 4.1M6.2 6.2A11.8 11.8 0 002 12c1 4 5 8 10 8a10.7 10.7 0 005.1-1.3" />
+                            </svg>
+                          ) : (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M2.5 12S6 5 12 5s9.5 7 9.5 7S18 19 12 19s-9.5-7-9.5-7z" />
+                              <circle cx="12" cy="12" r="3" strokeWidth="1.8" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                      {passwordError && (
+                        <p className="mt-1 text-[11px] font-medium text-rose-600">{passwordError}</p>
+                      )}
+                    </div>
+
+                    {isCurrentAccount && (
+                      <p className="mt-2 text-[11px] font-medium text-amber-700">
+                        Không thể khóa hoặc đặt lại mật khẩu tài khoản đang sử dụng.
+                      </p>
+                    )}
+
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <button
+                        type="button"
+                        disabled={isDetailBusy || isCurrentAccount}
+                        onClick={requestPasswordReset}
+                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[#3A5FC3]/30 bg-blue-50 px-3 py-2 font-bold text-[#3A5FC3] hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Đặt lại mật khẩu
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isDetailBusy || isCurrentAccount}
+                        onClick={() =>
+                          setConfirmAction(selectedLecturer.is_active ? "lock" : "unlock")
+                        }
+                        className={`inline-flex min-h-9 items-center justify-center rounded-lg border px-3 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-50 ${
+                          selectedLecturer.is_active
+                            ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                            : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        }`}
+                      >
+                        {selectedLecturer.is_active ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                      </button>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
+                  <button
+                    type="button"
+                    disabled={isDetailBusy}
+                    onClick={() => setIsDetailModalOpen(false)}
+                    className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {t.common.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isDetailBusy}
+                    className="inline-flex min-w-28 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {detailAction === "save" && (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    )}
+                    <span>{detailAction === "save" ? "Đang lưu..." : "Lưu thay đổi"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      <ConfirmModal
+        open={confirmAction !== null}
+        title={
+          confirmAction === "lock"
+            ? "Khóa tài khoản?"
+            : confirmAction === "unlock"
+              ? "Mở khóa tài khoản?"
+              : "Đặt lại mật khẩu?"
+        }
+        description={
+          confirmAction === "lock"
+            ? "Người dùng sẽ không thể đăng nhập cho đến khi tài khoản được mở khóa."
+            : confirmAction === "unlock"
+              ? "Người dùng sẽ có thể đăng nhập lại bằng thông tin đăng nhập hiện tại."
+              : "Mật khẩu đăng nhập hiện tại của người dùng sẽ không còn hiệu lực."
+        }
+        confirmLabel={
+          confirmAction === "lock"
+            ? "Khóa tài khoản"
+            : confirmAction === "unlock"
+              ? "Mở khóa tài khoản"
+              : "Đặt lại mật khẩu"
+        }
+        variant={confirmAction === "unlock" ? "primary" : "danger"}
+        loading={isDetailBusy && detailAction !== "save"}
+        onConfirm={handleSecurityAction}
+        onCancel={() => {
+          if (!isDetailBusy) setConfirmAction(null);
+        }}
+      />
+
+      {/* ====================================================================== */}
+      {/* MODAL 3: XÁC NHẬN XÓA GIẢNG VIÊN */}
+      {/* ====================================================================== */}
+      {isDeleteModalOpen && selectedLecturer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {locale === "vi" ? "Xác nhận xóa giảng viên" : "Confirm Lecturer Deletion"}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {locale === "vi" ? "Hành động này không thể hoàn tác." : "This action cannot be undone."}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-3 text-xs text-slate-700">
+              <p className="font-semibold text-slate-900">{selectedLecturer.display_name}</p>
+              <p className="text-slate-500 mt-0.5">{selectedLecturer.email}</p>
+              {selectedLecturer.staff_code && (
+                <p className="text-slate-400 text-[11px] mt-1 font-mono">Mã CB: {selectedLecturer.staff_code}</p>
+              )}
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                {t.common.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleDeleteConfirm}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span>{locale === "vi" ? "Đang xóa..." : "Deleting..."}</span>
+                  </>
+                ) : (
+                  <span>{locale === "vi" ? "Xác nhận xóa" : "Confirm Delete"}</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

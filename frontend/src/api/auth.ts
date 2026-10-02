@@ -22,7 +22,11 @@ export interface LogoutResponse {
 }
 
 export async function login(credentials: LoginCredentials): Promise<User> {
-  return apiPost<User, LoginCredentials>("/api/v1/auth/login", credentials);
+  return apiPost<User, LoginCredentials>("/api/v1/auth/login", credentials, {
+    // Login errors are mapped by the form and must not tear down a different
+    // session through the global protected-request handler.
+    skipGlobalAuthHandling: true,
+  });
 }
 
 export async function getCurrentUser(): Promise<User> {
@@ -30,5 +34,7 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 export async function logout(): Promise<LogoutResponse> {
-  return apiPost<LogoutResponse>("/api/v1/auth/logout");
+  return apiPost<LogoutResponse>("/api/v1/auth/logout", undefined, {
+    skipGlobalAuthHandling: true,
+  });
 }
