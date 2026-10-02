@@ -13,9 +13,15 @@ password contains characters such as `@`, `:`, `/`, or `?`.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+LOCAL_ENV_FILE = BACKEND_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -31,29 +37,23 @@ class Settings(BaseSettings):
     # Database — components only (no full URL committed to source).
     # The composed URL is exposed via the `database_url` computed field.
     # ------------------------------------------------------------------
-    db_user: str = Field("postgres", validation_alias="DB_USER")
-    db_password: str = Field("postgres", validation_alias="DB_PASSWORD")
-    db_host: str = Field("localhost", validation_alias="DB_HOST")
+    db_user: str = Field(..., validation_alias="DB_USER")
+    db_password: str = Field(..., validation_alias="DB_PASSWORD")
+    db_host: str = Field(..., validation_alias="DB_HOST")
     db_port: int = Field(5432, validation_alias="DB_PORT")
-    db_name: str = Field("scopus_ictu", validation_alias="DB_NAME")
+    db_name: str = Field(..., validation_alias="DB_NAME")
     db_driver: str = Field("postgresql+psycopg2", validation_alias="DB_DRIVER")
 
     # ------------------------------------------------------------------
     # CORS — comma-separated list sourced from environment.
     # MUST NOT be hard-coded origins in source.
     # ------------------------------------------------------------------
-    backend_cors_origins: str = Field(
-        "http://localhost:5173,http://127.0.0.1:5173",
-        validation_alias="BACKEND_CORS_ORIGINS",
-    )
+    backend_cors_origins: str = Field(..., validation_alias="BACKEND_CORS_ORIGINS")
 
     # ------------------------------------------------------------------
     # Security — JWT secret key and token expiration.
     # ------------------------------------------------------------------
-    secret_key: str = Field(
-        "insecure-dev-secret-key-change-in-production",
-        validation_alias="SECRET_KEY",
-    )
+    secret_key: str = Field(..., validation_alias="SECRET_KEY")
     access_token_expire_minutes: int = Field(
         60, validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Environment flag — local | dev | prod.
     # ------------------------------------------------------------------
-    environment: str = Field("local", validation_alias="ENVIRONMENT")
+    environment: str = Field(..., validation_alias="ENVIRONMENT")
 
     # ------------------------------------------------------------------
     # Offline file paths (never HTTP URLs).
@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(LOCAL_ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,

@@ -79,6 +79,9 @@ class User(Base):
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("1")
     )
+    auth_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("1")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
@@ -89,6 +92,9 @@ class User(Base):
     __table_args__ = (
         # CHECK (version >= 1) — FC-01: ck_users_version
         CheckConstraint("version >= 1", name="version"),
+        # Security-session version is intentionally independent from the
+        # optimistic-locking ``version`` column.
+        CheckConstraint("auth_version >= 1", name="auth_version"),
         # CHECK (btrim(email) <> '') — FC-01: ck_users_email_not_empty
         CheckConstraint("btrim(email) <> ''", name="email_not_empty"),
         # CHECK (btrim(display_name) <> '') — FC-01: ck_users_display_name_not_empty
@@ -125,6 +131,73 @@ class User(Base):
 
 
 # ---------------------------------------------------------------------------
+# user_notifications - Persistent per-user application notifications
+# ---------------------------------------------------------------------------
+class UserNotification(Base):
+    """Persistent notification delivered to exactly one application user."""
+
+    __tablename__ = "user_notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    notification_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    # ``metadata`` is reserved by SQLAlchemy's declarative base, so the Python
+    # attribute is safely aliased while preserving the physical column name.
+    notification_metadata: Mapped[dict] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "notification_type IN ("
+            "'PROFILE_UPDATED', 'ROLE_CHANGED', 'ACCOUNT_LOCKED', "
+            "'ACCOUNT_UNLOCKED', 'PASSWORD_RESET'"
+            ")",
+            name="notification_type",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(metadata) = 'object'",
+            name="metadata_object",
+        ),
+        CheckConstraint(
+            "(is_read = FALSE AND read_at IS NULL) OR "
+            "(is_read = TRUE AND read_at IS NOT NULL)",
+            name="read_consistency",
+        ),
+        Index("ix_user_notifications_user_id", "user_id"),
+        Index("ix_user_notifications_created_at", "created_at"),
+        Index(
+            "ix_user_notifications_unread_lookup",
+            "user_id",
+            "is_read",
+            "created_at",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
 # 15. audit_events — Append-only
 # ---------------------------------------------------------------------------
 class AuditEvent(Base):
@@ -151,8 +224,17 @@ class AuditEvent(Base):
         nullable=True,
     )
     actor_service: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    before_state: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    after_state: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Nullable audit snapshots must be stored as SQL NULL.  PostgreSQL's
+    # ``jsonb_typeof`` returns SQL NULL for the JSON literal ``null``, which
+    # does not satisfy the table's ``... IS NULL OR jsonb_typeof(...) =
+    # 'object'`` checks.  SQLAlchemy's JSON types default to persisting Python
+    # ``None`` as JSON ``null``, so opt into SQL NULL explicitly.
+    before_state: Mapped[dict | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
+    after_state: Mapped[dict | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     request_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     correlation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
@@ -164,7 +246,7 @@ class AuditEvent(Base):
     # is aliased to ``event_metadata`` to avoid colliding with
     # ``DeclarativeBase.metadata``. The DB column is NOT renamed.
     event_metadata: Mapped[dict | None] = mapped_column(
-        "metadata", JSONB, nullable=True
+        "metadata", JSONB(none_as_null=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
