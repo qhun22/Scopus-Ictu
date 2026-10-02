@@ -562,4 +562,3 @@ def test_31_lock_unlock_supersedes_stale_lock_notification(mock_db: MagicMock) -
     unlock_notif = next((o for o in added_objects if isinstance(o, UserNotification) and o.notification_type == "ACCOUNT_UNLOCKED"), None)
     assert unlock_notif is not None
     assert unlock_notif.is_read is False
-
