@@ -1,9 +1,12 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { I18nProvider } from "./i18n";
 import ProtectedRoute from "./components/ProtectedRoute";
-import MainLayout from "./layouts/MainLayout";
+import RoleRoute from "./components/auth/RoleRoute";
+import AppLayout from "./layouts/AppLayout";
 import LoginPage from "./pages/Login";
 import HomePage from "./pages/Home";
 import DashboardPage from "./pages/Dashboard";
@@ -12,6 +15,7 @@ import ImportsPage from "./pages/Imports";
 import PublicationsPage from "./pages/Publications";
 import ApprovalQueuePage from "./pages/ApprovalQueue";
 import AuditLogsPage from "./pages/AuditLogs";
+import PlaceholderPage from "./components/common/PlaceholderPage";
 import PageLoadingBar from "./components/PageLoadingBar";
 
 function RootRedirect() {
@@ -28,30 +32,79 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <PageLoadingBar />
-        <Routes>
+    <I18nProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <PageLoadingBar />
+            <Routes>
+          {/* Public Routes */}
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Protected Routes */}
+          {/* Authenticated Application Shell */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/home" element={<HomePage />} />
+            <Route element={<AppLayout />}>
+              {/* Universal landing route */}
+              <Route path="/home" element={<HomePage />} />
+              <Route path="/publications" element={<PublicationsPage />} />
+              <Route
+                path="/search"
+                element={
+                  <PlaceholderPage
+                    title="Tra cứu thông tin"
+                    description="Hệ thống tra cứu tổng hợp giảng viên, công bố Scopus và mã định danh đang được cập nhật."
+                  />
+                }
+              />
 
-            <Route element={<MainLayout />}>
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="lecturers" element={<LecturersPage />} />
-              <Route path="imports" element={<ImportsPage />} />
-              <Route path="publications" element={<PublicationsPage />} />
-              <Route path="approval-queue" element={<ApprovalQueuePage />} />
-              <Route path="audit-logs" element={<AuditLogsPage />} />
+              {/* Lecturer Routes */}
+              <Route element={<RoleRoute allowedRoles={["LECTURER", "ADMIN"]} />}>
+                <Route
+                  path="/profile"
+                  element={<PlaceholderPage title="Hồ sơ cá nhân" icon="profile" />}
+                />
+                <Route
+                  path="/my-publications"
+                  element={<PlaceholderPage title="Công bố của tôi" icon="publication" />}
+                />
+                <Route
+                  path="/identity"
+                  element={<PlaceholderPage title="Liên kết Scopus" icon="identity" />}
+                />
+              </Route>
+
+              {/* Reviewer Routes */}
+              <Route element={<RoleRoute allowedRoles={["REVIEWER", "ADMIN"]} />}>
+                <Route path="/reviews" element={<ApprovalQueuePage />} />
+                <Route path="/approval-queue" element={<ApprovalQueuePage />} />
+                <Route
+                  path="/review-history"
+                  element={<PlaceholderPage title="Lịch sử review" icon="history" />}
+                />
+              </Route>
+
+              {/* Admin Routes */}
+              <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/imports" element={<ImportsPage />} />
+                <Route path="/lecturers" element={<LecturersPage />} />
+                <Route path="/users" element={<Navigate to="/lecturers" replace />} />
+                <Route path="/audit-logs" element={<AuditLogsPage />} />
+                <Route
+                  path="/tasks"
+                  element={<PlaceholderPage title="Tác vụ hệ thống" icon="tasks" />}
+                />
+              </Route>
             </Route>
           </Route>
 
+          {/* Catch-all route */}
           <Route path="*" element={<RootRedirect />} />
-        </Routes>
-      </AuthProvider>
-    </ToastProvider>
+            </Routes>
+          </NotificationProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </I18nProvider>
   );
 }
