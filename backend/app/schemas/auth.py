@@ -35,6 +35,7 @@ class TokenPayload(BaseModel):
     sub: str
     email: str
     role: str
+    av: int
     exp: int
     iat: int | None = None
 

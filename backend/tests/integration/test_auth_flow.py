@@ -130,7 +130,8 @@ def test_login_unknown_email(client: TestClient, mock_db: MagicMock) -> None:
         json={"email": "unknown@gmail.com", "password": "AnyPassword"},
     )
     assert response.status_code == 401
-    assert "Email hoặc mật khẩu không chính xác" in response.json()["detail"]
+    assert "Email hoặc mật khẩu không đúng." in response.json()["detail"]
+    assert response.json().get("code") == "INVALID_CREDENTIALS"
 
 
 def test_login_wrong_password(client: TestClient, mock_db: MagicMock) -> None:
@@ -141,16 +142,18 @@ def test_login_wrong_password(client: TestClient, mock_db: MagicMock) -> None:
         password_hash=password_hasher.hash("CorrectPassword"),
         display_name="Quản trị viên",
         role="ADMIN",
+        auth_version=1,
         is_active=True,
     )
-    mock_db.query.return_value.filter.return_value.first.return_value = user
+    mock_db.query.return_value.filter.return_value.first.side_effect = [user, None]
 
     response = client.post(
         "/api/v1/auth/login",
         json={"email": "admin@gmail.com", "password": "WrongPassword"},
     )
     assert response.status_code == 401
-    assert "Email hoặc mật khẩu không chính xác" in response.json()["detail"]
+    assert "Email hoặc mật khẩu không đúng." in response.json()["detail"]
+    assert response.json().get("code") == "INVALID_CREDENTIALS"
 
 
 def test_login_inactive_user(client: TestClient, mock_db: MagicMock) -> None:
@@ -162,6 +165,7 @@ def test_login_inactive_user(client: TestClient, mock_db: MagicMock) -> None:
         display_name="Inactive User",
         role="LECTURER",
         lecturer_id=uuid.uuid4(),
+        auth_version=1,
         is_active=False,
     )
     mock_db.query.return_value.filter.return_value.first.return_value = user
@@ -171,7 +175,8 @@ def test_login_inactive_user(client: TestClient, mock_db: MagicMock) -> None:
         json={"email": "inactive@gmail.com", "password": "ValidPassword"},
     )
     assert response.status_code == 403
-    assert "vô hiệu hóa" in response.json()["detail"]
+    assert "Tài khoản đang bị khóa." in response.json()["detail"]
+    assert response.json().get("code") == "ACCOUNT_LOCKED"
 
 
 def test_me_and_logout_flow(client: TestClient, mock_db: MagicMock) -> None:

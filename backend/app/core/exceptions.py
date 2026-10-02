@@ -6,6 +6,9 @@ Implementations come in M1+.
 
 from __future__ import annotations
 
+from fastapi import HTTPException, Request
+from fastapi.responses import JSONResponse
+
 
 class ScopusIctuError(Exception):
     """Base exception for the application."""
@@ -53,3 +56,28 @@ class DSpaceSnapshotError(ScopusIctuError):
     """Raised when an ICTU DSpace snapshot operation fails."""
 
     pass
+
+
+class APIError(HTTPException):
+    """HTTP error with a stable, flat machine-readable error code."""
+
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        detail: str,
+        code: str,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        super().__init__(status_code=status_code, detail=detail, headers=headers)
+        self.code = code
+
+
+async def api_error_handler(_request: Request, exc: APIError) -> JSONResponse:
+    """Render the public error envelope used by API clients."""
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": exc.code},
+        headers=exc.headers,
+    )
