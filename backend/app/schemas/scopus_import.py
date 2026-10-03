@@ -9,6 +9,29 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+NormalizationSummary = Literal[
+    "canonical_new",
+    "canonical_existing",
+    "canonical_metadata_changed",
+    "canonical_failed",
+    "canonical_processed",
+    "canonical_intra_duplicate",
+]
+
+
+class NormalizationData(BaseModel):
+    """Normalization counters for a completed Scopus import (M2.6A)."""
+
+    status: Literal["NORMALIZING", "COMPLETED", "CANCELLED", "FAILED"] = "COMPLETED"
+    total_records: int = 0
+    progress_percent: int = Field(default=0, ge=0, le=100)
+    canonical_new: int = 0
+    canonical_existing: int = 0
+    canonical_metadata_changed: int = 0
+    canonical_failed: int = 0
+    canonical_processed: int = 0
+    canonical_intra_duplicate: int = 0
+
 ImportStatus = Literal[
     "RECEIVED",
     "PARSING",
@@ -44,6 +67,7 @@ class ScopusImportResponse(BaseModel):
     duplicate_candidates: int = 0
     row_errors: list[dict] = Field(default_factory=list)
     error_summary: dict | None = None
+    normalization: NormalizationData | None = None
     version: int = 1
     created_at: datetime
     updated_at: datetime
@@ -75,19 +99,32 @@ class ScopusImportConfigResponse(BaseModel):
 
 
 class ImportStatusResponse(BaseModel):
-    import_id: uuid.UUID
     current_stage: str
     progress_pct: int = 0
     errors: list[str] = Field(default_factory=list)
 
 
+class NormalizationResponse(BaseModel):
+    """Response returned after normalizing a Scopus import."""
+
+    import_id: uuid.UUID
+    canonical_new: int
+    canonical_existing: int
+    canonical_metadata_changed: int
+    canonical_failed: int
+    canonical_processed: int
+    canonical_intra_duplicate: int
+
+
 __all__ = [
     "ImportStatus",
     "ImportStatusResponse",
+    "ImportType",
+    "NormalizationData",
+    "NormalizationResponse",
+    "ScopusImportConfigResponse",
     "ScopusImportBase",
     "ScopusImportCreate",
-    "ImportType",
-    "ScopusImportConfigResponse",
     "ScopusImportListResponse",
     "ScopusImportResponse",
     "UnifiedImportStats",

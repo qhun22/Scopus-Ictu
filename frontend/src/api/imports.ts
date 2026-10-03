@@ -10,6 +10,18 @@ export type ImportStatus =
   | "CANCELLED"
   | "IMPORTED";
 
+export interface NormalizationData {
+  status: "NORMALIZING" | "COMPLETED" | "CANCELLED" | "FAILED";
+  total_records: number;
+  progress_percent: number;
+  canonical_new: number;
+  canonical_existing: number;
+  canonical_metadata_changed: number;
+  canonical_failed: number;
+  canonical_processed: number;
+  canonical_intra_duplicate: number;
+}
+
 export interface LecturerImportSummaryData {
   created?: number;
   updated?: number;
@@ -33,6 +45,7 @@ export interface ScopusImport {
   duplicate_candidates: number;
   row_errors: Array<{ row_number?: number; code?: string; message?: string }>;
   error_summary: Record<string, unknown> | null;
+  normalization: NormalizationData | null;
   version: number;
   created_at: string;
   updated_at: string;
@@ -92,4 +105,8 @@ export function deleteImport(id: string): Promise<{ message: string; id: string 
 
 export function rollbackLecturerImport(id: string): Promise<{ message: string; id: string }> {
   return apiPost<{ message: string; id: string }>(`/api/v1/imports/${id}/rollback`);
+}
+
+export function normalizeImport(id: string): Promise<ScopusImport> {
+  return apiPost<ScopusImport>(`/api/v1/imports/${id}/normalize`);
 }
