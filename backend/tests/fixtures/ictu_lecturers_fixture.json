@@ -1,0 +1,100 @@
+{
+  "dataset": {
+    "name": "ICTU Lecturer Master Dataset (Fixture)",
+    "schema_version": "1.0",
+    "institution": "Thai Nguyen University of Information and Communication Technology (ICTU)",
+    "source": "synthetic test fixture",
+    "source_url": "https://example.invalid/ictu_lecturers_fixture.json",
+    "source_system": "test_fixture",
+    "generated_at": "2026-10-02T00:00:00+00:00",
+    "parser_version": "ictu_en_lecturers_parser/test-fixture/1.0",
+    "record_count": 5
+  },
+  "lecturers": [
+    {
+      "full_name": "Nguyen Van Test A",
+      "institutional_email": "test.a@example.invalid",
+      "tel": "0900000001",
+      "academic_degree": "TS",
+      "academic_rank": null,
+      "position": "Lecturer",
+      "faculty": "Faculty of Information Technology",
+      "department": "Department of Computer Science",
+      "staff_code": "ICTU-TEST-A-001",
+      "orcid": null,
+      "is_active": true,
+      "provenance": {
+        "source_name": "test fixture",
+        "source_system": "test_fixture",
+        "source_urls": ["https://example.invalid/ictu_lecturers_fixture.json"],
+        "source_record_id": null,
+        "retrieved_at": "2026-10-02T00:00:00+00:00"
+      },
+      "known_publications": []
+    },
+    {
+      "full_name": "Nguyen Van Test B",
+      "institutional_email": "test.b@example.invalid",
+      "academic_degree": "ThS",
+      "position": "Lecturer",
+      "faculty": "Faculty of Information Technology",
+      "department": "Department of Software engineering",
+      "staff_code": "ICTU-TEST-B-001",
+      "is_active": true,
+      "provenance": {
+        "source_name": "test fixture",
+        "source_system": "test_fixture",
+        "source_urls": ["https://example.invalid/ictu_lecturers_fixture.json"]
+      },
+      "known_publications": []
+    },
+    {
+      "full_name": "Tran Thi Test C",
+      "institutional_email": "test.c@example.invalid",
+      "academic_degree": "KS",
+      "position": "Lab Lecturer",
+      "faculty": "Faculty of Information Technology",
+      "department": "Department of Software engineering",
+      "staff_code": "ICTU-TEST-C-001",
+      "is_active": true,
+      "provenance": {
+        "source_name": "test fixture",
+        "source_system": "test_fixture",
+        "source_urls": ["https://example.invalid/ictu_lecturers_fixture.json"]
+      },
+      "known_publications": []
+    },
+    {
+      "full_name": "Le Van Test D",
+      "institutional_email": "test.d@example.invalid",
+      "academic_degree": "TS",
+      "position": "Vice Head, Lecturer",
+      "faculty": "Faculty of Information Technology",
+      "department": "Department of Computer Science",
+      "staff_code": "ICTU-TEST-D-001",
+      "is_active": true,
+      "provenance": {
+        "source_name": "test fixture",
+        "source_system": "test_fixture",
+        "source_urls": ["https://example.invalid/ictu_lecturers_fixture.json"]
+      },
+      "known_publications": []
+    },
+    {
+      "full_name": "Pham Thi Test E",
+      "institutional_email": "test.e@example.invalid",
+      "academic_degree": "ThS",
+      "position": "Senior Lecturer",
+      "faculty": "Faculty of Information Technology",
+      "department": "Department of Software engineering",
+      "staff_code": "ICTU-TEST-E-001",
+      "is_active": true,
+      "provenance": {
+        "source_name": "test fixture",
+        "source_system": "test_fixture",
+        "source_urls": ["https://example.invalid/ictu_lecturers_fixture.json"]
+      },
+      "known_publications": []
+    }
+  ]
+}

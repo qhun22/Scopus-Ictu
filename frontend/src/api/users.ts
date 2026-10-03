@@ -6,6 +6,10 @@ export async function getUsers(): Promise<User[]> {
   return apiGet<User[]>("/api/v1/users");
 }
 
+export function getUser(id: string): Promise<LecturerUser> {
+  return apiGet<LecturerUser>(`/api/v1/users/${id}`);
+}
+
 export interface UpdateUserPayload {
   version: number;
   display_name?: string;

@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-10-02T02:30:35+00:00",
+  "source": {
+    "name": "ICTU official DSpace repository — lecturer archive (Vietnamese)",
+    "url": "https://repository.ictu.edu.vn/giang-vien/",
+    "system": "ictu_dspace_archive",
+    "raw_snapshot_path": "data\\lecturers\\raw\\ictu_lecturers_archive_snapshot.html",
+    "raw_snapshot_sha256": "9d7efb39505c3e082e82895b6c52e31c15748096203ec06c4f6f32d83e9ec4c3",
+    "retrieved_at": "2026-10-02T02:24:04.342391+00:00"
+  },
+  "counts": {
+    "source_records": 410,
+    "extracted_records": 410,
+    "unique_records": 410,
+    "valid_records": 410,
+    "invalid_records": 0,
+    "duplicate_candidates": 9,
+    "expected_in_directive": 410,
+    "expected_in_builder": 410,
+    "count_matches_expected": true
+  },
+  "field_coverage": {
+    "staff_code": 0,
+    "institutional_email": 410,
+    "tel": 0,
+    "academic_degree": 360,
+    "academic_rank": 8,
+    "position": 4,
+    "faculty": 0,
+    "department": 0,
+    "profile_url": 410,
+    "orcid": 0,
+    "known_publications": 0,
+    "pct": {
+      "staff_code": 0.0,
+      "institutional_email": 100.0,
+      "tel": 0.0,
+      "academic_degree": 87.8,
+      "academic_rank": 2.0,
+      "position": 1.0,
+      "faculty": 0.0,
+      "department": 0.0,
+      "profile_url": 100.0,
+      "orcid": 0.0,
+      "known_publications": 0.0
+    }
+  },
+  "records_with_known_publications": 0,
+  "known_publication_source": "none (source page does not publish per-lecturer publication lists)",
+  "privacy_check": {
+    "password_present": false,
+    "password_hash_present": false,
+    "token_present": false,
+    "secret_present": false,
+    "citizen_id_present": false,
+    "home_address_present": false
+  },
+  "milestone": "M2.5A",
+  "final_status": "DATASET_COUNT_PASS",
+  "final_status_reason": "DSpace archive published exactly 410 lecturer cards; matches the directive's expected 410 count.",
+  "dataset_sha256": "a2c326f98b5eaf4a690f4719110fda69470f62031363a4c47a90517a3258f1b9"
+}

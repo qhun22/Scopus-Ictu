@@ -1,0 +1,151 @@
+{
+  "dataset": {
+    "name": "ICTU Lecturer Master Dataset (Example)",
+    "schema_version": "1.0",
+    "institution": "Thai Nguyen University of Information and Communication Technology (ICTU)",
+    "source": "ICTU official DSpace repository — lecturer archive (Vietnamese)",
+    "source_url": "https://repository.ictu.edu.vn/giang-vien/",
+    "source_system": "ictu_dspace_archive",
+    "generated_at": "2026-10-02T02:30:35.969932+00:00",
+    "parser_version": "ictu_dspace_archive_parser/1.0",
+    "record_count": 5,
+    "is_example": true
+  },
+  "lecturers": [
+    {
+      "source_id": "https://repository.ictu.edu.vn/giang-vien/bui-thi-kim-thai/",
+      "staff_code": null,
+      "full_name": "DH. Bùi Thị Kim Thái",
+      "institutional_email": "btkthai@ictu.edu.vn",
+      "tel": null,
+      "academic_degree": "CN",
+      "academic_rank": null,
+      "position": null,
+      "faculty": null,
+      "department": null,
+      "profile_url": "https://repository.ictu.edu.vn/giang-vien/bui-thi-kim-thai/",
+      "orcid": null,
+      "is_active": true,
+      "provenance": {
+        "source_name": "ICTU official DSpace repository — lecturer archive (Vietnamese)",
+        "source_system": "ictu_dspace_archive",
+        "source_urls": [
+          "https://repository.ictu.edu.vn/giang-vien/"
+        ],
+        "source_record_id": "https://repository.ictu.edu.vn/giang-vien/bui-thi-kim-thai/",
+        "retrieved_at": "2026-10-02T02:24:04.342391+00:00",
+        "parser_version": "ictu_dspace_archive_parser/1.0",
+        "known_specialisation": "Thông tin Thư viện"
+      },
+      "known_publications": []
+    },
+    {
+      "source_id": "https://repository.ictu.edu.vn/giang-vien/bui-thi-ngoc-chau/",
+      "staff_code": null,
+      "full_name": "DH. Bùi Thị Ngọc Châu",
+      "institutional_email": "btnchau@ictu.edu.vn",
+      "tel": null,
+      "academic_degree": "CN",
+      "academic_rank": null,
+      "position": null,
+      "faculty": null,
+      "department": null,
+      "profile_url": "https://repository.ictu.edu.vn/giang-vien/bui-thi-ngoc-chau/",
+      "orcid": null,
+      "is_active": true,
+      "provenance": {
+        "source_name": "ICTU official DSpace repository — lecturer archive (Vietnamese)",
+        "source_system": "ictu_dspace_archive",
+        "source_urls": [
+          "https://repository.ictu.edu.vn/giang-vien/"
+        ],
+        "source_record_id": "https://repository.ictu.edu.vn/giang-vien/bui-thi-ngoc-chau/",
+        "retrieved_at": "2026-10-02T02:24:04.342391+00:00",
+        "parser_version": "ictu_dspace_archive_parser/1.0",
+        "known_specialisation": "Quản trị kinh doanh"
+      },
+      "known_publications": []
+    },
+    {
+      "source_id": "https://repository.ictu.edu.vn/giang-vien/cam-thi-thu-thuong/",
+      "staff_code": null,
+      "full_name": "DH. Cam Thị Thu Thương",
+      "institutional_email": "ctthuong@ictu.edu.vn",
+      "tel": null,
+      "academic_degree": "CN",
+      "academic_rank": null,
+      "position": null,
+      "faculty": null,
+      "department": null,
+      "profile_url": "https://repository.ictu.edu.vn/giang-vien/cam-thi-thu-thuong/",
+      "orcid": null,
+      "is_active": true,
+      "provenance": {
+        "source_name": "ICTU official DSpace repository — lecturer archive (Vietnamese)",
+        "source_system": "ictu_dspace_archive",
+        "source_urls": [
+          "https://repository.ictu.edu.vn/giang-vien/"
+        ],
+        "source_record_id": "https://repository.ictu.edu.vn/giang-vien/cam-thi-thu-thuong/",
+        "retrieved_at": "2026-10-02T02:24:04.342391+00:00",
+        "parser_version": "ictu_dspace_archive_parser/1.0",
+        "known_specialisation": "CNTT"
+      },
+      "known_publications": []
+    },
+    {
+      "source_id": "https://repository.ictu.edu.vn/giang-vien/duong-minh-quoc/",
+      "staff_code": null,
+      "full_name": "DH. Dương Minh Quốc",
+      "institutional_email": "dmquoc@ictu.edu.vn",
+      "tel": null,
+      "academic_degree": "CN",
+      "academic_rank": null,
+      "position": null,
+      "faculty": null,
+      "department": null,
+      "profile_url": "https://repository.ictu.edu.vn/giang-vien/duong-minh-quoc/",
+      "orcid": null,
+      "is_active": true,
+      "provenance": {
+        "source_name": "ICTU official DSpace repository — lecturer archive (Vietnamese)",
+        "source_system": "ictu_dspace_archive",
+        "source_urls": [
+          "https://repository.ictu.edu.vn/giang-vien/"
+        ],
+        "source_record_id": "https://repository.ictu.edu.vn/giang-vien/duong-minh-quoc/",
+        "retrieved_at": "2026-10-02T02:24:04.342391+00:00",
+        "parser_version": "ictu_dspace_archive_parser/1.0",
+        "known_specialisation": "CNTT"
+      },
+      "known_publications": []
+    },
+    {
+      "source_id": "https://repository.ictu.edu.vn/giang-vien/duong-van-tai/",
+      "staff_code": null,
+      "full_name": "DH. Dương Văn Tài",
+      "institutional_email": "dvtai@ictu.edu.vn",
+      "tel": null,
+      "academic_degree": "CN",
+      "academic_rank": null,
+      "position": null,
+      "faculty": null,
+      "department": null,
+      "profile_url": "https://repository.ictu.edu.vn/giang-vien/duong-van-tai/",
+      "orcid": null,
+      "is_active": true,
+      "provenance": {
+        "source_name": "ICTU official DSpace repository — lecturer archive (Vietnamese)",
+        "source_system": "ictu_dspace_archive",
+        "source_urls": [
+          "https://repository.ictu.edu.vn/giang-vien/"
+        ],
+        "source_record_id": "https://repository.ictu.edu.vn/giang-vien/duong-van-tai/",
+        "retrieved_at": "2026-10-02T02:24:04.342391+00:00",
+        "parser_version": "ictu_dspace_archive_parser/1.0",
+        "known_specialisation": "CNTT"
+      },
+      "known_publications": []
+    }
+  ]
+}

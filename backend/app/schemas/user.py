@@ -53,6 +53,8 @@ class UserAdminResponse(BaseModel):
     version: int
     created_at: datetime
     updated_at: datetime
+    has_warning: bool = False
+    warning_reason: str | None = None
 
 
 class PasswordResetResponse(BaseModel):
