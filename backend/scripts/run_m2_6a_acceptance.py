@@ -1,18 +1,21 @@
 """Run the M2.6A acceptance checks against the configured local PostgreSQL DB.
 
-This intentionally uses the real import service and the repository's current
-660-row CSV.  It does not delete canonical or raw data after the run because
-the resulting rows are the requested local acceptance/provenance dataset.
+This intentionally uses the real import service and an explicitly supplied
+local CSV. It does not delete canonical or raw data after the run because the
+resulting rows are the requested local acceptance/provenance dataset.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+import app.models  # noqa: F401 - register the complete metadata
+from app.core.config import settings
 from app.core.database import get_session_factory
 from app.core.exceptions import APIError
 from app.models.governance import User
@@ -25,13 +28,6 @@ from app.services.scopus_import_service import (
     process_import_job,
 )
 
-
-DATASET = (
-    Path(__file__).resolve().parents[2]
-    / "data"
-    / "scopus"
-    / "Truong_Quang_Huy_Scopus_Sep2026.csv"
-)
 ACCEPTANCE_EMAIL = "m2.6a-acceptance@local.invalid"
 
 
@@ -75,7 +71,17 @@ def _summary(db, import_id: uuid.UUID) -> dict:
 
 
 def main() -> None:
-    content = DATASET.read_bytes()
+    if settings.environment.lower() == "prod":
+        raise SystemExit("Refusing acceptance execution in ENVIRONMENT=prod.")
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", type=Path, required=True)
+    args = parser.parse_args()
+    dataset = args.dataset.expanduser()
+    if not dataset.is_file():
+        raise SystemExit(f"Dataset file not found: {dataset}")
+
+    content = dataset.read_bytes()
     factory = get_session_factory()
     with factory() as db:
         admin = _admin(db)
@@ -83,7 +89,7 @@ def main() -> None:
 
         first = create_import_job(
             db,
-            filename=DATASET.name,
+            filename=dataset.name,
             content=content,
             actor=admin,
             allow_duplicate=True,
@@ -97,7 +103,7 @@ def main() -> None:
 
         duplicate = create_import_job(
             db,
-            filename=DATASET.name,
+            filename=dataset.name,
             content=content,
             actor=admin,
             allow_duplicate=True,
@@ -167,7 +173,7 @@ def main() -> None:
             }
 
         report = {
-            "dataset": str(DATASET),
+            "dataset": dataset.name,
             "dataset_bytes": len(content),
             "before": before,
             "first_import_id": str(first.id),
