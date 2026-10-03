@@ -2,7 +2,7 @@ import { Card } from "antd";
 
 export default function AuditLogsPage() {
   return (
-    <div className="space-y-4">
+    <div className="app-page-container space-y-4 sm:space-y-5">
       <h1 className="text-2xl font-semibold">Audit Logs</h1>
       <Card>
         <p className="text-gray-600">

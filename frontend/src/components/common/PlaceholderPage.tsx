@@ -59,7 +59,7 @@ export default function PlaceholderPage({
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
+    <div className="app-page-container max-w-4xl p-4 sm:p-6 lg:p-8">
       <div className="rounded-2xl border border-slate-200/80 bg-white p-8 sm:p-12 shadow-sm text-center">
         <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-50 shadow-inner border border-slate-100">
           {renderIcon()}

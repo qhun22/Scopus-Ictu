@@ -386,7 +386,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="app-page-container space-y-4 sm:space-y-5">
       {/* ====================================================================== */}
       {/* 1. WELCOME BANNER */}
       {/* ====================================================================== */}
@@ -470,7 +470,7 @@ export default function HomePage() {
           </h2>
         </div>
 
-        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${role === "ADMIN" ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${role === "ADMIN" ? "xl:grid-cols-4 lg:grid-cols-2" : "lg:grid-cols-3"} sm:gap-4`}>
           {overviewCards.map((card) => (
             <Link
               key={card.to + card.title}
