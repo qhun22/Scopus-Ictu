@@ -55,6 +55,13 @@ export interface ScopusImport {
   is_terminal: boolean;
   performed_by: string | null;
   can_delete?: boolean;
+  // M2.6A follow-up: truthful import usage state.
+  in_use?: boolean;
+  archived?: boolean;
+  usage?: {
+    publication_source_links: number;
+    author_variant_links: number;
+  };
   scopus_summary?: Record<string, unknown> | null;
   lecturer_summary?: LecturerImportSummaryData | null;
 }
@@ -80,8 +87,11 @@ export function getImportConfig(): Promise<ImportConfig> {
   return apiGet<ImportConfig>("/api/v1/imports/config");
 }
 
-export function getImportHistory(): Promise<ImportHistoryResponse> {
-  return apiGet<ImportHistoryResponse>("/api/v1/imports");
+export function getImportHistory(
+  includeArchived = false,
+): Promise<ImportHistoryResponse> {
+  const query = includeArchived ? "?include_archived=true" : "";
+  return apiGet<ImportHistoryResponse>(`/api/v1/imports${query}`);
 }
 
 export function getImportDetail(id: string): Promise<ScopusImport> {
@@ -109,4 +119,12 @@ export function rollbackLecturerImport(id: string): Promise<{ message: string; i
 
 export function normalizeImport(id: string): Promise<ScopusImport> {
   return apiPost<ScopusImport>(`/api/v1/imports/${id}/normalize`);
+}
+
+export function archiveImport(id: string): Promise<ScopusImport> {
+  return apiPost<ScopusImport>(`/api/v1/imports/${id}/archive`);
+}
+
+export function restoreImportHistory(id: string): Promise<ScopusImport> {
+  return apiPost<ScopusImport>(`/api/v1/imports/${id}/restore-history`);
 }
