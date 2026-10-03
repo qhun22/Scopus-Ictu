@@ -74,7 +74,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="app-page-container space-y-4 sm:space-y-5">
       {/* Header Title Section */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -110,7 +110,7 @@ export default function UsersPage() {
       </div>
 
       {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-slate-500">{t.users.totalUsers}</span>
           <p className="mt-1 text-2xl font-black text-slate-800">{users.length}</p>

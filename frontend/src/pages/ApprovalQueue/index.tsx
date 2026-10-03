@@ -4,7 +4,7 @@ import DiffViewerStub from "../../components/diff/DiffViewerStub";
 
 export default function ApprovalQueuePage() {
   return (
-    <div className="space-y-4">
+    <div className="app-page-container space-y-4 sm:space-y-5">
       <h1 className="text-2xl font-semibold">Approval Queue</h1>
       <Card>
         <p className="mb-4 text-gray-600">

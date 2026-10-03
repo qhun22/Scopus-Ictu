@@ -117,7 +117,7 @@ export default function ConfirmModal({
   return (
     <ModalPortal>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm transition-opacity animate-in fade-in"
+        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-3 sm:p-4 backdrop-blur-sm transition-opacity animate-in fade-in"
         onClick={() => {
           if (!loading) onCancel();
         }}
@@ -127,7 +127,7 @@ export default function ConfirmModal({
           aria-modal="true"
           aria-labelledby="confirm-modal-title"
           aria-describedby="confirm-modal-desc"
-          className="relative w-full max-w-md overflow-hidden rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl transition-all animate-in zoom-in-95 sm:p-7"
+          className="relative w-[calc(100vw-1.5rem)] sm:w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-100 bg-white p-5 sm:p-7 shadow-2xl transition-all animate-in zoom-in-95"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-start gap-4">

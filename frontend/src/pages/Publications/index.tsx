@@ -2,7 +2,7 @@ import { Card } from "antd";
 
 export default function PublicationsPage() {
   return (
-    <div className="space-y-4">
+    <div className="app-page-container space-y-4 sm:space-y-5">
       <h1 className="text-2xl font-semibold">Publications</h1>
       <Card>
         <p className="text-gray-600">
