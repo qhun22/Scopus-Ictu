@@ -3,8 +3,10 @@ import {
   ImportConfig,
   ImportStatus,
   ScopusImport,
+  archiveImport,
   cancelImport,
   deleteImport,
+  restoreImportHistory,
   rollbackLecturerImport,
   getImportConfig,
   getImportDetail,
@@ -69,6 +71,9 @@ export default function ImportsPage() {
   // Search & Filter & Pagination states
   const [search, setSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [archiveFilter, setArchiveFilter] = useState<"active" | "archived" | "all">(
+    "active",
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(10);
 
@@ -87,6 +92,16 @@ export default function ImportsPage() {
   const [itemToDelete, setItemToDelete] = useState<ScopusImport | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Archive (hide from history)
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
+  const [itemToArchive, setItemToArchive] = useState<ScopusImport | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+
+  // Restore archived
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [itemToRestore, setItemToRestore] = useState<ScopusImport | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+
   // Rollback Lecturer Import
   const [rollbackModalOpen, setRollbackModalOpen] = useState(false);
   const [itemToRollback, setItemToRollback] = useState<ScopusImport | null>(null);
@@ -102,7 +117,7 @@ export default function ImportsPage() {
     try {
       const [nextConfig, response] = await Promise.all([
         getImportConfig(),
-        getImportHistory(),
+        getImportHistory(archiveFilter !== "active"),
       ]);
       setConfig(nextConfig);
       setHistory(response.items);
@@ -118,7 +133,8 @@ export default function ImportsPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [archiveFilter]);
 
   const hasActiveImports = history.some((item) => ACTIVE_STATUSES.includes(item.status));
 
@@ -192,6 +208,26 @@ export default function ImportsPage() {
       return false;
     }
     return getItemWarningCount(item) > 0;
+  };
+
+  const isInUse = (item: ScopusImport): boolean => {
+    if (item.type === "LECTURERS") return false;
+    return Boolean(item.in_use);
+  };
+
+  const canDeleteImport = (item: ScopusImport): boolean => {
+    // UI-side helper: backend can_delete is authoritative.
+    if (item.type === "LECTURERS") {
+      return item.status === "CANCELLED";
+    }
+    if (ACTIVE_STATUSES.includes(item.status)) return false;
+    return !isInUse(item) && !item.archived;
+  };
+
+  const canArchiveImport = (item: ScopusImport): boolean => {
+    if (item.archived) return false;
+    if (item.type === "LECTURERS") return false;
+    return !ACTIVE_STATUSES.includes(item.status);
   };
 
   const statusLabel = (item: ScopusImport): string => {
@@ -303,7 +339,7 @@ export default function ImportsPage() {
 
   const refreshHistory = async () => {
     try {
-      const response = await getImportHistory();
+      const response = await getImportHistory(archiveFilter !== "active");
       setHistory(response.items);
       setLatestResult((current) => {
         if (!current) return current;
@@ -461,14 +497,21 @@ export default function ImportsPage() {
           error.status === 409)
       ) {
         const linkedCount = errorNumberField(error, "linked_accounts");
+        const pubLinks = errorNumberField(error, "publication_source_links");
+        const authLinks = errorNumberField(error, "author_variant_links");
+        const totalLinks = (pubLinks ?? 0) + (authLinks ?? 0);
         const msg = linkedCount
           ? (locale === "vi"
               ? `Có ${linkedCount} hồ sơ trong đợt nhập đang được liên kết với tài khoản hệ thống. Vui lòng xử lý các liên kết trước.`
               : `There are ${linkedCount} profiles in this import linked to system accounts. Please resolve linkages first.`)
-          : (error.message ||
-            (locale === "vi"
-              ? "Dữ liệu từ đợt nhập này đang được hệ thống sử dụng."
-              : "Data from this import is currently in use by the system."));
+          : totalLinks > 0
+            ? (locale === "vi"
+                ? `Dữ liệu nguồn đang được sử dụng ở bước xử lý tiếp theo (${pubLinks ?? 0} liên kết công bố, ${authLinks ?? 0} biến thể tên). Vui lòng chọn "Ẩn khỏi lịch sử" thay vì xóa.`
+                : `Source data is referenced downstream (${pubLinks ?? 0} publication links, ${authLinks ?? 0} author variants). Use "Hide from history" instead of deleting.`)
+            : (error.message ||
+              (locale === "vi"
+                ? "Dữ liệu từ đợt nhập này đang được hệ thống sử dụng."
+                : "Data from this import is currently in use by the system."));
         toast.error(
           locale === "vi" ? "Không thể xóa đợt nhập" : "Cannot delete import",
           msg,
@@ -575,6 +618,67 @@ export default function ImportsPage() {
       );
     } finally {
       setIsNormalizing(false);
+    }
+  };
+
+  const handleOpenArchiveModal = (item: ScopusImport) => {
+    if (item.archived) return;
+    setItemToArchive(item);
+    setArchiveModalOpen(true);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!itemToArchive) return;
+    setIsArchiving(true);
+    try {
+      const updated = await archiveImport(itemToArchive.id);
+      toast.success(
+        locale === "vi" ? "Đã ẩn khỏi lịch sử" : "Hidden from history",
+        locale === "vi"
+          ? `Đã ẩn ${updated.file_name} khỏi danh sách lịch sử.`
+          : `${updated.file_name} is no longer visible in the default history list.`,
+      );
+      setArchiveModalOpen(false);
+      setItemToArchive(null);
+      // Refresh using the current filter (the item may be gone from "active" view).
+      await refreshHistory();
+    } catch (error: unknown) {
+      toast.error(
+        locale === "vi" ? "Không thể ẩn đợt nhập" : "Cannot hide import",
+        error instanceof ApiError ? error.message : (locale === "vi" ? "Lỗi không xác định." : "Unknown error."),
+      );
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const handleOpenRestoreModal = (item: ScopusImport) => {
+    if (!item.archived) return;
+    setItemToRestore(item);
+    setRestoreModalOpen(true);
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!itemToRestore) return;
+    setIsRestoring(true);
+    try {
+      const updated = await restoreImportHistory(itemToRestore.id);
+      toast.success(
+        locale === "vi" ? "Đã khôi phục hiển thị" : "Visibility restored",
+        locale === "vi"
+          ? `${updated.file_name} đã xuất hiện trở lại trong lịch sử.`
+          : `${updated.file_name} is visible in history again.`,
+      );
+      setRestoreModalOpen(false);
+      setItemToRestore(null);
+      await refreshHistory();
+    } catch (error: unknown) {
+      toast.error(
+        locale === "vi" ? "Không thể khôi phục" : "Cannot restore",
+        error instanceof ApiError ? error.message : (locale === "vi" ? "Lỗi không xác định." : "Unknown error."),
+      );
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -956,6 +1060,23 @@ export default function ImportsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <label htmlFor="import-archive-filter" className="text-xs font-medium text-slate-500 whitespace-nowrap">
+            {locale === "vi" ? "Hiển thị" : "Visibility"}:
+          </label>
+          <select
+            id="import-archive-filter"
+            value={archiveFilter}
+            onChange={(e) => {
+              setArchiveFilter(e.target.value as "active" | "archived" | "all");
+              setPage(1);
+            }}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          >
+            <option value="active">{locale === "vi" ? "Đang hiển thị" : "Visible"}</option>
+            <option value="archived">{locale === "vi" ? "Đã ẩn" : "Hidden"}</option>
+            <option value="all">{locale === "vi" ? "Tất cả" : "All"}</option>
+          </select>
+
           <label htmlFor="import-status-filter" className="text-xs font-medium text-slate-500 whitespace-nowrap">
             {t.common.status}:
           </label>
@@ -981,9 +1102,10 @@ export default function ImportsPage() {
             onClick={() => {
               setSearch("");
               setStatusFilter("ALL");
+              setArchiveFilter("active");
               setPage(1);
             }}
-            disabled={!search && statusFilter === "ALL"}
+            disabled={!search && statusFilter === "ALL" && archiveFilter === "active"}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1088,7 +1210,29 @@ export default function ImportsPage() {
                     </td>
 
                     <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
-                      {renderStatusBadge(item)}
+                      <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                        {renderStatusBadge(item)}
+                        {item.archived && (
+                          <span
+                            title={locale === "vi" ? "Đã ẩn khỏi lịch sử" : "Hidden from history"}
+                            className={`${badgeClassName} border-violet-200 bg-violet-50/80 text-violet-700`}
+                          >
+                            {locale === "vi" ? "Đã ẩn" : "Archived"}
+                          </span>
+                        )}
+                        {isInUse(item) && !item.archived && (
+                          <span
+                            title={
+                              locale === "vi"
+                                ? "Dữ liệu nguồn đang được sử dụng ở bước xử lý tiếp theo"
+                                : "Source data is referenced by downstream processing"
+                            }
+                            className={`${badgeClassName} border-violet-200 bg-violet-50/80 text-violet-700`}
+                          >
+                            {locale === "vi" ? "Đang được sử dụng" : "In use"}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
@@ -1117,7 +1261,42 @@ export default function ImportsPage() {
                           </button>
                         )}
 
-                        {(item.type === "LECTURERS" || item.can_delete) && !ACTIVE_STATUSES.includes(item.status) && (
+                        {/* In-use imports: replace destructive delete with archive. */}
+                        {isInUse(item) && !item.archived && canArchiveImport(item) && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenArchiveModal(item)}
+                            title={
+                              locale === "vi"
+                                ? "Không thể xóa vì dữ liệu nguồn đã được sử dụng để tạo dữ liệu chuẩn hóa"
+                                : "Cannot delete: source data is used by canonical publications"
+                            }
+                            className="inline-flex items-center justify-center gap-1 w-28 min-w-[112px] rounded-md border border-violet-200 bg-violet-50/50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100/70 transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M5 8h14M9 8v12a1 1 0 001 1h4a1 1 0 001-1V8m-7 0V5a2 2 0 012-2h2a2 2 0 012 2v3" />
+                            </svg>
+                            <span>{locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history"}</span>
+                          </button>
+                        )}
+
+                        {/* Archived imports: show restore. */}
+                        {item.archived && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRestoreModal(item)}
+                            title={locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}
+                            className="inline-flex items-center justify-center gap-1 w-28 min-w-[112px] rounded-md border border-blue-200 bg-blue-50/50 px-2.5 py-1 text-[11px] font-semibold text-[#3A5FC3] hover:bg-blue-100/70 transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span>{locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}</span>
+                          </button>
+                        )}
+
+                        {/* Genuine physical delete: only when truly not in use and not archived. */}
+                        {(item.type === "LECTURERS" || canDeleteImport(item)) && !ACTIVE_STATUSES.includes(item.status) && (
                           <button
                             type="button"
                             onClick={() => handleOpenDeleteModal(item)}
@@ -1415,6 +1594,62 @@ export default function ImportsPage() {
                       )}
                     </dl>
 
+                    {/* SECTION C: TÌNH TRẠNG SỬ DỤNG DỮ LIỆU (M2.6A follow-up) */}
+                    <div className="rounded-xl border border-violet-200/80 bg-violet-50/20 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 015.656 0l1.415 1.415a4 4 0 010 5.656l-3 3a4 4 0 01-5.656 0M10.172 13.828a4 4 0 01-5.656 0l-1.415-1.415a4 4 0 010-5.656l3-3a4 4 0 015.656 0" />
+                          </svg>
+                        </div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-violet-700">
+                          {locale === "vi" ? "Tình trạng sử dụng dữ liệu" : "Data usage state"}
+                        </h3>
+                        {detail.archived && (
+                          <span className={`${badgeClassName} ml-auto border-violet-200 bg-violet-50 text-violet-700`}>
+                            {locale === "vi" ? "Đã ẩn khỏi lịch sử" : "Hidden from history"}
+                          </span>
+                        )}
+                      </div>
+                      <dl className="grid grid-cols-1 gap-2.5 text-xs sm:grid-cols-3">
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
+                          <dt className="text-[11px] font-medium text-slate-500">
+                            {locale === "vi" ? "Dữ liệu đang được sử dụng" : "Source data in use"}
+                          </dt>
+                          <dd className={`mt-0.5 text-lg font-black ${
+                            isInUse(detail) ? "text-violet-700" : "text-slate-700"
+                          }`}>
+                            {isInUse(detail)
+                              ? (locale === "vi" ? "Có" : "Yes")
+                              : (locale === "vi" ? "Không" : "No")}
+                          </dd>
+                        </div>
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
+                          <dt className="text-[11px] font-medium text-slate-500">
+                            {locale === "vi" ? "Liên kết nguồn công bố" : "Publication source links"}
+                          </dt>
+                          <dd className="mt-0.5 text-lg font-black text-slate-800">
+                            {numberFormatter.format(detail.usage?.publication_source_links ?? 0)}
+                          </dd>
+                        </div>
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
+                          <dt className="text-[11px] font-medium text-slate-500">
+                            {locale === "vi" ? "Biến thể tên tác giả" : "Author name variants"}
+                          </dt>
+                          <dd className="mt-0.5 text-lg font-black text-slate-800">
+                            {numberFormatter.format(detail.usage?.author_variant_links ?? 0)}
+                          </dd>
+                        </div>
+                      </dl>
+                      {isInUse(detail) && (
+                        <p className="mt-3 text-[11px] text-violet-900">
+                          {locale === "vi"
+                            ? "Dữ liệu nguồn của đợt nhập đã được sử dụng ở bước xử lý tiếp theo nên không thể xóa vật lý mà không làm mất provenance."
+                            : "Source data has been consumed by downstream processing, so it cannot be physically deleted without losing provenance."}
+                        </p>
+                      )}
+                    </div>
+
                     {detail.duplicate_candidates > 0 && (
                       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                         <strong>{t.imports.duplicateRows}:</strong> {numberFormatter.format(detail.duplicate_candidates)}
@@ -1481,7 +1716,36 @@ export default function ImportsPage() {
                     <span>{locale === "vi" ? "Hoàn tác đợt nhập" : "Rollback import"}</span>
                   </button>
                 )}
-                {detail && (detail.type === "LECTURERS" || detail.can_delete) && !ACTIVE_STATUSES.includes(detail.status) && (
+
+                {detail && !detail.archived && canArchiveImport(detail) && (
+                  <button
+                    type="button"
+                    disabled={detailLoading || isArchiving}
+                    onClick={() => handleOpenArchiveModal(detail)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M5 8h14M9 8v12a1 1 0 001 1h4a1 1 0 001-1V8m-7 0V5a2 2 0 012-2h2a2 2 0 012 2v3" />
+                    </svg>
+                    <span>{isArchiving ? (locale === "vi" ? "Đang ẩn..." : "Hiding...") : (locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history")}</span>
+                  </button>
+                )}
+
+                {detail && detail.archived && (
+                  <button
+                    type="button"
+                    disabled={detailLoading || isRestoring}
+                    onClick={() => handleOpenRestoreModal(detail)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-xs font-semibold text-[#3A5FC3] hover:bg-blue-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>{isRestoring ? (locale === "vi" ? "Đang khôi phục..." : "Restoring...") : (locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility")}</span>
+                  </button>
+                )}
+
+                {detail && (detail.type === "LECTURERS" || canDeleteImport(detail)) && !ACTIVE_STATUSES.includes(detail.status) && (
                   <button
                     type="button"
                     disabled={detailLoading}
@@ -1607,6 +1871,62 @@ export default function ImportsPage() {
             if (!isDeleting) {
               setDeleteModalOpen(false);
               setItemToDelete(null);
+            }
+          }}
+        />
+      )}
+
+      {/* ARCHIVE MODAL */}
+      {archiveModalOpen && itemToArchive && (
+        <ConfirmModal
+          open={archiveModalOpen}
+          variant="warning"
+          loading={isArchiving}
+          title={locale === "vi" ? "Ẩn đợt nhập khỏi lịch sử?" : "Hide import from history?"}
+          description={
+            <span>
+              {locale === "vi"
+                ? "Đợt nhập sẽ không còn xuất hiện trong danh sách mặc định. Dữ liệu nguồn, dữ liệu chuẩn hóa, liên kết provenance và nhật ký hệ thống vẫn được giữ nguyên."
+                : "This import will no longer appear in the default history list. Source data, canonical publications, provenance links and audit logs remain intact."}
+              <br />
+              <strong className="text-slate-800 mt-1 block">{itemToArchive.file_name}</strong>
+            </span>
+          }
+          confirmLabel={locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history"}
+          cancelLabel={t.common.cancel}
+          onConfirm={handleConfirmArchive}
+          onCancel={() => {
+            if (!isArchiving) {
+              setArchiveModalOpen(false);
+              setItemToArchive(null);
+            }
+          }}
+        />
+      )}
+
+      {/* RESTORE MODAL */}
+      {restoreModalOpen && itemToRestore && (
+        <ConfirmModal
+          open={restoreModalOpen}
+          variant="primary"
+          loading={isRestoring}
+          title={locale === "vi" ? "Khôi phục hiển thị đợt nhập?" : "Restore import visibility?"}
+          description={
+            <span>
+              {locale === "vi"
+                ? "Đợt nhập sẽ xuất hiện trở lại trong danh sách lịch sử mặc định. Chỉ thay đổi khả năng hiển thị trong lịch sử, không ảnh hưởng tới dữ liệu."
+                : "This import will appear again in the default history list. Only the history visibility changes — no data is affected."}
+              <br />
+              <strong className="text-slate-800 mt-1 block">{itemToRestore.file_name}</strong>
+            </span>
+          }
+          confirmLabel={locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}
+          cancelLabel={t.common.cancel}
+          onConfirm={handleConfirmRestore}
+          onCancel={() => {
+            if (!isRestoring) {
+              setRestoreModalOpen(false);
+              setItemToRestore(null);
             }
           }}
         />

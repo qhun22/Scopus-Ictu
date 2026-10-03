@@ -24,6 +24,7 @@ from app.services.scopus_import_service import (
     ImportAlreadyFinished,
     ImportAlreadyProcessing,
     ImportStorageError,
+    archive_import_history,
     cancel_import,
     create_import_job,
     delete_scopus_import,
@@ -33,6 +34,7 @@ from app.services.scopus_import_service import (
     list_imports,
     normalize_existing_import,
     process_import_job,
+    restore_import_history,
     rollback_lecturer_import,
     validate_upload_filename,
 )
@@ -135,9 +137,10 @@ def import_history(
     _admin: AdminUser,
     db: DatabaseSession,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    include_archived: Annotated[bool, Query()] = False,
 ) -> ScopusImportListResponse:
     try:
-        items = list_imports(db, limit=limit)
+        items = list_imports(db, limit=limit, include_archived=include_archived)
         stats = get_import_stats(items)
         return ScopusImportListResponse(items=items, stats=stats)
     except SQLAlchemyError as exc:
@@ -146,6 +149,58 @@ def import_history(
             detail="Không thể tải lịch sử nhập dữ liệu.",
             code="DATABASE_UNAVAILABLE",
         ) from exc
+
+
+@router.post("/{import_id}/archive", response_model=ScopusImportResponse)
+def archive_import_endpoint(
+    import_id: uuid.UUID,
+    admin: AdminUser,
+    db: DatabaseSession,
+) -> ScopusImportResponse:
+    """Admin-only: hide a Scopus import from the default history list.
+
+    Does NOT delete the ScopusImport, raw rows, or any provenance. Uses
+    an append-only AuditEvent so the action is fully reversible.
+    """
+    try:
+        result = archive_import_history(db, import_id, admin)
+    except SQLAlchemyError as exc:
+        raise APIError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể ẩn đợt nhập khỏi lịch sử.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
+    if result is None:
+        raise APIError(
+            status_code=404,
+            detail="Không tìm thấy đợt nhập dữ liệu.",
+            code="IMPORT_NOT_FOUND",
+        )
+    return result
+
+
+@router.post("/{import_id}/restore-history", response_model=ScopusImportResponse)
+def restore_import_endpoint(
+    import_id: uuid.UUID,
+    admin: AdminUser,
+    db: DatabaseSession,
+) -> ScopusImportResponse:
+    """Admin-only: restore a previously hidden Scopus import to history."""
+    try:
+        result = restore_import_history(db, import_id, admin)
+    except SQLAlchemyError as exc:
+        raise APIError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể khôi phục hiển thị đợt nhập.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
+    if result is None:
+        raise APIError(
+            status_code=404,
+            detail="Không tìm thấy đợt nhập dữ liệu.",
+            code="IMPORT_NOT_FOUND",
+        )
+    return result
 
 
 @router.delete("/{import_id}")
