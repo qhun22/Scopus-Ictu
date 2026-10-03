@@ -22,12 +22,13 @@ from app.models.base import Base
 from app.models.scopus_raw import RawScopusRecord, ScopusImport
 from app.services.normalization.scopus_normalizer import normalize_import
 
-
 ROWS = 10_000
 BATCH_SIZE = 500
 
 
 def main() -> None:
+    if settings.environment.lower() == "prod":
+        raise SystemExit("Refusing benchmark execution in ENVIRONMENT=prod.")
     schema = f"bench_m26a_{uuid.uuid4().hex}"
     admin_engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
     with admin_engine.begin() as connection:
