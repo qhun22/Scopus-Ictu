@@ -1,21 +1,25 @@
-"""Script to clean up orphan unlinked lecturer records in PostgreSQL.
+"""Safely inspect and remove explicitly marked disposable lecturer fixtures.
 
-Removes all lecturer master rows that:
-1. Have NO user account attached (User.lecturer_id IS NULL)
-2. Have NO downstream Scopus identities attached
-
-Preserves all 5 demo/system user accounts and their linked Lecturer records.
+Lecturers are institutional master records. Missing user or Scopus links do
+not make a lecturer disposable. This tool therefore only considers records
+with an explicit ``test://disposable/`` provenance snapshot and requires both
+an explicit lecturer id and ``--apply`` for mutation.
 
 Usage:
-    python -m scripts.clean_orphan_lecturers
+    python -m scripts.clean_orphan_lecturers --lecturer-id ID
+    python -m scripts.clean_orphan_lecturers --lecturer-id ID --apply
 """
 
 from __future__ import annotations
 
-import sys
-from sqlalchemy import select
+import argparse
+import uuid
+from collections.abc import Sequence
+
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_session_factory
 from app.models.governance import User
 from app.models.identity import LecturerScopusIdentity
@@ -25,52 +29,116 @@ from app.models.master_lecturer import (
     LecturerSourceSnapshot,
 )
 
+DISPOSABLE_SOURCE_SYSTEM = "TEST"
+DISPOSABLE_SOURCE_PREFIX = "test://disposable/"
 
-def clean_orphan_lecturers(session: Session) -> int:
-    # 1. Find all lecturer IDs that are linked to active Users
-    linked_users = session.query(User).filter(User.lecturer_id.is_not(None)).all()
-    protected_lecturer_ids = {u.lecturer_id for u in linked_users if u.lecturer_id is not None}
 
-    # 2. Find all lecturer IDs linked to Scopus identities
-    scopus_identities = session.query(LecturerScopusIdentity).all()
-    protected_lecturer_ids.update(
-        {i.lecturer_id for i in scopus_identities if i.lecturer_id is not None}
+def has_disposable_provenance(source_system: str, source_url: str) -> bool:
+    return (
+        source_system == DISPOSABLE_SOURCE_SYSTEM
+        and source_url.startswith(DISPOSABLE_SOURCE_PREFIX)
     )
 
-    # 3. Find all unlinked lecturers
-    all_lecturers = session.query(Lecturer).all()
-    orphan_lecturers = [l for l in all_lecturers if l.id not in protected_lecturer_ids]
-    orphan_ids = [l.id for l in orphan_lecturers]
 
-    if not orphan_ids:
-        print("[CLEAN] No orphan unlinked lecturers found. Database is clean!")
+def disposable_lecturer_ids(
+    session: Session,
+    lecturer_ids: Sequence[uuid.UUID],
+) -> list[uuid.UUID]:
+    """Return only explicitly disposable ids with no protected relationships."""
+    if not lecturer_ids:
+        return []
+
+    linked_user = exists().where(User.lecturer_id == Lecturer.id)
+    linked_scopus = exists().where(LecturerScopusIdentity.lecturer_id == Lecturer.id)
+    downstream_publication = exists().where(
+        LecturerKnownPublication.lecturer_id == Lecturer.id
+    )
+    disposable_snapshot = exists().where(
+        LecturerSourceSnapshot.lecturer_id == Lecturer.id,
+        LecturerSourceSnapshot.source_system == DISPOSABLE_SOURCE_SYSTEM,
+        LecturerSourceSnapshot.source_url.startswith(DISPOSABLE_SOURCE_PREFIX),
+    )
+
+    statement = (
+        select(Lecturer.id)
+        .where(
+            Lecturer.id.in_(lecturer_ids),
+            disposable_snapshot,
+            ~linked_user,
+            ~linked_scopus,
+            ~downstream_publication,
+        )
+        .order_by(Lecturer.id)
+    )
+    return list(session.scalars(statement))
+
+
+def remove_disposable_lecturers(
+    session: Session,
+    lecturer_ids: Sequence[uuid.UUID],
+) -> int:
+    """Delete only preselected disposable lecturers in the current transaction."""
+    removable_ids = disposable_lecturer_ids(session, lecturer_ids)
+    if not removable_ids:
         return 0
 
-    print(f"[CLEAN] Found {len(orphan_ids)} orphan unlinked lecturers to remove.")
-    print(f"[CLEAN] Preserving {len(protected_lecturer_ids)} protected user-linked lecturers.")
-
-    # 4. Clean known publications
-    session.query(LecturerKnownPublication).filter(
-        LecturerKnownPublication.lecturer_id.in_(orphan_ids)
-    ).delete(synchronize_session=False)
-
-    # 5. Clean source snapshots
     session.query(LecturerSourceSnapshot).filter(
-        LecturerSourceSnapshot.lecturer_id.in_(orphan_ids)
+        LecturerSourceSnapshot.lecturer_id.in_(removable_ids)
     ).delete(synchronize_session=False)
+    deleted = session.query(Lecturer).filter(Lecturer.id.in_(removable_ids)).delete(
+        synchronize_session=False
+    )
+    return deleted
 
-    # 6. Clean lecturer master records
-    deleted_count = session.query(Lecturer).filter(
-        Lecturer.id.in_(orphan_ids)
-    ).delete(synchronize_session=False)
 
-    session.commit()
-    print(f"[SUCCESS] Successfully removed {deleted_count} orphan unlinked lecturers.")
-    return deleted_count
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--lecturer-id",
+        action="append",
+        required=True,
+        help="Explicit lecturer UUID to inspect; repeat for multiple records.",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply deletion. Without this flag the command is a dry run.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = _parse_args()
+    if settings.environment.lower() == "prod":
+        raise SystemExit("Refusing to run in ENVIRONMENT=prod.")
+
+    try:
+        lecturer_ids = [uuid.UUID(value) for value in args.lecturer_id]
+    except ValueError as exc:
+        raise SystemExit(f"Invalid --lecturer-id: {exc}") from exc
+
+    factory = get_session_factory()
+    with factory() as session:
+        candidates = disposable_lecturer_ids(session, lecturer_ids)
+        print(
+            f"Selection: {len(candidates)} of {len(lecturer_ids)} requested lecturer(s) "
+            f"match source_system={DISPOSABLE_SOURCE_SYSTEM!r}, "
+            f"source_url prefix={DISPOSABLE_SOURCE_PREFIX!r}, "
+            "and have no protected relationships."
+        )
+        if not args.apply:
+            print("Dry run only. No records changed. Pass --apply to mutate.")
+            return 0
+
+        try:
+            deleted = remove_disposable_lecturers(session, lecturer_ids)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        print(f"Applied deletion: {deleted} disposable lecturer record(s).")
+    return 0
 
 
 if __name__ == "__main__":
-    factory = get_session_factory()
-    with factory() as db_session:
-        count = clean_orphan_lecturers(db_session)
-        print(f"Done. Cleaned {count} records.")
+    raise SystemExit(main())
