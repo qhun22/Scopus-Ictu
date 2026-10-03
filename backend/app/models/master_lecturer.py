@@ -27,7 +27,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, synonym
 
 from app.models.base import Base
 
@@ -52,6 +52,7 @@ class Lecturer(Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name_normalized: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    institutional_email = synonym("email")
     academic_rank: Mapped[str | None] = mapped_column(String(50), nullable=True)
     academic_degree: Mapped[str | None] = mapped_column(String(50), nullable=True)
     position: Mapped[str | None] = mapped_column(String(100), nullable=True)
@@ -82,7 +83,7 @@ class Lecturer(Base):
             "orcid IS NULL OR orcid ~ '^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$'",
             name="orcid_format",
         ),
-        # Partial unique indexes — explicit names (not auto-template).
+        # Partial indexes — explicit names (not auto-template).
         Index(
             "uq_lecturers_staff_code",
             "staff_code",
@@ -90,9 +91,9 @@ class Lecturer(Base):
             postgresql_where=text("staff_code IS NOT NULL"),
         ),
         Index(
-            "uq_lecturers_email_ci",
+            "ix_lecturers_email_ci",
             text("lower(email)"),
-            unique=True,
+            unique=False,
             postgresql_where=text("email IS NOT NULL"),
         ),
         Index(
