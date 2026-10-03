@@ -29,11 +29,14 @@ from app.services.scopus_import_service import (
     delete_scopus_import,
     get_import,
     get_import_stats,
+    is_import_eligible_for_normalization,
     list_imports,
+    normalize_existing_import,
     process_import_job,
     rollback_lecturer_import,
     validate_upload_filename,
 )
+from app.schemas.scopus_import import NormalizationResponse
 
 router = APIRouter()
 AdminUser = Annotated[User, Depends(require_role("ADMIN"))]
@@ -248,6 +251,41 @@ def import_detail(
             status_code=404, detail="Không tìm thấy phiên nhập dữ liệu.", code="IMPORT_NOT_FOUND"
         )
     return item
+
+
+@router.post(
+    "/{import_id}/normalize",
+    response_model=ScopusImportResponse,
+    summary="Normalize raw Scopus records for a completed import (M2.6A)",
+)
+def normalize_import_endpoint(
+    import_id: uuid.UUID,
+    admin: AdminUser,
+    db: DatabaseSession,
+) -> ScopusImportResponse:
+    """Admin-only: re-normalize or complete normalization for a STAGED Scopus import.
+
+    Idempotent: running again on an already-normalized import produces
+    EXISTING_UNCHANGED counters without creating duplicates.
+    """
+    try:
+        counters = normalize_existing_import(db, import_id, actor=admin)
+        item = get_import(db, import_id)
+        if item is None:
+            raise APIError(
+                status_code=404,
+                detail="Không tìm thấy phiên nhập dữ liệu.",
+                code="IMPORT_NOT_FOUND",
+            )
+        return item
+    except APIError:
+        raise
+    except SQLAlchemyError as exc:
+        raise APIError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể chuẩn hóa phiên nhập dữ liệu.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
 
 
 async def _read_bounded(file: UploadFile, max_bytes: int) -> bytes:

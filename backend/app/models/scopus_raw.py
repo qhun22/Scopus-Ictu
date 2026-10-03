@@ -71,6 +71,10 @@ class ScopusImport(Base):
     error_summary: Mapped[dict | None] = mapped_column(
         JSONB(none_as_null=True), nullable=True
     )
+    # M2.6A: normalization counters stored separately so error_summary retains raw validation errors.
+    normalization_summary: Mapped[dict | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("1")
     )

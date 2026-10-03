@@ -21,9 +21,11 @@ from app.core.security import password_hasher, token_service
 from app.models.governance import AuditEvent, User
 from app.models.scopus_raw import RawScopusRecord, ScopusImport
 from app.schemas.scopus_import import (
+    NormalizationData,
     ScopusImportResponse,
 )
 from app.services.parser.scopus_csv_parser import ParsedScopusFile, ScopusCsvError, ScopusCsvParser
+from app.services.normalization.scopus_normalizer import normalize_import
 
 ACTIVE_STATUSES = frozenset({"RECEIVED", "PARSING", "VALIDATED"})
 COMPLETED_STATUSES = frozenset({"STAGED", "APPLIED"})
@@ -153,6 +155,8 @@ def process_import_job(import_id: uuid.UUID, content: bytes, actor_user_id: uuid
                 return
         if not _finish_import(import_id, actor_user_id):
             return
+        # Normalize raw records → canonical publications (M2.6A)
+        _normalize_after_import(import_id)
     except ScopusCsvError as exc:
         _fail_import(import_id, exc.code, exc.detail)
     except Exception:
@@ -166,7 +170,11 @@ def cancel_import(db: Session, import_id: uuid.UUID, actor: User) -> ScopusImpor
             return None
         if item.status == "CANCELLED":
             return to_import_response(item, performed_by=actor.display_name)
-        if item.status in TERMINAL_STATUSES:
+        normalization_is_running = (
+            isinstance(item.normalization_summary, dict)
+            and item.normalization_summary.get("status") == "NORMALIZING"
+        )
+        if item.status in TERMINAL_STATUSES and not normalization_is_running:
             raise ImportAlreadyFinished(item.status)
         before = {"status": item.status}
         item.status = "CANCELLED"
@@ -672,6 +680,104 @@ def delete_lecturer_import_history(
     return True
 
 
+def is_import_eligible_for_normalization(item: ScopusImport) -> bool:
+    return item.status in COMPLETED_STATUSES
+
+
+def eligible_raw_records(db: Session, import_id: uuid.UUID) -> Query:
+    """Only VALID rows of completed imports are eligible downstream."""
+    return db.query(RawScopusRecord).filter(
+        RawScopusRecord.import_id == import_id,
+        RawScopusRecord.validation_status == "VALID",
+    )
+
+
+def normalize_existing_import(
+    db: Session,
+    import_id: uuid.UUID,
+    actor: User | None = None,
+) -> NormalizationCounters:
+    """Normalize an already-STAGED Scopus import (idempotent re-normalization).
+
+    Safe to call repeatedly; re-running produces EXISTING_UNCHANGED counters.
+    """
+    from app.services.normalization.scopus_normalizer import normalize_import as _norm
+
+    item = db.query(ScopusImport).filter(ScopusImport.id == import_id).first()
+    if item is None:
+        raise APIError(
+            status_code=404,
+            detail="Không tìm thấy phiên nhập dữ liệu.",
+            code="IMPORT_NOT_FOUND",
+        )
+    if not is_import_eligible_for_normalization(item):
+        raise APIError(
+            status_code=409,
+            detail="Chỉ các phiên nhập đã hoàn tất tiếp nhận nguồn mới có thể chuẩn hóa.",
+            code="IMPORT_NOT_ELIGIBLE_FOR_NORMALIZATION",
+            data={"status": item.status},
+        )
+
+    counters = _norm(db, import_id)
+
+    # Audit the normalization action
+    actor_id = actor.id if actor else None
+    audit_actor = actor_id if actor else None
+    db.add(
+        AuditEvent(
+            entity_type="scopus_imports",
+            entity_id=item.id,
+            action="SCOPUS_NORMALIZATION_TRIGGERED",
+            actor_type="USER" if actor else "SYSTEM",
+            actor_user_id=actor_id,
+            actor_service=None if actor else "normalization_service",
+            before_state=item.error_summary,
+            after_state=counters.to_dict(),
+            event_metadata={
+                "import_id": str(item.id),
+                "actor": str(actor_id) if actor_id else "system",
+            },
+        )
+    )
+    db.commit()
+    return counters
+
+
+def _build_normalization_data(item: ScopusImport) -> NormalizationData | None:
+    """Extract normalization counters from normalization_summary JSONB.
+
+    Falls back to legacy error_summary location for imports that were normalized
+    before the normalization_summary column existed (backwards compatibility).
+    """
+    summary = item.normalization_summary
+    if summary is None:
+        # Legacy: normalization counters may have been written to error_summary
+        # during earlier development. Try there as a fallback.
+        summary = item.error_summary
+    if summary is None:
+        return None
+    keys = {
+        "canonical_new",
+        "canonical_existing",
+        "canonical_metadata_changed",
+        "canonical_failed",
+        "canonical_processed",
+        "canonical_intra_duplicate",
+    }
+    if not any(k in summary for k in keys):
+        return None
+    return NormalizationData(
+        status=str(summary.get("status", "COMPLETED")),
+        total_records=int(summary.get("total_records", summary.get("canonical_processed", 0))),
+        progress_percent=int(summary.get("progress_percent", 100)),
+        canonical_new=int(summary.get("canonical_new", 0)),
+        canonical_existing=int(summary.get("canonical_existing", 0)),
+        canonical_metadata_changed=int(summary.get("canonical_metadata_changed", 0)),
+        canonical_failed=int(summary.get("canonical_failed", 0)),
+        canonical_processed=int(summary.get("canonical_processed", 0)),
+        canonical_intra_duplicate=int(summary.get("canonical_intra_duplicate", 0)),
+    )
+
 
 def to_import_response(item: ScopusImport, *, performed_by: str | None) -> ScopusImportResponse:
     processed = item.valid_records + item.invalid_records
@@ -682,6 +788,7 @@ def to_import_response(item: ScopusImport, *, performed_by: str | None) -> Scopu
     )
     terminal = item.status in TERMINAL_STATUSES
     summary = item.error_summary or {}
+    normalization = _build_normalization_data(item)
     return ScopusImportResponse(
         id=item.id,
         type="SCOPUS",
@@ -695,6 +802,7 @@ def to_import_response(item: ScopusImport, *, performed_by: str | None) -> Scopu
         duplicate_candidates=int(summary.get("duplicate_candidates", 0)),
         row_errors=list(summary.get("row_errors", [])),
         error_summary=item.error_summary,
+        normalization=normalization,
         version=item.version,
         created_at=item.created_at,
         updated_at=item.updated_at,
@@ -763,6 +871,49 @@ def _save_batch(import_id: uuid.UUID, records: list[RawScopusRecord]) -> bool:
         except StaleDataError:
             db.rollback()
             return False
+
+
+def _normalize_after_import(import_id: uuid.UUID) -> None:
+    """Normalize raw records after raw ingestion reaches STAGED (M2.6A).
+
+    Uses its own session so that a normalization failure does not corrupt
+    the already-committed raw ingestion state.
+
+    Writes counters to normalization_summary (not error_summary) so raw validation
+    errors remain preserved.
+    """
+    try:
+        with get_session_factory()() as db:
+            counters = normalize_import(db, import_id)
+            # normalize_import -> finalize() writes normalization_summary and commits.
+            # Here we only need to audit.
+            item = db.query(ScopusImport).filter(ScopusImport.id == import_id).first()
+            if item is not None:
+                normalization_status = (
+                    item.normalization_summary.get("status")
+                    if isinstance(item.normalization_summary, dict)
+                    else None
+                )
+                action = (
+                    "SCOPUS_NORMALIZATION_CANCELLED"
+                    if normalization_status == "CANCELLED"
+                    else "SCOPUS_NORMALIZATION_COMPLETED"
+                )
+                db.add(
+                    _system_audit(
+                        item,
+                        action,
+                        {"status": item.status},
+                        {"status": item.status},
+                        counters.to_dict(),
+                    )
+                )
+                db.commit()
+    except Exception:
+        # Normalization failure must not retroactively fail the import.
+        # The import is already STAGED (raw ingestion complete).
+        # Normalization can be retried via the /normalize endpoint.
+        pass
 
 
 def _finish_import(import_id: uuid.UUID, actor_user_id: uuid.UUID) -> bool:
@@ -946,7 +1097,9 @@ __all__ = [
     "eligible_raw_records",
     "get_import",
     "get_import_stats",
+    "is_import_eligible_for_normalization",
     "list_imports",
+    "normalize_existing_import",
     "process_import_job",
     "recover_interrupted_imports",
     "rollback_lecturer_import",

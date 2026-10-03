@@ -82,6 +82,12 @@ class Settings(BaseSettings):
         le=10_000,
         validation_alias="SCOPUS_IMPORT_BATCH_SIZE",
     )
+    scopus_normalization_batch_size: int = Field(
+        500,
+        ge=1,
+        le=50_000,
+        validation_alias="SCOPUS_NORMALIZATION_BATCH_SIZE",
+    )
 
     model_config = SettingsConfigDict(
         env_file=str(LOCAL_ENV_FILE),
