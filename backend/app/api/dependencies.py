@@ -4,20 +4,24 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import Depends, Request, status
+from fastapi import Depends, Request, Response, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.core.security import token_service
 from app.models.governance import User, UserNotification
 
-
 COOKIE_NAME = "access_token"
+SESSION_RENEWAL_WINDOW_SECONDS = max(
+    60,
+    min(15 * 60, settings.access_token_expire_minutes * 60 // 4),
+)
 
 get_db_session = get_session
 
@@ -42,8 +46,47 @@ def _session_error(detail: str = "Phiên đăng nhập không hợp lệ hoặc 
     )
 
 
+def set_access_token_cookie(response: Response, token: str) -> None:
+    """Write the authentication cookie with one consistent policy."""
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        max_age=settings.access_token_expire_minutes * 60,
+        httponly=True,
+        samesite="lax",
+        secure=settings.environment.lower() == "prod",
+        path="/",
+    )
+
+
+def _renew_session_if_needed(
+    response: Response,
+    user: User,
+    payload: dict,
+) -> None:
+    """Keep an actively used session alive without weakening revocation checks."""
+    expires_at = payload.get("exp")
+    if not isinstance(expires_at, int) or isinstance(expires_at, bool):
+        return
+
+    now_timestamp = int(datetime.now(UTC).timestamp())
+    if expires_at - now_timestamp > SESSION_RENEWAL_WINDOW_SECONDS:
+        return
+
+    renewed_token = token_service.create_access_token(
+        {
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "av": int(user.auth_version or 1),
+        }
+    )
+    set_access_token_cookie(response, renewed_token)
+
+
 def get_current_user(
     request: Request,
+    response: Response,
     db: Annotated[Session, Depends(get_session)],
 ) -> User:
     """Validate JWT identity, active status, and security-session version."""
@@ -97,7 +140,7 @@ def get_current_user(
             if isinstance(issued_at, int) and not isinstance(issued_at, bool):
                 query = query.filter(
                     UserNotification.created_at
-                    >= datetime.fromtimestamp(issued_at, tz=timezone.utc)
+                    >= datetime.fromtimestamp(issued_at, tz=UTC)
                 )
             latest_security_notification = query.order_by(
                 UserNotification.created_at.desc()
@@ -120,6 +163,7 @@ def get_current_user(
             )
         raise _session_error("Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.")
 
+    _renew_session_if_needed(response, user, payload)
     return user
 
 
@@ -149,4 +193,5 @@ __all__ = [
     "get_session",
     "get_token_from_request",
     "require_role",
+    "set_access_token_cookie",
 ]

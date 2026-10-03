@@ -1,9 +1,12 @@
-"""Application entry point — M2.2 runtime implementation.
+"""Application entry point — M2.2/M2.5 runtime implementation.
 
 Wires FastAPI application with CORS middleware, settings, and v1 API routers.
 """
 
 from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,15 +14,32 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router as v1_router
 from app.core.config import settings
 from app.core.exceptions import APIError, api_error_handler
+from app.services.scopus_import_service import recover_interrupted_imports
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
     """Factory for the FastAPI application."""
+
+    @asynccontextmanager
+    async def lifespan(application: FastAPI):
+        if getattr(application.state, "import_recovery_enabled", True):
+            try:
+                recovered = recover_interrupted_imports()
+                if recovered:
+                    logger.warning("Recovered %s interrupted Scopus import job(s).", recovered)
+            except Exception:
+                logger.exception("Could not recover interrupted Scopus imports at startup.")
+        yield
+
     app = FastAPI(
         title="Scopus-Ictu API",
         description="Identity reconciliation pipeline between ICTU Repository and Scopus records.",
         version="0.1.0",
+        lifespan=lifespan,
     )
+    app.state.import_recovery_enabled = True
 
     # CORS configuration with credentials enabled for HttpOnly cookie exchange
     origins = settings.cors_origins_list
