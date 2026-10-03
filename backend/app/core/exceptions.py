@@ -68,9 +68,11 @@ class APIError(HTTPException):
         detail: str,
         code: str,
         headers: dict[str, str] | None = None,
+        data: dict[str, object] | None = None,
     ) -> None:
         super().__init__(status_code=status_code, detail=detail, headers=headers)
         self.code = code
+        self.data = data or {}
 
 
 async def api_error_handler(_request: Request, exc: APIError) -> JSONResponse:
@@ -78,6 +80,6 @@ async def api_error_handler(_request: Request, exc: APIError) -> JSONResponse:
 
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail, "code": exc.code},
+        content={**exc.data, "detail": exc.detail, "code": exc.code},
         headers=exc.headers,
     )

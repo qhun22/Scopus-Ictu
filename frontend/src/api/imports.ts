@@ -1,7 +1,95 @@
-/** Imports API client — M0 scaffold. */
+import { apiDelete, apiGet, apiPost, apiPostForm } from "./client";
 
-import { apiGet } from "./client";
+export type ImportStatus =
+  | "RECEIVED"
+  | "PARSING"
+  | "VALIDATED"
+  | "STAGED"
+  | "APPLIED"
+  | "FAILED"
+  | "CANCELLED"
+  | "IMPORTED";
 
-export function pingImports() {
-  return apiGet<{ status: string; milestone: string }>("/api/v1/imports/ping");
+export interface LecturerImportSummaryData {
+  created?: number;
+  updated?: number;
+  unchanged?: number;
+  conflicts?: number;
+  warnings?: number;
+  dataset_name?: string;
+  schema_version?: string;
+}
+
+export interface ScopusImport {
+  id: string;
+  type?: "SCOPUS" | "LECTURERS";
+  file_name: string;
+  status: ImportStatus;
+  total_records: number;
+  imported_records: number;
+  failed_records: number;
+  processed_records: number;
+  progress_percent: number;
+  duplicate_candidates: number;
+  row_errors: Array<{ row_number?: number; code?: string; message?: string }>;
+  error_summary: Record<string, unknown> | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  started_at: string;
+  finished_at: string | null;
+  duration_seconds: number;
+  is_terminal: boolean;
+  performed_by: string | null;
+  can_delete?: boolean;
+  scopus_summary?: Record<string, unknown> | null;
+  lecturer_summary?: LecturerImportSummaryData | null;
+}
+
+export interface UnifiedImportStats {
+  total_imports: number;
+  success_count: number;
+  processing_count: number;
+  failed_count: number;
+}
+
+export interface ImportHistoryResponse {
+  items: ScopusImport[];
+  stats?: UnifiedImportStats | null;
+}
+
+export interface ImportConfig {
+  supported_extensions: string[];
+  max_bytes: number;
+}
+
+export function getImportConfig(): Promise<ImportConfig> {
+  return apiGet<ImportConfig>("/api/v1/imports/config");
+}
+
+export function getImportHistory(): Promise<ImportHistoryResponse> {
+  return apiGet<ImportHistoryResponse>("/api/v1/imports");
+}
+
+export function getImportDetail(id: string): Promise<ScopusImport> {
+  return apiGet<ScopusImport>(`/api/v1/imports/${id}`);
+}
+
+export function uploadScopusCsv(file: File, allowDuplicate = false): Promise<ScopusImport> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const suffix = allowDuplicate ? "?allow_duplicate=true" : "";
+  return apiPostForm<ScopusImport>(`/api/v1/imports/scopus${suffix}`, form);
+}
+
+export function cancelImport(id: string): Promise<ScopusImport> {
+  return apiPost<ScopusImport>(`/api/v1/imports/${id}/cancel`);
+}
+
+export function deleteImport(id: string): Promise<{ message: string; id: string }> {
+  return apiDelete<{ message: string; id: string }>(`/api/v1/imports/${id}`);
+}
+
+export function rollbackLecturerImport(id: string): Promise<{ message: string; id: string }> {
+  return apiPost<{ message: string; id: string }>(`/api/v1/imports/${id}/rollback`);
 }

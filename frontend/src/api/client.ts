@@ -144,6 +144,31 @@ async function request<T>(
   return parseSuccessBody<T>(response);
 }
 
+async function requestForm<T>(
+  method: string,
+  path: string,
+  body: FormData,
+  options: ApiRequestOptions,
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method,
+    headers: { Accept: "application/json" },
+    credentials: "include",
+    body,
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    const error = await createApiError(method, response);
+    if (!options.skipGlobalAuthHandling) {
+      publishSessionAuthError(error);
+    }
+    throw error;
+  }
+
+  return parseSuccessBody<T>(response);
+}
+
 export function apiGet<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   return request<T>("GET", path, undefined, options);
 }
@@ -154,6 +179,14 @@ export function apiPost<T, B = unknown>(
   options: ApiRequestOptions = {},
 ): Promise<T> {
   return request<T>("POST", path, body, options);
+}
+
+export function apiPostForm<T>(
+  path: string,
+  body: FormData,
+  options: ApiRequestOptions = {},
+): Promise<T> {
+  return requestForm<T>("POST", path, body, options);
 }
 
 export function apiPut<T, B = unknown>(
