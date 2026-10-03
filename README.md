@@ -1,91 +1,91 @@
 # Scopus-Ictu
 
-Institutional master-data reconciliation pipeline between ICTU Repository
-and Scopus publication records.
+Institutional master-data reconciliation between the ICTU Repository and
+Scopus publication records.
 
 ---
 
-## Architecture Status
+## Implemented scope (complete/frozen)
 
-| Item             | Value                                       |
-| ---------------- | ------------------------------------------- |
-| Architecture     | **v1.1 — FROZEN**                           |
-| Skeleton         | **v1.1.1 — FINAL**                          |
-| Milestone        | **M0 — Project Skeleton**                   |
-| Governance       | STRICT                                      |
-| Stack — Backend  | Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy 2.x, Alembic, PostgreSQL |
-| Stack — Frontend | React + TypeScript + Vite + Tailwind + Ant Design |
-
-> M0 contains **scaffolding and signatures only**.
-> No business logic. No first Alembic migration. No real data.
+| Milestone | Status | Description |
+|---|---|---|
+| **M0 / M1** | ✅ Frozen | Database foundation: PostgreSQL, Alembic migrations (`f4c8b1a2e9d7`), full schema with CHECK constraints, indexes, and audit contracts |
+| **M2.1** | ✅ Frozen | Cookie-based JWT authentication, role-based authorization (`ADMIN`, `REVIEWER`, `LECTURER`) |
+| **M2.2** | ✅ Frozen | Account administration: profile update, role change, lock/unlock, password reset; per-account audit trail and notifications |
+| **M2.3** | ✅ Frozen | Lecturer master dataset: import, rollback, per-record provenance snapshots, duplicate name detection |
+| **M2.4** | ✅ Frozen | Scopus raw CSV import lifecycle: SHA-256 deduplication, progress, cancellation, history, safe deletion |
+| **M2.5A** | ✅ Frozen | ICTU lecturer dataset build and import pipeline; identity resolution (staff_code → email → name+department) |
+| **M2.6A** | ✅ Frozen | Publication normalization from raw Scopus rows; canonical EID deduplication; `publication_raw_sources` provenance |
 
 ---
 
-## Repository Layout
+## Future / incomplete milestones
 
-```
-.
-├── docs/adr/                 Architecture Decision Records
-├── data/                     Real source data is NEVER committed
-├── backend/                  FastAPI service
-├── frontend/                 React SPA
-├── compose.yaml              Base compose (environment-neutral)
-├── compose.local.yaml        Local overrides
-└── compose.prod.yaml         Production reference overrides
-```
-
-See `docs/adr/` for the four frozen architectural decisions:
-
-- `ADR-001-eid-canonical-identity.md`
-- `ADR-002-ictu-repository-offline-ingestion.md`
-- `ADR-003-audit-append-only.md`
-- `ADR-004-identity-evidence-separation.md`
+| Milestone | Description |
+|---|---|
+| **M2.7** | Author normalization: canonical Scopus author identity, name-variant resolution, ORCID matching |
+| **M2.8** | Lecturer ↔ Scopus publication matching: linkage rules, confidence scoring |
+| **M3** | Human review workflow: UI for reviewers to confirm/reject match candidates |
+| **M4** | Complete publications management UI, dashboard, and audit reporting |
 
 ---
 
-## M0 Scope (this commit)
+## Stack
 
-- Folder skeleton as specified in MASTER CONSTRUCTION DIRECTIVE.
-- Class / function signatures only.
-- `pass`, `TODO`, `raise NotImplementedError` only.
-- No CRUD, no matching, no parsing, no normalization.
-
-Out of scope for M0:
-
-- First real Alembic migration
-- Production seed data
-- Real JWT / hashing
-- Real matching weights / thresholds
-- Real crawler HTTP calls
+- **Backend:** Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy 2.x, Alembic, PostgreSQL
+- **Frontend:** React, TypeScript, Vite, Tailwind, Ant Design
 
 ---
 
-## Local Development (M0)
+## Repository data policy
+
+Public ICTU lecturer source artifacts, schemas, reports, and provenance
+snapshots are intentionally versioned for reproducibility. Private or
+runtime-generated Scopus CSV exports remain local-only and are not committed.
+Credentials and local environment files are never committed.
+
+---
+
+## Environment configuration
 
 ### Backend
 
+The backend reads `backend/.env` (gitignored). Copy the placeholder template:
+
 ```bash
-cd backend
-# Create backend/.env from the repository template and fill in local values.
-cp ../.env.example .env
-pip install -e .
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+cp backend/.env.example backend/.env
 ```
 
-The backend reads `backend/.env` from the location of
-`backend/app/core/config.py`, so starting Uvicorn from `backend` or from the
-repository root uses the same configuration. Required database, CORS, JWT,
-and environment settings have no code defaults; startup fails with a
-validation error when they are missing.
-
-Then open <http://localhost:8000/docs>.
+Fill in your local PostgreSQL credentials, a long random `SECRET_KEY`, and
+set `ENVIRONMENT=local` for development.
 
 ### Frontend
 
 ```bash
 cd frontend
-npm install
-npm run build
+cp .env.example .env.local  # if present
+```
+
+---
+
+## Local development
+
+### Backend
+
+```bash
+cd backend
+python -m pip install -e ".[dev]"
+python -m alembic upgrade head
+python -m pytest -q
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm ci
+npm run dev
 ```
 
 ### Docker Compose
@@ -94,20 +94,71 @@ npm run build
 docker compose -f compose.yaml -f compose.local.yaml up --build
 ```
 
-Developer-specific overrides go to `compose.local.override.yaml`
-(gitignored).
+Use `compose.local.override.yaml` for developer-specific overrides; it is
+ignored by Git.
 
 ---
 
-## Frozen Principles (summary)
+## Alembic workflow
 
-1. ICTU Repository is master-data source, NOT ground truth.
-2. Ground truth is the approved Lecturer ↔ Scopus Author identity mapping.
-3. ICTU ingestion is OFFLINE (crawler → NDJSON → DB import).
-4. Runtime business requests MUST NOT hit ICTU Repository directly.
-5. Raw Scopus data and canonical data are separate.
-6. Canonical publication identity = EID.
-7. Provenance lives in `publication_raw_sources`.
-8. Identity and evidence are separate.
-9. Audit is append-only.
-10. Revert = compensating revisions, never delete.
+Migrations are append-only and must not be rewritten after publication.
+Inspect the current head:
+
+```bash
+cd backend
+python -m alembic heads
+python -m alembic upgrade head
+```
+
+The current migration head is `f4c8b1a2e9d7`.
+
+---
+
+## Developer tools
+
+### Demo account seeding
+
+```bash
+# admin@gmail.com (ADMIN) is auto-created if missing.
+# DEMO_ADMIN_PASSWORD required only when the admin account is absent.
+# DEMO_USER_PASSWORD required only when the lecturer account is absent.
+DEMO_USER_PASSWORD=your_password python -m scripts.seed_demo_users
+```
+
+### Acceptance testing (M2.6A)
+
+```bash
+cd backend
+python scripts/run_m2_6a_acceptance.py --dataset ../data/scopus/local.csv
+```
+
+Requires `ENVIRONMENT != prod` and an explicit dataset path.
+Do not commit private Scopus exports.
+
+### Benchmark (M2.6A)
+
+```bash
+cd backend
+python scripts/benchmark_m2_6a_10k.py
+```
+
+Creates a disposable PostgreSQL schema (`bench_m26a_*`), runs normalization,
+reports query count and duration, then drops the schema.
+Requires `ENVIRONMENT != prod`.
+
+---
+
+## Database isolation
+
+Tests (`pytest`) must never mutate the development database.
+See `backend/tests/conftest.py` for the isolation guard contract.
+For CI, set `ENVIRONMENT=test` and `TEST_DATABASE_URL` to an isolated
+test database URL.
+
+---
+
+## Git conventions
+
+- Credentials, `.env`, and local-only CSV files are never committed.
+- Migrations are append-only.
+- Alembic head: `f4c8b1a2e9d7` (do not rewrite).

@@ -56,6 +56,9 @@ Thumbs.db
 *.bak
 *.tmp
 
+# --- Local backups ---
+local_backups/
+
 # --- Testing ---
 .pytest_cache/
 .coverage
