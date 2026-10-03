@@ -5,11 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import desc, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Query, Session
 from sqlalchemy.orm.exc import StaleDataError
@@ -19,6 +20,7 @@ from app.core.database import get_session_factory
 from app.core.exceptions import APIError
 from app.core.security import password_hasher, token_service
 from app.models.governance import AuditEvent, User
+from app.models.publication import PublicationRawSource, ScopusAuthorNameVariant
 from app.models.scopus_raw import RawScopusRecord, ScopusImport
 from app.schemas.scopus_import import (
     NormalizationData,
@@ -63,6 +65,32 @@ class DuplicateImportConfirmationRequired(RuntimeError):
 class ImportAlreadyFinished(RuntimeError):
     def __init__(self, status: str) -> None:
         self.status = status
+
+
+@dataclass(frozen=True)
+class ImportUsageInfo:
+    """Usage counts and in-use flag for a single Scopus import."""
+
+    publication_source_links: int
+    author_variant_links: int
+
+    @property
+    def in_use(self) -> bool:
+        return self.publication_source_links > 0 or self.author_variant_links > 0
+
+    def to_dict(self) -> dict[str, int]:
+        return {
+            "publication_source_links": self.publication_source_links,
+            "author_variant_links": self.author_variant_links,
+        }
+
+
+# Append-only audit action constants for import history visibility.
+HISTORY_ARCHIVED_ACTION = "SCOPUS_IMPORT_HISTORY_ARCHIVED"
+HISTORY_RESTORED_ACTION = "SCOPUS_IMPORT_HISTORY_RESTORED"
+HISTORY_VISIBILITY_ACTIONS: frozenset[str] = frozenset(
+    {HISTORY_ARCHIVED_ACTION, HISTORY_RESTORED_ACTION}
+)
 
 
 def validate_upload_filename(filename: str | None) -> str:
@@ -265,14 +293,31 @@ def _ensure_dt(val: Any) -> datetime:
     return datetime.now(UTC)
 
 
-def list_imports(db: Session, *, limit: int = 50) -> list[ScopusImportResponse]:
-    """Return unified import history including Scopus CSV and Lecturer JSON imports."""
-    items = db.query(ScopusImport).order_by(ScopusImport.created_at.desc()).limit(limit).all()
+def list_imports(
+    db: Session, *, limit: int = 50, include_archived: bool = False
+) -> list[ScopusImportResponse]:
+    """Return unified import history including Scopus CSV and Lecturer JSON imports.
+
+    Default excludes Scopus imports that have been archived from history
+    visibility. Pass ``include_archived=True`` to return them as well.
+    """
+    items = db.query(ScopusImport).order_by(ScopusImport.created_at.desc()).all()
     names = _actor_names(db, [item.id for item in items])
-    scopus_responses = [
-        to_import_response(item, performed_by=names.get(item.id, "Không xác định"))
-        for item in items
-    ]
+    scopus_ids = [item.id for item in items]
+    usage_map = compute_usage_for_imports(db, scopus_ids)
+    archive_map = resolve_archive_state_for_imports(db, scopus_ids)
+    scopus_responses = []
+    for item in items:
+        if not include_archived and archive_map.get(item.id, False):
+            continue
+        scopus_responses.append(
+            to_import_response(
+                item,
+                performed_by=names.get(item.id, "Không xác định"),
+                usage=usage_map.get(item.id),
+                archived=archive_map.get(item.id, False),
+            )
+        )
 
     lecturer_audits = (
         db.query(AuditEvent)
@@ -416,6 +461,8 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
         return to_import_response(
             item,
             performed_by=_actor_names(db, [item.id]).get(item.id, "Không xác định"),
+            usage=compute_usage_for_import(db, item.id),
+            archived=is_archived(db, item.id),
         )
 
     audit = (
@@ -504,7 +551,6 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
 def delete_scopus_import(db: Session, import_id: uuid.UUID, actor: User) -> bool:
     """Delete a Scopus import, or hide a rolled-back lecturer import from history."""
     from app.core.exceptions import APIError
-    from app.models.publication import PublicationRawSource, ScopusAuthorNameVariant
 
     item = db.query(ScopusImport).filter(ScopusImport.id == import_id).first()
     if item is None:
@@ -517,27 +563,18 @@ def delete_scopus_import(db: Session, import_id: uuid.UUID, actor: User) -> bool
             code="IMPORT_ALREADY_PROCESSING",
         )
 
-    # Check downstream dependencies
-    in_use_pub = (
-        db.query(PublicationRawSource)
-        .join(RawScopusRecord, PublicationRawSource.raw_record_id == RawScopusRecord.id)
-        .filter(RawScopusRecord.import_id == item.id)
-        .first()
-    )
-    in_use_author = (
-        db.query(ScopusAuthorNameVariant)
-        .join(
-            RawScopusRecord,
-            ScopusAuthorNameVariant.first_seen_raw_record_id == RawScopusRecord.id,
-        )
-        .filter(RawScopusRecord.import_id == item.id)
-        .first()
-    )
-    if in_use_pub is not None or in_use_author is not None:
+    # Check downstream dependencies — re-checked on every DELETE call
+    # because the state may have changed between list/detail retrieval
+    # and the actual delete request.
+    usage = compute_usage_for_import(db, item.id)
+    if usage.in_use:
         raise APIError(
             status_code=409,
-            detail="Dữ liệu từ đợt nhập này đang được hệ thống sử dụng.",
+            detail=(
+                "Dữ liệu nguồn của đợt nhập này đang được sử dụng ở bước xử lý tiếp theo."
+            ),
             code="IMPORT_IN_USE",
+            data=usage.to_dict(),
         )
 
     # Audit deletion before destructive removal
@@ -779,7 +816,13 @@ def _build_normalization_data(item: ScopusImport) -> NormalizationData | None:
     )
 
 
-def to_import_response(item: ScopusImport, *, performed_by: str | None) -> ScopusImportResponse:
+def to_import_response(
+    item: ScopusImport,
+    *,
+    performed_by: str | None,
+    usage: ImportUsageInfo | None = None,
+    archived: bool = False,
+) -> ScopusImportResponse:
     processed = item.valid_records + item.invalid_records
     progress = (
         min(100, round(processed * 100 / item.total_records))
@@ -789,6 +832,13 @@ def to_import_response(item: ScopusImport, *, performed_by: str | None) -> Scopu
     terminal = item.status in TERMINAL_STATUSES
     summary = item.error_summary or {}
     normalization = _build_normalization_data(item)
+    usage_info = usage or ImportUsageInfo(publication_source_links=0, author_variant_links=0)
+    in_use = usage_info.in_use
+    # can_delete rules:
+    #   ACTIVE     -> False
+    #   TERMINAL   -> False when in_use else True
+    # archive state does NOT block physical deletion; visibility is independent.
+    can_delete = terminal and not in_use
     return ScopusImportResponse(
         id=item.id,
         type="SCOPUS",
@@ -811,7 +861,10 @@ def to_import_response(item: ScopusImport, *, performed_by: str | None) -> Scopu
         duration_seconds=max(0.0, (item.updated_at - item.created_at).total_seconds()),
         is_terminal=terminal,
         performed_by=performed_by or "Không xác định",
-        can_delete=terminal,
+        can_delete=can_delete,
+        in_use=in_use,
+        archived=archived,
+        usage=usage_info.to_dict(),
         scopus_summary=item.error_summary,
     )
 
@@ -830,6 +883,131 @@ def _lock_digest(db: Session, digest: str) -> None:
     if getattr(getattr(bind, "dialect", None), "name", None) == "postgresql":
         key = int.from_bytes(bytes.fromhex(digest[:16]), "big", signed=True)
         db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+
+
+def compute_usage_for_imports(
+    db: Session, import_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, ImportUsageInfo]:
+    """Bulk-resolve downstream usage counts for many Scopus imports.
+
+    Performs two grouped aggregate queries (one for PublicationRawSource,
+    one for ScopusAuthorNameVariant) instead of N+1. Missing import IDs
+    are not present in the returned mapping; callers should default to
+    zero usage.
+    """
+    result: dict[uuid.UUID, ImportUsageInfo] = {}
+    if not import_ids:
+        return result
+    unique_ids = list(dict.fromkeys(import_ids))
+
+    # PublicationRawSource links: COUNT(PublicationRawSource) JOIN RawScopusRecord
+    # grouped by RawScopusRecord.import_id
+    pub_stmt = (
+        select(
+            RawScopusRecord.import_id,
+            func.count(PublicationRawSource.id),
+        )
+        .join(PublicationRawSource, PublicationRawSource.raw_record_id == RawScopusRecord.id)
+        .where(RawScopusRecord.import_id.in_(unique_ids))
+        .group_by(RawScopusRecord.import_id)
+    )
+    pub_counts: dict[uuid.UUID, int] = {
+        row[0]: int(row[1]) for row in db.execute(pub_stmt).all()
+    }
+
+    # ScopusAuthorNameVariant links grouped by first_seen_raw_record.import_id
+    auth_stmt = (
+        select(
+            RawScopusRecord.import_id,
+            func.count(ScopusAuthorNameVariant.id),
+        )
+        .join(
+            ScopusAuthorNameVariant,
+            ScopusAuthorNameVariant.first_seen_raw_record_id == RawScopusRecord.id,
+        )
+        .where(RawScopusRecord.import_id.in_(unique_ids))
+        .group_by(RawScopusRecord.import_id)
+    )
+    auth_counts: dict[uuid.UUID, int] = {
+        row[0]: int(row[1]) for row in db.execute(auth_stmt).all()
+    }
+
+    for import_id in unique_ids:
+        result[import_id] = ImportUsageInfo(
+            publication_source_links=pub_counts.get(import_id, 0),
+            author_variant_links=auth_counts.get(import_id, 0),
+        )
+    return result
+
+
+def resolve_archive_state_for_imports(
+    db: Session, import_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, bool]:
+    """Resolve the current archive visibility for many imports in one query.
+
+    Archive state is derived from the latest relevant audit event
+    (SCOPUS_IMPORT_HISTORY_ARCHIVED / SCOPUS_IMPORT_HISTORY_RESTORED) per
+    entity_id. The query uses a window function so it remains O(N) in
+    audit rows rather than O(N) per import.
+    """
+    result: dict[uuid.UUID, bool] = {import_id: False for import_id in import_ids}
+    if not import_ids:
+        return result
+    unique_ids = list(dict.fromkeys(import_ids))
+
+    # Per-import latest audit row (across both actions) using ROW_NUMBER.
+    subquery = (
+        select(
+            AuditEvent.entity_id,
+            AuditEvent.action,
+            AuditEvent.created_at,
+            func.row_number()
+            .over(
+                partition_by=AuditEvent.entity_id,
+                order_by=desc(AuditEvent.created_at),
+            )
+            .label("rn"),
+        )
+        .where(
+            AuditEvent.entity_type == "scopus_imports",
+            AuditEvent.entity_id.in_(unique_ids),
+            AuditEvent.action.in_(HISTORY_VISIBILITY_ACTIONS),
+        )
+        .subquery()
+    )
+    stmt = select(subquery.c.entity_id, subquery.c.action).where(subquery.c.rn == 1)
+    for entity_id, action in db.execute(stmt).all():
+        result[entity_id] = action == HISTORY_ARCHIVED_ACTION
+    return result
+
+
+def compute_usage_for_import(db: Session, import_id: uuid.UUID) -> ImportUsageInfo:
+    """Focused single-import usage query (used by detail endpoint)."""
+    pub_count = (
+        db.query(func.count(PublicationRawSource.id))
+        .join(RawScopusRecord, PublicationRawSource.raw_record_id == RawScopusRecord.id)
+        .filter(RawScopusRecord.import_id == import_id)
+        .scalar()
+        or 0
+    )
+    auth_count = (
+        db.query(func.count(ScopusAuthorNameVariant.id))
+        .join(
+            RawScopusRecord,
+            ScopusAuthorNameVariant.first_seen_raw_record_id == RawScopusRecord.id,
+        )
+        .filter(RawScopusRecord.import_id == import_id)
+        .scalar()
+        or 0
+    )
+    return ImportUsageInfo(
+        publication_source_links=int(pub_count),
+        author_variant_links=int(auth_count),
+    )
+
+
+def is_archived(db: Session, import_id: uuid.UUID) -> bool:
+    return resolve_archive_state_for_imports(db, [import_id]).get(import_id, False)
 
 
 def _transition_active(import_id: uuid.UUID, *, status: str) -> bool:
@@ -1083,25 +1261,110 @@ def _actor_names(db: Session, import_ids: list[uuid.UUID]) -> dict[uuid.UUID, st
     }
 
 
+def archive_import_history(
+    db: Session, import_id: uuid.UUID, actor: User
+) -> ScopusImportResponse | None:
+    """Hide a Scopus import from default history without destroying data.
+
+    Append-only: records a ``SCOPUS_IMPORT_HISTORY_ARCHIVED`` audit event.
+    Idempotent: archiving an already-archived import is a no-op success.
+    """
+    item = db.query(ScopusImport).filter(ScopusImport.id == import_id).first()
+    if item is None:
+        return None
+    current_state = is_archived(db, item.id)
+    if current_state:
+        # Idempotent: no new audit row; return current response unchanged.
+        return get_import(db, import_id)
+
+    usage = compute_usage_for_import(db, item.id)
+    now = datetime.now(UTC)
+    db.add(AuditEvent(
+        entity_type="scopus_imports",
+        entity_id=item.id,
+        action=HISTORY_ARCHIVED_ACTION,
+        actor_type="USER",
+        actor_user_id=actor.id,
+        actor_service=None,
+        before_state={"archived": False},
+        after_state={"archived": True},
+        event_metadata={
+            "import_id": str(item.id),
+            "filename": item.file_name,
+            "in_use": usage.in_use,
+            "publication_source_links": usage.publication_source_links,
+            "author_variant_links": usage.author_variant_links,
+            "archived_by": actor.display_name,
+            "archived_at": now.isoformat(),
+        },
+    ))
+    db.commit()
+    return get_import(db, import_id)
+
+
+def restore_import_history(
+    db: Session, import_id: uuid.UUID, actor: User
+) -> ScopusImportResponse | None:
+    """Restore a previously archived Scopus import to the default history view.
+
+    Append-only: records a ``SCOPUS_IMPORT_HISTORY_RESTORED`` audit event.
+    Idempotent: restoring a non-archived import is a no-op success.
+    """
+    item = db.query(ScopusImport).filter(ScopusImport.id == import_id).first()
+    if item is None:
+        return None
+    if not is_archived(db, item.id):
+        return get_import(db, import_id)
+
+    now = datetime.now(UTC)
+    db.add(AuditEvent(
+        entity_type="scopus_imports",
+        entity_id=item.id,
+        action=HISTORY_RESTORED_ACTION,
+        actor_type="USER",
+        actor_user_id=actor.id,
+        actor_service=None,
+        before_state={"archived": True},
+        after_state={"archived": False},
+        event_metadata={
+            "import_id": str(item.id),
+            "filename": item.file_name,
+            "restored_by": actor.display_name,
+            "restored_at": now.isoformat(),
+        },
+    ))
+    db.commit()
+    return get_import(db, import_id)
+
+
 __all__ = [
     "ACTIVE_STATUSES",
     "COMPLETED_STATUSES",
     "TERMINAL_STATUSES",
     "DuplicateImportConfirmationRequired",
+    "HISTORY_ARCHIVED_ACTION",
+    "HISTORY_RESTORED_ACTION",
     "ImportAlreadyFinished",
     "ImportAlreadyProcessing",
     "ImportStorageError",
+    "ImportUsageInfo",
+    "archive_import_history",
     "cancel_import",
+    "compute_usage_for_import",
+    "compute_usage_for_imports",
     "create_import_job",
     "delete_scopus_import",
     "eligible_raw_records",
     "get_import",
     "get_import_stats",
+    "is_archived",
     "is_import_eligible_for_normalization",
     "list_imports",
     "normalize_existing_import",
     "process_import_job",
     "recover_interrupted_imports",
+    "resolve_archive_state_for_imports",
+    "restore_import_history",
     "rollback_lecturer_import",
     "to_import_response",
     "validate_upload_filename",

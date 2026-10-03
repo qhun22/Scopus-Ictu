@@ -76,7 +76,17 @@ class ScopusImportResponse(BaseModel):
     duration_seconds: float
     is_terminal: bool
     performed_by: str | None = None
+    # Legacy alias kept for backwards compatibility; computed from `usage`.
+    # For Scopus imports: `can_delete = is_terminal AND NOT in_use`.
+    # For lecturer imports: `can_delete` is unrelated to usage.
     can_delete: bool = False
+    # New M2.6A follow-up fields:
+    in_use: bool = False
+    archived: bool = False
+    usage: dict = Field(default_factory=lambda: {
+        "publication_source_links": 0,
+        "author_variant_links": 0,
+    })
     scopus_summary: dict | None = None
     lecturer_summary: dict | None = None
 
