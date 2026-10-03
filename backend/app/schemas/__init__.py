@@ -25,8 +25,12 @@ from app.schemas.publication import (
     ScopusAuthorResponse,
 )
 from app.schemas.scopus_import import (
+    ImportStatus,
+    ScopusImportConfigResponse,
     ImportStatusResponse,
+    ScopusImportBase,
     ScopusImportCreate,
+    ScopusImportListResponse,
     ScopusImportResponse,
 )
 
@@ -46,10 +50,13 @@ __all__ = [
     "LecturerSourceSnapshotResponse",
     "LecturerKnownPublicationResponse",
     # scopus_import
+    "ImportStatus",
+    "ImportStatusResponse",
+    "ScopusImportConfigResponse",
+    "ScopusImportListResponse",
     "ScopusImportBase",
     "ScopusImportCreate",
     "ScopusImportResponse",
-    "ImportStatusResponse",
     # publication
     "PublicationBase",
     "PublicationCreate",

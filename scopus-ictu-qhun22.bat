@@ -37,7 +37,7 @@ if errorlevel 1 (
 
 netstat -ano | findstr /R /C:":8000 .*LISTENING" > nul
 if errorlevel 1 (
-    start "" /b cmd /c "cd /d ""%BACKEND_DIR%"" && ""%PYTHON%"" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 >> ""%LOG_DIR%\backend.log"" 2>&1"
+    start "" /b cmd /c "cd /d ""%BACKEND_DIR%"" && ""%PYTHON%"" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload >> ""%LOG_DIR%\backend.log"" 2>&1"
 ) else (
     echo Backend port 8000 is already in use; keeping the existing server.
 )

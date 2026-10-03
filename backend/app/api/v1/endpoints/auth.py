@@ -9,14 +9,18 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import COOKIE_NAME, get_current_user, require_role
+from app.api.dependencies import (
+    COOKIE_NAME,
+    get_current_user,
+    require_role,
+    set_access_token_cookie,
+)
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.core.security import password_hasher, token_service
 from app.models.governance import User, UserNotification
 from app.schemas.auth import LoginRequest, MessageResponse, UserResponse
-
 
 router = APIRouter()
 
@@ -108,15 +112,7 @@ def login(
             "av": int(user.auth_version or 1),
         }
     )
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=token,
-        max_age=settings.access_token_expire_minutes * 60,
-        httponly=True,
-        samesite="lax",
-        secure=settings.environment.lower() == "prod",
-        path="/",
-    )
+    set_access_token_cookie(response, token)
     return _public_user(user)
 
 
