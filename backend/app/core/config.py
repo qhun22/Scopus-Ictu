@@ -19,7 +19,6 @@ from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
-
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 LOCAL_ENV_FILE = BACKEND_DIR / ".env"
 
@@ -71,6 +70,17 @@ class Settings(BaseSettings):
     )
     scopus_raw_dir: str = Field(
         "./data/raw_scopus/", validation_alias="SCOPUS_RAW_DIR"
+    )
+    scopus_import_max_bytes: int = Field(
+        20 * 1024 * 1024,
+        ge=1,
+        validation_alias="SCOPUS_IMPORT_MAX_BYTES",
+    )
+    scopus_import_batch_size: int = Field(
+        100,
+        ge=1,
+        le=10_000,
+        validation_alias="SCOPUS_IMPORT_BATCH_SIZE",
     )
 
     model_config = SettingsConfigDict(

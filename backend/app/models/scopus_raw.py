@@ -68,7 +68,9 @@ class ScopusImport(Base):
         nullable=False,
         server_default=text("'RECEIVED'"),
     )
-    error_summary: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error_summary: Mapped[dict | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
     version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("1")
     )
@@ -141,7 +143,9 @@ class RawScopusRecord(Base):
     doi_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     validation_status: Mapped[str] = mapped_column(String(20), nullable=False)
-    validation_errors: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    validation_errors: Mapped[list | None] = mapped_column(
+        JSONB(none_as_null=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
