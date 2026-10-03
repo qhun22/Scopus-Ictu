@@ -18,7 +18,7 @@ export default function AppLayout() {
 
       {/* Main Content Area */}
       <div
-        className={`flex min-h-screen flex-col transition-all duration-300 ${
+        className={`flex min-h-screen min-w-0 flex-1 flex-col transition-all duration-300 ${
           isSidebarCollapsed ? "md:pl-20" : "md:pl-64"
         }`}
       >
@@ -30,7 +30,7 @@ export default function AppLayout() {
         />
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden p-4 sm:p-5 lg:p-6">
+        <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6">
           <Outlet />
         </main>
       </div>

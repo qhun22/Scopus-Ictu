@@ -38,6 +38,10 @@
   background: #94a3b8;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 html,
 body,
 #root {
@@ -54,6 +58,14 @@ body {
   white-space: nowrap;
   font-size: clamp(0.9rem, 2.2vw, 1.5rem);
   line-height: 1.2;
+}
+
+/* Common Page Container: Fluid with 1600px ceiling to prevent infinite stretch on ultra-wide monitors */
+.app-page-container {
+  width: 100%;
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .validation-message {
