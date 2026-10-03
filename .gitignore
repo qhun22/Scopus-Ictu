@@ -36,6 +36,7 @@ compose.local.override.yaml
 # --- Data (real source data is NEVER committed) ---
 data/raw_scopus/*
 !data/raw_scopus/.gitkeep
+data/scopus/Truong_Quang_Huy_Scopus_Sep2026.csv
 data/snapshots/*
 !data/snapshots/.gitkeep
 data/test_fixtures/*

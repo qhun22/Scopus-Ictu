@@ -47,7 +47,7 @@ PROFILE/ROLE
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Generator
 from unittest.mock import MagicMock
 
@@ -302,8 +302,8 @@ def test_15_16_17_18_19_20_password_reset_mutation(mock_db: MagicMock) -> None:
     audit = next((o for o in added_objects if isinstance(o, AuditEvent)), None)
     assert audit is not None
     assert audit.action == "USER_PASSWORD_RESET"
-    assert "password" not in str(audit.after_state)
-    assert "hash" not in str(audit.after_state)
+    assert new_pwd not in str(audit.after_state)
+    assert old_hash not in str(audit.after_state)
     assert audit.after_state == {"password_reset": True}
 
 
@@ -328,6 +328,30 @@ def test_21_old_session_rejected_after_reset(client: TestClient, mock_db: MagicM
 
     response = client.get("/api/v1/auth/me")
     assert response.status_code == 401
+
+
+def test_active_session_is_renewed_near_expiration(
+    client: TestClient,
+    mock_db: MagicMock,
+) -> None:
+    user = _create_user()
+    mock_db.query.return_value.filter.return_value.first.return_value = user
+    expiring_token = token_service.create_access_token(
+        {
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "av": int(user.auth_version or 1),
+        },
+        expires_delta=timedelta(minutes=5),
+    )
+    client.cookies.set("access_token", expiring_token)
+
+    response = client.get("/api/v1/auth/me")
+
+    assert response.status_code == 200
+    assert "access_token=" in response.headers["set-cookie"]
+    assert "HttpOnly" in response.headers["set-cookie"]
 
 
 def test_22_offline_user_old_password_returns_password_reset_by_admin(
