@@ -17,8 +17,20 @@ from app.services.matching.candidate_generator import (
     normalize_name_n2,
     strip_observed_title_prefix,
 )
-from app.services.matching.candidate_types import CandidateEvidence, LecturerScopusCandidate
+from app.services.matching.candidate_types import (
+    CandidateEvidence,
+    EnrichedLecturerScopusCandidate,
+    LecturerScopusCandidate,
+    PublicationEvidence,
+    PublicationEvidenceConflict,
+)
 from app.services.matching.engine import MatchingEngine
+from app.services.matching.publication_evidence_enricher import (
+    PublicationEvidenceEnricher,
+    PublicationEvidenceEnrichmentResult,
+    enrich_candidates,
+    normalize_doi_for_matching,
+)
 from app.services.matching.scoring import ScoreCalculator, ScoreResult
 
 __all__ = [
@@ -26,6 +38,13 @@ __all__ = [
     "CandidateGenerator",
     "CandidateEvidence",
     "LecturerScopusCandidate",
+    "EnrichedLecturerScopusCandidate",
+    "PublicationEvidence",
+    "PublicationEvidenceConflict",
+    "PublicationEvidenceEnricher",
+    "PublicationEvidenceEnrichmentResult",
+    "enrich_candidates",
+    "normalize_doi_for_matching",
     "OBSERVED_TITLE_PREFIXES",
     "generate_candidates",
     "normalize_name_n0",
