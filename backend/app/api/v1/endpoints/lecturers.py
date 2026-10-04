@@ -6,7 +6,7 @@ import re
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -414,7 +414,6 @@ def export_lecturers(
     """Export all current canonical lecturer master data to JSON without user/account/security fields."""
     from datetime import UTC, datetime
     import json
-    from fastapi.responses import Response
     from app.models.governance import AuditEvent
 
     now = datetime.now(UTC)
