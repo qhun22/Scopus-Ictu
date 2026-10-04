@@ -22,6 +22,7 @@ from app.services.matching.candidate_persistence import (
     CANDIDATE_RULE_SET_VERSION,
     PUBLICATION_RULE_SET_VERSION,
     CandidatePersistenceService,
+    GenerationRunConflict,
     GenerationRunSpec,
     canonical_json,
     sha256_json,
@@ -165,6 +166,19 @@ def test_first_run_and_same_run_retry_are_idempotent(candidate_fixture) -> None:
     assert session.scalar(select(func.count(LecturerScopusCandidate.id))) == 1
     assert session.scalar(select(func.count(LecturerScopusCandidateObservation.id))) == 1
     assert session.scalar(select(func.count(LecturerScopusCandidateEvidence.id))) == 1
+
+
+def test_same_run_retry_requires_the_exact_original_pair_set(candidate_fixture) -> None:
+    session, lecturer_id, author_id = candidate_fixture
+    service = CandidatePersistenceService(session)
+    run_id = uuid.uuid4()
+    spec = GenerationRunSpec(run_id=run_id, source_state=_source_state())
+    candidate = _candidate(lecturer_id, author_id)
+
+    service.persist_generation(spec, [candidate])
+
+    with pytest.raises(GenerationRunConflict, match="different candidate pair set"):
+        service.persist_generation(spec, [])
 
 
 def test_pair_uniqueness_allows_many_to_many_candidate_roots(candidate_fixture) -> None:
