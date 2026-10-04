@@ -235,6 +235,7 @@ export const vi: TranslationSchema = {
     uploadSubtitle: "Tải lên tệp CSV xuất từ Scopus để nạp và xử lý dữ liệu công bố khoa học",
     dragActivePrompt: "Thả tệp CSV vào đây để tải lên",
     addImport: "Thêm tệp Scopus",
+    addLecturers: "Thêm giảng viên",
     completedWithErrors: "Hoàn thành có lỗi",
     duplicateTitle: "Tệp có nội dung trùng với một đợt nhập trước.",
     duplicateMessage: "Đợt nhập trước:",
