@@ -89,6 +89,8 @@ class ScopusImportResponse(BaseModel):
     })
     scopus_summary: dict | None = None
     lecturer_summary: dict | None = None
+    # M2.6B: nested author normalization counters
+    normalization_summary: dict | None = None
 
 
 class UnifiedImportStats(BaseModel):

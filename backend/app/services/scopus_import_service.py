@@ -542,6 +542,7 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
                 "dataset_name": meta.get("dataset_name"),
                 "schema_version": meta.get("dataset_schema_version", "1.0"),
             },
+            normalization_summary=None,
         )
     return None
 
@@ -864,6 +865,7 @@ def to_import_response(
         archived=archived,
         usage=usage_info.to_dict(),
         scopus_summary=item.error_summary,
+        normalization_summary=item.normalization_summary,
     )
 
 
