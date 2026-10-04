@@ -63,3 +63,36 @@ class AuthorListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class NormalizationCountersResponse(BaseModel):
+    """Counters from an author normalization run."""
+
+    raw_records_processed: int
+    raw_records_failed: int
+    author_occurrences: int
+    unique_authors_seen: int
+    authors_created: int
+    authors_existing: int
+    publication_author_links_created: int
+    publication_author_links_existing: int
+    variants_created: int
+    variants_existing: int
+    conflicts: int
+
+
+class NormalizationErrorEntry(BaseModel):
+    """Structured row-level error from author normalization."""
+
+    row_number: int
+    code: str
+    message: str
+
+
+class AuthorNormalizationResponse(BaseModel):
+    """Response returned after author normalization (M2.6B)."""
+
+    import_id: UUID
+    status: str  # COMPLETED | FAILED | NORMALIZING
+    counters: NormalizationCountersResponse
+    errors: list[NormalizationErrorEntry] = Field(default_factory=list)

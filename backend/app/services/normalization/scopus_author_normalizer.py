@@ -358,7 +358,6 @@ class AuthorNormalizer:
 
             # Upsert ScopusAuthor
             author = self._upsert_author(db, occ)
-            is_new = self.counters.unique_authors_seen < len(self.counters._seen_scopus_ids)
 
             # Ensure both name variants
             if occ.display_name:
@@ -400,7 +399,6 @@ class AuthorNormalizer:
         try:
             db.flush()  # Get the ID without committing
             self.counters.authors_created += 1
-            self.counters.unique_authors_seen += 1
             self.counters._seen_scopus_ids.add(occ.scopus_id)
             return author
         except IntegrityError:
@@ -679,6 +677,9 @@ def normalize_authors_for_import(
                 for sid in {o.scopus_id for o in occurrences}:
                     if sid not in normalizer.counters._seen_scopus_ids:
                         normalizer.counters._seen_scopus_ids.add(sid)
+                normalizer.counters.unique_authors_seen = len(
+                    normalizer.counters._seen_scopus_ids
+                )
 
                 normalizer.record_occurrences(
                     occurrences, db, publication_by_raw_record_id

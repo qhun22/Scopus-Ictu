@@ -23,10 +23,14 @@ from datetime import UTC, datetime
 from typing import Generator
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.api.dependencies import get_current_user
 from app.core.exceptions import APIError
+from app.core.database import get_session
+from app.main import app
 from app.models.base import Base
 from app.models.governance import User
 from app.models.publication import (
@@ -208,6 +212,123 @@ def test_applied_import_author_normalization_succeeds(
     variant_types = {v.variant_type for v in variants}
     assert "AUTHOR_DISPLAY" in variant_types
     assert "AUTHOR_FULL_NAME" in variant_types
+
+
+def test_author_normalize_http_rerun_is_idempotent(
+    db_session: Session, admin_user: User
+) -> None:
+    """The HTTP contract must remain truthful on the second run."""
+    import_item = _make_staged_import(db_session, admin_user)
+    _add_raw_record(
+        db_session,
+        import_item.id,
+        row_number=1,
+        raw_payload={
+            "Authors": "Nguyen T.",
+            "Author full names": "Nguyen, Thanh-Tung (58035626100)",
+            "Author(s) ID": "58035626100",
+            "Title": "HTTP rerun regression",
+        },
+    )
+    _apply_publication_normalization(db_session, import_item.id)
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        with TestClient(app) as client:
+            first = client.post(
+                f"/api/v1/authors/normalize-import/{import_item.id}"
+            )
+            assert first.status_code == 200, first.text
+
+            before = (
+                db_session.query(ScopusAuthor).count(),
+                db_session.query(PublicationAuthor).count(),
+                db_session.query(ScopusAuthorNameVariant).count(),
+            )
+            second = client.post(
+                f"/api/v1/authors/normalize-import/{import_item.id}"
+            )
+            assert second.status_code == 200, second.text
+            payload = second.json()
+            assert payload["import_id"] == str(import_item.id)
+            assert payload["status"] == "COMPLETED"
+            assert set(("counters", "errors")) <= payload.keys()
+
+        db_session.refresh(import_item)
+        after = (
+            db_session.query(ScopusAuthor).count(),
+            db_session.query(PublicationAuthor).count(),
+            db_session.query(ScopusAuthorNameVariant).count(),
+        )
+        assert after == before
+        assert import_item.status == "APPLIED"
+        assert import_item.normalization_summary["authors"]["status"] == "COMPLETED"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_unique_authors_seen_counts_distinct_ids_on_first_and_rerun(
+    db_session: Session, admin_user: User
+) -> None:
+    """The distinct-ID counter is independent from authors_created."""
+    import_item = _make_staged_import(db_session, admin_user)
+    for row_number, display_name, full_name, scopus_id in (
+        (1, "Author A", "Author, A", "10000000001"),
+        (2, "Author B", "Author, B", "10000000002"),
+        (3, "Author A2", "Author, A2", "10000000001"),
+    ):
+        _add_raw_record(
+            db_session,
+            import_item.id,
+            row_number=row_number,
+            raw_payload={
+                "Authors": display_name,
+                "Author full names": f"{full_name} ({scopus_id})",
+                "Author(s) ID": scopus_id,
+                "Title": f"Distinct counter {row_number}",
+            },
+        )
+    _apply_publication_normalization(db_session, import_item.id)
+
+    app.dependency_overrides[get_session] = lambda: db_session
+    app.dependency_overrides[get_current_user] = lambda: admin_user
+    try:
+        with TestClient(app) as client:
+            first = client.post(
+                f"/api/v1/authors/normalize-import/{import_item.id}"
+            )
+            assert first.status_code == 200, first.text
+            first_payload = first.json()
+            assert first_payload["counters"]["author_occurrences"] == 3
+            assert first_payload["counters"]["unique_authors_seen"] == 2
+            assert first_payload["counters"]["authors_created"] == 2
+
+            before = (
+                db_session.query(ScopusAuthor).count(),
+                db_session.query(PublicationAuthor).count(),
+                db_session.query(ScopusAuthorNameVariant).count(),
+            )
+
+            rerun = client.post(
+                f"/api/v1/authors/normalize-import/{import_item.id}"
+            )
+            assert rerun.status_code == 200, rerun.text
+            rerun_payload = rerun.json()
+            assert rerun_payload["counters"]["author_occurrences"] == 3
+            assert rerun_payload["counters"]["unique_authors_seen"] == 2
+            assert rerun_payload["counters"]["authors_created"] == 0
+
+        after = (
+            db_session.query(ScopusAuthor).count(),
+            db_session.query(PublicationAuthor).count(),
+            db_session.query(ScopusAuthorNameVariant).count(),
+        )
+        assert after == before
+        assert import_item.status == "APPLIED"
+        assert import_item.normalization_summary["authors"]["status"] == "COMPLETED"
+    finally:
+        app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -909,3 +1030,417 @@ def test_fatal_exception_sets_failed(
            "canonical" in import_item.normalization_summary or \
            any(k for k in (import_item.normalization_summary or {}).keys() if k != "authors"), \
         "M2.6A counters must be preserved after fatal author exception"
+
+
+# ---------------------------------------------------------------------------
+# S. AUTHOR_LIST_LENGTH_MISMATCH — no truncate, no zip-shortest, no guessing
+# ---------------------------------------------------------------------------
+
+def test_author_list_length_mismatch_no_author_created(
+    db_session: Session, admin_user: User
+):
+    """When Authors / Author full names / Author(s) ID have different lengths,
+    the row is rejected with a structured error and NO author/variant/link is created.
+    There must be no truncation, zip-shortest, or silent guessing."""
+    import_item = _make_staged_import(db_session, admin_user)
+
+    # Case 1: Authors longer than full names
+    raw1 = _add_raw_record(
+        db_session, import_item.id, 1,
+        {
+            "Authors": "A; B; C",
+            "Author full names": "A Full (1); B Full (2)",          # 2 ≠ 3
+            "Author(s) ID": "1; 2; 3",
+            "Title": "T1",
+        },
+    )
+
+    # Case 2: Authors shorter than IDs
+    raw2 = _add_raw_record(
+        db_session, import_item.id, 2,
+        {
+            "Authors": "X; Y",                                      # 2 ≠ 3
+            "Author full names": "X Full (10); Y Full (20)",
+            "Author(s) ID": "10; 20; 30",
+            "Title": "T2",
+        },
+    )
+
+    _apply_publication_normalization(db_session, import_item.id)
+
+    counters = normalize_authors_for_import(db_session, import_item.id)
+
+    # No authors created for either row
+    assert counters.authors_created == 0
+    # Both rows failed
+    assert counters.raw_records_failed == 2
+    assert counters.raw_records_processed == 2
+    # No publication-author links
+    assert counters.publication_author_links_created == 0
+    # Import still COMPLETED (row-level errors, not fatal)
+    db_session.refresh(import_item)
+    author_summary = import_item.normalization_summary.get("authors") if isinstance(
+        import_item.normalization_summary, dict
+    ) else None
+    assert author_summary is not None
+    assert author_summary["status"] == "COMPLETED"
+
+    # Structured errors present
+    errors = author_summary.get("errors", [])
+    error_codes = {e.get("code") for e in errors}
+    assert "AUTHOR_LIST_LENGTH_MISMATCH" in error_codes
+
+    # Zero ScopusAuthors in DB (no truncation → no "A; B; C" merged to shorter list)
+    assert db_session.query(ScopusAuthor).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# T. AUTHOR_LIST_LENGTH_MISMATCH parser — fail closed, no zip-shortest
+# ---------------------------------------------------------------------------
+
+def test_author_list_length_mismatch_parser_fails_closed(
+    db_session: Session, admin_user: User
+):
+    """The parse_author_occurrences function must return empty occurrences
+    when list lengths differ — never truncate, never zip-shortest."""
+    import_item = _make_staged_import(db_session, admin_user)
+    raw = _add_raw_record(
+        db_session, import_item.id, 1,
+        {
+            "Authors": "A; B",
+            "Author full names": "A Full (1)",          # 1 != 2
+            "Author(s) ID": "1; 2",
+            "Title": "T",
+        },
+    )
+
+    _apply_publication_normalization(db_session, import_item.id)
+
+    counters = normalize_authors_for_import(db_session, import_item.id)
+
+    # author_occurrences must be ZERO — no guessing/truncation
+    assert counters.author_occurrences == 0
+    assert counters.raw_records_failed == 1
+    # Cannot have created 1 author (which would mean zip-shortest happened)
+    assert counters.authors_created == 0
+
+    # The DB must NOT contain a ScopusAuthor for scopus_id "1" with truncated data
+    author1 = db_session.query(ScopusAuthor).filter(
+        ScopusAuthor.scopus_id == "1"
+    ).first()
+    assert author1 is None
+
+
+# ---------------------------------------------------------------------------
+# U. DUPLICATE_SCOPUS_ID_IN_PUBLICATION — no duplicate occurrence/link
+# ---------------------------------------------------------------------------
+
+def test_duplicate_scopus_id_in_publication_no_duplicate_link(
+    db_session: Session, admin_user: User
+):
+    """The same Scopus ID appearing twice in one publication must be recorded
+    as a structured error and must NOT create duplicate author or duplicate links."""
+    import_item = _make_staged_import(db_session, admin_user)
+
+    raw = _add_raw_record(
+        db_session, import_item.id, 1,
+        {
+            "Authors": "Nguyen T.; Le S.",
+            "Author full names": "Nguyen, T. (11111111111); Le, S. (11111111111)",  # duplicate!
+            "Author(s) ID": "11111111111; 11111111111",
+            "Title": "T",
+        },
+    )
+
+    _apply_publication_normalization(db_session, import_item.id)
+
+    counters = normalize_authors_for_import(db_session, import_item.id)
+
+    # Raw record fails due to duplicate
+    assert counters.raw_records_failed == 1
+    assert counters.raw_records_processed == 1
+    # Zero author occurrences (duplicate rejected before linking)
+    assert counters.author_occurrences == 0
+    # No authors created
+    assert counters.authors_created == 0
+
+    # No duplicate ScopusAuthor entities
+    all_authors = db_session.query(ScopusAuthor).all()
+    assert len(all_authors) == 0
+
+    # No publication-author links
+    pub = db_session.query(Publication).first()
+    links = db_session.query(PublicationAuthor).filter(
+        PublicationAuthor.publication_id == pub.id
+    ).all()
+    assert len(links) == 0
+
+    # Structured error recorded
+    db_session.refresh(import_item)
+    author_summary = import_item.normalization_summary.get("authors") if isinstance(
+        import_item.normalization_summary, dict
+    ) else None
+    errors = author_summary.get("errors", []) if author_summary else []
+    assert any(e.get("code") == "DUPLICATE_SCOPUS_ID_IN_PUBLICATION" for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# V. ASSOCIATION_CONFLICT — no silent overwrite (strengthened)
+# ---------------------------------------------------------------------------
+
+def test_association_conflict_recorded_no_overwrite(
+    db_session: Session, admin_user: User
+):
+    """When author_order position is already occupied by a different author,
+    the conflict must be recorded as an error and NO silent overwrite occurs.
+    The original author must retain their position."""
+    import_item = _make_staged_import(db_session, admin_user)
+
+    # Add two raw records — they will initially get different EIDs (2-s2.0-1 vs 2-s2.0-2)
+    # from _add_raw_record. We'll manually force them to share the same publication
+    # so that author_order slots genuinely collide.
+    raw1 = _add_raw_record(
+        db_session, import_item.id, 1,
+        {"Authors": "Alice A.", "Author full names": "Alice A (1)", "Author(s) ID": "1", "Title": "P1"},
+    )
+    raw2 = _add_raw_record(
+        db_session, import_item.id, 2,
+        {"Authors": "Bob B.", "Author full names": "Bob B (2)", "Author(s) ID": "2", "Title": "P2"},
+    )
+
+    _apply_publication_normalization(db_session, import_item.id)
+
+    # Force both raw records to map to the SAME publication so position 1 collides.
+    # Keep raw1's provenance as-is (pub1 at position 1 with author "1").
+    pub1 = db_session.query(Publication).filter(Publication.eid == "2-s2.0-1").first()
+    assert pub1 is not None
+    pub2 = db_session.query(Publication).filter(Publication.eid == "2-s2.0-2").first()
+    assert pub2 is not None
+
+    # Point raw2's provenance at pub1 instead of pub2
+    raw2_provenance = (
+        db_session.query(PublicationRawSource)
+        .filter(PublicationRawSource.raw_record_id == raw2.id)
+        .first()
+    )
+    assert raw2_provenance is not None
+    raw2_provenance.publication_id = pub1.id
+    db_session.commit()
+
+    # Pre-seed only author1 and link1 at position 1 (do NOT pre-seed author2).
+    # After this setup:
+    #   - raw1 → pub1, author "1" at position 1  [link already exists → no conflict]
+    #   - raw2 → pub1, author "2" at position 1  [position 1 occupied by author1 → CONFLICT]
+    author1 = ScopusAuthor(scopus_id="1", preferred_name="Alice A", created_at=datetime.now(UTC), updated_at=datetime.now(UTC))
+    db_session.add(author1)
+    db_session.flush()
+
+    link1 = PublicationAuthor(publication_id=pub1.id, scopus_author_id=author1.id, author_order=1, created_at=datetime.now(UTC))
+    db_session.add(link1)
+    db_session.commit()
+
+    # Run author normalization
+    counters = normalize_authors_for_import(db_session, import_item.id)
+
+    # Conflict counter incremented
+    assert counters.conflicts >= 1, (
+        f"Expected at least 1 conflict, got {counters.conflicts}. "
+        f"Full counters: raw_failed={counters.raw_records_failed}, "
+        f"created={counters.publication_author_links_created}, "
+        f"existing={counters.publication_author_links_existing}"
+    )
+
+    # Original link at position 1 is UNCHANGED — Alice keeps her slot
+    remaining = (
+        db_session.query(PublicationAuthor)
+        .filter(PublicationAuthor.publication_id == pub1.id)
+        .all()
+    )
+    assert len(remaining) == 1, "Must not have created duplicate link for conflicting author"
+    assert remaining[0].scopus_author_id == author1.id, "Original author at position 1 must not be overwritten"
+    assert remaining[0].author_order == 1
+
+    # Bob's link was NOT created (conflict blocked it)
+    author2 = db_session.query(ScopusAuthor).filter(ScopusAuthor.scopus_id == "2").first()
+    assert author2 is not None, "Bob's author entity should have been created"
+
+    bob_link = (
+        db_session.query(PublicationAuthor)
+        .filter(
+            PublicationAuthor.publication_id == pub1.id,
+            PublicationAuthor.scopus_author_id == author2.id,
+        )
+        .first()
+    )
+    assert bob_link is None, "Conflicting author must NOT get a link at the occupied position"
+
+    # Structured error recorded
+    db_session.refresh(import_item)
+    author_summary = import_item.normalization_summary.get("authors") if isinstance(
+        import_item.normalization_summary, dict
+    ) else None
+    errors = author_summary.get("errors", []) if author_summary else []
+    assert any(e.get("code") == "AUTHOR_ORDER_CONFLICT" for e in errors), (
+        f"Expected AUTHOR_ORDER_CONFLICT in errors, got {[e.get('code') for e in errors]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# W. PREFERRED_NAME_STABILITY — first occurrence locks, later spellings captured as variant
+# ---------------------------------------------------------------------------
+
+def test_preferred_name_stability_not_overwritten_on_rerun(
+    db_session: Session, admin_user: User
+):
+    """The first occurrence sets ScopusAuthor.preferred_name.
+    A later occurrence with a different spelling must NOT overwrite the existing
+    preferred_name. The new spelling is captured as a name variant instead."""
+    import_item = _make_staged_import(db_session, admin_user)
+
+    # First record: spelling "Nguyen, Van-Thanh"
+    _add_raw_record(
+        db_session, import_item.id, 1,
+        {
+            "Authors": "N.V.T.",
+            "Author full names": "Nguyen, Van-Thanh (58035626100)",
+            "Author(s) ID": "58035626100",
+            "Title": "Paper 1",
+        },
+    )
+
+    # Second record (later rerun or new paper): different spelling "Nguyen Van Thanh"
+    _add_raw_record(
+        db_session, import_item.id, 2,
+        {
+            "Authors": "NV Thanh",
+            "Author full names": "Nguyen Van Thanh (58035626100)",
+            "Author(s) ID": "58035626100",
+            "Title": "Paper 2",
+        },
+    )
+
+    _apply_publication_normalization(db_session, import_item.id)
+
+    # First run
+    counters1 = normalize_authors_for_import(db_session, import_item.id)
+    assert counters1.authors_created == 1
+
+    author = db_session.query(ScopusAuthor).filter(
+        ScopusAuthor.scopus_id == "58035626100"
+    ).first()
+    assert author is not None
+    initial_preferred = author.preferred_name
+    assert initial_preferred is not None
+    assert initial_preferred != ""
+
+    # Capture the initial preferred_name — it must be from the FULL_NAME variant
+    # (preferred_name uses FULL_NAME first, then falls back to display)
+    first_full_name_variant = (
+        db_session.query(ScopusAuthorNameVariant)
+        .filter(
+            ScopusAuthorNameVariant.scopus_author_id == author.id,
+            ScopusAuthorNameVariant.variant_type == "AUTHOR_FULL_NAME",
+        )
+        .order_by(ScopusAuthorNameVariant.created_at)
+        .first()
+    )
+    assert first_full_name_variant is not None
+
+    # Second run (simulates re-normalization with new spelling)
+    db_session.expire_all()
+    counters2 = normalize_authors_for_import(db_session, import_item.id)
+
+    # Second run: no new author created (already exists)
+    # Note: authors_existing counts occurrences where author was found in DB.
+    # With 2 rows both referencing the same scopus_id, both find the existing author,
+    # so counters2.authors_existing == 2 (not 1).
+    assert counters2.authors_created == 0
+    assert counters2.authors_existing == 2
+
+    # preferred_name must be UNCHANGED
+    db_session.refresh(author)
+    assert author.preferred_name == initial_preferred, (
+        f"preferred_name must not change on re-run. "
+        f"Expected '{initial_preferred}', got '{author.preferred_name}'"
+    )
+
+    # The new spelling is captured as an additional FULL_NAME variant
+    all_full_name_variants = (
+        db_session.query(ScopusAuthorNameVariant)
+        .filter(
+            ScopusAuthorNameVariant.scopus_author_id == author.id,
+            ScopusAuthorNameVariant.variant_type == "AUTHOR_FULL_NAME",
+        )
+        .all()
+    )
+    full_names = {v.variant_name for v in all_full_name_variants}
+    assert "Nguyen, Van-Thanh" in full_names, "Original full name must remain as variant"
+    assert "Nguyen Van Thanh" in full_names, "New spelling must be captured as additional variant"
+
+
+# ---------------------------------------------------------------------------
+# X. PREFERRED_NAME_STABILITY — rerun with preferred_name already set
+# ---------------------------------------------------------------------------
+
+def test_preferred_name_stable_across_rerun_scenario(
+    db_session: Session, admin_user: User
+):
+    """Simulate the production scenario: ScopusAuthor.preferred_name is already
+    populated from a previous run. A subsequent run must not change it even when
+    the incoming FULL_NAME spelling differs."""
+    import_item = _make_staged_import(db_session, admin_user)
+
+    _add_raw_record(
+        db_session, import_item.id, 1,
+        {
+            "Authors": "T. Nguyen",
+            "Author full names": "Nguyen, Thanh (58035626100)",
+            "Author(s) ID": "58035626100",
+            "Title": "First Paper",
+        },
+    )
+    _add_raw_record(
+        db_session, import_item.id, 2,
+        {
+            "Authors": "TNguyen",
+            "Author full names": "Thanh-Nguyen (58035626100)",  # different spelling
+            "Author(s) ID": "58035626100",
+            "Title": "Second Paper",
+        },
+    )
+
+    _apply_publication_normalization(db_session, import_item.id)
+
+    # First run
+    normalize_authors_for_import(db_session, import_item.id)
+
+    author = db_session.query(ScopusAuthor).filter(
+        ScopusAuthor.scopus_id == "58035626100"
+    ).first()
+    assert author is not None
+    preferred_after_first = author.preferred_name
+
+    # Reset summary to simulate a fresh re-run (not a retry after FAILED)
+    import_item.normalization_summary = {"authors": None}
+    db_session.commit()
+
+    # Re-run: pretend a new import record comes in with different spelling
+    db_session.expire_all()
+
+    # The preferred_name is already set; re-running with the new spelling
+    # must NOT change the existing preferred_name
+    normalize_authors_for_import(db_session, import_item.id)
+
+    db_session.refresh(author)
+    assert author.preferred_name == preferred_after_first, (
+        "preferred_name must not change when re-run encounters different spelling"
+    )
+
+    # New spelling added as variant
+    all_variants = db_session.query(ScopusAuthorNameVariant).filter(
+        ScopusAuthorNameVariant.scopus_author_id == author.id,
+        ScopusAuthorNameVariant.variant_type == "AUTHOR_FULL_NAME",
+    ).all()
+    variant_names = {v.variant_name for v in all_variants}
+    assert len(variant_names) >= 2, "Both spellings should appear as separate variants"
+    assert "Thanh-Nguyen" in variant_names
