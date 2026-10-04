@@ -493,18 +493,37 @@ def create_lecturer(
     current_user: User = Depends(require_role("ADMIN")),
     db: Session = Depends(get_session),
 ) -> LecturerResponse:
-    """Create a lecturer master record and its login account."""
+    """Create a lecturer master record and its login account.
+
+    `staff_code` is optional: blank/omitted => stored as NULL. The
+    partial unique index on `lecturers.staff_code` still enforces
+    uniqueness when a value is supplied.
+    """
     role = _validate_role(payload.role)
     full_name = _normalise_name(payload.full_name)
     email = payload.email.strip()
-    staff_code = payload.staff_code.strip()
-    if not full_name or not email or not staff_code:
-        raise HTTPException(status_code=422, detail="Tên, email và mã cán bộ không được để trống.")
+    # Optional: normalize empty/whitespace to None.
+    staff_code = (payload.staff_code or "").strip() or None
+    if not full_name or not email:
+        raise HTTPException(
+            status_code=422,
+            detail="Tên và email không được để trống.",
+        )
+    if not payload.password or len(payload.password) < 8:
+        raise HTTPException(
+            status_code=422,
+            detail="Mật khẩu phải có ít nhất 8 ký tự.",
+        )
 
     if db.query(User).filter(func.lower(User.email) == email.lower()).first():
         raise HTTPException(status_code=409, detail="Email đã được sử dụng.")
-    if db.query(Lecturer).filter(Lecturer.staff_code == staff_code).first():
-        raise HTTPException(status_code=409, detail="Mã cán bộ đã được sử dụng.")
+    if staff_code is not None and db.query(Lecturer).filter(Lecturer.staff_code == staff_code).first():
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Mã cán bộ đã được sử dụng.",
+            code="STAFF_CODE_ALREADY_EXISTS",
+            data={"staff_code": staff_code},
+        )
 
     lecturer = Lecturer(
         full_name=full_name,
@@ -529,10 +548,26 @@ def create_lecturer(
         return _lecturer_response(lecturer)
     except IntegrityError as exc:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Email hoặc mã cán bộ đã được sử dụng.") from exc
+        # Try to surface a precise duplicate code when possible.
+        if staff_code is not None and db.query(Lecturer).filter(Lecturer.staff_code == staff_code).first():
+            raise APIError(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Mã cán bộ đã được sử dụng.",
+                code="STAFF_CODE_ALREADY_EXISTS",
+                data={"staff_code": staff_code},
+            ) from exc
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email đã được sử dụng.",
+            code="EMAIL_ALREADY_EXISTS",
+        ) from exc
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=503, detail="Không thể tạo tài khoản giảng viên.") from exc
+        raise APIError(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể tạo tài khoản giảng viên.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
 
 
 def update_lecturer(
@@ -554,6 +589,9 @@ def update_lecturer(
                 detail="Dữ liệu giảng viên đã bị thay đổi bởi phiên làm việc khác.",
                 code="VERSION_CONFLICT",
             )
+        # Detect which fields were EXPLICITLY provided in the request body
+        # so we can distinguish "omitted" (unchanged) from "null" (clear).
+        provided = payload.model_fields_set
         before_dict = {
             "full_name": lecturer.full_name,
             "staff_code": lecturer.staff_code,
@@ -569,15 +607,20 @@ def update_lecturer(
             fn = _normalise_name(payload.full_name)
             lecturer.full_name = fn
             lecturer.full_name_normalized = fn.casefold()
-        if payload.staff_code is not None:
-            sc = payload.staff_code.strip() or None
+        if "staff_code" in provided:
+            sc = (payload.staff_code or "").strip() or None
             if sc:
                 dup_sc = db.query(Lecturer).filter(Lecturer.staff_code == sc, Lecturer.id != lecturer.id).first()
                 if dup_sc:
-                    raise HTTPException(status_code=409, detail="Mã cán bộ đã được sử dụng bởi giảng viên khác.")
+                    raise APIError(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Mã cán bộ đã được sử dụng bởi giảng viên khác.",
+                        code="STAFF_CODE_ALREADY_EXISTS",
+                        data={"staff_code": sc},
+                    )
             lecturer.staff_code = sc
         duplicate_email = None
-        if payload.email is not None:
+        if "email" in provided:
             email = payload.email.strip() or None
             if email:
                 duplicate_email = (
@@ -588,6 +631,12 @@ def update_lecturer(
                     )
                     .first()
                 )
+                if duplicate_email is not None:
+                    # Email uniqueness is enforced by the partial index on
+                    # the lower(email) form, but we keep the existing
+                    # "multiple lecturers may temporarily share an email"
+                    # semantic and surface it as a warning, not an error.
+                    pass
             lecturer.email = email
         if payload.academic_degree is not None:
             lecturer.academic_degree = payload.academic_degree.strip() or None
@@ -658,9 +707,22 @@ def update_lecturer(
             ) from exc
         except IntegrityError as exc:
             db.rollback()
+            # Re-query to disambiguate which field collided.
+            if (
+                lecturer.staff_code is not None
+                and db.query(Lecturer)
+                .filter(Lecturer.staff_code == lecturer.staff_code, Lecturer.id != lecturer.id)
+                .first()
+            ):
+                raise APIError(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Mã cán bộ đã được sử dụng bởi hồ sơ giảng viên khác.",
+                    code="STAFF_CODE_ALREADY_EXISTS",
+                    data={"staff_code": lecturer.staff_code},
+                ) from exc
             raise APIError(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Email, mã cán bộ hoặc ORCID đã được sử dụng bởi hồ sơ giảng viên khác.",
+                detail="Dữ liệu giảng viên bị trùng với hồ sơ khác.",
                 code="LECTURER_DATA_CONFLICT",
             ) from exc
         except SQLAlchemyError as exc:

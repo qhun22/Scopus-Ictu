@@ -41,7 +41,8 @@ export interface LecturerForm {
   full_name: string;
   email: string;
   password?: string;
-  staff_code: string;
+  // staff_code is OPTIONAL: blank/omitted -> stored as NULL on the server.
+  staff_code: string | null;
   role: string;
   academic_degree: string;
   department: string;
@@ -51,7 +52,11 @@ export interface LecturerUpdatePayload {
   version: number;
   full_name?: string;
   email?: string;
-  staff_code?: string;
+  // staff_code update contract:
+  //   * non-empty string -> trim & set
+  //   * null              -> clear to NULL
+  //   * undefined         -> unchanged (field omitted)
+  staff_code?: string | null;
   role?: string;
   academic_degree?: string;
   academic_rank?: string;

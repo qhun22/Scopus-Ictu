@@ -245,6 +245,7 @@ def update_user(
                         status_code=status.HTTP_409_CONFLICT,
                         detail="Mã cán bộ đã được sử dụng.",
                         code="STAFF_CODE_ALREADY_EXISTS",
+                        data={"staff_code": value},
                     )
             if getattr(lecturer, field) != value:
                 setattr(lecturer, field, value)
