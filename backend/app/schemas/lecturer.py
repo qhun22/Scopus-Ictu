@@ -10,7 +10,9 @@ from app.schemas.common import TimestampMixin
 class LecturerBase(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     email: str = Field(..., min_length=3, max_length=255)
-    staff_code: str = Field(..., min_length=1, max_length=50)
+    # staff_code is OPTIONAL. A blank/omitted value is stored as NULL.
+    # Uniqueness is enforced at the DB level (partial unique index).
+    staff_code: str | None = Field(default=None, max_length=50)
     role: str = Field(default="LECTURER", min_length=1, max_length=20)
     academic_degree: str | None = Field(default=None, max_length=50)
     department: str | None = Field(default=None, max_length=150)
@@ -24,7 +26,12 @@ class LecturerUpdate(BaseModel):
     version: int = Field(..., ge=1)
     full_name: str | None = Field(default=None, min_length=1, max_length=255)
     email: str | None = Field(default=None, min_length=3, max_length=255)
-    staff_code: str | None = Field(default=None, min_length=1, max_length=50)
+    # Update semantics:
+    #   * omitted  -> field unchanged
+    #   * None     -> clear field to NULL
+    #   * ""       -> clear field to NULL
+    #   * non-empty -> trim, validate uniqueness against OTHER lecturer IDs
+    staff_code: str | None = Field(default=None, max_length=50)
     role: str | None = Field(default=None, min_length=1, max_length=20)
     academic_rank: str | None = Field(default=None, max_length=50)
     academic_degree: str | None = Field(default=None, max_length=50)

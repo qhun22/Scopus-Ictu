@@ -71,6 +71,10 @@ export default function LecturersPage() {
     department: "Khoa CNTT",
   });
   const [addError, setAddError] = useState<string>("");
+  // Track whether the user has manually edited the staff_code field so the
+  // email-local-part suggestion never overwrites an intentional edit.
+  const [staffCodeTouched, setStaffCodeTouched] = useState<boolean>(false);
+  const [staffCodeFieldError, setStaffCodeFieldError] = useState<string>("");
 
   // Form states for Edit / Detail
   const [editForm, setEditForm] = useState<{
@@ -91,6 +95,7 @@ export default function LecturersPage() {
     department: "",
   });
   const [editError, setEditError] = useState<string>("");
+  const [editStaffCodeFieldError, setEditStaffCodeFieldError] = useState<string>("");
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
@@ -190,13 +195,34 @@ export default function LecturersPage() {
       department: "Khoa CNTT",
     });
     setAddError("");
+    setStaffCodeTouched(false);
+    setStaffCodeFieldError("");
     setIsAddModalOpen(true);
+  };
+
+  // Email-local-part suggestion: copy the part before "@" of the email
+  // into the staff_code field as a UX assist. Only acts when the staff_code
+  // field has not been manually edited by the user and is currently empty.
+  const handleAddEmailChange = (nextEmail: string) => {
+    setAddForm((prev) => {
+      if (!staffCodeTouched && (!prev.staff_code || prev.staff_code === "")) {
+        const suggestion = nextEmail.split("@")[0]?.trim() || "";
+        return { ...prev, email: nextEmail, staff_code: suggestion };
+      }
+      return { ...prev, email: nextEmail };
+    });
+  };
+
+  const handleAddStaffCodeChange = (next: string) => {
+    setStaffCodeTouched(true);
+    setStaffCodeFieldError("");
+    setAddForm((prev) => ({ ...prev, staff_code: next }));
   };
 
   // Submit Add Lecturer
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addForm.full_name.trim() || !addForm.email.trim() || !addForm.password?.trim() || !addForm.staff_code.trim()) {
+    if (!addForm.full_name.trim() || !addForm.email.trim() || !addForm.password?.trim()) {
       setAddError(locale === "vi" ? "Vui lòng nhập đầy đủ các thông tin bắt buộc." : "Please fill in all required fields.");
       return;
     }
@@ -207,12 +233,18 @@ export default function LecturersPage() {
 
     setIsSubmitting(true);
     setAddError("");
+    setStaffCodeFieldError("");
     try {
+      // staff_code is optional: blank/omitted -> stored as NULL on the
+      // server. We always send the trimmed value (or null when empty)
+      // so the backend receives an explicit null rather than an
+      // implicit "field omitted".
+      const trimmedStaffCode = (addForm.staff_code || "").trim();
       await createLecturer({
         full_name: addForm.full_name.trim(),
         email: addForm.email.trim(),
         password: addForm.password,
-        staff_code: addForm.staff_code.trim(),
+        staff_code: trimmedStaffCode ? trimmedStaffCode : null as unknown as string,
         role: addForm.role,
         academic_degree: addForm.academic_degree,
         department: addForm.department,
@@ -224,6 +256,15 @@ export default function LecturersPage() {
       setIsAddModalOpen(false);
       fetchData();
     } catch (err: any) {
+      const code = getErrorCode(err);
+      if (code === "STAFF_CODE_ALREADY_EXISTS") {
+        setStaffCodeFieldError(
+          locale === "vi"
+            ? "Mã cán bộ đã được sử dụng bởi giảng viên khác."
+            : "This staff code is already in use by another lecturer.",
+        );
+        return;
+      }
       const msg = err?.response?.data?.detail || (locale === "vi" ? "Không thể thêm giảng viên. Vui lòng thử lại." : "Could not add lecturer.");
       setAddError(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
@@ -248,6 +289,7 @@ export default function LecturersPage() {
     setGrantPassword("");
     setGrantRole(lec.account?.role || "LECTURER");
     setEditError("");
+    setEditStaffCodeFieldError("");
     setNewPassword("");
     setPasswordError("");
     setShowNewPassword(false);
@@ -279,12 +321,18 @@ export default function LecturersPage() {
 
     setDetailAction("save");
     setEditError("");
+    setEditStaffCodeFieldError("");
     try {
+      // staff_code update contract:
+      //   * user types a value -> trimmed value is sent (non-null)
+      //   * user clears the field -> explicit null is sent so the server
+      //     can distinguish "clear" from "omitted/unchanged"
+      const trimmedStaffCode = editForm.staff_code.trim();
       const payload: LecturerUpdatePayload = {
         version: selectedLecturer.account?.version ?? selectedLecturer.version,
         full_name: editForm.full_name.trim(),
         email: (grantAccount ? grantEmail.trim() : editForm.email.trim()) || undefined,
-        staff_code: editForm.staff_code.trim() || undefined,
+        staff_code: trimmedStaffCode ? trimmedStaffCode : null,
         academic_degree: editForm.academic_degree.trim() || undefined,
         academic_rank: editForm.academic_rank.trim() || undefined,
         faculty: editForm.faculty.trim() || undefined,
@@ -312,6 +360,12 @@ export default function LecturersPage() {
     } catch (error: unknown) {
       if (getErrorCode(error) === "VERSION_CONFLICT") {
         await handleVersionConflict();
+      } else if (getErrorCode(error) === "STAFF_CODE_ALREADY_EXISTS") {
+        setEditStaffCodeFieldError(
+          locale === "vi"
+            ? "Mã cán bộ đã được sử dụng bởi giảng viên khác."
+            : "This staff code is already in use by another lecturer.",
+        );
       } else {
         toast.error(
           "Không thể lưu thay đổi",
@@ -879,7 +933,7 @@ export default function LecturersPage() {
                     type="email"
                     required
                     value={addForm.email}
-                    onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                    onChange={(e) => handleAddEmailChange(e.target.value)}
                     placeholder="example@ictu.edu.vn"
                     className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
                   />
@@ -904,16 +958,28 @@ export default function LecturersPage() {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Mã cán bộ" : "Staff Code"} <span className="text-rose-500">*</span>
+                    {locale === "vi" ? "Mã cán bộ" : "Staff Code"}
+                    <span className="ml-1 text-[10px] font-normal text-slate-400">
+                      ({locale === "vi" ? "tùy chọn" : "optional"})
+                    </span>
                   </label>
                   <input
                     type="text"
-                    required
-                    value={addForm.staff_code}
-                    onChange={(e) => setAddForm({ ...addForm, staff_code: e.target.value })}
-                    placeholder="VD: CB00123"
+                    value={addForm.staff_code ?? ""}
+                    onChange={(e) => handleAddStaffCodeChange(e.target.value)}
+                    placeholder={addForm.email.split("@")[0] || "VD: CB00123"}
                     className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                    aria-invalid={staffCodeFieldError ? "true" : "false"}
                   />
+                  {staffCodeFieldError ? (
+                    <p className="mt-1 text-[11px] font-medium text-rose-600">{staffCodeFieldError}</p>
+                  ) : (
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      {locale === "vi"
+                        ? "Gợi ý từ phần tên của email. Có thể chỉnh sửa hoặc để trống."
+                        : "Suggested from the email username. You may edit or leave it blank."}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1076,16 +1142,26 @@ export default function LecturersPage() {
                       <div>
                         <label htmlFor="edit-staff-code" className="mb-1 block font-semibold text-slate-700">
                           {locale === "vi" ? "Mã cán bộ" : "Staff Code"}
+                          <span className="ml-1 text-[10px] font-normal text-slate-400">
+                            ({locale === "vi" ? "có thể để trống" : "may be blank"})
+                          </span>
                         </label>
                         <input
                           id="edit-staff-code"
                           type="text"
                           disabled={isDetailBusy}
                           value={editForm.staff_code}
-                          onChange={(e) => setEditForm({ ...editForm, staff_code: e.target.value })}
+                          onChange={(e) => {
+                            setEditForm({ ...editForm, staff_code: e.target.value });
+                            setEditStaffCodeFieldError("");
+                          }}
                           placeholder="VD: CB00123"
                           className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          aria-invalid={editStaffCodeFieldError ? "true" : "false"}
                         />
+                        {editStaffCodeFieldError && (
+                          <p className="mt-1 text-[11px] font-medium text-rose-600">{editStaffCodeFieldError}</p>
+                        )}
                       </div>
 
                       <div>
