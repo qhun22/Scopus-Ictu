@@ -103,6 +103,8 @@ export default function Header({
         return t.nav.dashboard;
       case "/imports":
         return t.nav.imports;
+      case "/normalization":
+        return t.nav.normalization;
       case "/lecturers":
         return t.nav.lecturers;
       case "/publications":
