@@ -12,6 +12,7 @@ import HomePage from "./pages/Home";
 import DashboardPage from "./pages/Dashboard";
 import LecturersPage from "./pages/Lecturers";
 import ImportsPage from "./pages/Imports";
+import NormalizationPage from "./pages/Normalization";
 import PublicationsPage from "./pages/Publications";
 import ApprovalQueuePage from "./pages/ApprovalQueue";
 import AuditLogsPage from "./pages/AuditLogs";
@@ -88,6 +89,7 @@ export default function App() {
               <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/imports" element={<ImportsPage />} />
+                <Route path="/normalization" element={<NormalizationPage />} />
                 <Route path="/lecturers" element={<LecturersPage />} />
                 <Route path="/users" element={<Navigate to="/lecturers" replace />} />
                 <Route path="/audit-logs" element={<AuditLogsPage />} />

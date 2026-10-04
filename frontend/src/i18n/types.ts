@@ -43,6 +43,7 @@ export interface TranslationSchema {
     imports: string;
     lecturers: string;
     users: string;
+    normalization: string;
     publications: string;
     reviews: string;
     reviewHistory: string;
@@ -283,5 +284,54 @@ export interface TranslationSchema {
     updated: string;
     unchanged: string;
     conflicts: string;
+  };
+  normalization: {
+    title: string;
+    subtitle: string;
+    tabs: {
+      publications: string;
+      authors: string;
+    };
+    authorsPlaceholder: string;
+    authorsPlaceholderNote: string;
+    searchPlaceholder: string;
+    table: {
+      fileName: string;
+      importedAt: string;
+      sourceRecords: string;
+      status: string;
+      newPublications: string;
+      existing: string;
+      metadataChanged: string;
+      errors: string;
+      actions: string;
+    };
+    status: {
+      notNormalized: string;
+      normalizing: string;
+      completed: string;
+      failed: string;
+      cancelled: string;
+    };
+    actions: {
+      normalize: string;
+      normalizing: string;
+      reNormalize: string;
+      viewDetail: string;
+      hideDetail: string;
+      confirmReNormalize: string;
+      reNormalizePrompt: string;
+    };
+    detail: {
+      metricsTitle: string;
+      rawIngestionTitle: string;
+      provenanceTitle: string;
+      provenanceInUse: string;
+      provenanceNotInUse: string;
+      publicationLinks: string;
+      authorVariantLinks: string;
+    };
+    goToNormalization: string;
+    comingSoon: string;
   };
 }

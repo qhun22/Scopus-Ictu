@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ImportConfig,
   ImportStatus,
@@ -11,13 +12,14 @@ import {
   getImportConfig,
   getImportDetail,
   getImportHistory,
-  normalizeImport,
   uploadScopusCsv,
 } from "../../api/imports";
 import { ApiError } from "../../api/client";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import ModalPortal from "../../components/common/ModalPortal";
-import LecturerDatasetImportCard from "../../components/lecturers/LecturerDatasetImportCard";
+import LecturerDatasetImportCard, {
+  LecturerDatasetImportCardHandle,
+} from "../../components/lecturers/LecturerDatasetImportCard";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
 
@@ -107,9 +109,6 @@ export default function ImportsPage() {
   const [rollbackModalOpen, setRollbackModalOpen] = useState(false);
   const [itemToRollback, setItemToRollback] = useState<ScopusImport | null>(null);
   const [isRollingBack, setIsRollingBack] = useState(false);
-
-  // Normalization (M2.6A)
-  const [isNormalizing, setIsNormalizing] = useState(false);
 
   const numberFormatter = new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US");
 
@@ -614,42 +613,6 @@ export default function ImportsPage() {
       }
     } finally {
       setIsRollingBack(false);
-    }
-  };
-
-  const handleNormalize = async (item: ScopusImport) => {
-    if (isNormalizing) return;
-    setIsNormalizing(true);
-    try {
-      const normalized = await normalizeImport(item.id);
-      setDetail(normalized);
-      setHistory((current) => current.map((i) => (i.id === normalized.id ? normalized : i)));
-      setLatestResult((current) => (current?.id === normalized.id ? normalized : current));
-      const n = normalized.normalization;
-      const total = n?.canonical_processed ?? 0;
-      const newCount = n?.canonical_new ?? 0;
-      const existingCount = n?.canonical_existing ?? 0;
-      const changedCount = n?.canonical_metadata_changed ?? 0;
-      const msg =
-        total === 0
-          ? locale === "vi"
-            ? "Không có bản ghi nào để chuẩn hóa."
-            : "No records to normalize."
-          : newCount === 0
-            ? locale === "vi"
-              ? `Tất cả ${total} bản ghi đã tồn tại trong hệ thống.`
-              : `${total} records already exist in the system.`
-            : locale === "vi"
-              ? `Đã chuẩn hóa ${total} bản ghi: ${newCount} công bố mới, ${existingCount + changedCount} đã tồn tại.`
-              : `Normalized ${total} records: ${newCount} new publications, ${existingCount + changedCount} existing.`;
-      toast.success(locale === "vi" ? "Chuẩn hóa hoàn tất" : "Normalization complete", msg);
-    } catch (error: unknown) {
-      toast.error(
-        locale === "vi" ? "Lỗi chuẩn hóa" : "Normalization error",
-        error instanceof ApiError ? error.message : (locale === "vi" ? "Không thể chuẩn hóa." : "Unable to normalize."),
-      );
-    } finally {
-      setIsNormalizing(false);
     }
   };
 
@@ -1434,23 +1397,23 @@ export default function ImportsPage() {
                   <div className="space-y-4">
                     {/* Summary Stats for Lecturer JSON Import */}
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 text-center">
+                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-slate-500">{t.lecturerImport.totalRecords}</span>
                         <p className="mt-0.5 text-lg font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
                       </div>
-                      <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 text-center">
+                      <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-emerald-600">{t.lecturerImport.created}</span>
                         <p className="mt-0.5 text-lg font-black text-emerald-600">
                           {numberFormatter.format(detail.lecturer_summary?.created ?? detail.imported_records)}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-amber-200/80 bg-amber-50/40 p-3 text-center">
+                      <div className="rounded-xl border border-amber-200/80 bg-amber-50/40 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-amber-600">{t.lecturerImport.updated}</span>
                         <p className="mt-0.5 text-lg font-black text-amber-600">
                           {numberFormatter.format(detail.lecturer_summary?.updated ?? 0)}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 text-center">
+                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-slate-500">{t.lecturerImport.unchanged}</span>
                         <p className="mt-0.5 text-lg font-black text-slate-700">
                           {numberFormatter.format(detail.lecturer_summary?.unchanged ?? 0)}
@@ -1490,149 +1453,161 @@ export default function ImportsPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* SECTION A: TIẾP NHẬN NGUỒN */}
-                    <div className="rounded-xl border border-slate-200/80 bg-blue-50/20 p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
-                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                          </svg>
+                    {/* ROW 1: Two equal cards side-by-side on desktop, stacked on mobile */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+                      {/* CARD 1: TIẾP NHẬN NGUỒN */}
+                      <div className="flex flex-col rounded-xl border border-blue-100 bg-blue-50/20 p-4 shadow-2xs">
+                        <div className="flex items-center justify-between pb-3 mb-3 border-b border-blue-100/70">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-blue-800">
+                                {t.imports.sourceIngestion}
+                              </h3>
+                              <span className="text-[11px] font-medium text-blue-600">
+                                {locale === "vi" ? "Đã tiếp nhận nguồn" : "Source received"}
+                              </span>
+                            </div>
+                          </div>
+                          {renderStatusBadge(detail)}
                         </div>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                          {locale === "vi" ? "Tiếp nhận nguồn" : "Raw Ingestion"}
-                        </h3>
-                      </div>
-                      <p className="mb-3 text-xs font-semibold text-blue-700">
-                        {locale === "vi" ? "Đã tiếp nhận nguồn" : "Source received"}
-                      </p>
-                      <div className="grid grid-cols-3 gap-2.5">
-                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
-                          <span className="text-[11px] font-medium text-slate-500">{t.imports.totalRecords}</span>
-                          <p className="mt-0.5 text-lg font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
-                        </div>
-                        <div className="rounded-xl border border-emerald-200/80 bg-white p-3 text-center">
-                          <span className="text-[11px] font-medium text-emerald-600">{t.imports.importedRecords}</span>
-                          <p className="mt-0.5 text-lg font-black text-emerald-600">{numberFormatter.format(detail.imported_records)}</p>
-                        </div>
-                        <div className="rounded-xl border border-rose-200/80 bg-white p-3 text-center">
-                          <span className="text-[11px] font-medium text-rose-600">{t.imports.failedRecords}</span>
-                          <p className="mt-0.5 text-lg font-black text-rose-600">{numberFormatter.format(detail.failed_records)}</p>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* SECTION B: CHUẨN HÓA CÔNG BỐ (M2.6A) */}
-                    {detail.normalization ? (
-                      <div className="rounded-xl border border-violet-200/80 bg-violet-50/20 p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                            </svg>
+                        {/* Raw stats */}
+                        <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                          <div className="rounded-lg border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.imports.totalRecords}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
                           </div>
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-violet-700">
-                            {locale === "vi" ? "Chuẩn hóa công bố" : "Publication Normalization"}
-                          </h3>
-                        </div>
-                        <p className="mb-3 text-xs font-semibold text-violet-700">
-                          {detail.normalization.status === "NORMALIZING"
-                            ? (locale === "vi" ? "Đang chuẩn hóa công bố" : "Normalizing publications")
-                            : detail.normalization.status === "CANCELLED"
-                              ? (locale === "vi" ? "Chuẩn hóa đã hủy" : "Normalization cancelled")
-                              : detail.normalization.status === "FAILED"
-                                ? (locale === "vi" ? "Chuẩn hóa lỗi" : "Normalization failed")
-                                : (locale === "vi" ? "Đã chuẩn hóa" : "Normalized")}
-                          {detail.normalization.status === "NORMALIZING" || detail.normalization.status === "CANCELLED"
-                            ? ` · ${detail.normalization.progress_percent}%`
-                            : ""}
-                        </p>
-                        <div className="grid grid-cols-3 gap-2.5">
-                          <div className="rounded-xl border border-emerald-200/80 bg-white p-3 text-center">
-                            <span className="text-[11px] font-medium text-emerald-600">{locale === "vi" ? "Bài mới" : "New"}</span>
-                            <p className="mt-0.5 text-lg font-black text-emerald-600">{numberFormatter.format(detail.normalization.canonical_new)}</p>
+                          <div className="rounded-lg border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-[10px] font-medium text-emerald-600 uppercase">{t.imports.importedRecords}</span>
+                            <p className="mt-0.5 text-base font-black text-emerald-600">{numberFormatter.format(detail.imported_records)}</p>
                           </div>
-                          <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
-                            <span className="text-[11px] font-medium text-slate-500">{locale === "vi" ? "Đã tồn tại" : "Existing"}</span>
-                            <p className="mt-0.5 text-lg font-black text-slate-600">{numberFormatter.format(detail.normalization.canonical_existing)}</p>
-                          </div>
-                          <div className="rounded-xl border border-amber-200/80 bg-white p-3 text-center">
-                            <span className="text-[11px] font-medium text-amber-600">{locale === "vi" ? "Metadata thay đổi" : "Meta Changed"}</span>
-                            <p className="mt-0.5 text-lg font-black text-amber-600">{numberFormatter.format(detail.normalization.canonical_metadata_changed)}</p>
+                          <div className="rounded-lg border border-rose-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-[10px] font-medium text-rose-600 uppercase">{t.imports.failedRecords}</span>
+                            <p className="mt-0.5 text-base font-black text-rose-600">{numberFormatter.format(detail.failed_records)}</p>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2.5 mt-2.5">
-                          <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
-                            <span className="text-[11px] font-medium text-slate-500">{locale === "vi" ? "Lỗi chuẩn hóa" : "Normalize Failed"}</span>
-                            <p className="mt-0.5 text-lg font-black text-slate-600">{numberFormatter.format(detail.normalization.canonical_failed)}</p>
+
+                        {/* Metadata summary */}
+                        <div className="mt-auto space-y-1.5 rounded-lg border border-blue-100/80 bg-white/75 p-3 text-xs text-slate-600">
+                          <div className="flex justify-between gap-2">
+                            <span className="text-slate-400 shrink-0">{t.imports.fileName}:</span>
+                            <span className="font-semibold text-slate-800 truncate text-right" title={detail.file_name}>{detail.file_name}</span>
                           </div>
-                          {detail.normalization.canonical_intra_duplicate > 0 && (
-                            <div className="rounded-xl border border-amber-200/80 bg-amber-50 p-3 text-center">
-                              <span className="text-[11px] font-medium text-amber-600">{locale === "vi" ? "Trùng EID nội tệp" : "Intra-file EID Duplicates"}</span>
-                              <p className="mt-0.5 text-lg font-black text-amber-600">{numberFormatter.format(detail.normalization.canonical_intra_duplicate)}</p>
+                          <div className="flex justify-between gap-2">
+                            <span className="text-slate-400 shrink-0">{t.imports.performedBy}:</span>
+                            <span className="font-semibold text-slate-700">{detail.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span>
+                          </div>
+                          <div className="flex justify-between gap-2">
+                            <span className="text-slate-400 shrink-0">{locale === "vi" ? "Bắt đầu lúc" : "Started at"}:</span>
+                            <span className="font-medium text-slate-700">{formatDate(detail.started_at)}</span>
+                          </div>
+                          {detail.finished_at && (
+                            <div className="flex justify-between gap-2">
+                              <span className="text-slate-400 shrink-0">
+                                {detail.status === "CANCELLED"
+                                  ? (locale === "vi" ? "Thời điểm hủy" : "Cancelled at")
+                                  : (locale === "vi" ? "Kết thúc lúc" : "Finished at")}:
+                              </span>
+                              <span className="font-medium text-slate-700">{formatDate(detail.finished_at)} ({formatDuration(detail.duration_seconds)})</span>
                             </div>
                           )}
                         </div>
                       </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/40 p-4 text-center">
-                        <p className="text-xs text-slate-500 font-medium">
-                          {locale === "vi"
-                            ? "Chưa chuẩn hóa — dữ liệu nguồn đã tiếp nhận, chuẩn hóa công bố đang chờ thực thi."
-                            : "Not yet normalized — source data received, awaiting publication normalization."}
-                        </p>
-                      </div>
-                    )}
 
-                    {/* Metadata details */}
-                    <dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
-                      <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 sm:col-span-2">
-                        <dt className="font-semibold text-slate-500">{t.imports.fileName}</dt>
-                        <dd className="mt-1 break-all font-bold text-slate-800">{detail.file_name}</dd>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                        <dt className="font-semibold text-slate-500">{locale === "vi" ? "Bắt đầu lúc" : "Started at"}</dt>
-                        <dd className="mt-1 font-semibold text-slate-700">{formatDate(detail.started_at)}</dd>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                        <dt className="font-semibold text-slate-500">{t.imports.performedBy}</dt>
-                        <dd className="mt-1 font-semibold text-slate-700">{detail.performed_by ?? (locale === "vi" ? "Không xác định" : "Unknown")}</dd>
-                      </div>
-
-                      <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 sm:col-span-2">
-                        <dt className="font-semibold text-slate-500">{t.common.status}</dt>
-                        <dd className="mt-1.5">{renderStatusBadge(detail)}</dd>
-                      </div>
-
-                      {detail.finished_at && (
-                        <>
-                          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                            <dt className="font-semibold text-slate-500">
-                              {detail.status === "CANCELLED"
-                                ? (locale === "vi" ? "Thời điểm hủy" : "Cancelled at")
-                                : (locale === "vi" ? "Kết thúc lúc" : "Finished at")}
-                            </dt>
-                            <dd className="mt-1 font-semibold text-slate-700">{formatDate(detail.finished_at)}</dd>
+                      {/* CARD 2: CHUẨN HÓA DỮ LIỆU */}
+                      <div className="flex flex-col rounded-xl border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
+                        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                                {t.normalization.title}
+                              </h3>
+                              <span className="text-[11px] font-medium text-slate-500">
+                                {detail.normalization
+                                  ? (detail.normalization.status === "COMPLETED"
+                                      ? (locale === "vi" ? "Đã chuẩn hóa công bố" : "Publications normalized")
+                                      : (locale === "vi" ? "Đang xử lý" : "Processing"))
+                                  : t.normalization.status.notNormalized}
+                              </span>
+                            </div>
                           </div>
-                          <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                            <dt className="font-semibold text-slate-500">{locale === "vi" ? "Thời lượng" : "Duration"}</dt>
-                            <dd className="mt-1 font-semibold text-slate-700">{formatDuration(detail.duration_seconds)}</dd>
-                          </div>
-                        </>
-                      )}
-                    </dl>
+                          <Link
+                            to={`/normalization?import=${detail.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#3A5FC3] bg-white px-2.5 py-1 text-[11px] font-bold text-[#3A5FC3] shadow-2xs hover:bg-blue-50 transition-colors cursor-pointer"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            <span>{t.normalization.goToNormalization}</span>
+                          </Link>
+                        </div>
 
-                    {/* SECTION C: TÌNH TRẠNG SỬ DỤNG DỮ LIỆU (M2.6A follow-up) */}
-                    <div className="rounded-xl border border-violet-200/80 bg-violet-50/20 p-4">
+                        {detail.normalization ? (
+                          <>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center mb-3">
+                              <div className="rounded-lg border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
+                                <span className="text-[10px] font-medium text-emerald-700 uppercase">{t.normalization.table.newPublications}</span>
+                                <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detail.normalization.canonical_new)}</p>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-2xs">
+                                <span className="text-[10px] font-medium text-slate-600 uppercase">{t.normalization.table.existing}</span>
+                                <p className="mt-0.5 text-base font-black text-slate-700">{numberFormatter.format(detail.normalization.canonical_existing)}</p>
+                              </div>
+                              <div className="rounded-lg border border-amber-200/80 bg-white p-2.5 shadow-2xs">
+                                <span className="text-[10px] font-medium text-amber-700 uppercase">{t.normalization.table.metadataChanged}</span>
+                                <p className="mt-0.5 text-base font-black text-amber-700">{numberFormatter.format(detail.normalization.canonical_metadata_changed)}</p>
+                              </div>
+                              <div className="rounded-lg border border-rose-200/80 bg-white p-2.5 shadow-2xs">
+                                <span className="text-[10px] font-medium text-rose-700 uppercase">{t.normalization.table.errors}</span>
+                                <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detail.normalization.canonical_failed)}</p>
+                              </div>
+                              <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-2xs col-span-2 sm:col-span-2">
+                                <span className="text-[10px] font-medium text-slate-600 uppercase">{locale === "vi" ? "Trùng EID nội tệp" : "Intra-file Duplicates"}</span>
+                                <p className="mt-0.5 text-base font-black text-slate-700">{numberFormatter.format(detail.normalization.canonical_intra_duplicate)}</p>
+                              </div>
+                            </div>
+                            <div className="mt-auto rounded-lg border border-slate-200/60 bg-white/75 p-2.5 text-[11px] text-slate-500">
+                              {locale === "vi"
+                                ? "Dữ liệu Scopus đã được chuẩn hóa và ánh xạ vào kho công bố khoa học hợp nhất."
+                                : "Scopus data has been normalized and mapped to the canonical publication store."}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/60 p-5 text-center">
+                            <svg className="h-7 w-7 text-slate-300 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            <p className="text-xs font-semibold text-slate-600">{t.normalization.status.notNormalized}</p>
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              {locale === "vi"
+                                ? "Chưa chạy chuẩn hóa công bố cho đợt nhập này."
+                                : "Publication normalization has not been run for this import."}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ROW 2: TÌNH TRẠNG SỬ DỤNG DỮ LIỆU SPANS FULL WIDTH */}
+                    <div className="rounded-xl border border-violet-200/80 bg-violet-50/20 p-4 shadow-2xs">
                       <div className="flex items-center gap-2 mb-3">
                         <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
                           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 015.656 0l1.415 1.415a4 4 0 010 5.656l-3 3a4 4 0 01-5.656 0M10.172 13.828a4 4 0 01-5.656 0l-1.415-1.415a4 4 0 010-5.656l3-3a4 4 0 015.656 0" />
                           </svg>
                         </div>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-violet-700">
-                          {locale === "vi" ? "Tình trạng sử dụng dữ liệu" : "Data usage state"}
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-violet-800">
+                          {locale === "vi" ? "Tình trạng sử dụng dữ liệu" : "Data Usage State"}
                         </h3>
                         {detail.archived && (
                           <span className={`${badgeClassName} ml-auto border-violet-200 bg-violet-50 text-violet-700`}>
@@ -1641,9 +1616,9 @@ export default function ImportsPage() {
                         )}
                       </div>
                       <dl className="grid grid-cols-1 gap-2.5 text-xs sm:grid-cols-3">
-                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
                           <dt className="text-[11px] font-medium text-slate-500">
-                            {locale === "vi" ? "Dữ liệu đang được sử dụng" : "Source data in use"}
+                            {locale === "vi" ? "Được sử dụng" : "In use"}
                           </dt>
                           <dd className={`mt-0.5 text-lg font-black ${
                             isInUse(detail) ? "text-violet-700" : "text-slate-700"
@@ -1653,7 +1628,7 @@ export default function ImportsPage() {
                               : (locale === "vi" ? "Không" : "No")}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
                           <dt className="text-[11px] font-medium text-slate-500">
                             {locale === "vi" ? "Liên kết nguồn công bố" : "Publication source links"}
                           </dt>
@@ -1661,7 +1636,7 @@ export default function ImportsPage() {
                             {numberFormatter.format(detail.usage?.publication_source_links ?? 0)}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center">
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
                           <dt className="text-[11px] font-medium text-slate-500">
                             {locale === "vi" ? "Biến thể tên tác giả" : "Author name variants"}
                           </dt>
@@ -1716,20 +1691,6 @@ export default function ImportsPage() {
                     className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 cursor-pointer shadow-2xs"
                   >
                     {t.imports.cancelImport}
-                  </button>
-                )}
-                {/* M2.6A: Normalize button for STAGED imports */}
-                {detail && detail.type !== "LECTURERS" && (detail.status === "STAGED" || detail.status === "APPLIED") && (
-                  <button
-                    type="button"
-                    disabled={detailLoading || isNormalizing}
-                    onClick={() => handleNormalize(detail)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    <span>{isNormalizing ? (locale === "vi" ? "Đang chuẩn hóa..." : "Normalizing...") : (locale === "vi" ? "Chuẩn hóa công bố" : "Normalize Publications")}</span>
                   </button>
                 )}
                 {detail && detail.type === "LECTURERS" && detail.status !== "CANCELLED" && !ACTIVE_STATUSES.includes(detail.status) && (
@@ -1961,5 +1922,6 @@ export default function ImportsPage() {
         />
       )}
     </div>
+    </>
   );
 }
