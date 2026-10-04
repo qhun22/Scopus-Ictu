@@ -27,6 +27,7 @@ export interface TranslationSchema {
     of: string;
     users: string;
     lecturers: string;
+    close: string;
   };
   roles: {
     ADMIN: string;
@@ -295,6 +296,17 @@ export interface TranslationSchema {
     authorsPlaceholder: string;
     authorsPlaceholderNote: string;
     searchPlaceholder: string;
+    pendingTitle: string;
+    pendingSubtitle: string;
+    historyTitle: string;
+    emptyPending: string;
+    emptyPendingSub: string;
+    summary: {
+      pending: string;
+      processing: string;
+      completed: string;
+      failed: string;
+    };
     table: {
       fileName: string;
       importedAt: string;
