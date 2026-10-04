@@ -57,6 +57,7 @@ export default function ImportsPage() {
   const { t, locale } = useI18n();
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+  const lecturerCardRef = useRef<LecturerDatasetImportCardHandle>(null);
 
   const [config, setConfig] = useState<ImportConfig | null>(null);
   const [history, setHistory] = useState<ScopusImport[]>([]);
@@ -268,6 +269,37 @@ export default function ImportsPage() {
         {statusLabel(item)}
       </span>
     );
+  };
+
+  const renderTableStatusBadge = (item: ScopusImport) => {
+    if (item.archived) {
+      return (
+        <span
+          title={locale === "vi" ? "Đã ẩn khỏi lịch sử" : "Hidden from history"}
+          className={`${badgeClassName} border-slate-200 bg-slate-100 text-slate-600`}
+        >
+          {locale === "vi" ? "Đã ẩn" : "Archived"}
+        </span>
+      );
+    }
+
+    const isTerminal = !ACTIVE_STATUSES.includes(item.status);
+    if (isInUse(item) && isTerminal) {
+      return (
+        <span
+          title={
+            locale === "vi"
+              ? "Dữ liệu nguồn được sử dụng ở bước xử lý tiếp theo"
+              : "Source data is in use by downstream processing"
+          }
+          className={`${badgeClassName} border-violet-200 bg-violet-50 text-violet-700`}
+        >
+          {locale === "vi" ? "Được sử dụng" : "In Use"}
+        </span>
+      );
+    }
+
+    return renderStatusBadge(item);
   };
 
   const renderTypeBadge = (type?: string) => {
@@ -506,11 +538,11 @@ export default function ImportsPage() {
               : `There are ${linkedCount} profiles in this import linked to system accounts. Please resolve linkages first.`)
           : totalLinks > 0
             ? (locale === "vi"
-                ? `Dữ liệu nguồn đang được sử dụng ở bước xử lý tiếp theo (${pubLinks ?? 0} liên kết công bố, ${authLinks ?? 0} biến thể tên). Vui lòng chọn "Ẩn khỏi lịch sử" thay vì xóa.`
+                ? `Dữ liệu nguồn được sử dụng ở bước xử lý tiếp theo (${pubLinks ?? 0} liên kết công bố, ${authLinks ?? 0} biến thể tên). Vui lòng chọn "Ẩn khỏi lịch sử" thay vì xóa.`
                 : `Source data is referenced downstream (${pubLinks ?? 0} publication links, ${authLinks ?? 0} author variants). Use "Hide from history" instead of deleting.`)
             : (error.message ||
               (locale === "vi"
-                ? "Dữ liệu từ đợt nhập này đang được hệ thống sử dụng."
+                ? "Dữ liệu từ đợt nhập này được hệ thống sử dụng."
                 : "Data from this import is currently in use by the system."));
         toast.error(
           locale === "vi" ? "Không thể xóa đợt nhập" : "Cannot delete import",
@@ -749,8 +781,9 @@ export default function ImportsPage() {
   const maxSize = config ? formatBytes(config.max_bytes) : "20.0 MB";
 
   return (
-    <div className="app-page-container space-y-4 sm:space-y-5">
-      {/* Hidden File Input */}
+    <>
+      {/* Hidden File Input — kept outside app-page-container so its
+          space-y children start at the correct vertical position. */}
       <input
         ref={inputRef}
         type="file"
@@ -759,6 +792,8 @@ export default function ImportsPage() {
         className="hidden"
         onChange={(event) => selectFile(event.target.files?.[0])}
       />
+
+      <div className="app-page-container space-y-4 sm:space-y-5">
 
       {/* Header Title Section with '+ Thêm tệp Scopus' Button */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -771,7 +806,7 @@ export default function ImportsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             disabled={uploading}
@@ -782,6 +817,18 @@ export default function ImportsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
             </svg>
             <span>{t.imports.addImport}</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={uploading}
+            onClick={() => lecturerCardRef.current?.openFilePicker()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span>{t.imports.addLecturers}</span>
           </button>
         </div>
       </div>
@@ -834,161 +881,165 @@ export default function ImportsPage() {
         </div>
       </div>
 
-      {/* Upload Section Box */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
-        <div className="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-slate-800">
-              {t.imports.uploadTitle}
-            </h2>
-            <p className="text-xs text-slate-500">
-              {t.imports.uploadSubtitle}
-            </p>
-          </div>
-        </div>
-
-        {!selectedFile ? (
-          <div
-            onClick={() => !uploading && inputRef.current?.click()}
-            onDragEnter={(event) => {
-              event.preventDefault();
-              if (!uploading) setDragging(true);
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={(event) => {
-              event.preventDefault();
-              if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragging(false);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragging(false);
-              selectFile(event.dataTransfer.files[0]);
-            }}
-            className={`mt-4 group flex min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
-              dragging
-                ? "border-[#3A5FC3] bg-[#3A5FC3]/10 scale-[0.99]"
-                : "border-slate-200 hover:border-[#3A5FC3]/60 bg-slate-50/40 hover:bg-[#3A5FC3]/5"
-            } ${uploading ? "cursor-not-allowed opacity-60" : ""}`}
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3A5FC3]/10 text-[#3A5FC3] mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6H16a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3" />
+      {/* Import Boxes Grid: 1 row, 2 boxes (1:1 ratio) - Left: Scopus CSV, Right: Lecturer JSON */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-stretch">
+        {/* Left Box: Tải tệp Scopus */}
+        <section className="flex flex-col h-full rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
             </div>
-            <p className="text-xs font-semibold text-slate-700 sm:text-sm group-hover:text-[#3A5FC3] transition-colors">
-              {dragging
-                ? t.imports.dragActivePrompt
-                : locale === "vi"
-                  ? "Nhấp hoặc kéo thả tệp CSV vào đây để tải lên"
-                  : "Click or drag and drop a CSV file here to upload"}
-            </p>
-            <p className="mt-1 text-[11px] text-slate-400">
-              {replaceToken(t.imports.supportedHint, "size", maxSize)}
-            </p>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">
+                {t.imports.uploadTitle}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {t.imports.uploadSubtitle}
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+
+          {!selectedFile ? (
+            <div
+              onClick={() => !uploading && inputRef.current?.click()}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                if (!uploading) setDragging(true);
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragging(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragging(false);
+                selectFile(event.dataTransfer.files[0]);
+              }}
+              className={`mt-4 group flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
+                dragging
+                  ? "border-[#3A5FC3] bg-[#3A5FC3]/10 scale-[0.99]"
+                  : "border-slate-200 hover:border-[#3A5FC3]/60 bg-slate-50/40 hover:bg-[#3A5FC3]/5"
+              } ${uploading ? "cursor-not-allowed opacity-60" : ""}`}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3A5FC3]/10 text-[#3A5FC3] mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6H16a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3" />
+                </svg>
+              </div>
+              <p className="text-xs font-semibold text-slate-700 sm:text-sm group-hover:text-[#3A5FC3] transition-colors">
+                {dragging
+                  ? t.imports.dragActivePrompt
+                  : locale === "vi"
+                    ? "Nhấp hoặc kéo thả tệp CSV vào đây để tải lên"
+                    : "Click or drag and drop a CSV file here to upload"}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                {replaceToken(t.imports.supportedHint, "size", maxSize)}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-800 text-sm truncate max-w-[180px] sm:max-w-xs" title={selectedFile.name}>
+                        {selectedFile.name}
+                      </span>
+                      <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shrink-0">
+                        {t.imports.ready}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span>{t.imports.fileSize}: <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong></span>
+                      <span>•</span>
+                      <span>{t.imports.fileFormat}: <strong className="text-slate-700">CSV</strong></span>
+                    </div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-800 text-sm truncate max-w-xs sm:max-w-md" title={selectedFile.name}>
-                      {selectedFile.name}
-                    </span>
-                    <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                      {t.imports.ready}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                    <span>{t.imports.fileSize}: <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong></span>
-                    <span>•</span>
-                    <span>{t.imports.fileFormat}: <strong className="text-slate-700">CSV</strong></span>
-                  </div>
+
+                <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={clearFile}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                  >
+                    {t.imports.cancelFile}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => void startImport()}
+                    className="inline-flex min-w-28 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors disabled:cursor-wait disabled:opacity-70 cursor-pointer"
+                  >
+                    {uploading ? (
+                      <>
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                        <span>{t.imports.processing}</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        <span>{t.imports.startImport}</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
+            </div>
+          )}
 
-              <div className="flex items-center gap-2 self-end sm:self-auto">
+          {selectionError && (
+            <div role="alert" className="mt-3 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50/80 p-3 text-xs font-semibold text-rose-700">
+              <svg className="h-4 w-4 shrink-0 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{selectionError}</span>
+            </div>
+          )}
+
+          {duplicateWarning && selectedFile && (
+            <div role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
+              <p className="font-bold">{t.imports.duplicateTitle}</p>
+              <p className="mt-1">
+                {t.imports.duplicateMessage} <strong>{duplicateWarning.filename}</strong> · {formatDate(duplicateWarning.importedAt)}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={uploading}
-                  onClick={clearFile}
-                  className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                  onClick={() => void viewDuplicateImport()}
+                  className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
                 >
-                  {t.imports.cancelFile}
+                  {t.imports.viewPrevious}
                 </button>
                 <button
                   type="button"
                   disabled={uploading}
-                  onClick={() => void startImport()}
-                  className="inline-flex min-w-32 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors disabled:cursor-wait disabled:opacity-70 cursor-pointer"
+                  onClick={() => void startImport(true)}
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 font-bold text-white hover:bg-amber-700 disabled:opacity-50"
                 >
-                  {uploading ? (
-                    <>
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                      <span>{t.imports.processing}</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                      </svg>
-                      <span>{t.imports.startImport}</span>
-                    </>
-                  )}
+                  {t.imports.importAnyway}
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </section>
 
-        {selectionError && (
-          <div role="alert" className="mt-3 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50/80 p-3 text-xs font-semibold text-rose-700">
-            <svg className="h-4 w-4 shrink-0 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>{selectionError}</span>
-          </div>
-        )}
-
-        {duplicateWarning && selectedFile && (
-          <div role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
-            <p className="font-bold">{t.imports.duplicateTitle}</p>
-            <p className="mt-1">
-              {t.imports.duplicateMessage} <strong>{duplicateWarning.filename}</strong> · {formatDate(duplicateWarning.importedAt)}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={() => void viewDuplicateImport()}
-                className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-              >
-                {t.imports.viewPrevious}
-              </button>
-              <button
-                type="button"
-                disabled={uploading}
-                onClick={() => void startImport(true)}
-                className="rounded-lg bg-amber-600 px-3 py-1.5 font-bold text-white hover:bg-amber-700 disabled:opacity-50"
-              >
-                {t.imports.importAnyway}
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <LecturerDatasetImportCard onSuccess={fetchData} />
+        {/* Right Box: Dữ liệu giảng viên ICTU */}
+        <LecturerDatasetImportCard ref={lecturerCardRef} onSuccess={fetchData} />
+      </div>
 
       {/* Latest Result Banner */}
       {latestResult && (
@@ -1128,7 +1179,7 @@ export default function ImportsPage() {
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.common.status}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.actions}</th>
+                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-60">{t.imports.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1210,59 +1261,46 @@ export default function ImportsPage() {
                     </td>
 
                     <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
-                        {renderStatusBadge(item)}
-                        {item.archived && (
-                          <span
-                            title={locale === "vi" ? "Đã ẩn khỏi lịch sử" : "Hidden from history"}
-                            className={`${badgeClassName} border-violet-200 bg-violet-50/80 text-violet-700`}
-                          >
-                            {locale === "vi" ? "Đã ẩn" : "Archived"}
-                          </span>
-                        )}
-                        {isInUse(item) && !item.archived && (
-                          <span
-                            title={
-                              locale === "vi"
-                                ? "Dữ liệu nguồn đang được sử dụng ở bước xử lý tiếp theo"
-                                : "Source data is referenced by downstream processing"
-                            }
-                            className={`${badgeClassName} border-violet-200 bg-violet-50/80 text-violet-700`}
-                          >
-                            {locale === "vi" ? "Đang được sử dụng" : "In use"}
-                          </span>
-                        )}
-                      </div>
+                      {renderTableStatusBadge(item)}
                     </td>
 
-                    <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                      <div className="mx-auto grid w-56 grid-cols-2 gap-1.5">
                         <button
                           type="button"
                           onClick={() => openDetail(item)}
-                          className="inline-flex items-center justify-center gap-1 w-20 min-w-[80px] rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                          className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer"
                         >
-                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
-                          <span>{t.imports.detail}</span>
+                          <span className="truncate">{t.imports.detail}</span>
                         </button>
 
-                        {ACTIVE_STATUSES.includes(item.status) && (
+                        {ACTIVE_STATUSES.includes(item.status) ? (
                           <button
                             type="button"
                             onClick={() => handleOpenCancelModal(item)}
-                            className="inline-flex items-center justify-center gap-1 w-20 min-w-[80px] rounded-md border border-amber-200 bg-amber-50/50 px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100/70 transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50/70 px-2 text-[11px] font-semibold text-amber-700 shadow-2xs transition-colors hover:bg-amber-100 cursor-pointer"
                           >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6L6 18" />
                             </svg>
-                            <span>{t.imports.cancelImport}</span>
+                            <span className="truncate">{t.imports.cancelImport}</span>
                           </button>
-                        )}
-
-                        {/* In-use imports: replace destructive delete with archive. */}
-                        {isInUse(item) && !item.archived && canArchiveImport(item) && (
+                        ) : item.archived ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRestoreModal(item)}
+                            title={locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-blue-200 bg-blue-50/70 px-2 text-[11px] font-semibold text-[#3A5FC3] shadow-2xs transition-colors hover:bg-blue-100 cursor-pointer"
+                          >
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span className="truncate">{locale === "vi" ? "Khôi phục" : "Restore"}</span>
+                          </button>
+                        ) : isInUse(item) && canArchiveImport(item) ? (
                           <button
                             type="button"
                             onClick={() => handleOpenArchiveModal(item)}
@@ -1271,44 +1309,26 @@ export default function ImportsPage() {
                                 ? "Không thể xóa vì dữ liệu nguồn đã được sử dụng để tạo dữ liệu chuẩn hóa"
                                 : "Cannot delete: source data is used by canonical publications"
                             }
-                            className="inline-flex items-center justify-center gap-1 w-28 min-w-[112px] rounded-md border border-violet-200 bg-violet-50/50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100/70 transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-violet-200 bg-violet-50/70 px-2 text-[11px] font-semibold text-violet-700 shadow-2xs transition-colors hover:bg-violet-100 cursor-pointer"
                           >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M5 8h14M9 8v12a1 1 0 001 1h4a1 1 0 001-1V8m-7 0V5a2 2 0 012-2h2a2 2 0 012 2v3" />
                             </svg>
-                            <span>{locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history"}</span>
+                            <span className="truncate">{locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history"}</span>
                           </button>
-                        )}
-
-                        {/* Archived imports: show restore. */}
-                        {item.archived && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenRestoreModal(item)}
-                            title={locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}
-                            className="inline-flex items-center justify-center gap-1 w-28 min-w-[112px] rounded-md border border-blue-200 bg-blue-50/50 px-2.5 py-1 text-[11px] font-semibold text-[#3A5FC3] hover:bg-blue-100/70 transition-colors cursor-pointer shadow-2xs"
-                          >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            <span>{locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}</span>
-                          </button>
-                        )}
-
-                        {/* Genuine physical delete: only when truly not in use and not archived. */}
-                        {(item.type === "LECTURERS" || canDeleteImport(item)) && !ACTIVE_STATUSES.includes(item.status) && (
+                        ) : (item.type === "LECTURERS" || canDeleteImport(item)) ? (
                           <button
                             type="button"
                             onClick={() => handleOpenDeleteModal(item)}
                             title={locale === "vi" ? "Xóa đợt nhập" : "Delete import"}
-                            className="inline-flex items-center justify-center gap-1 w-20 min-w-[80px] rounded-md border border-rose-200 bg-rose-50/50 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-100/70 transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50/70 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-colors hover:bg-rose-100 cursor-pointer"
                           >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            <span>{locale === "vi" ? "Xóa" : "Delete"}</span>
+                            <span className="truncate">{locale === "vi" ? "Xóa" : "Delete"}</span>
                           </button>
-                        )}
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -1378,7 +1398,7 @@ export default function ImportsPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="import-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div className="flex items-center gap-2.5">
@@ -1394,9 +1414,18 @@ export default function ImportsPage() {
                   </div>
                   {detail && renderTypeBadge(detail.type)}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailOpen(false)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </header>
 
-              <div className="min-h-48 overflow-y-auto p-5">
+              <div className="min-h-48 overflow-y-auto p-4 sm:p-5">
                 {detailLoading || !detail ? (
                   <div className="flex min-h-40 items-center justify-center">
                     <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />

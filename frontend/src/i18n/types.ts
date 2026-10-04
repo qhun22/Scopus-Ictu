@@ -228,6 +228,7 @@ export interface TranslationSchema {
     uploadSubtitle: string;
     dragActivePrompt: string;
     addImport: string;
+    addLecturers: string;
     completedWithErrors: string;
     duplicateTitle: string;
     duplicateMessage: string;

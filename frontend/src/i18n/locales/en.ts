@@ -235,6 +235,7 @@ export const en: TranslationSchema = {
     uploadSubtitle: "Upload Scopus CSV file to import and process publication records",
     dragActivePrompt: "Drop CSV file here to upload",
     addImport: "Add Scopus File",
+    addLecturers: "Add Lecturers",
     completedWithErrors: "Completed with errors",
     duplicateTitle: "File was imported previously",
     duplicateMessage: "A completed import has identical content:",
