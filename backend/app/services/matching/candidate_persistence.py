@@ -631,6 +631,32 @@ class CandidatePersistenceService:
         run_id: UUID,
         prepared: Sequence[_PreparedCandidate],
     ) -> None:
+        persisted_pairs = {
+            tuple(row)
+            for row in self._session.execute(
+                select(
+                    LecturerScopusCandidate.lecturer_id,
+                    LecturerScopusCandidate.scopus_author_id,
+                )
+                .join(
+                    LecturerScopusCandidateObservation,
+                    LecturerScopusCandidateObservation.candidate_id
+                    == LecturerScopusCandidate.id,
+                )
+                .where(
+                    LecturerScopusCandidateObservation.generation_run_id == run_id
+                )
+            ).all()
+        }
+        requested_pairs = {
+            (item.candidate.lecturer_id, item.candidate.scopus_author_id)
+            for item in prepared
+        }
+        if persisted_pairs != requested_pairs:
+            raise GenerationRunConflict(
+                f"completed run {run_id} has a different candidate pair set"
+            )
+
         for item in prepared:
             root = self._session.scalar(
                 select(LecturerScopusCandidate).where(
