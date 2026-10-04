@@ -10,6 +10,7 @@ import { useI18n } from "../../i18n";
 import { useToast } from "../../contexts/ToastContext";
 import ModalPortal from "../../components/common/ModalPortal";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import AuthorsTab from "./AuthorsTab";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -245,31 +246,16 @@ export default function NormalizationPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
           </svg>
           <span>{t.normalization.tabs.authors}</span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 border border-slate-200">
-            {t.normalization.comingSoon}
-          </span>
         </button>
       </div>
 
-      {/* Tab Content: Authors Placeholder (M2.6B) */}
+      {/* Tab Content: Authors Tab (M2.6B) */}
       {activeTab === "authors" && (
-        <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-center shadow-xs">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#3A5FC3] mb-3.5 border border-blue-100">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          </div>
-          <h2 className="text-base font-bold text-slate-800 sm:text-lg">
-            {t.normalization.authorsPlaceholder}
-          </h2>
-          <p className="mt-2 max-w-md mx-auto text-xs text-slate-500 sm:text-sm">
-            {t.normalization.authorsPlaceholderNote}
-          </p>
-          <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3.5 py-1.5 border border-slate-200 text-xs font-semibold text-slate-600">
-            <span className="h-2 w-2 rounded-full bg-slate-400" />
-            <span>M2.6B — {locale === "vi" ? "Chưa triển khai" : "Not implemented"}</span>
-          </div>
-        </div>
+        <AuthorsTab
+          scopusImports={scopusImports}
+          locale={locale}
+          onRefresh={fetchImports}
+        />
       )}
 
       {/* Tab Content: Publications Normalization (M2.6A Functional) */}

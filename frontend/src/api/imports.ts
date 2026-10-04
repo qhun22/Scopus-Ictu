@@ -32,6 +32,27 @@ export interface LecturerImportSummaryData {
   schema_version?: string;
 }
 
+export interface AuthorNormalizationSummary {
+  status: "NORMALIZING" | "COMPLETED" | "FAILED";
+  raw_records_processed: number;
+  raw_records_failed: number;
+  author_occurrences: number;
+  unique_authors_seen: number;
+  authors_created: number;
+  authors_existing: number;
+  publication_author_links_created: number;
+  publication_author_links_existing: number;
+  variants_created: number;
+  variants_existing: number;
+  conflicts: number;
+  errors?: Array<{
+    row_number?: number;
+    code?: string;
+    message?: string;
+    [key: string]: unknown;
+  }>;
+}
+
 export interface ScopusImport {
   id: string;
   type?: "SCOPUS" | "LECTURERS";
@@ -64,6 +85,8 @@ export interface ScopusImport {
   };
   scopus_summary?: Record<string, unknown> | null;
   lecturer_summary?: LecturerImportSummaryData | null;
+  // M2.6B: nested author normalization counters
+  normalization_summary?: AuthorNormalizationSummary | null;
 }
 
 export interface UnifiedImportStats {
