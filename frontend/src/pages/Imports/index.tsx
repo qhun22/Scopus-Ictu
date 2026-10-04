@@ -15,10 +15,12 @@ import {
   uploadScopusCsv,
 } from "../../api/imports";
 import { ApiError } from "../../api/client";
+import { importLecturerDataset } from "../../api/lecturerImport";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import ModalPortal from "../../components/common/ModalPortal";
 import LecturerDatasetImportCard, {
   LecturerDatasetImportCardHandle,
+  PreviewResponse,
 } from "../../components/lecturers/LecturerDatasetImportCard";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
@@ -69,6 +71,13 @@ export default function ImportsPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [latestResult, setLatestResult] = useState<ScopusImport | null>(null);
+  const [lecturerPreview, setLecturerPreview] = useState<{
+    preview: PreviewResponse;
+    file: File;
+  } | null>(null);
+  const [lecturerImporting, setLecturerImporting] = useState(false);
+  const [lecturerConfirmOpen, setLecturerConfirmOpen] = useState(false);
+  const [activeResultPanel, setActiveResultPanel] = useState<"scopus" | "lecturer_preview" | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
 
   // Search & Filter & Pagination states
@@ -109,6 +118,12 @@ export default function ImportsPage() {
   const [rollbackModalOpen, setRollbackModalOpen] = useState(false);
   const [itemToRollback, setItemToRollback] = useState<ScopusImport | null>(null);
   const [isRollingBack, setIsRollingBack] = useState(false);
+
+  // Blocked Delete Explanation Modal (Scopus in use or Lecturer rollback prerequisite)
+  const [blockedDeleteState, setBlockedDeleteState] = useState<{
+    item: ScopusImport;
+    reason: "SCOPUS_IN_USE" | "LECTURER_NEED_ROLLBACK" | "LECTURER_BLOCKED";
+  } | null>(null);
 
   const numberFormatter = new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US");
 
@@ -215,27 +230,9 @@ export default function ImportsPage() {
     return Boolean(item.in_use);
   };
 
-  const canDeleteImport = (item: ScopusImport): boolean => {
-    // UI-side helper: backend can_delete is authoritative.
-    if (item.type === "LECTURERS") {
-      return item.status === "CANCELLED";
-    }
-    if (ACTIVE_STATUSES.includes(item.status)) return false;
-    return !isInUse(item) && !item.archived;
-  };
-
-  const canArchiveImport = (item: ScopusImport): boolean => {
-    if (item.archived) return false;
-    if (item.type === "LECTURERS") return false;
-    return !ACTIVE_STATUSES.includes(item.status);
-  };
-
   const statusLabel = (item: ScopusImport): string => {
-    if (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") {
-      if (isWarningStatus(item)) {
-        return locale === "vi" ? "Cảnh báo" : "Warning";
-      }
-      return item.failed_records > 0 ? t.imports.completedWithErrors : t.imports.completed;
+    if (ACTIVE_STATUSES.includes(item.status)) {
+      return `${t.imports.inProgress} · ${item.progress_percent}%`;
     }
     if (item.status === "FAILED") return t.imports.failed;
     if (item.status === "CANCELLED") {
@@ -243,24 +240,58 @@ export default function ImportsPage() {
         ? (locale === "vi" ? "Đã hoàn tác" : "Rolled back")
         : t.imports.cancelled;
     }
-    return `${t.imports.inProgress} · ${item.progress_percent}%`;
+    if (item.type === "LECTURERS") {
+      if (isWarningStatus(item)) {
+        return locale === "vi" ? "Cảnh báo" : "Warning";
+      }
+      return item.failed_records > 0 ? t.imports.completedWithErrors : t.imports.completed;
+    }
+    // Scopus imports
+    if (item.status === "APPLIED" || isInUse(item)) {
+      return locale === "vi" ? "Được sử dụng" : "In Use";
+    }
+    if (item.status === "STAGED") {
+      if (isWarningStatus(item)) {
+        return locale === "vi" ? "Cảnh báo" : "Warning";
+      }
+      return locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization";
+    }
+    return t.imports.completed;
   };
 
   const renderStatusBadge = (item: ScopusImport) => {
     const status = item.status;
     let colorClass = "border-slate-200 bg-slate-50 text-slate-600";
-    if (status === "STAGED" || status === "APPLIED" || status === "IMPORTED") {
-      if (isWarningStatus(item)) {
-        colorClass = "border-amber-300 bg-amber-50 text-amber-700";
+    if (item.type !== "LECTURERS") {
+      if (status === "APPLIED" || isInUse(item)) {
+        colorClass = "border-violet-200 bg-violet-50 text-violet-700";
+      } else if (status === "STAGED") {
+        if (isWarningStatus(item)) {
+          colorClass = "border-amber-300 bg-amber-50 text-amber-700";
+        } else {
+          colorClass = "border-blue-200 bg-blue-50 text-[#3A5FC3]";
+        }
+      } else if (status === "FAILED") {
+        colorClass = "border-rose-200 bg-rose-50 text-rose-700";
+      } else if (status === "CANCELLED") {
+        colorClass = "border-slate-200 bg-slate-100 text-slate-600";
       } else {
-        colorClass = "border-emerald-200 bg-emerald-50 text-emerald-700";
+        colorClass = "border-blue-200 bg-blue-50 text-[#3A5FC3]";
       }
-    } else if (status === "FAILED") {
-      colorClass = "border-rose-200 bg-rose-50 text-rose-700";
-    } else if (status === "CANCELLED") {
-      colorClass = "border-slate-200 bg-slate-100 text-slate-600";
     } else {
-      colorClass = "border-blue-200 bg-blue-50 text-[#3A5FC3]";
+      if (status === "IMPORTED" || status === "STAGED" || status === "APPLIED") {
+        if (isWarningStatus(item)) {
+          colorClass = "border-amber-300 bg-amber-50 text-amber-700";
+        } else {
+          colorClass = "border-emerald-200 bg-emerald-50 text-emerald-700";
+        }
+      } else if (status === "FAILED") {
+        colorClass = "border-rose-200 bg-rose-50 text-rose-700";
+      } else if (status === "CANCELLED") {
+        colorClass = "border-slate-200 bg-slate-100 text-slate-600";
+      } else {
+        colorClass = "border-blue-200 bg-blue-50 text-[#3A5FC3]";
+      }
     }
 
     return (
@@ -282,23 +313,97 @@ export default function ImportsPage() {
       );
     }
 
-    const isTerminal = !ACTIVE_STATUSES.includes(item.status);
-    if (isInUse(item) && isTerminal) {
+    return renderStatusBadge(item);
+  };
+
+  const ingestionStatusLabel = (item: ScopusImport): string => {
+    if (ACTIVE_STATUSES.includes(item.status)) {
+      return `${t.imports.inProgress} · ${item.progress_percent}%`;
+    }
+    if (item.status === "FAILED") return t.imports.failed;
+    if (item.status === "CANCELLED") {
+      return item.type === "LECTURERS"
+        ? (locale === "vi" ? "Đã hoàn tác" : "Rolled back")
+        : t.imports.cancelled;
+    }
+    if (item.failed_records > 0) {
+      return locale === "vi" ? "Tiếp nhận hoàn tất (có lỗi)" : "Ingestion complete with errors";
+    }
+    return locale === "vi" ? "Tiếp nhận hoàn tất" : "Ingestion complete";
+  };
+
+  const renderIngestionBadge = (item: ScopusImport) => {
+    if (ACTIVE_STATUSES.includes(item.status)) {
       return (
-        <span
-          title={
-            locale === "vi"
-              ? "Dữ liệu nguồn được sử dụng ở bước xử lý tiếp theo"
-              : "Source data is in use by downstream processing"
-          }
-          className={`${badgeClassName} border-violet-200 bg-violet-50 text-violet-700`}
-        >
-          {locale === "vi" ? "Được sử dụng" : "In Use"}
+        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+          {t.imports.inProgress} · {item.progress_percent}%
         </span>
       );
     }
+    if (item.status === "FAILED") {
+      return (
+        <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700">
+          {t.imports.failed}
+        </span>
+      );
+    }
+    if (item.status === "CANCELLED") {
+      return (
+        <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600">
+          {item.type === "LECTURERS" ? (locale === "vi" ? "Đã hoàn tác" : "Rolled back") : t.imports.cancelled}
+        </span>
+      );
+    }
+    if (isWarningStatus(item)) {
+      return (
+        <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+          {locale === "vi" ? "Cảnh báo" : "Warning"}
+        </span>
+      );
+    }
+    if (item.failed_records > 0) {
+      return (
+        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+          {locale === "vi" ? "Đã tiếp nhận (có lỗi)" : "Ingested with errors"}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+        {locale === "vi" ? "Đã tiếp nhận" : "Ingestion complete"}
+      </span>
+    );
+  };
 
-    return renderStatusBadge(item);
+  const renderNormalizationBadge = (item: ScopusImport) => {
+    const n = item.normalization;
+    if (n && n.status === "COMPLETED") {
+      return (
+        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+          {locale === "vi" ? "Hoàn thành" : "Completed"}
+        </span>
+      );
+    }
+    if (n && n.status === "NORMALIZING") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+          <span className="h-2 w-2 animate-spin rounded-full border-2 border-[#3A5FC3] border-t-transparent" />
+          {locale === "vi" ? "Đang xử lý" : "Processing"} ({n.progress_percent}%)
+        </span>
+      );
+    }
+    if (n && n.status === "FAILED") {
+      return (
+        <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700">
+          {locale === "vi" ? "Lỗi chuẩn hóa" : "Normalization failed"}
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+        {locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization"}
+      </span>
+    );
   };
 
   const renderTypeBadge = (type?: string) => {
@@ -388,6 +493,7 @@ export default function ImportsPage() {
     try {
       const result = await uploadScopusCsv(selectedFile, allowDuplicate);
       setLatestResult(result);
+      setActiveResultPanel("scopus");
       setDuplicateWarning(null);
       setSelectedFile(null);
       if (inputRef.current) inputRef.current.value = "";
@@ -435,6 +541,39 @@ export default function ImportsPage() {
       toast.error(t.imports.errorTitle, message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleConfirmLecturerImport = async () => {
+    if (!lecturerPreview?.file || lecturerImporting) return;
+    setLecturerImporting(true);
+    try {
+      const result = await importLecturerDataset(lecturerPreview.file);
+      setLecturerConfirmOpen(false);
+      setLecturerPreview(null);
+      if (activeResultPanel === "lecturer_preview") {
+        setActiveResultPanel(null);
+      }
+      lecturerCardRef.current?.clearFile();
+      toast.success(
+        t.lecturerImport.importSuccessTitle,
+        t.lecturerImport.importSuccessMessage.replace(
+          "{count}",
+          String(result.summary.total),
+        ),
+      );
+      await fetchData();
+    } catch (error) {
+      const code = error instanceof ApiError ? error.code : "IMPORT_FAILED";
+      const detail =
+        error instanceof ApiError
+          ? error.message
+          : locale === "vi"
+            ? "Không thể nhập dữ liệu giảng viên."
+            : "Unable to import lecturer data.";
+      toast.error(t.lecturerImport.importErrorTitle, `${code}: ${detail}`);
+    } finally {
+      setLecturerImporting(false);
     }
   };
 
@@ -486,16 +625,29 @@ export default function ImportsPage() {
     }
   };
 
-  const handleOpenDeleteModal = (item: ScopusImport) => {
-    if (item.type === "LECTURERS" && item.status !== "CANCELLED") {
-      toast.warning(
-        locale === "vi" ? "Bạn chưa hoàn tác" : "Rollback required",
-        locale === "vi"
-          ? "Hãy hoàn tác đợt nhập để gỡ dữ liệu giảng viên trước khi xóa lịch sử."
-          : "Rollback the import to remove its lecturer data before deleting the history entry.",
-      );
+  const handleDeleteIntent = (item: ScopusImport) => {
+    if (ACTIVE_STATUSES.includes(item.status) || item.archived) return;
+
+    if (item.type === "LECTURERS") {
+      if (item.status !== "CANCELLED") {
+        setBlockedDeleteState({ item, reason: "LECTURER_NEED_ROLLBACK" });
+        return;
+      }
+      if (item.can_delete === false) {
+        setBlockedDeleteState({ item, reason: "LECTURER_BLOCKED" });
+        return;
+      }
+      setItemToDelete(item);
+      setDeleteModalOpen(true);
       return;
     }
+
+    // Scopus / default import
+    if (isInUse(item) || item.can_delete === false) {
+      setBlockedDeleteState({ item, reason: "SCOPUS_IN_USE" });
+      return;
+    }
+
     setItemToDelete(item);
     setDeleteModalOpen(true);
   };
@@ -519,6 +671,10 @@ export default function ImportsPage() {
       );
       setDeleteModalOpen(false);
       setItemToDelete(null);
+      if (detail && detail.id === itemToDelete.id) {
+        setDetailOpen(false);
+        setDetail(null);
+      }
       await refreshHistory();
     } catch (error: unknown) {
       if (
@@ -635,6 +791,9 @@ export default function ImportsPage() {
       );
       setArchiveModalOpen(false);
       setItemToArchive(null);
+      if (detail && detail.id === updated.id) {
+        setDetail(updated);
+      }
       // Refresh using the current filter (the item may be gone from "active" view).
       await refreshHistory();
     } catch (error: unknown) {
@@ -666,6 +825,9 @@ export default function ImportsPage() {
       );
       setRestoreModalOpen(false);
       setItemToRestore(null);
+      if (detail && detail.id === updated.id) {
+        setDetail(updated);
+      }
       await refreshHistory();
     } catch (error: unknown) {
       toast.error(
@@ -774,7 +936,7 @@ export default function ImportsPage() {
             type="button"
             disabled={uploading}
             onClick={handleHeaderAddClick}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex min-w-36 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
@@ -786,7 +948,7 @@ export default function ImportsPage() {
             type="button"
             disabled={uploading}
             onClick={() => lecturerCardRef.current?.openFilePicker()}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+            className="inline-flex min-w-36 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
@@ -904,7 +1066,7 @@ export default function ImportsPage() {
               </p>
             </div>
           ) : (
-            <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+            <div className="mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
@@ -913,18 +1075,13 @@ export default function ImportsPage() {
                     </svg>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-800 text-sm truncate max-w-[180px] sm:max-w-xs" title={selectedFile.name}>
-                        {selectedFile.name}
-                      </span>
-                      <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200 shrink-0">
-                        {t.imports.ready}
-                      </span>
-                    </div>
+                    <span className="block font-bold text-slate-800 text-sm truncate max-w-[180px] sm:max-w-xs" title={selectedFile.name}>
+                      {selectedFile.name}
+                    </span>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                      <span>{t.imports.fileSize}: <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong></span>
+                      <span>{locale === "vi" ? "Dung lượng:" : "Size:"} <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong></span>
                       <span>•</span>
-                      <span>{t.imports.fileFormat}: <strong className="text-slate-700">CSV</strong></span>
+                      <span>{locale === "vi" ? "Định dạng:" : "Format:"} <strong className="text-slate-700">CSV</strong></span>
                     </div>
                   </div>
                 </div>
@@ -974,54 +1131,214 @@ export default function ImportsPage() {
 
           {duplicateWarning && selectedFile && (
             <div role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900">
-              <p className="font-bold">{t.imports.duplicateTitle}</p>
-              <p className="mt-1">
-                {t.imports.duplicateMessage} <strong>{duplicateWarning.filename}</strong> · {formatDate(duplicateWarning.importedAt)}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={() => void viewDuplicateImport()}
-                  className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50"
-                >
-                  {t.imports.viewPrevious}
-                </button>
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={() => void startImport(true)}
-                  className="rounded-lg bg-amber-600 px-3 py-1.5 font-bold text-white hover:bg-amber-700 disabled:opacity-50"
-                >
-                  {t.imports.importAnyway}
-                </button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="font-bold text-amber-900">{t.imports.duplicateTitle}</p>
+                  <p className="mt-0.5 text-amber-800">
+                    {t.imports.duplicateMessage} <strong className="text-amber-950">{duplicateWarning.filename}</strong> · {formatDate(duplicateWarning.importedAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200/60 justify-end">
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => void viewDuplicateImport()}
+                    className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                  >
+                    {t.imports.viewPrevious}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => void startImport(true)}
+                    className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {t.imports.importAnyway}
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </section>
 
         {/* Right Box: Dữ liệu giảng viên ICTU */}
-        <LecturerDatasetImportCard ref={lecturerCardRef} onSuccess={fetchData} />
+        <LecturerDatasetImportCard
+          ref={lecturerCardRef}
+          isImporting={lecturerImporting}
+          onPreviewGenerated={(preview, file) => {
+            setLecturerPreview({ preview, file });
+            setActiveResultPanel("lecturer_preview");
+          }}
+          onFileCleared={() => {
+            setLecturerPreview(null);
+            if (activeResultPanel === "lecturer_preview") {
+              setActiveResultPanel(null);
+            }
+          }}
+          onFileSelected={() => {
+            setLecturerPreview(null);
+            if (activeResultPanel === "lecturer_preview") {
+              setActiveResultPanel(null);
+            }
+          }}
+        />
       </div>
 
-      {/* Latest Result Banner */}
-      {latestResult && (
-        <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 shadow-xs">
-          <div className="flex items-center justify-between pb-2 border-b border-blue-100">
-            <div className="flex items-center gap-2">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[#3A5FC3]">
+      {/* Unified Result Panel: Shows most recently produced result (Lecturer JSON validation or Scopus CSV latest result) */}
+      {activeResultPanel === "lecturer_preview" && lecturerPreview ? (
+        <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:p-5 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center justify-between pb-2.5 border-b border-blue-100">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-700 shrink-0">
+                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-blue-800 shrink-0">
+                {t.lecturerImport.previewTitle}
+              </h2>
+              <span className="inline-flex items-center rounded-md border border-violet-200 bg-violet-100/60 px-2 py-0.5 text-[10px] font-semibold text-violet-700 shrink-0">
+                {locale === "vi" ? "Dữ liệu giảng viên ICTU" : "ICTU Lecturer JSON"}
+              </span>
+              <span className="text-xs text-slate-500 font-medium truncate hidden sm:inline" title={lecturerPreview.preview.filename}>
+                {lecturerPreview.preview.filename}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setLecturerPreview(null);
+                setActiveResultPanel(null);
+              }}
+              className="text-blue-600 hover:text-blue-800 text-xs font-medium cursor-pointer p-1"
+              aria-label={t.imports.close}
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="rounded-lg bg-white/80 border border-blue-100 p-3 shadow-2xs">
+              <p className="text-xs font-medium text-slate-500">{t.lecturerImport.totalRecords}</p>
+              <p className="mt-0.5 text-xl font-black text-slate-800">
+                {numberFormatter.format(lecturerPreview.preview.summary.total)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white/80 border border-blue-100 p-3 shadow-2xs">
+              <p className="text-xs font-medium text-emerald-600">{t.lecturerImport.validRecords}</p>
+              <p className="mt-0.5 text-xl font-black text-emerald-600">
+                {numberFormatter.format(lecturerPreview.preview.summary.valid)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white/80 border border-blue-100 p-3 shadow-2xs">
+              <p className="text-xs font-medium text-blue-600">{t.lecturerImport.createRecords}</p>
+              <p className="mt-0.5 text-xl font-black text-blue-600">
+                {numberFormatter.format(lecturerPreview.preview.summary.create)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white/80 border border-blue-100 p-3 shadow-2xs">
+              <p className="text-xs font-medium text-amber-600">{t.lecturerImport.updateRecords}</p>
+              <p className="mt-0.5 text-xl font-black text-amber-600">
+                {numberFormatter.format(lecturerPreview.preview.summary.update)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white/80 border border-blue-100 p-3 shadow-2xs">
+              <p className="text-xs font-medium text-slate-500">{t.lecturerImport.unchangedRecords}</p>
+              <p className="mt-0.5 text-xl font-black text-slate-600">
+                {numberFormatter.format(lecturerPreview.preview.summary.unchanged)}
+              </p>
+            </div>
+            <div className="rounded-lg bg-white/80 border border-blue-100 p-3 shadow-2xs">
+              <p className="text-xs font-medium text-rose-600">{locale === "vi" ? "Cảnh báo" : "Warnings"}</p>
+              <p className="mt-0.5 text-xl font-black text-rose-600">
+                {numberFormatter.format(lecturerPreview.preview.summary.conflicts)}
+              </p>
+            </div>
+          </div>
+
+          {lecturerPreview.preview.conflicts.length > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+              <div className="flex items-center gap-2 font-bold">
+                <svg className="h-4 w-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>
+                  {locale === "vi"
+                    ? `Phát hiện ${lecturerPreview.preview.conflicts.length} cảnh báo trùng tên cán bộ (hệ thống vẫn lưu trữ riêng biệt):`
+                    : `${lecturerPreview.preview.conflicts.length} duplicate name warnings detected (retained separately):`}
+                </span>
+              </div>
+              <ul className="mt-2 list-disc list-inside space-y-0.5 text-slate-700 max-h-28 overflow-y-auto">
+                {lecturerPreview.preview.conflicts.map((c, i) => (
+                  <li key={i}>
+                    <strong>{c.record_full_name}</strong> {locale === "vi" ? "trùng tên với" : "matches name of"} <strong>{c.existing_full_name}</strong> {c.existing_email ? `(${c.existing_email})` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-3.5 flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-blue-100">
+            <button
+              type="button"
+              disabled={lecturerImporting}
+              onClick={() => {
+                setLecturerPreview(null);
+                setActiveResultPanel(null);
+              }}
+              className="rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+            >
+              {t.common.cancel}
+            </button>
+            <button
+              type="button"
+              disabled={lecturerImporting || lecturerPreview.preview.summary.valid === 0}
+              onClick={() => setLecturerConfirmOpen(true)}
+              className="inline-flex min-w-28 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors disabled:cursor-wait disabled:opacity-70 cursor-pointer"
+            >
+              {lecturerImporting ? (
+                <>
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                  <span>{t.imports.processing}</span>
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>{t.lecturerImport.confirmImport}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </section>
+      ) : (activeResultPanel === "scopus" || (!activeResultPanel && latestResult)) && latestResult ? (
+        <section className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:p-5 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center justify-between pb-2.5 border-b border-blue-100">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[#3A5FC3] shrink-0">
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-blue-800">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-blue-800 shrink-0">
                 {t.imports.latestResult}
               </h2>
+              <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-100/60 px-2 py-0.5 text-[10px] font-semibold text-[#3A5FC3] shrink-0">
+                Scopus CSV
+              </span>
+              <span className="text-xs text-slate-500 font-medium truncate hidden sm:inline" title={latestResult.file_name}>
+                {latestResult.file_name}
+              </span>
             </div>
             <button
               type="button"
-              onClick={() => setLatestResult(null)}
-              className="text-blue-600 hover:text-blue-800 text-xs font-medium cursor-pointer"
+              onClick={() => {
+                setLatestResult(null);
+                if (activeResultPanel === "scopus") setActiveResultPanel(null);
+              }}
+              className="text-blue-600 hover:text-blue-800 text-xs font-medium cursor-pointer p-1"
+              aria-label={t.imports.close}
             >
               ✕
             </button>
@@ -1042,7 +1359,7 @@ export default function ImportsPage() {
           </div>
           <div className="mt-3">
             <div className="mb-1 flex justify-between text-[11px] font-semibold text-slate-600">
-              <span>{statusLabel(latestResult)}</span>
+              <span>{ingestionStatusLabel(latestResult)}</span>
               <span>{latestResult.processed_records} / {latestResult.total_records} ({latestResult.progress_percent}%)</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-blue-100">
@@ -1050,7 +1367,7 @@ export default function ImportsPage() {
             </div>
           </div>
         </section>
-      )}
+      ) : null}
 
       {/* Filter & Search Bar */}
       <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
@@ -1142,7 +1459,7 @@ export default function ImportsPage() {
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.common.status}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-60">{t.imports.actions}</th>
+                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-56">{t.imports.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1228,70 +1545,54 @@ export default function ImportsPage() {
                     </td>
 
                     <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
-                      <div className="mx-auto grid w-56 grid-cols-2 gap-1.5">
+                      <div className="mx-auto grid w-52 grid-cols-2 gap-1.5">
                         <button
                           type="button"
                           onClick={() => openDetail(item)}
-                          className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer"
+                          className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                         >
                           <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
-                          <span className="truncate">{t.imports.detail}</span>
+                          <span>{t.imports.detail}</span>
                         </button>
 
                         {ACTIVE_STATUSES.includes(item.status) ? (
                           <button
                             type="button"
                             onClick={() => handleOpenCancelModal(item)}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50/70 px-2 text-[11px] font-semibold text-amber-700 shadow-2xs transition-colors hover:bg-amber-100 cursor-pointer"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-amber-200 bg-amber-50/80 px-2 text-[11px] font-semibold text-amber-700 shadow-2xs transition-colors hover:bg-amber-100 cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6L6 18" />
                             </svg>
-                            <span className="truncate">{t.imports.cancelImport}</span>
+                            <span>{t.imports.cancelImport}</span>
                           </button>
                         ) : item.archived ? (
                           <button
                             type="button"
                             onClick={() => handleOpenRestoreModal(item)}
                             title={locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-blue-200 bg-blue-50/70 px-2 text-[11px] font-semibold text-[#3A5FC3] shadow-2xs transition-colors hover:bg-blue-100 cursor-pointer"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-blue-200 bg-blue-50/80 px-2 text-[11px] font-semibold text-[#3A5FC3] shadow-2xs transition-colors hover:bg-blue-100 cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
-                            <span className="truncate">{locale === "vi" ? "Khôi phục" : "Restore"}</span>
+                            <span>{locale === "vi" ? "Khôi phục" : "Restore"}</span>
                           </button>
-                        ) : isInUse(item) && canArchiveImport(item) ? (
+                        ) : (
                           <button
                             type="button"
-                            onClick={() => handleOpenArchiveModal(item)}
-                            title={
-                              locale === "vi"
-                                ? "Không thể xóa vì dữ liệu nguồn đã được sử dụng để tạo dữ liệu chuẩn hóa"
-                                : "Cannot delete: source data is used by canonical publications"
-                            }
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-violet-200 bg-violet-50/70 px-2 text-[11px] font-semibold text-violet-700 shadow-2xs transition-colors hover:bg-violet-100 cursor-pointer"
-                          >
-                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M5 8h14M9 8v12a1 1 0 001 1h4a1 1 0 001-1V8m-7 0V5a2 2 0 012-2h2a2 2 0 012 2v3" />
-                            </svg>
-                            <span className="truncate">{locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history"}</span>
-                          </button>
-                        ) : (item.type === "LECTURERS" || canDeleteImport(item)) ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDeleteModal(item)}
+                            onClick={() => handleDeleteIntent(item)}
                             title={locale === "vi" ? "Xóa đợt nhập" : "Delete import"}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50/70 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-colors hover:bg-rose-100 cursor-pointer"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-colors hover:bg-rose-100 cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            <span className="truncate">{locale === "vi" ? "Xóa" : "Delete"}</span>
+                            <span>{locale === "vi" ? "Xóa" : "Delete"}</span>
                           </button>
-                        ) : null}
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1473,7 +1774,7 @@ export default function ImportsPage() {
                               </span>
                             </div>
                           </div>
-                          {renderStatusBadge(detail)}
+                          {renderIngestionBadge(detail)}
                         </div>
 
                         {/* Raw stats */}
@@ -1537,19 +1838,22 @@ export default function ImportsPage() {
                                   ? (detail.normalization.status === "COMPLETED"
                                       ? (locale === "vi" ? "Đã chuẩn hóa công bố" : "Publications normalized")
                                       : (locale === "vi" ? "Đang xử lý" : "Processing"))
-                                  : t.normalization.status.notNormalized}
+                                  : (locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization")}
                               </span>
                             </div>
                           </div>
-                          <Link
-                            to={`/normalization?import=${detail.id}`}
-                            className="inline-flex items-center gap-1 rounded-lg border border-[#3A5FC3] bg-white px-2.5 py-1 text-[11px] font-bold text-[#3A5FC3] shadow-2xs hover:bg-blue-50 transition-colors cursor-pointer"
-                          >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                            <span>{t.normalization.goToNormalization}</span>
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            {renderNormalizationBadge(detail)}
+                            <Link
+                              to={`/normalization?import=${detail.id}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#3A5FC3] bg-white px-2.5 py-1 text-[11px] font-bold text-[#3A5FC3] shadow-2xs hover:bg-blue-50 transition-colors cursor-pointer"
+                            >
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              <span>{t.normalization.goToNormalization}</span>
+                            </Link>
+                          </div>
                         </div>
 
                         {detail.normalization ? (
@@ -1590,8 +1894,8 @@ export default function ImportsPage() {
                             <p className="text-xs font-semibold text-slate-600">{t.normalization.status.notNormalized}</p>
                             <p className="mt-1 text-[11px] text-slate-400">
                               {locale === "vi"
-                                ? "Chưa chạy chuẩn hóa công bố cho đợt nhập này."
-                                : "Publication normalization has not been run for this import."}
+                                ? "Đã hoàn thành tiếp nhận nguồn. Vui lòng chuyển sang không gian Chuẩn hóa để xử lý và ánh xạ vào kho công bố khoa học."
+                                : "Source ingestion complete. Please visit the Normalization workspace to process and map to canonical publications."}
                             </p>
                           </div>
                         )}
@@ -1682,79 +1986,45 @@ export default function ImportsPage() {
                 )}
               </div>
 
-              <footer className="flex justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
-                {detail && ACTIVE_STATUSES.includes(detail.status) && (
+              <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+                {detail && ACTIVE_STATUSES.includes(detail.status) ? (
                   <button
                     type="button"
                     disabled={detailLoading}
                     onClick={() => handleOpenCancelModal(detail)}
-                    className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 cursor-pointer shadow-2xs"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 cursor-pointer shadow-2xs"
                   >
-                    {t.imports.cancelImport}
-                  </button>
-                )}
-                {detail && detail.type === "LECTURERS" && detail.status !== "CANCELLED" && !ACTIVE_STATUSES.includes(detail.status) && (
-                  <button
-                    type="button"
-                    disabled={detailLoading || isRollingBack}
-                    onClick={() => handleOpenRollbackModal(detail)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 10h10a5 5 0 015 5v2m0 0l-3-3m3 3l3-3M3 10l3-3m-3 3l3 3" />
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6L6 18" />
                     </svg>
-                    <span>{locale === "vi" ? "Hoàn tác đợt nhập" : "Rollback import"}</span>
+                    <span>{t.imports.cancelImport}</span>
                   </button>
-                )}
-
-                {detail && !detail.archived && canArchiveImport(detail) && (
-                  <button
-                    type="button"
-                    disabled={detailLoading || isArchiving}
-                    onClick={() => handleOpenArchiveModal(detail)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-4 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M5 8h14M9 8v12a1 1 0 001 1h4a1 1 0 001-1V8m-7 0V5a2 2 0 012-2h2a2 2 0 012 2v3" />
-                    </svg>
-                    <span>{isArchiving ? (locale === "vi" ? "Đang ẩn..." : "Hiding...") : (locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history")}</span>
-                  </button>
-                )}
-
-                {detail && detail.archived && (
+                ) : detail && detail.archived ? (
                   <button
                     type="button"
                     disabled={detailLoading || isRestoring}
                     onClick={() => handleOpenRestoreModal(detail)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-xs font-semibold text-[#3A5FC3] hover:bg-blue-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     <span>{isRestoring ? (locale === "vi" ? "Đang khôi phục..." : "Restoring...") : (locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility")}</span>
                   </button>
-                )}
-
-                {detail && (detail.type === "LECTURERS" || canDeleteImport(detail)) && !ACTIVE_STATUSES.includes(detail.status) && (
+                ) : detail ? (
                   <button
                     type="button"
                     disabled={detailLoading}
-                    onClick={() => {
-                      if (detail.type === "LECTURERS" && detail.status !== "CANCELLED") {
-                        handleOpenDeleteModal(detail);
-                        return;
-                      }
-                      setDetailOpen(false);
-                      handleOpenDeleteModal(detail);
-                    }}
+                    onClick={() => handleDeleteIntent(detail)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     <span>{locale === "vi" ? "Xóa đợt nhập" : "Delete import"}</span>
                   </button>
-                )}
+                ) : null}
+
                 <button
                   type="button"
                   disabled={detailLoading}
@@ -1767,6 +2037,90 @@ export default function ImportsPage() {
             </section>
           </div>
         </ModalPortal>
+      )}
+
+      {/* BLOCKED DELETE WARNING / EXPLANATORY MODAL */}
+      {blockedDeleteState && (
+        <ConfirmModal
+          open={Boolean(blockedDeleteState)}
+          variant="warning"
+          title={
+            blockedDeleteState.reason === "LECTURER_NEED_ROLLBACK"
+              ? (locale === "vi" ? "Cần hoàn tác trước khi xóa" : "Rollback required before deletion")
+              : (locale === "vi" ? "Không thể xóa đợt nhập" : "Cannot delete import")
+          }
+          description={
+            <span>
+              {blockedDeleteState.reason === "LECTURER_NEED_ROLLBACK" ? (
+                <>
+                  {locale === "vi"
+                    ? "Đợt nhập này đã tạo hoặc cập nhật dữ liệu giảng viên. Hãy hoàn tác các thay đổi của đợt nhập trước khi xóa bản ghi lịch sử."
+                    : "This import created or updated lecturer master records. Please rollback changes before deleting history."}
+                  <br />
+                  <strong className="text-slate-800 mt-1 block">{blockedDeleteState.item.file_name}</strong>
+                </>
+              ) : blockedDeleteState.reason === "SCOPUS_IN_USE" ? (
+                <>
+                  {locale === "vi"
+                    ? "Dữ liệu của đợt nhập này đang được sử dụng ở các bước xử lý tiếp theo nên không thể xóa vật lý mà không làm mất provenance."
+                    : "This import's data is consumed by downstream processing and cannot be physically deleted without losing provenance."}
+                  {blockedDeleteState.item.usage && (
+                    <span className="my-2.5 block rounded-lg border border-amber-200/80 bg-amber-50/50 p-2.5 text-xs text-slate-700">
+                      <span className="block">
+                        {locale === "vi" ? "Liên kết nguồn công bố:" : "Publication source links:"}{" "}
+                        <strong className="text-slate-800 font-bold">
+                          {numberFormatter.format(blockedDeleteState.item.usage.publication_source_links ?? 0)}
+                        </strong>
+                      </span>
+                      <span className="block mt-1">
+                        {locale === "vi" ? "Biến thể tên tác giả:" : "Author name variants:"}{" "}
+                        <strong className="text-slate-800 font-bold">
+                          {numberFormatter.format(blockedDeleteState.item.usage.author_variant_links ?? 0)}
+                        </strong>
+                      </span>
+                    </span>
+                  )}
+                  <span className="block text-slate-600">
+                    {locale === "vi"
+                      ? "Bạn có thể Ẩn khỏi lịch sử. Thao tác này không xóa dữ liệu và không làm mất thông tin truy vết."
+                      : "You can Hide from history. This will not delete data or lose provenance tracking."}
+                  </span>
+                  <strong className="text-slate-800 mt-1 block">{blockedDeleteState.item.file_name}</strong>
+                </>
+              ) : (
+                <>
+                  {locale === "vi"
+                    ? "Đợt nhập giảng viên này đang có hồ sơ liên kết với tài khoản hệ thống nên không thể xóa."
+                    : "This lecturer import has accounts linked to system users and cannot be deleted."}
+                  <br />
+                  <strong className="text-slate-800 mt-1 block">{blockedDeleteState.item.file_name}</strong>
+                </>
+              )}
+            </span>
+          }
+          confirmLabel={
+            blockedDeleteState.reason === "LECTURER_NEED_ROLLBACK"
+              ? (locale === "vi" ? "Hoàn tác đợt nhập" : "Rollback import")
+              : blockedDeleteState.reason === "SCOPUS_IN_USE"
+                ? (locale === "vi" ? "Ẩn khỏi lịch sử" : "Hide from history")
+                : undefined
+          }
+          showConfirmButton={blockedDeleteState.reason !== "LECTURER_BLOCKED"}
+          cancelLabel={t.imports.close}
+          onConfirm={() => {
+            const item = blockedDeleteState.item;
+            const reason = blockedDeleteState.reason;
+            setBlockedDeleteState(null);
+            if (reason === "LECTURER_NEED_ROLLBACK") {
+              handleOpenRollbackModal(item);
+            } else if (reason === "SCOPUS_IN_USE") {
+              handleOpenArchiveModal(item);
+            }
+          }}
+          onCancel={() => {
+            setBlockedDeleteState(null);
+          }}
+        />
       )}
 
       {/* CANCEL MODAL */}
@@ -1917,6 +2271,33 @@ export default function ImportsPage() {
             if (!isRestoring) {
               setRestoreModalOpen(false);
               setItemToRestore(null);
+            }
+          }}
+        />
+      )}
+
+      {/* LECTURER IMPORT CONFIRM MODAL */}
+      {lecturerConfirmOpen && lecturerPreview && (
+        <ConfirmModal
+          open={lecturerConfirmOpen}
+          variant="primary"
+          loading={lecturerImporting}
+          title={t.lecturerImport.confirmTitle}
+          description={
+            <span>
+              {t.lecturerImport.confirmMessage}
+              <br />
+              <strong className="text-slate-800 mt-1 block">
+                {lecturerPreview.preview.filename} ({numberFormatter.format(lecturerPreview.preview.summary.valid)} {locale === "vi" ? "hồ sơ hợp lệ" : "valid records"})
+              </strong>
+            </span>
+          }
+          confirmLabel={t.lecturerImport.confirmImport}
+          cancelLabel={t.common.cancel}
+          onConfirm={handleConfirmLecturerImport}
+          onCancel={() => {
+            if (!lecturerImporting) {
+              setLecturerConfirmOpen(false);
             }
           }}
         />
