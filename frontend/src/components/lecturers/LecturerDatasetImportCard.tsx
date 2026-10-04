@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { importLecturerDataset, previewLecturerDataset } from "../../api/lecturerImport";
 import ConfirmModal from "../../components/common/ConfirmModal";
@@ -48,14 +48,27 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-interface LecturerDatasetImportCardProps {
+export interface LecturerDatasetImportCardHandle {
+  openFilePicker: () => void;
+}
+
+export interface LecturerDatasetImportCardProps {
   onSuccess?: () => void;
 }
 
-export default function LecturerDatasetImportCard({ onSuccess }: LecturerDatasetImportCardProps = {}) {
+const LecturerDatasetImportCard = forwardRef<
+  LecturerDatasetImportCardHandle,
+  LecturerDatasetImportCardProps
+>(function LecturerDatasetImportCard({ onSuccess }, ref) {
   const { t, locale } = useI18n();
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    openFilePicker: () => {
+      inputRef.current?.click();
+    },
+  }));
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectionError, setSelectionError] = useState("");
@@ -158,7 +171,7 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
   };
 
   return (
-    <section className="rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
+    <section className="flex flex-col h-full rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
       <div className="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -205,7 +218,7 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
             setDragging(false);
             selectFile(event.dataTransfer.files[0]);
           }}
-          className={`mt-4 group flex min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
+          className={`mt-4 group flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
             dragging
               ? "border-violet-500 bg-violet-50 scale-[0.99]"
               : "border-slate-200 hover:border-violet-400 bg-slate-50/40 hover:bg-violet-50/40"
@@ -234,8 +247,8 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
         </div>
       ) : (
         <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3 min-w-0">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 shrink-0">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -246,11 +259,11 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
                   />
                 </svg>
               </div>
-              <div className="min-w-0">
-                <span className="block font-bold text-slate-800 text-sm truncate max-w-xs sm:max-w-md" title={selectedFile.name}>
+              <div className="min-w-0 flex-1">
+                <span className="block font-bold text-slate-800 text-sm truncate max-w-[180px] sm:max-w-xs" title={selectedFile.name}>
                   {selectedFile.name}
                 </span>
-                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                   <span>
                     {locale === "vi" ? "Dung lượng:" : "Size:"}{" "}
                     <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong>
@@ -258,12 +271,12 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
               <button
                 type="button"
                 disabled={previewing || importing}
                 onClick={clearFile}
-                className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
               >
                 {locale === "vi" ? "Hủy tệp" : "Clear file"}
               </button>
@@ -271,7 +284,7 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
                 type="button"
                 disabled={previewing || importing}
                 onClick={() => void handlePreview()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition-colors disabled:cursor-wait disabled:opacity-70 cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition-colors disabled:cursor-wait disabled:opacity-70 cursor-pointer"
               >
                 {previewing ? (
                   <>
@@ -346,7 +359,7 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
             <strong>{preview.filename}</strong> · {preview.dataset.schema_version} ·{" "}
             {preview.dataset.record_count} {locale === "vi" ? "bản ghi" : "records"}
           </p>
-          <dl className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+          <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Stat label={t.lecturerImport.totalRecords} value={preview.summary.total} />
             <Stat label={t.lecturerImport.validRecords} value={preview.summary.valid} variant="emerald" />
             <Stat label={t.lecturerImport.createRecords} value={preview.summary.create} variant="emerald" />
@@ -364,7 +377,7 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
               type="button"
               disabled={importing}
               onClick={() => setConfirmOpen(false)}
-              className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {t.common.cancel}
             </button>
@@ -372,7 +385,7 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
               type="button"
               disabled={importing}
               onClick={() => setConfirmOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition-colors disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {t.lecturerImport.confirmImport}
             </button>
@@ -395,7 +408,7 @@ export default function LecturerDatasetImportCard({ onSuccess }: LecturerDataset
       />
     </section>
   );
-}
+});
 
 function Stat({
   label,
@@ -421,3 +434,5 @@ function Stat({
     </div>
   );
 }
+
+export default LecturerDatasetImportCard;
