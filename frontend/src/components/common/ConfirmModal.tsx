@@ -9,6 +9,7 @@ export interface ConfirmModalProps {
   description: string | React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  showConfirmButton?: boolean;
   variant?: ConfirmVariant;
   confirmClassName?: string;
   loading?: boolean;
@@ -22,6 +23,7 @@ export default function ConfirmModal({
   description,
   confirmLabel = "Xác nhận",
   cancelLabel = "Hủy",
+  showConfirmButton = true,
   variant = "danger",
   confirmClassName,
   loading = false,
@@ -154,6 +156,7 @@ export default function ConfirmModal({
           </div>
 
           <div className="mt-7 flex items-center justify-end gap-3">
+            {showConfirmButton && (
             <button
               type="button"
               disabled={loading}
@@ -162,6 +165,7 @@ export default function ConfirmModal({
             >
               {cancelLabel}
             </button>
+            )}
 
             <button
               ref={confirmBtnRef}

@@ -1,11 +1,10 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
-import { importLecturerDataset, previewLecturerDataset } from "../../api/lecturerImport";
-import ConfirmModal from "../../components/common/ConfirmModal";
+import { previewLecturerDataset } from "../../api/lecturerImport";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
 
-interface DatasetMeta {
+export interface DatasetMeta {
   name?: string | null;
   schema_version: string;
   institution?: string | null;
@@ -17,7 +16,7 @@ interface DatasetMeta {
   record_count: number;
 }
 
-interface PreviewSummary {
+export interface PreviewSummary {
   total: number;
   valid: number;
   create: number;
@@ -26,7 +25,7 @@ interface PreviewSummary {
   conflicts: number;
 }
 
-interface PreviewConflict {
+export interface PreviewConflict {
   record_full_name: string;
   matched_by: string;
   existing_id: string;
@@ -34,7 +33,7 @@ interface PreviewConflict {
   existing_email: string | null;
 }
 
-interface PreviewResponse {
+export interface PreviewResponse {
   dataset: DatasetMeta;
   summary: PreviewSummary;
   conflicts: PreviewConflict[];
@@ -50,34 +49,47 @@ function formatBytes(bytes: number): string {
 
 export interface LecturerDatasetImportCardHandle {
   openFilePicker: () => void;
+  clearFile: () => void;
 }
 
 export interface LecturerDatasetImportCardProps {
-  onSuccess?: () => void;
+  onPreviewGenerated?: (preview: PreviewResponse, file: File) => void;
+  onFileCleared?: () => void;
+  onFileSelected?: (file: File) => void;
+  isImporting?: boolean;
 }
 
 const LecturerDatasetImportCard = forwardRef<
   LecturerDatasetImportCardHandle,
   LecturerDatasetImportCardProps
->(function LecturerDatasetImportCard({ onSuccess }, ref) {
+>(function LecturerDatasetImportCard(
+  { onPreviewGenerated, onFileCleared, onFileSelected, isImporting = false },
+  ref,
+) {
   const { t, locale } = useI18n();
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectionError, setSelectionError] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+
+  const clearFile = () => {
+    setSelectedFile(null);
+    setSelectionError("");
+    if (inputRef.current) inputRef.current.value = "";
+    onFileCleared?.();
+  };
 
   useImperativeHandle(ref, () => ({
     openFilePicker: () => {
       inputRef.current?.click();
     },
+    clearFile: () => {
+      clearFile();
+    },
   }));
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectionError, setSelectionError] = useState("");
-  const [dragging, setDragging] = useState(false);
-
-  const [preview, setPreview] = useState<PreviewResponse | null>(null);
-  const [previewing, setPreviewing] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const selectFile = (file: File | undefined) => {
     if (!file) return;
@@ -89,6 +101,7 @@ const LecturerDatasetImportCard = forwardRef<
           ? "Chỉ hỗ trợ tệp .json. Vui lòng chọn lại."
           : "Only .json files are supported.",
       );
+      onFileCleared?.();
       return;
     }
     if (file.size === 0) {
@@ -96,27 +109,19 @@ const LecturerDatasetImportCard = forwardRef<
       setSelectionError(
         locale === "vi" ? "Tệp rỗng." : "File is empty.",
       );
+      onFileCleared?.();
       return;
     }
     setSelectedFile(file);
     setSelectionError("");
-    setPreview(null);
-  };
-
-  const clearFile = () => {
-    setSelectedFile(null);
-    setSelectionError("");
-    setPreview(null);
-    if (inputRef.current) inputRef.current.value = "";
+    onFileSelected?.(file);
   };
 
   const handlePreview = async () => {
-    if (!selectedFile || previewing) return;
+    if (!selectedFile || previewing || isImporting) return;
     setPreviewing(true);
-    setPreview(null);
     try {
       const response = await previewLecturerDataset(selectedFile);
-      setPreview(response);
       if (response.conflicts && response.conflicts.length > 0) {
         toast.warning(
           locale === "vi" ? "Cảnh báo trùng tên" : "Duplicate Name Warnings",
@@ -125,6 +130,7 @@ const LecturerDatasetImportCard = forwardRef<
             : `${response.conflicts.length} duplicate name candidates detected. Separate records will be retained.`,
         );
       }
+      onPreviewGenerated?.(response, selectedFile);
     } catch (error) {
       const code = error instanceof ApiError ? error.code : "PREVIEW_FAILED";
       const detail =
@@ -139,41 +145,10 @@ const LecturerDatasetImportCard = forwardRef<
     }
   };
 
-  const handleConfirmImport = async () => {
-    if (!selectedFile || importing) return;
-    setImporting(true);
-    try {
-      const result = await importLecturerDataset(selectedFile);
-      setConfirmOpen(false);
-      clearFile();
-      toast.success(
-        t.lecturerImport.importSuccessTitle,
-        t.lecturerImport.importSuccessMessage.replace(
-          "{count}",
-          String(result.summary.total),
-        ),
-      );
-      if (onSuccess) {
-        onSuccess();
-      }
-    } catch (error) {
-      const code = error instanceof ApiError ? error.code : "IMPORT_FAILED";
-      const detail =
-        error instanceof ApiError
-          ? error.message
-          : locale === "vi"
-            ? "Không thể nhập dữ liệu giảng viên."
-            : "Unable to import lecturer data.";
-      toast.error(t.lecturerImport.importErrorTitle, `${code}: ${detail}`);
-    } finally {
-      setImporting(false);
-    }
-  };
-
   return (
     <section className="flex flex-col h-full rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
       <div className="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -197,16 +172,17 @@ const LecturerDatasetImportCard = forwardRef<
         ref={inputRef}
         type="file"
         accept=".json,application/json"
+        disabled={isImporting || previewing}
         className="hidden"
         onChange={(event) => selectFile(event.target.files?.[0])}
       />
 
       {!selectedFile ? (
         <div
-          onClick={() => inputRef.current?.click()}
+          onClick={() => !isImporting && !previewing && inputRef.current?.click()}
           onDragEnter={(event) => {
             event.preventDefault();
-            setDragging(true);
+            if (!isImporting && !previewing) setDragging(true);
           }}
           onDragOver={(event) => event.preventDefault()}
           onDragLeave={(event) => {
@@ -220,11 +196,11 @@ const LecturerDatasetImportCard = forwardRef<
           }}
           className={`mt-4 group flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
             dragging
-              ? "border-violet-500 bg-violet-50 scale-[0.99]"
-              : "border-slate-200 hover:border-violet-400 bg-slate-50/40 hover:bg-violet-50/40"
-          }`}
+              ? "border-[#3A5FC3] bg-[#3A5FC3]/10 scale-[0.99]"
+              : "border-slate-200 hover:border-[#3A5FC3]/60 bg-slate-50/40 hover:bg-[#3A5FC3]/5"
+          } ${isImporting || previewing ? "cursor-not-allowed opacity-60" : ""}`}
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3A5FC3]/10 text-[#3A5FC3] mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -234,19 +210,19 @@ const LecturerDatasetImportCard = forwardRef<
               />
             </svg>
           </div>
-          <p className="text-xs font-semibold text-slate-700 sm:text-sm group-hover:text-violet-600 transition-colors">
+          <p className="text-xs font-semibold text-slate-700 sm:text-sm group-hover:text-[#3A5FC3] transition-colors">
             {locale === "vi"
-              ? "Kéo thả JSON hoặc chọn tệp"
-              : "Drag and drop a JSON file or click to choose"}
+              ? "Nhấp hoặc kéo thả tệp JSON vào đây để tải lên"
+              : "Click or drag and drop a JSON file here to upload"}
           </p>
           <p className="mt-1 text-[11px] text-slate-400">
             {locale === "vi"
-              ? "Hỗ trợ .json — tối đa 20 MB"
-              : "Supports .json — up to 20 MB"}
+              ? "Hỗ trợ .json — tối đa 20.0 MB"
+              : "Supports .json — up to 20.0 MB"}
           </p>
         </div>
       ) : (
-        <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
+        <div className="mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3 min-w-0">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 shrink-0">
@@ -268,23 +244,28 @@ const LecturerDatasetImportCard = forwardRef<
                     {locale === "vi" ? "Dung lượng:" : "Size:"}{" "}
                     <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong>
                   </span>
+                  <span>•</span>
+                  <span>
+                    {locale === "vi" ? "Định dạng:" : "Format:"}{" "}
+                    <strong className="text-slate-700">JSON</strong>
+                  </span>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
               <button
                 type="button"
-                disabled={previewing || importing}
+                disabled={previewing || isImporting}
                 onClick={clearFile}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
               >
-                {locale === "vi" ? "Hủy tệp" : "Clear file"}
+                {t.imports.cancelFile}
               </button>
               <button
                 type="button"
-                disabled={previewing || importing}
+                disabled={previewing || isImporting}
                 onClick={() => void handlePreview()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition-colors disabled:cursor-wait disabled:opacity-70 cursor-pointer"
+                className="inline-flex min-w-28 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors disabled:cursor-wait disabled:opacity-70 cursor-pointer"
               >
                 {previewing ? (
                   <>
@@ -310,24 +291,6 @@ const LecturerDatasetImportCard = forwardRef<
         </div>
       )}
 
-      {selectedFile && previewing && (
-        <div className="mt-3 overflow-hidden rounded-xl border border-violet-200 bg-violet-50/60 p-4 transition-all duration-300">
-          <div className="flex items-center justify-between text-xs font-semibold text-violet-800">
-            <span className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-violet-600"></span>
-              </span>
-              {locale === "vi" ? "Đang phân tích và kiểm tra tính toàn vẹn dữ liệu..." : "Analyzing and validating dataset structure..."}
-            </span>
-            <span className="text-violet-600 font-mono text-[11px] font-medium">{locale === "vi" ? "Đang tải" : "Loading"}</span>
-          </div>
-          <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-violet-200/80">
-            <div className="h-full w-2/5 bg-violet-600 rounded-full animate-[pulse_1s_ease-in-out_infinite]" />
-          </div>
-        </div>
-      )}
-
       {selectionError && (
         <div
           role="alert"
@@ -349,90 +312,8 @@ const LecturerDatasetImportCard = forwardRef<
           <span>{selectionError}</span>
         </div>
       )}
-
-      {preview && (
-        <div className="mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all duration-300">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-            {t.lecturerImport.previewTitle}
-          </h3>
-          <p className="mt-1 text-xs text-slate-500">
-            <strong>{preview.filename}</strong> · {preview.dataset.schema_version} ·{" "}
-            {preview.dataset.record_count} {locale === "vi" ? "bản ghi" : "records"}
-          </p>
-          <dl className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Stat label={t.lecturerImport.totalRecords} value={preview.summary.total} />
-            <Stat label={t.lecturerImport.validRecords} value={preview.summary.valid} variant="emerald" />
-            <Stat label={t.lecturerImport.createRecords} value={preview.summary.create} variant="emerald" />
-            <Stat label={t.lecturerImport.updateRecords} value={preview.summary.update} variant="amber" />
-            <Stat label={t.lecturerImport.unchangedRecords} value={preview.summary.unchanged} variant="slate" />
-            <Stat label={locale === "vi" ? "Cảnh báo" : "Warnings"} value={preview.conflicts.length} variant="amber" />
-          </dl>
-          {preview.conflicts.length > 0 && (
-            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-              <strong>{locale === "vi" ? "Cảnh báo trùng tên cần kiểm tra" : "Duplicate name warnings"}:</strong> {preview.conflicts.length}
-            </div>
-          )}
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              type="button"
-              disabled={importing}
-              onClick={() => setConfirmOpen(false)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {t.common.cancel}
-            </button>
-            <button
-              type="button"
-              disabled={importing}
-              onClick={() => setConfirmOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-violet-700 transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              {t.lecturerImport.confirmImport}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <ConfirmModal
-        open={confirmOpen}
-        variant="primary"
-        loading={importing}
-        title={t.lecturerImport.confirmTitle}
-        description={t.lecturerImport.confirmMessage}
-        confirmLabel={t.lecturerImport.confirmImport}
-        cancelLabel={t.common.cancel}
-        onConfirm={() => void handleConfirmImport()}
-        onCancel={() => {
-          if (!importing) setConfirmOpen(false);
-        }}
-      />
     </section>
   );
 });
-
-function Stat({
-  label,
-  value,
-  variant = "slate",
-}: {
-  label: string;
-  value: number;
-  variant?: "slate" | "emerald" | "amber" | "rose";
-}) {
-  const variantClasses: Record<string, string> = {
-    slate: "border-slate-200 bg-slate-50/60 text-slate-700",
-    emerald: "border-emerald-200 bg-emerald-50/60 text-emerald-700",
-    amber: "border-amber-200 bg-amber-50/60 text-amber-700",
-    rose: "border-rose-200 bg-rose-50/60 text-rose-700",
-  };
-  return (
-    <div className={`rounded-lg border p-2.5 text-center ${variantClasses[variant]}`}>
-      <dt className="text-[10px] font-medium uppercase tracking-wider opacity-70">
-        {label}
-      </dt>
-      <dd className="mt-0.5 text-base font-black">{value}</dd>
-    </div>
-  );
-}
 
 export default LecturerDatasetImportCard;
