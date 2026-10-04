@@ -735,6 +735,11 @@ class Normalizer:
             summary["normalization_errors"] = self.errors[:50]  # cap at 50
 
         item.normalization_summary = summary
+        if status == "COMPLETED" and item.status != "CANCELLED":
+            item.status = "APPLIED"
+        elif status == "FAILED" and item.status != "CANCELLED":
+            if item.status not in {"STAGED", "APPLIED"}:
+                item.status = "STAGED"
         item.updated_at = datetime.now(UTC)
         db.commit()
 
