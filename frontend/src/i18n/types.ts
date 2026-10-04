@@ -344,6 +344,58 @@ export interface TranslationSchema {
       authorVariantLinks: string;
     };
     goToNormalization: string;
-    comingSoon: string;
+    authorsTab: {
+      subtitle: string;
+      summary: {
+        pending: string;
+        processed: string;
+        scopusAuthors: string;
+        completedWithErrors: string;
+      };
+      pendingTitle: string;
+      pendingSubtitle: string;
+      emptyPending: string;
+      emptyPendingSub: string;
+      historyTitle: string;
+      scopusAuthorsTitle: string;
+      searchPlaceholder: string;
+      table: {
+        authorName: string;
+        scopusId: string;
+        publicationCount: string;
+        variantCount: string;
+        actions: string;
+      };
+      detail: {
+        title: string;
+        preferredName: string;
+        scopusId: string;
+        nameVariants: string;
+        publicationCount: string;
+        noVariants: string;
+      };
+      actions: {
+        normalizeAuthors: string;
+        normalizingAuthors: string;
+        viewDetail: string;
+      };
+      status: {
+        pending: string;
+        completed: string;
+        completedWithErrors: string;
+        failed: string;
+        normalizing: string;
+      };
+      result: {
+        processedPublications: string;
+        authorOccurrences: string;
+        scopusAuthors: string;
+        nameVariants: string;
+        errors: string;
+        success: string;
+        successMessage: string;
+        noRecords: string;
+      };
+    };
   };
 }
