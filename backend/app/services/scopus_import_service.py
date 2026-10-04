@@ -183,8 +183,6 @@ def process_import_job(import_id: uuid.UUID, content: bytes, actor_user_id: uuid
                 return
         if not _finish_import(import_id, actor_user_id):
             return
-        # Normalize raw records → canonical publications (M2.6A)
-        _normalize_after_import(import_id)
     except ScopusCsvError as exc:
         _fail_import(import_id, exc.code, exc.detail)
     except Exception:
