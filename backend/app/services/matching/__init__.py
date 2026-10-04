@@ -17,6 +17,14 @@ from app.services.matching.candidate_generator import (
     normalize_name_n2,
     strip_observed_title_prefix,
 )
+from app.services.matching.candidate_persistence import (
+    CandidatePersistenceResult,
+    CandidatePersistenceService,
+    GenerationRunConflict,
+    GenerationRunSpec,
+    GenerationRunStateError,
+    build_source_state,
+)
 from app.services.matching.candidate_types import (
     CandidateEvidence,
     EnrichedLecturerScopusCandidate,
@@ -53,4 +61,10 @@ __all__ = [
     "strip_observed_title_prefix",
     "ScoreCalculator",
     "ScoreResult",
+    "CandidatePersistenceResult",
+    "CandidatePersistenceService",
+    "GenerationRunConflict",
+    "GenerationRunSpec",
+    "GenerationRunStateError",
+    "build_source_state",
 ]
