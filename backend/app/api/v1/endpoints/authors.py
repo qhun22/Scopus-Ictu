@@ -30,9 +30,11 @@ from app.models.scopus_raw import ScopusImport
 from app.schemas.scopus_author import (
     AuthorListItemResponse,
     AuthorListResponse,
+    AuthorNormalizationResponse,
+    NormalizationCountersResponse,
+    NormalizationErrorEntry,
     ScopusAuthorDetailResponse,
     ScopusAuthorNameVariantResponse,
-    ScopusAuthorResponse,
 )
 from app.services.normalization.scopus_author_normalizer import (
     is_import_eligible_for_author_normalization,
@@ -46,14 +48,14 @@ DatabaseSession = Annotated[Session, Depends(get_session)]
 
 @router.post(
     "/normalize-import/{import_id}",
-    response_model=ScopusAuthorResponse,
+    response_model=AuthorNormalizationResponse,
     summary="Run author normalization for an APPLIED Scopus import (M2.6B)",
 )
 def normalize_authors_endpoint(
     import_id: uuid.UUID,
     admin: AdminUser,
     db: DatabaseSession,
-) -> ScopusAuthorResponse:
+) -> AuthorNormalizationResponse:
     """Admin-only: normalize authors for a Scopus import whose publication normalization is complete.
 
     Prerequisites:
@@ -96,24 +98,51 @@ def normalize_authors_endpoint(
                 detail="Chuẩn hóa tác giả đã chạy nhưng không tìm thấy kết quả.",
                 code="AUTHOR_NORMALIZATION_FAILED",
             )
-        return ScopusAuthorResponse(
-            id=import_id,
-            scopus_id=str(import_id),
-            preferred_name=(
-                f"Import: {item.file_name} "
-                f"({counters.raw_records_processed} records, "
-                f"{counters.unique_authors_seen} authors)"
+        # Errors are persisted alongside the counters in the import summary.
+        # AuthorNormalizationCounters intentionally contains only numeric
+        # counters, so reading ``counters.errors`` here raises AttributeError
+        # after an otherwise successful normalization (including idempotent
+        # reruns) and gets converted into a misleading generic 500.
+        persisted_errors = author_summary.get("errors", [])
+        error_entries = [
+            NormalizationErrorEntry(
+                row_number=err.row_number,
+                code=err.code,
+                message=err.message,
+            )
+            for err in (
+                NormalizationErrorEntry.model_validate(error)
+                for error in persisted_errors
+            )
+        ]
+        return AuthorNormalizationResponse(
+            import_id=import_id,
+            status=author_summary.get("status", "COMPLETED"),
+            counters=NormalizationCountersResponse(
+                raw_records_processed=counters.raw_records_processed,
+                raw_records_failed=counters.raw_records_failed,
+                author_occurrences=counters.author_occurrences,
+                unique_authors_seen=counters.unique_authors_seen,
+                authors_created=counters.authors_created,
+                authors_existing=counters.authors_existing,
+                publication_author_links_created=counters.publication_author_links_created,
+                publication_author_links_existing=counters.publication_author_links_existing,
+                variants_created=counters.variants_created,
+                variants_existing=counters.variants_existing,
+                conflicts=counters.conflicts,
             ),
-            created_at=item.created_at,
-            updated_at=item.updated_at,
+            errors=error_entries,
         )
+    except APIError:
+        # Preserve deliberate, already-classified public errors.
+        raise
     except ValueError as exc:
         raise APIError(
             status_code=409,
             detail=str(exc),
             code="AUTHOR_NORMALIZATION_NOT_ELIGIBLE",
         )
-    except Exception as exc:
+    except Exception:
         raise APIError(
             status_code=500,
             detail="Chuẩn hóa tác giả không thành công.",
@@ -121,7 +150,7 @@ def normalize_authors_endpoint(
         )
 
 
-@router.get("/authors/stats", response_model=dict)
+@router.get("/stats", response_model=dict)
 def author_stats(_admin: AdminUser, db: DatabaseSession) -> dict:
     """Admin-only: global canonical aggregates for the Authors tab KPIs."""
     total_authors = db.query(func.count(ScopusAuthor.id)).scalar() or 0
@@ -134,7 +163,7 @@ def author_stats(_admin: AdminUser, db: DatabaseSession) -> dict:
     }
 
 
-@router.get("/authors", response_model=AuthorListResponse)
+@router.get("", response_model=AuthorListResponse)
 def list_authors(
     _admin: AdminUser,
     db: DatabaseSession,
@@ -196,7 +225,7 @@ def list_authors(
     )
 
 
-@router.get("/authors/{author_id}", response_model=ScopusAuthorDetailResponse)
+@router.get("/{author_id}", response_model=ScopusAuthorDetailResponse)
 def author_detail(
     author_id: uuid.UUID,
     _admin: AdminUser,
