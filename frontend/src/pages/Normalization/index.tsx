@@ -51,17 +51,24 @@ export default function NormalizationPage() {
   const [search, setSearch] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "completed" | "failed">("all");
 
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
   const [normalizingId, setNormalizingId] = useState<string | null>(null);
   const [detailModalItem, setDetailModalItem] = useState<ScopusImport | null>(null);
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [reNormalizeTarget, setReNormalizeTarget] = useState<ScopusImport | null>(null);
 
-  const highlightedRef = useRef<HTMLDivElement | null>(null);
+  const highlightedRef = useRef<HTMLTableRowElement | null>(null);
 
   const fetchImports = async () => {
     try {
       setLoading(true);
+      const startTime = Date.now();
       const res = await getImportHistory(true);
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 2000) {
+        await new Promise((res) => setTimeout(res, 2000 - elapsed));
+      }
       setHistory(res.items || []);
     } catch (err: unknown) {
       toast.error(
@@ -145,6 +152,25 @@ export default function NormalizationPage() {
     );
   }, [historyImports, historyStatusFilter, search]);
 
+  const historyTotalPages = Math.max(1, Math.ceil(filteredHistory.length / historyPageSize));
+  const currentHistoryPage = Math.min(historyPage, historyTotalPages);
+  const paginatedHistory = useMemo(() => {
+    return filteredHistory.slice(
+      (currentHistoryPage - 1) * historyPageSize,
+      currentHistoryPage * historyPageSize,
+    );
+  }, [filteredHistory, currentHistoryPage, historyPageSize]);
+
+  const formatPerformedBy = (name: string | null | undefined): string => {
+    if (!name || name === "Không xác định") {
+      return locale === "vi" ? "Không xác định" : "Unknown";
+    }
+    if (name.includes("?") || name === "Qu?n tr? vi?n") {
+      return locale === "vi" ? "Quản trị viên" : "Administrator";
+    }
+    return name;
+  };
+
   // Deep-link scroll into view
   useEffect(() => {
     if (requestedImportId && !loading) {
@@ -205,7 +231,7 @@ export default function NormalizationPage() {
   return (
     <div className="app-page-container space-y-4 sm:space-y-5">
       {/* Header */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">
             {t.normalization.title}
@@ -214,53 +240,57 @@ export default function NormalizationPage() {
             {t.normalization.subtitle}
           </p>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab("publications")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
-            activeTab === "publications"
-              ? "bg-[#3A5FC3] text-white shadow-xs"
-              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-          }`}
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-          <span>{t.normalization.tabs.publications}</span>
-        </button>
+        <div className="page-action-group">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("publications");
+              setHistoryPage(1);
+            }}
+            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              activeTab === "publications"
+                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
+                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
+            }`}
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            <span className="truncate">{t.normalization.tabs.publications}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("authors")}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs sm:text-sm font-bold transition-colors cursor-pointer ${
-            activeTab === "authors"
-              ? "bg-[#3A5FC3] text-white shadow-xs"
-              : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-          }`}
-        >
-          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-          <span>{t.normalization.tabs.authors}</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("authors")}
+            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              activeTab === "authors"
+                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
+                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
+            }`}
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <span className="truncate">{t.normalization.tabs.authors}</span>
+          </button>
+        </div>
       </div>
 
       {/* Tab Content: Authors Tab (M2.6B) */}
       {activeTab === "authors" && (
-        <AuthorsTab
-          scopusImports={scopusImports}
-          locale={locale}
-          onRefresh={fetchImports}
-        />
+        <div className="tab-fade-in">
+          <AuthorsTab
+            scopusImports={scopusImports}
+            locale={locale}
+            onRefresh={fetchImports}
+          />
+        </div>
       )}
 
       {/* Tab Content: Publications Normalization (M2.6A Functional) */}
       {activeTab === "publications" && (
-        <div className="space-y-5">
+        <div className="tab-fade-in space-y-5">
           {/* Summary KPI Cards — Matching /imports & /lecturers visual rhythm */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
@@ -300,7 +330,7 @@ export default function NormalizationPage() {
             </div>
           </div>
 
-          {/* SECTION 1: CẦN XỬ LÝ (Actionable Queue) */}
+          {/* SECTION 1: CẦN XỬ LÝ (Actionable Queue Table) */}
           <section className="space-y-3">
             <div>
               <h2 className="text-base font-bold text-slate-800 sm:text-lg">
@@ -311,114 +341,141 @@ export default function NormalizationPage() {
               </p>
             </div>
 
-            {loading ? (
-              <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-center text-slate-400">
-                <div className="flex flex-col items-center justify-center gap-2">
-                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
-                  <span className="text-xs font-medium">{t.common.loading}</span>
-                </div>
-              </div>
-            ) : pendingImports.length === 0 ? (
-              <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-center shadow-xs">
-                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 mb-2.5 border border-emerald-100">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 className="text-sm font-bold text-slate-700">
-                  {t.normalization.emptyPending}
-                </h3>
-                <p className="mt-1 text-xs text-slate-400">
-                  {t.normalization.emptyPendingSub}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                {pendingImports.map((item) => {
-                  const isHighlighted = requestedImportId === item.id;
-                  const isBusy = normalizingId === item.id;
-                  return (
-                    <div
-                      key={item.id}
-                      id={`import-item-${item.id}`}
-                      ref={isHighlighted ? highlightedRef : null}
-                      className={`rounded-xl border bg-white p-4 transition-all shadow-xs ${
-                        isHighlighted
-                          ? "border-[#3A5FC3] ring-2 ring-[#3A5FC3]/20 bg-blue-50/20"
-                          : "border-slate-200/80 hover:border-slate-300"
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        {/* Left: Info */}
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#3A5FC3] border border-blue-100/80 shrink-0">
-                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
+            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3">{t.normalization.table.fileName}</th>
+                      <th className="px-4 py-3 text-center">{t.normalization.table.importedAt}</th>
+                      <th className="px-4 py-3 text-center">{t.normalization.table.sourceRecords}</th>
+                      <th className="px-4 py-3 text-center">{t.normalization.table.status}</th>
+                      <th className="w-64 px-4 py-3 text-center">{t.normalization.table.actions}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-slate-400">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+                            <span className="text-xs font-medium">{t.common.loading}</span>
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-bold text-slate-800 text-sm truncate max-w-xs sm:max-w-md" title={item.file_name}>
-                                {item.file_name}
-                              </span>
-                              <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#3A5FC3]">
-                                Scopus
-                              </span>
+                        </td>
+                      </tr>
+                    ) : pendingImports.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-slate-400">
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <span>
-                                <strong className="text-slate-700">{numberFormatter.format(item.total_records)}</strong> {locale === "vi" ? "bản ghi" : "records"}
-                              </span>
-                              <span>•</span>
-                              <span>{formatDate(item.created_at)}</span>
-                              <span>•</span>
-                              <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#3A5FC3]">
-                                {t.normalization.summary.pending}
-                              </span>
-                            </div>
+                            <span className="text-sm font-bold text-slate-700">
+                              {locale === "vi" ? "Không có đợt nhập nào chờ xử lý" : "No pending imports awaiting normalization"}
+                            </span>
+                            <span className="text-xs text-slate-400">
+                              {locale === "vi" ? "Tất cả các đợt nhập Scopus đã được chuẩn hóa hoặc xử lý hoàn tất." : "All Scopus imports have been normalized or processed."}
+                            </span>
                           </div>
-                        </div>
-
-                        {/* Right: Actions */}
-                        <div className="flex items-center gap-2 shrink-0 justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDetailModal(item)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+                        </td>
+                      </tr>
+                    ) : (
+                      pendingImports.map((item) => {
+                        const isHighlighted = requestedImportId === item.id;
+                        const isBusy = normalizingId === item.id;
+                        return (
+                          <tr
+                            key={item.id}
+                            id={`import-item-${item.id}`}
+                            ref={isHighlighted ? highlightedRef : null}
+                            className={`transition-colors hover:bg-slate-50/70 ${
+                              isHighlighted ? "bg-blue-50/30" : ""
+                            }`}
                           >
-                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            <span>{t.normalization.actions.viewDetail}</span>
-                          </button>
+                            {/* File Name */}
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100/80 bg-blue-50 text-[#3A5FC3] shrink-0 shadow-2xs">
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                </div>
+                                <div className="min-w-0 max-w-xs sm:max-w-sm">
+                                  <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
+                                    {item.file_name}
+                                  </span>
+                                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                                    <span className="font-semibold text-slate-600">Scopus</span>
+                                    <span>•</span>
+                                    <span className="font-mono text-[10px] text-slate-400 truncate">ID: {item.id}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
 
-                          <button
-                            type="button"
-                            disabled={isBusy}
-                            onClick={() => void handleNormalize(item)}
-                            className="inline-flex min-w-36 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
-                          >
-                            {isBusy ? (
-                              <>
-                                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                                <span>{t.normalization.actions.normalizing}</span>
-                              </>
-                            ) : (
-                              <>
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                </svg>
-                                <span>{t.normalization.actions.normalize}</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                            {/* Time */}
+                            <td className="px-4 py-3.5 text-center text-slate-600 whitespace-nowrap">
+                              {formatDate(item.created_at)}
+                            </td>
+
+                            {/* Records */}
+                            <td className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">
+                              {numberFormatter.format(item.processed_records || item.imported_records || item.total_records)} / {numberFormatter.format(item.total_records)}
+                            </td>
+
+                            {/* Status */}
+                            <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                              <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+                                {locale === "vi" ? "Chờ xử lý" : "Pending"}
+                              </span>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
+                              <div className="flex items-center justify-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenDetailModal(item)}
+                                  className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                                >
+                                  <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                  <span>{t.normalization.actions.viewDetail}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={isBusy}
+                                  onClick={() => void handleNormalize(item)}
+                                  className="inline-flex h-7 min-w-32 items-center justify-center gap-1.5 rounded-md bg-[#3A5FC3] px-3 text-[11px] font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                                >
+                                  {isBusy ? (
+                                    <>
+                                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                      <span>{t.normalization.actions.normalizing}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                      </svg>
+                                      <span>{t.normalization.actions.normalize}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+            </div>
           </section>
 
           {/* SECTION 2: LỊCH SỬ ĐÃ XỬ LÝ (Processed History) */}
@@ -489,11 +546,21 @@ export default function NormalizationPage() {
                     ) : filteredHistory.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-slate-400">
-                          {t.common.noData}
+                          <div className="flex flex-col items-center justify-center gap-1.5">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <span className="text-sm font-bold text-slate-700">{t.common.noData}</span>
+                            <span className="text-xs text-slate-400">
+                              {locale === "vi" ? "Chưa có đợt nhập nào được chuẩn hóa." : "No normalized imports yet."}
+                            </span>
+                          </div>
                         </td>
                       </tr>
                     ) : (
-                      filteredHistory.map((item) => {
+                      paginatedHistory.map((item) => {
                         const n = item.normalization;
                         return (
                           <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
@@ -567,6 +634,55 @@ export default function NormalizationPage() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Footer info & Pagination Controls (Visible even at total=0) */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+                <div className="flex items-center gap-3">
+                  <span>
+                    {locale === "vi" ? "Hiển thị" : "Showing"} <strong>{paginatedHistory.length}</strong> {locale === "vi" ? "trong" : "of"} {filteredHistory.length} {locale === "vi" ? "đợt nhập" : "imports"}
+                  </span>
+
+                  {/* Page Size Selector */}
+                  <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                    <span className="text-slate-500">{locale === "vi" ? "Hiển thị:" : "Show:"}</span>
+                    <select
+                      value={historyPageSize}
+                      onChange={(e) => {
+                        setHistoryPageSize(Number(e.target.value));
+                        setHistoryPage(1);
+                      }}
+                      className="h-6.5 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                    >
+                      <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
+                      <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
+                      <option value={50}>50 / {locale === "vi" ? "trang" : "page"}</option>
+                      <option value={100}>100 / {locale === "vi" ? "trang" : "page"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <nav aria-label="Pagination" className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
+                    disabled={currentHistoryPage <= 1}
+                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  >
+                    {locale === "vi" ? "Trang trước" : "Previous"}
+                  </button>
+                  <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
+                    {locale === "vi" ? "Trang" : "Page"} <strong>{currentHistoryPage}</strong> / {historyTotalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setHistoryPage((prev) => Math.min(historyTotalPages, prev + 1))}
+                    disabled={currentHistoryPage >= historyTotalPages}
+                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  >
+                    {locale === "vi" ? "Trang sau" : "Next"}
+                  </button>
+                </nav>
               </div>
             </div>
           </section>
@@ -660,7 +776,7 @@ export default function NormalizationPage() {
                       </div>
                       <div className="flex justify-between gap-2">
                         <span className="text-slate-400 shrink-0">{locale === "vi" ? "Người thực hiện:" : "Performed by:"}</span>
-                        <span className="font-semibold text-slate-700">{detailModalItem.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span>
+                        <span className="font-semibold text-slate-700">{formatPerformedBy(detailModalItem.performed_by)}</span>
                       </div>
                       <div className="flex justify-between gap-2">
                         <span className="text-slate-400 shrink-0">{locale === "vi" ? "Thời gian tiếp nhận:" : "Imported at:"}</span>

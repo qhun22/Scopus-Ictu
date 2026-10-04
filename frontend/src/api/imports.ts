@@ -53,6 +53,12 @@ export interface AuthorNormalizationSummary {
   }>;
 }
 
+export interface ImportNormalizationSummary {
+  status?: NormalizationData["status"];
+  authors?: AuthorNormalizationSummary | null;
+  [key: string]: unknown;
+}
+
 export interface ScopusImport {
   id: string;
   type?: "SCOPUS" | "LECTURERS";
@@ -86,7 +92,7 @@ export interface ScopusImport {
   scopus_summary?: Record<string, unknown> | null;
   lecturer_summary?: LecturerImportSummaryData | null;
   // M2.6B: nested author normalization counters
-  normalization_summary?: AuthorNormalizationSummary | null;
+  normalization_summary?: ImportNormalizationSummary | null;
 }
 
 export interface UnifiedImportStats {
