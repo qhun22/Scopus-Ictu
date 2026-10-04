@@ -722,6 +722,13 @@ class Normalizer:
         if item is None:
             return
 
+        # Preserve nested M2.6B author summary when re-running M2.6A
+        existing_summary = item.normalization_summary or {}
+        if isinstance(existing_summary, dict):
+            nested_authors = existing_summary.get("authors")
+        else:
+            nested_authors = None
+
         summary = self.counters.to_dict()
         summary["status"] = status
         if total_records is not None:
@@ -733,6 +740,10 @@ class Normalizer:
             )
         if self.errors:
             summary["normalization_errors"] = self.errors[:50]  # cap at 50
+
+        # Restore nested authors key if it was set by M2.6B
+        if nested_authors is not None:
+            summary["authors"] = nested_authors
 
         item.normalization_summary = summary
         if status == "COMPLETED" and item.status != "CANCELLED":
