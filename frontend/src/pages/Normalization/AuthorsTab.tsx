@@ -10,7 +10,6 @@ import {
 } from "../../api/authors";
 import { ApiError } from "../../api/client";
 import {
-  AuthorNormalizationSummary,
   normalizeImport as normalizePublicationImport,
   ScopusImport,
 } from "../../api/imports";
@@ -31,7 +30,7 @@ interface AuthorsTabProps {
 function isAuthorPending(item: ScopusImport): boolean {
   // Only re-queue COMPLETED imports that FAILED (system exception).
   // COMPLETED with row-level errors stays completed (no retry needed).
-  const summary = item.normalization_summary as AuthorNormalizationSummary | undefined | null;
+  const summary = item.normalization_summary?.authors;
   if (item.status !== "APPLIED") return false;
   if (!summary) return true;
   if (summary.status === "FAILED") return true;
@@ -40,7 +39,7 @@ function isAuthorPending(item: ScopusImport): boolean {
 }
 
 function isAuthorCompletedWithErrors(item: ScopusImport): boolean {
-  const summary = item.normalization_summary as AuthorNormalizationSummary | undefined | null;
+  const summary = item.normalization_summary?.authors;
   const completed = isAuthorCompleted(item);
   if (!completed) return false;
   // Has row-level errors or conflicts — flag but still COMPLETED (not FAILED)
@@ -51,7 +50,7 @@ function isAuthorCompletedWithErrors(item: ScopusImport): boolean {
 }
 
 function isAuthorCompleted(item: ScopusImport): boolean {
-  const summary = item.normalization_summary as AuthorNormalizationSummary | undefined | null;
+  const summary = item.normalization_summary?.authors;
   return (
     item.status === "APPLIED" &&
     summary?.status === "COMPLETED"
@@ -90,7 +89,9 @@ function variantTypeLabel(vt: string, locale: string): string {
 
 export default function AuthorsTab({ scopusImports, locale, onRefresh }: AuthorsTabProps) {
   const { t } = useI18n();
-  const toast = useToast();
+  // Destructure stable callbacks — avoid depending on the whole toast object
+  // which changes identity when state (toast list) updates.
+  const { error: toastError, success: toastSuccess } = useToast();
 
   // Pending imports for author extraction
   const [pendingImports, setPendingImports] = useState<ScopusImport[]>([]);
@@ -100,10 +101,13 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
   // Author list state
   const [authorSearch, setAuthorSearch] = useState("");
   const [authorPage, setAuthorPage] = useState(1);
+  const [authorPageSize, setAuthorPageSize] = useState(10);
   const [authorTotal, setAuthorTotal] = useState(0);
   const [authors, setAuthors] = useState<AuthorListItem[]>([]);
   const [authorsLoading, setAuthorsLoading] = useState(false);
   const [globalStats, setGlobalStats] = useState<AuthorStats | null>(null);
+
+  const authorTotalPages = Math.max(1, Math.ceil(authorTotal / authorPageSize));
 
   // Author detail modal
   const [selectedAuthor, setSelectedAuthor] = useState<AuthorDetail | null>(null);
@@ -122,21 +126,21 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
   }, [scopusImports]);
 
   // Load author list
-  const loadAuthors = useCallback(async (q: string, page: number) => {
+  const loadAuthors = useCallback(async (q: string, page: number, pageSize: number) => {
     setAuthorsLoading(true);
     try {
-      const res = await getAuthors({ q: q || undefined, page, page_size: 20 });
+      const res = await getAuthors({ q: q || undefined, page, page_size: pageSize });
       setAuthors(res.items);
       setAuthorTotal(res.total);
     } catch (err: unknown) {
-      toast.error(
+      toastError(
         locale === "vi" ? "Lỗi tải danh sách" : "Load error",
         err instanceof ApiError ? err.message : (locale === "vi" ? "Không thể tải danh sách tác giả." : "Unable to load author list."),
       );
     } finally {
       setAuthorsLoading(false);
     }
-  }, [toast, locale]);
+  }, [toastError, locale]);
 
   // Load global stats
   const loadStats = useCallback(async () => {
@@ -150,14 +154,14 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
 
   // Reload author list AND global stats after a normalization action
   const reloadAuthorsAndStats = useCallback(async () => {
-    await loadAuthors(authorSearch, authorPage);
+    await loadAuthors(authorSearch, authorPage, authorPageSize);
     await loadStats();
-  }, [authorSearch, authorPage, loadAuthors, loadStats]);
+  }, [authorSearch, authorPage, authorPageSize, loadAuthors, loadStats]);
 
   useEffect(() => {
-    void loadAuthors(authorSearch, authorPage);
+    void loadAuthors(authorSearch, authorPage, authorPageSize);
     void loadStats();
-  }, [authorSearch, authorPage, loadAuthors, loadStats]);
+  }, [authorSearch, authorPage, authorPageSize, loadAuthors, loadStats]);
 
   // Handlers
   const handleNormalizePublication = async (item: ScopusImport) => {
@@ -167,14 +171,14 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
       await normalizePublicationImport(item.id);
       onRefresh();
       await reloadAuthorsAndStats();
-      toast.success(
+      toastSuccess(
         locale === "vi" ? "Chuẩn hóa công bố hoàn tất" : "Publication normalization complete",
         locale === "vi"
           ? "Đã chuẩn hóa công bố thành công."
           : "Publication normalization complete.",
       );
     } catch (err: unknown) {
-      toast.error(
+      toastError(
         locale === "vi" ? "Lỗi chuẩn hóa" : "Normalization error",
         err instanceof ApiError ? err.message : (locale === "vi" ? "Không thể chuẩn hóa." : "Unable to normalize."),
       );
@@ -190,14 +194,14 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
       await normalizeAuthors(item.id);
       onRefresh();
       await reloadAuthorsAndStats();
-      toast.success(
+      toastSuccess(
         locale === "vi" ? "Bóc tách hoàn tất" : "Extraction complete",
         locale === "vi"
           ? "Đã bóc tách tác giả thành công."
           : "Author extraction complete.",
       );
     } catch (err: unknown) {
-      toast.error(
+      toastError(
         locale === "vi" ? "Lỗi bóc tách" : "Extraction error",
         err instanceof ApiError ? err.message : (locale === "vi" ? "Không thể bóc tách tác giả." : "Unable to extract authors."),
       );
@@ -211,7 +215,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
       const detail = await getAuthorDetail(author.id);
       setSelectedAuthor(detail);
     } catch (err: unknown) {
-      toast.error(
+      toastError(
         locale === "vi" ? "Lỗi tải chi tiết" : "Load error",
         err instanceof ApiError ? err.message : (locale === "vi" ? "Không thể tải chi tiết." : "Unable to load detail."),
       );
@@ -304,7 +308,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
         ) : (
           <div className="space-y-2.5">
             {pendingImports.map((item) => {
-              const authorSummary = item.normalization_summary as AuthorNormalizationSummary | undefined;
+              const authorSummary = item.normalization_summary?.authors;
               const authorStatus = authorSummary?.status;
               const needsPublicationNormalization =
                 !item.normalization || item.normalization.status !== "COMPLETED";
@@ -458,13 +462,18 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                   </tr>
                 ) : authors.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
-                      <div className="flex flex-col items-center gap-1">
-                        <svg className="h-6 w-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                        <span className="text-xs">
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">
                           {locale === "vi" ? "Chưa có tác giả nào" : "No authors yet"}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {locale === "vi" ? "Danh sách tác giả trích xuất sẽ xuất hiện tại đây." : "Extracted author list will appear here."}
                         </span>
                       </div>
                     </td>
@@ -510,35 +519,55 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
             </table>
           </div>
 
-          {/* Pagination */}
-          {authorTotal > 20 && (
-            <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 bg-slate-50/50">
-              <span className="text-xs text-slate-500">
-                {locale === "vi"
-                  ? `Hiển thị ${(authorPage - 1) * 20 + 1}–${Math.min(authorPage * 20, authorTotal)} trong ${formatCount(authorTotal)}`
-                  : `Showing ${(authorPage - 1) * 20 + 1}–${Math.min(authorPage * 20, authorTotal)} of ${formatCount(authorTotal)}`}
+          {/* Footer info & Pagination Controls (Visible even at total=0) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+            <div className="flex items-center gap-3">
+              <span>
+                {locale === "vi" ? "Hiển thị" : "Showing"} <strong>{authors.length}</strong> {locale === "vi" ? "trong" : "of"} {authorTotal} {locale === "vi" ? "tác giả" : "authors"}
               </span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setAuthorPage((p) => Math.max(1, p - 1))}
-                  disabled={authorPage <= 1}
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+
+              {/* Page Size Selector */}
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <span className="text-slate-500">{locale === "vi" ? "Hiển thị:" : "Show:"}</span>
+                <select
+                  value={authorPageSize}
+                  onChange={(e) => {
+                    const newSize = Number(e.target.value);
+                    setAuthorPageSize(newSize);
+                    setAuthorPage(1);
+                  }}
+                  className="h-6.5 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
                 >
-                  ‹
-                </button>
-                <span className="px-2 text-xs font-semibold text-slate-700">{authorPage}</span>
-                <button
-                  type="button"
-                  onClick={() => setAuthorPage((p) => p + 1)}
-                  disabled={authorPage * 20 >= authorTotal}
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                >
-                  ›
-                </button>
+                  <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={50}>50 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={100}>100 / {locale === "vi" ? "trang" : "page"}</option>
+                </select>
               </div>
             </div>
-          )}
+
+            <nav aria-label="Pagination" className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setAuthorPage((prev) => Math.max(1, prev - 1))}
+                disabled={authorPage <= 1}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                {locale === "vi" ? "Trang trước" : "Previous"}
+              </button>
+              <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
+                {locale === "vi" ? "Trang" : "Page"} <strong>{authorPage}</strong> / {authorTotalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAuthorPage((prev) => Math.min(authorTotalPages, prev + 1))}
+                disabled={authorPage >= authorTotalPages}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                {locale === "vi" ? "Trang sau" : "Next"}
+              </button>
+            </nav>
+          </div>
         </div>
       </section>
 
