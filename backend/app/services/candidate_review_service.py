@@ -33,6 +33,7 @@ from app.models.candidate import (
 from app.models.governance import User
 from app.models.identity import IdentityEvidence, LecturerScopusIdentity
 from app.models.publication import ScopusAuthor
+from app.services.candidate_review_queries import current_reviewable_observation
 
 
 # ---------------------------------------------------------------------------
@@ -332,46 +333,7 @@ class CandidateReviewService:
             deterministic tie-breakers. UUID id is only a stable tie-breaker
             for equal timestamps, not a chronological signal.
         """
-        latest_run_subq = (
-            select(LecturerScopusCandidateObservation.generation_run_id)
-            .join(
-                CandidateGenerationRun,
-                CandidateGenerationRun.id
-                == LecturerScopusCandidateObservation.generation_run_id,
-            )
-            .where(
-                LecturerScopusCandidateObservation.candidate_id == candidate_id,
-                CandidateGenerationRun.status == "COMPLETED",
-            )
-            .order_by(
-                CandidateGenerationRun.completed_at.desc(),
-                CandidateGenerationRun.created_at.desc(),
-                CandidateGenerationRun.id.desc(),
-            )
-            .limit(1)
-        )
-
-        latest_run_id = self._session.scalar(latest_run_subq)
-        if latest_run_id is None:
-            raise ObservationNotFoundError(
-                f"No observation from a COMPLETED generation run for "
-                f"candidate {candidate_id}"
-            )
-
-        observation = self._session.scalar(
-            select(LecturerScopusCandidateObservation)
-            .where(
-                LecturerScopusCandidateObservation.candidate_id == candidate_id,
-                LecturerScopusCandidateObservation.generation_run_id
-                == latest_run_id,
-            )
-        )
-        if observation is None:
-            raise ObservationNotFoundError(
-                f"Observation for candidate {candidate_id} in latest run "
-                f"{latest_run_id} not found"
-            )
-        return observation
+        return current_reviewable_observation(self._session, candidate_id)
 
     def _authorize_reviewer(
         self, user_id: uuid.UUID
