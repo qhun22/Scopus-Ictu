@@ -139,8 +139,10 @@ class LecturerScopusIdentity(Base):
 class IdentityEvidence(Base):
     """Evidence supporting an identity decision.
 
-    M1.0-B §12. Append-only per M1.0-A08. The numeric confidence score
-    is normalized to [0.0, 1.0] (C4-09). Fingerprint regex per M1C-04.
+    M1.0-B §12. Append-only per M1.0-A08. ``confidence_score`` is a
+    machine-derived normalized evidence strength in [0.0, 1.0] (C4-09),
+    not reviewer confidence; NULL means no numeric strength was derived.
+    Fingerprint regex per M1C-04.
     """
 
     __tablename__ = "identity_evidence"
@@ -157,7 +159,11 @@ class IdentityEvidence(Base):
     )
     evidence_type: Mapped[str] = mapped_column(String(40), nullable=False)
     direction: Mapped[str] = mapped_column(String(20), nullable=False)
-    confidence_score: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
+    # NULL means no machine-derived numeric evidence strength is available;
+    # non-NULL values are normalized to [0, 1], not reviewer confidence.
+    confidence_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 4), nullable=True
+    )
     algorithm_version: Mapped[str] = mapped_column(String(100), nullable=False)
     features: Mapped[dict] = mapped_column(JSONB, nullable=False)
     source_refs: Mapped[list] = mapped_column(JSONB, nullable=False)
