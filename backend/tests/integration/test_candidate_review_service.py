@@ -1342,14 +1342,22 @@ def test_service_class_is_exported() -> None:
 # ---------------------------------------------------------------------------
 
 def test_current_observation_is_deterministic_for_tied_completed_runs(
-    ready_fixture: dict[str, Any], review_session: Session
+    review_session: Session,
 ) -> None:
     """Equal completion timestamps use created_at/id tie-breakers deterministically."""
-    candidate = ready_fixture["candidate"]
+    lecturer = _make_lecturer(review_session)
+    author = _make_author(review_session)
+    candidate = _make_candidate(review_session, lecturer=lecturer, author=author)
     fixed_time = datetime(2026, 10, 5, 10, 0, tzinfo=UTC)
+    lower_run_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    higher_run_id = uuid.UUID("00000000-0000-0000-0000-000000000002")
 
-    completed_a = _make_run(review_session, status="COMPLETED")
-    completed_b = _make_run(review_session, status="COMPLETED")
+    completed_a = _make_run(
+        review_session, status="COMPLETED", run_id=lower_run_id
+    )
+    completed_b = _make_run(
+        review_session, status="COMPLETED", run_id=higher_run_id
+    )
     running = _make_run(review_session, status="RUNNING")
     failed = _make_run(review_session, status="FAILED")
     for run in (completed_a, completed_b):
@@ -1372,7 +1380,7 @@ def test_current_observation_is_deterministic_for_tied_completed_runs(
     _make_observation(review_session, candidate=candidate, run=failed)
     review_session.commit()
 
-    expected = obs_a if completed_a.id > completed_b.id else obs_b
+    expected = obs_b
     service = CandidateReviewService(review_session)
     selected = [
         service._resolve_current_reviewable_observation(candidate.id).id
