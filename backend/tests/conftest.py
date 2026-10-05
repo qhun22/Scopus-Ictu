@@ -19,6 +19,7 @@ from typing import Generator
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
@@ -37,8 +38,8 @@ def _build_isolated_test_engine() -> Engine | None:
         # Read the base URL from .env, replace DB name with {name}_test_schema
         base_url = os.environ.get("TEST_DATABASE_URL")
         if not base_url:
-            # Construct from current settings env vars
             return None
+        _assert_test_database_url(base_url)
 
         test_engine = create_engine(base_url, pool_pre_ping=True, future=True)
 
@@ -51,19 +52,26 @@ def _build_isolated_test_engine() -> Engine | None:
         return None
 
 
+def _assert_test_database_url(base_url: str) -> None:
+    database = make_url(base_url).database
+    if database in {"scopus_ictu_acceptance_v2", "scopus_ictu_ui_clean"}:
+        raise RuntimeError(
+            "TEST_DATABASE_URL must not target an acceptance or forensic database"
+        )
+
+
 ISOLATION_ENGINE: Engine | None = None
 
 # Guard: refuse to run against ENVIRONMENT=local unless TEST_ALLOW_LOCAL=1
 _env = os.environ.get("ENVIRONMENT", "local").lower()
-_is_local = _env == "local"
 _can_override = os.environ.get("TEST_ALLOW_LOCAL", "0") == "1"
 
-if _is_local and not _can_override:
+if not _can_override:
     ISOLATION_ENGINE = _build_isolated_test_engine()
     if ISOLATION_ENGINE is None:
         pytest.exit(
-            "TEST ISOLATION BLOCKER: pytest is running against ENVIRONMENT=local "
-            "(backend/.env -> scopus_m12_test) but no isolated test database is available.\n"
+            "TEST ISOLATION BLOCKER: TEST_DATABASE_URL must point to an available "
+            "isolated PostgreSQL database.\n"
             "Options:\n"
             "  1. Set TEST_DATABASE_URL to an isolated PostgreSQL URL, OR\n"
             "  2. Set TEST_ALLOW_LOCAL=1 if you intentionally want to run tests "
