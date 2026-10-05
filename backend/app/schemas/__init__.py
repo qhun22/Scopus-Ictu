@@ -11,6 +11,13 @@ from app.schemas.identity_review import (
     MappingReviewCreate,
     MappingReviewResponse,
 )
+from app.schemas.review_api import (
+    ReviewCandidateDetailResponse,
+    ReviewDecisionRequest,
+    ReviewDecisionResponse,
+    ReviewQueueItem,
+    ReviewQueueResponse,
+)
 from app.schemas.lecturer import (
     LecturerCreate,
     LecturerKnownPublicationResponse,
@@ -77,6 +84,11 @@ __all__ = [
     "MappingReviewCreate",
     "MappingReviewResponse",
     "CandidateWithEvidenceResponse",
+    "ReviewCandidateDetailResponse",
+    "ReviewDecisionRequest",
+    "ReviewDecisionResponse",
+    "ReviewQueueItem",
+    "ReviewQueueResponse",
     # audit
     "AuditEventResponse",
 ]
