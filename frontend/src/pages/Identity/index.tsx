@@ -10,7 +10,6 @@ const viCopy = {
   subtitle: "Các định danh Scopus đã được phê duyệt cho hồ sơ của bạn.",
   identity: "Định danh Scopus",
   scopusId: "Scopus Author ID",
-  scopusIdShort: "Scopus ID",
   status: "Trạng thái",
   approved: "Đã phê duyệt",
   variants: "Biến thể tên",
@@ -34,7 +33,6 @@ const enCopy = {
   subtitle: "Approved Scopus identities associated with your profile.",
   identity: "Scopus identity",
   scopusId: "Scopus Author ID",
-  scopusIdShort: "Scopus ID",
   status: "Status",
   approved: "Approved",
   variants: "Name variants",
@@ -106,8 +104,7 @@ function IdentityCard({ identity, copy, locale }: { identity: ApprovedScopusIden
       </div>
 
       <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{copy.scopusId}</dt><dd className="mt-1 break-all text-sm font-medium text-slate-800">{identity.scopus_author_id || fallback}</dd></div>
-        <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{copy.scopusIdShort}</dt><dd className="mt-1 break-all text-sm font-medium text-slate-800">{identity.scopus_id || fallback}</dd></div>
+        <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{copy.scopusId}</dt><dd className="mt-1 break-all text-sm font-medium text-slate-800">{identity.scopus_id || fallback}</dd></div>
       </dl>
 
       <div className="mt-6 border-t border-slate-100 pt-5">
@@ -196,7 +193,7 @@ export default function IdentityPage() {
       ) : null}
       {!loading && !error && identities.length > 0 ? (
         <div className="grid gap-6 lg:grid-cols-2">
-          {identities.map((identity) => <IdentityCard key={identity.identity_id} identity={identity} copy={copy} locale={locale} />)}
+          {identities.map((identity) => <IdentityCard key={identity.scopus_id} identity={identity} copy={copy} locale={locale} />)}
         </div>
       ) : null}
     </main>
