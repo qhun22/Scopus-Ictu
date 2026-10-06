@@ -209,7 +209,7 @@ export default function ProfilePage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">{copy.research}</h2>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2">
-              <Field label={copy.orcid} value={linkValue(profile.orcid)} />
+              <Field label={copy.orcid} value={value(profile.orcid)} />
               <Field label={copy.repository} value={linkValue(profile.repository_profile_url)} />
             </dl>
           </section>
