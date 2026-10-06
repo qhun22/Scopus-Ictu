@@ -19,6 +19,7 @@ from app.schemas.lecturer_scopus_projection import (
     LecturerPublicationRead,
     PaginatedLecturerPublicationsRead,
 )
+from app.schemas.lecturer_scopus_api import LecturerPublicationsAPIResponse
 from app.schemas.review_api import (
     ReviewCandidateDetailResponse,
     ReviewDecisionRequest,
@@ -97,6 +98,7 @@ __all__ = [
     "LecturerPublicationRead",
     "PaginatedLecturerPublicationsRead",
     "LecturerPublicationAggregatesRead",
+    "LecturerPublicationsAPIResponse",
     "CandidateWithEvidenceResponse",
     "ReviewCandidateDetailResponse",
     "ReviewDecisionRequest",
