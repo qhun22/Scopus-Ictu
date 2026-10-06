@@ -49,7 +49,7 @@ jobs:
       SCOPUS_IMPORT_MAX_BYTES: "20971520"
       SCOPUS_IMPORT_BATCH_SIZE: "100"
       SCOPUS_NORMALIZATION_BATCH_SIZE: "500"
-      TEST_DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/test_db"
+      TEST_DATABASE_URL: "postgresql+psycopg2://test_user:test_password@localhost:5432/test_db"
 
     steps:
       - uses: actions/checkout@v4
