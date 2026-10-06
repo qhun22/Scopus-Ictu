@@ -46,7 +46,7 @@ export const vi: TranslationSchema = {
     lecturers: "Giảng viên",
     users: "Người dùng",
     publications: "Công bố",
-    reviews: "Hàng đợi xác minh",
+    reviews: "Duyệt đối sánh",
     reviewHistory: "Lịch sử review",
     auditLogs: "Nhật ký hệ thống",
     tasks: "Tác vụ",
