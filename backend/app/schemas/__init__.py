@@ -11,6 +11,14 @@ from app.schemas.identity_review import (
     MappingReviewCreate,
     MappingReviewResponse,
 )
+from app.schemas.lecturer_scopus_projection import (
+    ApprovedIdentitySummaryRead,
+    IdentityEvidenceSummaryRead,
+    LecturerProfileRead,
+    LecturerPublicationAggregatesRead,
+    LecturerPublicationRead,
+    PaginatedLecturerPublicationsRead,
+)
 from app.schemas.review_api import (
     ReviewCandidateDetailResponse,
     ReviewDecisionRequest,
@@ -83,6 +91,12 @@ __all__ = [
     "MappingReviewBase",
     "MappingReviewCreate",
     "MappingReviewResponse",
+    "LecturerProfileRead",
+    "IdentityEvidenceSummaryRead",
+    "ApprovedIdentitySummaryRead",
+    "LecturerPublicationRead",
+    "PaginatedLecturerPublicationsRead",
+    "LecturerPublicationAggregatesRead",
     "CandidateWithEvidenceResponse",
     "ReviewCandidateDetailResponse",
     "ReviewDecisionRequest",
