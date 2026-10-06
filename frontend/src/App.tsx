@@ -18,6 +18,7 @@ import ApprovalQueuePage from "./pages/ApprovalQueue";
 import AuditLogsPage from "./pages/AuditLogs";
 import ProfilePage from "./pages/Profile";
 import IdentityPage from "./pages/Identity";
+import MyPublicationsPage from "./pages/MyPublications";
 import PlaceholderPage from "./components/common/PlaceholderPage";
 import PageLoadingBar from "./components/PageLoadingBar";
 
@@ -69,7 +70,7 @@ export default function App() {
                 />
                 <Route
                   path="/my-publications"
-                  element={<PlaceholderPage title="Công bố của tôi" icon="publication" />}
+                  element={<MyPublicationsPage />}
                 />
                 <Route
                   path="/identity"
