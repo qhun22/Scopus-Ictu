@@ -46,7 +46,7 @@ export const en: TranslationSchema = {
     lecturers: "Lecturers",
     users: "Users",
     publications: "Publications",
-    reviews: "Approval Queue",
+    reviews: "Review Matches",
     reviewHistory: "Review History",
     auditLogs: "Audit Log",
     tasks: "Tasks",
