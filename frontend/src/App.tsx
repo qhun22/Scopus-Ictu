@@ -16,6 +16,8 @@ import NormalizationPage from "./pages/Normalization";
 import PublicationsPage from "./pages/Publications";
 import ApprovalQueuePage from "./pages/ApprovalQueue";
 import AuditLogsPage from "./pages/AuditLogs";
+import ProfilePage from "./pages/Profile";
+import IdentityPage from "./pages/Identity";
 import PlaceholderPage from "./components/common/PlaceholderPage";
 import PageLoadingBar from "./components/PageLoadingBar";
 
@@ -60,10 +62,10 @@ export default function App() {
               />
 
               {/* Lecturer Routes */}
-              <Route element={<RoleRoute allowedRoles={["LECTURER", "ADMIN"]} />}>
+              <Route element={<RoleRoute allowedRoles={["LECTURER"]} />}>
                 <Route
                   path="/profile"
-                  element={<PlaceholderPage title="Hồ sơ cá nhân" icon="profile" />}
+                  element={<ProfilePage />}
                 />
                 <Route
                   path="/my-publications"
@@ -71,7 +73,7 @@ export default function App() {
                 />
                 <Route
                   path="/identity"
-                  element={<PlaceholderPage title="Liên kết Scopus" icon="identity" />}
+                  element={<IdentityPage />}
                 />
               </Route>
 
