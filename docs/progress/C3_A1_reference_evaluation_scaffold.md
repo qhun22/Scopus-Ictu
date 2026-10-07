@@ -143,6 +143,50 @@ report.  Final CI evidence will be reported externally in the task report.
 - Canonical WIP modified: false
 - `scopus_ictu_acceptance_v2` not touched
 
+## Audit Correction
+
+An independent audit of the initial A1 commit
+(`6c060c8aae00f7a2e1857f594541367716562bd5`, CI run 37655663788,
+Backend SUCCESS / Frontend SUCCESS) identified the following defects and
+applied a corrective commit on the same branch:
+
+- **Prediction source corrected**: the initial implementation read persisted
+  `LecturerScopusCandidate` rows filtered by `status == PENDING`.  This
+  couples evaluation results to workflow state (ACCEPTED/REJECTED decisions,
+  older generation runs) and does not measure the *current* production
+  retrieval algorithm.  Correction changed the prediction source to
+  `CandidateGenerator(session).generate_all()` (transient, read-only),
+  enriched by `PublicationEvidenceEnricher(session).enrich()`.
+- **Historical observation evidence removed**: `LecturerScopusCandidateObservation`
+  and `LecturerScopusCandidateEvidence` are no longer read for evaluation
+  predictions.
+- **Real ISO-8601 datetime validation**: `confirmed_at` was previously
+  validated by regex only, which accepted impossible dates such as
+  `2026-13-01` or `2026-02-30`.  Replaced with `datetime.fromisoformat()`
+  after Z→+00:00 normalisation.  UTC timezone is now enforced.
+- **Official dataset exactly-one invariant**: the cross-check previously
+  used a `dict` keyed by `source_id`, silently collapsing duplicates.
+  Changed to a list-based index; zero or >1 matches now raise a validation
+  error.
+- **Evaluation fails closed on unresolved lecturer**: `evaluate_candidate_retrieval`
+  previously inserted a dummy case and excluded the row from metrics when a
+  reference record had no resolved canonical lecturer.  It now raises
+  `EvaluationInputError` instead.
+- **Read-only DB transaction guard hardened**: `evaluate_matching_reference.py`
+  now uses `settings.database_url` (not a nonexistent `get_db_url()` helper
+  or manual env-var fallback), refuses to run when
+  `settings.environment == "prod"`, and fails closed if
+  `SET TRANSACTION READ ONLY` is rejected by the database.
+- **Production matching algorithms unchanged**: `candidate_generator.py`,
+  `candidate_types.py`, `publication_evidence_enricher.py`,
+  `candidate_persistence.py` are unmodified.
+
+Corrected authoritative SHA: see Git commit containing this record and final
+A1 audit report.
+
+Corrected CI evidence: NOT_AVAILABLE_AT_COMMIT_TIME.  Final corrected CI
+evidence will be reported externally in the audit report.
+
 ## Known Limitations
 
 - **No real supervisor-confirmed reference dataset is added in C3-A1.**
@@ -150,8 +194,6 @@ report.  Final CI evidence will be reported externally in the task report.
 - **Therefore NO real ICTU precision/recall/F1 result is claimed yet.**
   Any numbers would be fabricated; the evaluator requires real labels.
 - **Actual evaluation requires C3-A2** (reference labeling/population).
-- The evaluate CLI's `SET TRANSACTION READ ONLY` is a best-effort guard;
-  the application code performs no writes regardless.
 
 ## Next Recommended Step
 
