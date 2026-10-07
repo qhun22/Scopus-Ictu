@@ -14,6 +14,7 @@ import LecturersPage from "./pages/Lecturers";
 import ImportsPage from "./pages/Imports";
 import NormalizationPage from "./pages/Normalization";
 import PublicationsPage from "./pages/Publications";
+import PublicationDetailPage from "./pages/Publications/Detail";
 import ApprovalQueuePage from "./pages/ApprovalQueue";
 import AuditLogsPage from "./pages/AuditLogs";
 import ProfilePage from "./pages/Profile";
@@ -51,7 +52,6 @@ export default function App() {
             <Route element={<AppLayout />}>
               {/* Universal landing route */}
               <Route path="/home" element={<HomePage />} />
-              <Route path="/publications" element={<PublicationsPage />} />
               <Route
                 path="/search"
                 element={
@@ -61,6 +61,12 @@ export default function App() {
                   />
                 }
               />
+
+              {/* Admin + Reviewer Routes */}
+              <Route element={<RoleRoute allowedRoles={["ADMIN", "REVIEWER"]} />}>
+                <Route path="/publications" element={<PublicationsPage />} />
+                <Route path="/publications/:eid" element={<PublicationDetailPage />} />
+              </Route>
 
               {/* Lecturer Routes */}
               <Route element={<RoleRoute allowedRoles={["LECTURER"]} />}>
