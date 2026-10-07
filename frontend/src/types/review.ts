@@ -126,19 +126,21 @@ export type ReviewDecisionRequest =
 // --- Review History (C2-A3) ---
 
 export type ReviewHistoryAction = "ACCEPT" | "REJECT" | "REOPEN";
+export type ReviewHistoryStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "SUPERSEDED";
 
 export interface ReviewHistoryItem {
   id: string;
   action: ReviewHistoryAction;
-  from_status: string;
-  to_status: string;
+  from_status: ReviewHistoryStatus;
+  to_status: ReviewHistoryStatus;
   reason: string | null;
   created_at: string;
-  reviewer_display_name: string | null;
-  lecturer_full_name: string | null;
+  // Non-null: DB contract guarantees reviewer, lecturer, scopus_author projections
+  reviewer_display_name: string;
+  lecturer_full_name: string;
   lecturer_staff_code: string | null;
-  scopus_author_scopus_id: string | null;
-  scopus_author_preferred_name: string | null;
+  scopus_author_scopus_id: string;
+  scopus_author_preferred_name: string;
 }
 
 export interface ReviewHistoryResponse {
