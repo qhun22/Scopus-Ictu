@@ -405,9 +405,9 @@ export default function HomePage() {
       </section>
 
       {/* ====================================================================== */}
-      {/* 2. QUICK SEARCH */}
+      {/* 2. QUICK SEARCH — hidden for LECTURER (no access to /search) */}
       {/* ====================================================================== */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
+      {role !== "LECTURER" && <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
         <div className="mb-2.5 flex items-center gap-2">
           <svg className="h-4 w-4 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -458,7 +458,7 @@ export default function HomePage() {
             <p className="mt-1 text-xs font-medium text-rose-500">{searchError}</p>
           )}
         </form>
-      </section>
+      </section>}
 
       {/* ====================================================================== */}
       {/* 3. ROLE OVERVIEW */}
