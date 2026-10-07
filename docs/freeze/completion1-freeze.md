@@ -108,19 +108,19 @@ These are an intentional internal audit/traceability contract for authorized use
   "publications": [
     {
       "eid": "...",
-      "doi": "...",
+      "doi": <str|null>,
       "title": "...",
-      "source_title": "...",
+      "source_title": <str|null>,
       "year": <int|null>,
-      "volume": "...",
-      "issue": "...",
-      "art_no": "...",
-      "page_start": "...",
-      "page_end": "...",
+      "volume": <str|null>,
+      "issue": <str|null>,
+      "art_no": <str|null>,
+      "page_start": <str|null>,
+      "page_end": <str|null>,
       "cited_by_count": <int|null>,
-      "document_type": "...",
-      "publication_stage": "...",
-      "open_access_status": "...",
+      "document_type": <str|null>,
+      "publication_stage": <str|null>,
+      "open_access_status": <str|null>,
       "authors": [
         {
           "author_order": <int>,
@@ -133,10 +133,10 @@ These are an intentional internal audit/traceability contract for authorized use
           "author_order": <int>,
           "scopus_id": "...",
           "full_name": "...",
-          "staff_code": "...",
-          "department": "...",
-          "faculty": "...",
-          "orcid": "..."
+          "staff_code": <str|null>,
+          "department": <str|null>,
+          "faculty": <str|null>,
+          "orcid": <str|null>
         }
       ]
     }
@@ -212,10 +212,16 @@ Verified 2026-10-07 against a disposable schema on `scopus_m12_test`.
 - `actor_user_id` equals the requesting admin: PASS
 - Audit event written on success: PASS
 
-**Automated regression suite** (verified by 585-test backend suite):
+**Backend automated regression** (585 backend tests PASS):
+- Backend publication/search/export/provenance/auth/filter/order contracts
 - Safe provenance detail contract (A1 provenance ordering, field set, raw exclusions)
-- Async frontend build contracts
 - Publication list/detail/export full filter/ordering/authorization matrix
+
+**Frontend build** (`npm run build` SUCCESS):
+- Verifies TypeScript compilation and production bundle compatibility
+- Does NOT prove browser runtime behavior, async UX, or visual rendering
+
+**A5 browser automation**: NOT_AVAILABLE — Playwright/Cypress not installed; no browser-level runtime checks were executed in A5.
 
 **NOT directly verified by A5 browser automation** (`NOT_RUN_IN_A5_BROWSER`):
 - Visual rendering of `publication_id` absence from user-facing UI elements
