@@ -194,8 +194,8 @@ export default function SearchPage() {
         <div className="space-y-4">
           <ResultSection title={t.search.lecturersTitle} empty={t.search.noLecturers} count={results.lecturers.length}>
             <ul className="divide-y divide-slate-100">
-              {results.lecturers.map((item) => (
-                <li key={`${item.full_name}-${item.staff_code ?? ""}`} className="py-2.5">
+              {results.lecturers.map((item, idx) => (
+                <li key={`${item.full_name}|${item.staff_code ?? ""}|${item.orcid ?? ""}|${item.department ?? ""}|${item.faculty ?? ""}|${idx}`} className="py-2.5">
                   <p className="text-sm font-semibold text-slate-800">{item.full_name}</p>
                   <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
                     {item.staff_code && <Meta label={t.search.staffCode} value={item.staff_code} />}
