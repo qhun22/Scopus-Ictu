@@ -385,6 +385,82 @@ def test_search_dto_exposes_no_internal_identifiers(
     assert "provenance" not in serialized
 
 
+def test_search_accepts_exactly_255_trimmed_chars(
+    client: TestClient, authenticate
+) -> None:
+    authenticate("ADMIN")
+    q = "a" * 255
+    response = client.get(SEARCH_URL, params={"q": q})
+    assert response.status_code == 200, response.text
+    assert response.json()["q"] == q
+
+
+def test_search_rejects_256_trimmed_chars(
+    client: TestClient, authenticate
+) -> None:
+    authenticate("ADMIN")
+    q = "a" * 256
+    response = client.get(SEARCH_URL, params={"q": q})
+    assert response.status_code == 422, response.text
+
+
+def test_search_accepts_padded_query_within_trimmed_limit(
+    client: TestClient, authenticate
+) -> None:
+    """Raw q >255 due to surrounding whitespace, but trimmed q is valid."""
+    authenticate("ADMIN")
+    trimmed = "ab"
+    q = " " * 300 + trimmed + " " * 300
+    assert len(q) > 255
+    response = client.get(SEARCH_URL, params={"q": q})
+    assert response.status_code == 200, response.text
+    assert response.json()["q"] == trimmed
+
+
+def test_search_lecturer_order_is_total_with_null_staff_code(
+    client: TestClient, authenticate, db_session: Session
+) -> None:
+    """Lecturers with the same full_name_normalized and NULL staff_code must
+    still sort deterministically via the UUID tie-breaker."""
+    import uuid as _uuid
+
+    id_a = _uuid.UUID("00000000-0000-0000-0000-000000000001")
+    id_b = _uuid.UUID("00000000-0000-0000-0000-000000000002")
+    now = datetime.now(UTC)
+    for lecturer_id, name in [(id_a, "Tie Lecturer"), (id_b, "Tie Lecturer")]:
+        db_session.add(
+            Lecturer(
+                id=lecturer_id,
+                staff_code=None,
+                full_name=name,
+                full_name_normalized="tie lecturer",
+                email=None,
+                academic_rank=None,
+                academic_degree=None,
+                position=None,
+                department=None,
+                faculty=None,
+                repository_profile_url=None,
+                repository_profile_id=None,
+                orcid=None,
+                is_active=True,
+                version=1,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    db_session.commit()
+    authenticate("ADMIN")
+
+    first = client.get(SEARCH_URL, params={"q": "Tie Lecturer", "limit": 20}).json()
+    second = client.get(SEARCH_URL, params={"q": "Tie Lecturer", "limit": 20}).json()
+
+    ids_first = [item.get("staff_code") for item in first["lecturers"]]
+    ids_second = [item.get("staff_code") for item in second["lecturers"]]
+    assert ids_first == ids_second, "Order must be deterministic across repeated calls"
+    assert len(first["lecturers"]) == 2
+
+
 def test_search_reports_database_unavailable(
     client: TestClient, authenticate, db_session: Session
 ) -> None:

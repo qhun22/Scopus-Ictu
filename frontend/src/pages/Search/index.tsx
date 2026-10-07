@@ -66,11 +66,16 @@ export default function SearchPage() {
   }, [t.search.errorTitle]);
 
   // Auto-search on entry when the URL already carries a usable term.
+  // If the trimmed term is non-empty but too short, populate the input and
+  // show the inline validation error without issuing any API request.
   useEffect(() => {
     const trimmed = urlQuery.trim();
     if (trimmed.length >= MIN_QUERY_LENGTH) {
       setInputValue(trimmed);
       void runSearch(trimmed);
+    } else if (trimmed.length > 0) {
+      setInputValue(trimmed);
+      setValidationError(t.search.tooShort);
     }
     // Only the initial URL term should trigger the automatic search.
     // eslint-disable-next-line react-hooks/exhaustive-deps

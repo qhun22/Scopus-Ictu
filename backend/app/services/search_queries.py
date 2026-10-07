@@ -53,6 +53,7 @@ def _search_lecturers(
         .order_by(
             Lecturer.full_name_normalized.asc(),
             Lecturer.staff_code.asc().nullslast(),
+            Lecturer.id.asc(),
         )
         .limit(limit)
     ).all()
