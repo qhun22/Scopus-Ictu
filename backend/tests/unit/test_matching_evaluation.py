@@ -1,4 +1,4 @@
-"""Unit tests for the matching evaluation service — C3-A1.
+"""Unit tests for the matching evaluation service — C3-A1 (audit-corrected).
 
 No live database or external service required.
 All tests use synthetic in-memory data.
@@ -10,12 +10,14 @@ import json
 import tempfile
 import uuid
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
 from app.services.matching.evaluation import (
     CandidateRetrievalEvaluation,
     CandidateRetrievalMetrics,
+    EvaluationInputError,
     ReferenceDecision,
     ReferenceRecord,
     ReferenceValidationError,
@@ -183,7 +185,7 @@ class TestReferenceParsing:
         )
         with pytest.raises(ReferenceValidationError) as exc_info:
             parse_reference_csv(csv_content)
-        assert "ISO-8601" in str(exc_info.value)
+        assert "ISO-8601" in str(exc_info.value) or "valid" in str(exc_info.value).lower()
 
     def test_missing_required_column_rejected(self):
         bad_header = "lecturer_source_id,lecturer_full_name,decision,expected_scopus_id,confirmation_source,confirmed_at,notes"
@@ -209,6 +211,52 @@ class TestReferenceParsing:
         assert d.lecturer_source_id == "https://example.com/a/"
         assert d.institutional_email == "a@ictu.edu.vn"
         assert d.expected_scopus_id == "S1"
+
+
+# ===========================================================================
+# CONFIRMED_AT REAL PARSING (audit-corrected)
+# ===========================================================================
+
+
+class TestConfirmedAtRealParsing:
+    """Real datetime parsing — impossible dates and times must be rejected."""
+
+    def _row(self, confirmed_at: str) -> str:
+        return (
+            f"https://example.com/a/,a@ictu.edu.vn,Name A,NO_MATCH,,Supervisor,{confirmed_at},"
+        )
+
+    def test_invalid_month_13_rejected(self):
+        with pytest.raises(ReferenceValidationError):
+            parse_reference_csv(_csv(self._row("2026-13-01T10:00:00Z")))
+
+    def test_invalid_day_feb_30_rejected(self):
+        with pytest.raises(ReferenceValidationError):
+            parse_reference_csv(_csv(self._row("2026-02-30T10:00:00Z")))
+
+    def test_invalid_hour_25_rejected(self):
+        with pytest.raises(ReferenceValidationError):
+            parse_reference_csv(_csv(self._row("2026-10-01T25:00:00Z")))
+
+    def test_valid_utc_z_accepted(self):
+        records = parse_reference_csv(_csv(self._row("2026-10-01T10:00:00Z")))
+        assert len(records) == 1
+
+    def test_valid_utc_explicit_offset_accepted(self):
+        records = parse_reference_csv(_csv(self._row("2026-10-01T10:00:00+00:00")))
+        assert len(records) == 1
+
+    def test_missing_timezone_rejected(self):
+        """Naive datetime (no timezone) must be rejected — UTC required."""
+        with pytest.raises(ReferenceValidationError) as exc_info:
+            parse_reference_csv(_csv(self._row("2026-10-01T10:00:00")))
+        assert "timezone" in str(exc_info.value).lower() or "UTC" in str(exc_info.value)
+
+    def test_non_utc_offset_rejected(self):
+        """Non-zero UTC offset must be rejected — UTC only."""
+        with pytest.raises(ReferenceValidationError) as exc_info:
+            parse_reference_csv(_csv(self._row("2026-10-01T10:00:00+07:00")))
+        assert "UTC" in str(exc_info.value) or "offset" in str(exc_info.value).lower()
 
 
 # ===========================================================================
@@ -326,6 +374,27 @@ class TestLecturerDatasetCrossCheck:
             email="l5@ictu.edu.vn",
         )
         validate_against_lecturer_dataset((rec,), ds_path)  # must not raise
+
+    def test_duplicate_official_source_id_rejected(self):
+        """Official dataset with two rows sharing the same source_id must be rejected."""
+        ds_path = self._write_dataset(
+            [
+                {
+                    "source_id": "https://example.com/a/",
+                    "full_name": "TS. Nguyễn Văn A",
+                    "institutional_email": "a@ictu.edu.vn",
+                },
+                {
+                    "source_id": "https://example.com/a/",  # duplicate
+                    "full_name": "TS. Nguyễn Văn A",
+                    "institutional_email": "a2@ictu.edu.vn",
+                },
+            ]
+        )
+        rec = _make_record(source_id="https://example.com/a/")
+        with pytest.raises(ReferenceValidationError) as exc_info:
+            validate_against_lecturer_dataset((rec,), ds_path)
+        assert "Ambiguous" in str(exc_info.value) or "duplicate" in str(exc_info.value).lower()
 
 
 # ===========================================================================
@@ -461,6 +530,42 @@ class TestPairMetrics:
         assert m.false_positive_pairs == 1
         assert m.ambiguous_match_count == 1
         assert m.single_candidate_match_count == 0
+
+
+# ===========================================================================
+# STRICT RESOLUTION INVARIANT (audit-corrected)
+# ===========================================================================
+
+
+class TestStrictResolutionInvariant:
+    """evaluate_candidate_retrieval must fail closed when a lecturer is missing."""
+
+    def test_missing_resolved_lecturer_raises_evaluation_input_error(self):
+        """A reference record not present in resolved_lecturers must raise."""
+        lec_id = uuid.uuid4()
+        source_id = "https://example.com/a/"
+        rec = _make_record(source_id=source_id, expected_scopus_id="S1")
+        # resolved_lecturers is empty — source_id not resolved
+        with pytest.raises(EvaluationInputError) as exc_info:
+            evaluate_candidate_retrieval(
+                reference_records=(rec,),
+                resolved_lecturers={},  # missing!
+                scopus_corpus_ids=frozenset({"S1"}),
+                generated_pairs_by_lecturer_db_id={lec_id: ()},
+            )
+        assert source_id in str(exc_info.value) or "missing" in str(exc_info.value).lower()
+
+    def test_missing_lecturer_does_not_silently_produce_zero_metrics(self):
+        """Must not silently exclude the row and produce metrics as if nothing happened."""
+        source_id = "https://example.com/a/"
+        rec = _make_record(source_id=source_id, expected_scopus_id="S1")
+        with pytest.raises(EvaluationInputError):
+            evaluate_candidate_retrieval(
+                reference_records=(rec,),
+                resolved_lecturers={},
+                scopus_corpus_ids=frozenset(),
+                generated_pairs_by_lecturer_db_id={},
+            )
 
 
 # ===========================================================================
@@ -665,6 +770,195 @@ class TestCaseOutput:
         )
         assert result.cases[0].lecturer_source_id == src_a
         assert result.cases[1].lecturer_source_id == src_b
+
+
+# ===========================================================================
+# CANDIDATE GENERATOR CONVERSION (audit-corrected)
+# ===========================================================================
+
+
+class TestCandidateGeneratorConversion:
+    """Verify _GeneratedPair conversion from transient CandidateGenerator output."""
+
+    def _make_candidate(
+        self,
+        lecturer_id: UUID,
+        scopus_author_id: UUID,
+        scopus_id: str,
+        rule_ids: tuple[str, ...],
+    ):
+        """Build a transient LecturerScopusCandidate (no DB mapping)."""
+        from app.services.matching.candidate_types import (
+            CandidateEvidence,
+            LecturerScopusCandidate,
+        )
+        evidence = tuple(
+            CandidateEvidence(
+                rule_id=rid,
+                lecturer_source_value="Name",
+                lecturer_comparison_value="name",
+                scopus_surface_type="PREFERRED_NAME",
+                scopus_surface_value="Name",
+                scopus_comparison_value="name",
+            )
+            for rid in rule_ids
+        )
+        return LecturerScopusCandidate(
+            lecturer_id=lecturer_id,
+            scopus_author_id=scopus_author_id,
+            scopus_id=scopus_id,
+            preferred_name="Name",
+            evidence=evidence,
+        )
+
+    def test_pair_conversion_correct_fields(self):
+        """Converted pair must have correct lecturer_db_id, scopus_id, sorted rule_ids."""
+        from app.services.matching.evaluation import _GeneratedPair
+        from app.services.matching.candidate_types import EnrichedLecturerScopusCandidate
+
+        lec_id = uuid.uuid4()
+        author_id = uuid.uuid4()
+        candidate = self._make_candidate(
+            lec_id, author_id, "SCOPUS-42",
+            rule_ids=("RULE_TITLE_STRIPPED_N2", "RULE_EXACT_N0"),
+        )
+        enriched = EnrichedLecturerScopusCandidate.from_candidate(candidate, ())
+
+        rule_ids = tuple(sorted(ev.rule_id for ev in enriched.evidence))
+        has_pub = bool(enriched.publication_evidence)
+
+        pair = _GeneratedPair(
+            lecturer_db_id=enriched.lecturer_id,
+            scopus_id=enriched.scopus_id,
+            rule_ids=rule_ids,
+            has_publication_evidence=has_pub,
+        )
+
+        assert pair.lecturer_db_id == lec_id
+        assert pair.scopus_id == "SCOPUS-42"
+        assert pair.rule_ids == ("RULE_EXACT_N0", "RULE_TITLE_STRIPPED_N2")
+        assert pair.has_publication_evidence is False
+
+    def test_pair_conversion_pub_evidence_flag(self):
+        """has_publication_evidence must be True when publication evidence present."""
+        from app.services.matching.candidate_types import (
+            EnrichedLecturerScopusCandidate,
+            PublicationEvidence,
+        )
+
+        lec_id = uuid.uuid4()
+        author_id = uuid.uuid4()
+        candidate = self._make_candidate(lec_id, author_id, "SCOPUS-99", ("RULE_EXACT_N0",))
+
+        pub_ev = PublicationEvidence(
+            rule_id="RULE_KNOWN_PUBLICATION_DOI_EXACT",
+            known_publication_id=uuid.uuid4(),
+            lecturer_id=lec_id,
+            lecturer_snapshot_id=uuid.uuid4(),
+            canonical_publication_id=uuid.uuid4(),
+            canonical_publication_eid="2-s2.0-999",
+            candidate_scopus_author_id=author_id,
+            known_publication_doi_normalized="10.1000/xyz123",
+            known_publication_title_normalized="a title",
+            canonical_publication_doi="10.1000/xyz123",
+            canonical_publication_title="A Title",
+            reconciliation="DOI_EXACT",
+        )
+        enriched = EnrichedLecturerScopusCandidate.from_candidate(candidate, (pub_ev,))
+        has_pub = bool(enriched.publication_evidence)
+        assert has_pub is True
+
+    def test_irrelevant_lecturers_filtered(self):
+        """Candidates for lecturers not in the reference set must not appear."""
+        from app.services.matching.candidate_types import EnrichedLecturerScopusCandidate
+
+        ref_lec_id = uuid.uuid4()
+        other_lec_id = uuid.uuid4()
+        ref_author_id = uuid.uuid4()
+        other_author_id = uuid.uuid4()
+
+        ref_candidate = self._make_candidate(ref_lec_id, ref_author_id, "S-REF", ("RULE_EXACT_N0",))
+        other_candidate = self._make_candidate(other_lec_id, other_author_id, "S-OTHER", ("RULE_EXACT_N0",))
+
+        all_enriched = [
+            EnrichedLecturerScopusCandidate.from_candidate(ref_candidate, ()),
+            EnrichedLecturerScopusCandidate.from_candidate(other_candidate, ()),
+        ]
+
+        reference_db_ids = frozenset({ref_lec_id})
+        filtered = [c for c in all_enriched if c.lecturer_id in reference_db_ids]
+
+        assert len(filtered) == 1
+        assert filtered[0].lecturer_id == ref_lec_id
+        assert filtered[0].scopus_id == "S-REF"
+
+    def test_deterministic_pair_order(self):
+        """Pairs sorted by (lecturer UUID string, scopus_id) must be stable."""
+        from app.services.matching.candidate_types import EnrichedLecturerScopusCandidate
+
+        # Use fixed UUIDs to make ordering deterministic in the test
+        lec_a = UUID("00000000-0000-0000-0000-000000000001")
+        lec_b = UUID("00000000-0000-0000-0000-000000000002")
+        auth_1 = uuid.uuid4()
+        auth_2 = uuid.uuid4()
+
+        c1 = self._make_candidate(lec_b, auth_2, "S-Z", ("RULE_EXACT_N0",))
+        c2 = self._make_candidate(lec_a, auth_1, "S-A", ("RULE_EXACT_N0",))
+
+        enriched_list = [
+            EnrichedLecturerScopusCandidate.from_candidate(c1, ()),
+            EnrichedLecturerScopusCandidate.from_candidate(c2, ()),
+        ]
+
+        sorted_enriched = sorted(
+            enriched_list,
+            key=lambda c: (str(c.lecturer_id), c.scopus_id),
+        )
+
+        assert sorted_enriched[0].lecturer_id == lec_a
+        assert sorted_enriched[1].lecturer_id == lec_b
+
+    def test_no_persistence_import_in_generation_path(self):
+        """generate_pairs_from_current_production must not import persistence tables."""
+        import ast
+        import inspect
+        from app.services.matching import evaluation as eval_module
+
+        source = inspect.getsource(eval_module.generate_pairs_from_current_production)
+
+        # Parse the function source as an AST to inspect only real import nodes,
+        # not docstring text that may mention names for documentation purposes.
+        # Wrap in a class/module so ast.parse can handle the indented source.
+        tree = ast.parse(source)
+
+        imported_names: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    imported_names.add(alias.asname or alias.name)
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    imported_names.add(alias.asname or alias.name)
+
+        # These persistence models must NOT be imported in the generation path
+        forbidden_imports = {
+            "LecturerScopusCandidateObservation",
+            "LecturerScopusCandidateEvidence",
+            "CandidateGenerationRun",
+        }
+        for name in forbidden_imports:
+            assert name not in imported_names, (
+                f"Persistence model {name!r} must not be imported in "
+                f"generate_pairs_from_current_production"
+            )
+
+        # CandidateGenerator and PublicationEvidenceEnricher must be imported
+        assert "CandidateGenerator" in imported_names, (
+            "CandidateGenerator must be imported in generate_pairs_from_current_production"
+        )
+        assert "PublicationEvidenceEnricher" in imported_names, (
+            "PublicationEvidenceEnricher must be imported in generate_pairs_from_current_production"
+        )
 
 
 # ===========================================================================

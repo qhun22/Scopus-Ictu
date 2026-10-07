@@ -1,4 +1,4 @@
-"""Candidate-retrieval evaluation service — C3-A1.
+"""Candidate-retrieval evaluation service — C3-A1 (audit-corrected).
 
 This is a read-only research/evaluation utility.  It must never write to any
 database table, create candidates, create identities, or create audit events.
@@ -10,6 +10,11 @@ Evaluation measures CANDIDATE RETRIEVAL QUALITY only:
 
 No ranking, scoring, thresholds, top-k, MRR, or NDCG are computed here.
 Those require a separate approved slice with a production ranking contract.
+
+Audit correction (C3-A1): prediction source changed from persisted
+LecturerScopusCandidate (PENDING status) to current CandidateGenerator
+transient output enriched by PublicationEvidenceEnricher.  The persisted
+candidate/observation/evidence tables are NOT used for predictions.
 """
 
 from __future__ import annotations
@@ -17,7 +22,6 @@ from __future__ import annotations
 import csv
 import io
 import json
-import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,12 +45,6 @@ _REQUIRED_COLUMNS = frozenset(
         "confirmed_at",
         "notes",
     }
-)
-
-_ISO_DATETIME_RE = re.compile(
-    r"^\d{4}-\d{2}-\d{2}"  # date
-    r"(?:[T ]\d{2}:\d{2}(:\d{2})?)"  # time (seconds optional)
-    r"(?:Z|[+-]\d{2}:?\d{2})?$"  # timezone optional
 )
 
 
@@ -101,6 +99,53 @@ class ReferenceValidationError(Exception):
         return "\n".join(lines)
 
 
+class EvaluationInputError(Exception):
+    """Raised when evaluate_candidate_retrieval receives incomplete input."""
+
+
+# ---------------------------------------------------------------------------
+# confirmed_at validation — real datetime parsing, UTC required
+# ---------------------------------------------------------------------------
+
+
+def _validate_confirmed_at(value: str) -> str | None:
+    """Return error message if value is not a valid timezone-aware UTC timestamp.
+
+    Accepts:
+      - Z suffix (converted to +00:00 for fromisoformat)
+      - explicit +00:00 offset
+
+    Rejects:
+      - impossible calendar dates (month 13, Feb 30, hour 25 …)
+      - missing timezone
+      - non-UTC timezone offsets
+    """
+    v = value.strip()
+    if not v:
+        return "Must not be empty."
+
+    # Normalise Z -> +00:00 for fromisoformat (Python < 3.11 does not accept Z)
+    if v.endswith("Z"):
+        normalised = v[:-1] + "+00:00"
+    else:
+        normalised = v
+
+    try:
+        dt = datetime.fromisoformat(normalised)
+    except ValueError:
+        return f"Not a valid ISO-8601 datetime: {value!r}"
+
+    if dt.tzinfo is None:
+        return f"Timezone-aware UTC timestamp required (missing timezone): {value!r}"
+
+    # Require UTC: offset must be exactly zero
+    offset = dt.utcoffset()
+    if offset is None or offset.total_seconds() != 0:
+        return f"UTC timestamp required (Z or +00:00 offset); got: {value!r}"
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Reference CSV parsing
 # ---------------------------------------------------------------------------
@@ -121,7 +166,7 @@ def parse_reference_csv(content: str | bytes) -> tuple[ReferenceRecord, ...]:
     - MATCH requires expected_scopus_id
     - NO_MATCH forbids expected_scopus_id
     - confirmation_source non-empty
-    - confirmed_at non-empty and ISO-8601 parseable
+    - confirmed_at non-empty, valid ISO-8601, timezone-aware UTC
     - duplicate lecturer_source_id rejected
     - duplicate MATCH expected_scopus_id rejected
     """
@@ -228,17 +273,11 @@ def parse_reference_csv(content: str | bytes) -> tuple[ReferenceRecord, ...]:
             )
             ok = False
 
-        if not confirmed_at_raw:
+        # Real datetime validation (replaces regex-only check)
+        confirmed_at_error = _validate_confirmed_at(confirmed_at_raw)
+        if confirmed_at_error:
             row_issues.append(
-                ReferenceValidationIssue(row_number, "confirmed_at", "Must not be empty.")
-            )
-            ok = False
-        elif not _ISO_DATETIME_RE.match(confirmed_at_raw):
-            row_issues.append(
-                ReferenceValidationIssue(
-                    row_number, "confirmed_at",
-                    f"Must be ISO-8601 date/datetime, got: {confirmed_at_raw!r}"
-                )
+                ReferenceValidationIssue(row_number, "confirmed_at", confirmed_at_error)
             )
             ok = False
 
@@ -314,17 +353,26 @@ def validate_against_lecturer_dataset(
 
     Raises :class:`ReferenceValidationError` if any mismatch is found.
     Does NOT require all 410 lecturers to be present (subset is allowed).
+
+    Audit correction: uses a list-based index so that duplicate source_ids
+    in the official dataset are detected and rejected (exactly-one invariant).
     """
     raw = json.loads(lecturer_dataset_path.read_text(encoding="utf-8"))
-    lecturers_by_source_id: dict[str, dict] = {
-        lec["source_id"]: lec for lec in raw.get("lecturers", [])
-    }
+
+    # Build a multi-value index to detect duplicates in the official dataset
+    lecturers_by_source_id: dict[str, list[dict]] = {}
+    for lec in raw.get("lecturers", []):
+        sid = lec.get("source_id", "")
+        if sid not in lecturers_by_source_id:
+            lecturers_by_source_id[sid] = []
+        lecturers_by_source_id[sid].append(lec)
 
     issues: list[ReferenceValidationIssue] = []
     for ref in records:
         d = ref.decision
-        official = lecturers_by_source_id.get(d.lecturer_source_id)
-        if official is None:
+        matches = lecturers_by_source_id.get(d.lecturer_source_id, [])
+
+        if len(matches) == 0:
             issues.append(
                 ReferenceValidationIssue(
                     ref.row_number,
@@ -333,6 +381,19 @@ def validate_against_lecturer_dataset(
                 )
             )
             continue
+
+        if len(matches) > 1:
+            issues.append(
+                ReferenceValidationIssue(
+                    ref.row_number,
+                    "lecturer_source_id",
+                    f"Ambiguous: {len(matches)} rows with source_id="
+                    f"{d.lecturer_source_id!r} in official dataset (expected exactly one).",
+                )
+            )
+            continue
+
+        official = matches[0]
 
         # name cross-check
         official_name = official.get("full_name", "")
@@ -383,7 +444,11 @@ class _EvaluationLecturer:
 
 @dataclass(frozen=True)
 class _GeneratedPair:
-    """One generated candidate pair (lecturer ↔ Scopus author)."""
+    """One generated candidate pair (lecturer ↔ Scopus author).
+
+    Audit correction: populated from CandidateGenerator transient output,
+    NOT from persisted LecturerScopusCandidate rows.
+    """
 
     lecturer_db_id: UUID
     scopus_id: str
@@ -485,10 +550,26 @@ def evaluate_candidate_retrieval(
             _EvaluationLecturer (from DB).
         scopus_corpus_ids: all scopus_id values present in the DB corpus.
         generated_pairs_by_lecturer_db_id: generated pairs keyed by
-            lecturer UUID.
+            lecturer UUID (from CandidateGenerator, NOT from persistence).
+
+    Raises :class:`EvaluationInputError` if any reference record lacks a
+    resolved canonical lecturer — every validated row must participate.
 
     No DB writes are performed here.
     """
+    # Fail closed: every reference row must have a resolved lecturer.
+    missing_source_ids = [
+        ref.decision.lecturer_source_id
+        for ref in reference_records
+        if ref.decision.lecturer_source_id not in resolved_lecturers
+    ]
+    if missing_source_ids:
+        raise EvaluationInputError(
+            f"Cannot evaluate: {len(missing_source_ids)} reference record(s) have no "
+            f"resolved canonical lecturer. Missing source_ids: {missing_source_ids!r}. "
+            f"All validated reference rows must participate in the evaluation."
+        )
+
     cases: list[ReferenceCaseResult] = []
 
     tp = 0
@@ -510,26 +591,7 @@ def evaluate_candidate_retrieval(
 
     for ref in reference_records:
         d = ref.decision
-        lec = resolved_lecturers.get(d.lecturer_source_id)
-        if lec is None:
-            # Input error: reference row has no resolved DB lecturer.
-            # Include a minimal case but do not count it in metrics.
-            cases.append(
-                ReferenceCaseResult(
-                    lecturer_source_id=d.lecturer_source_id,
-                    institutional_email=d.institutional_email,
-                    lecturer_full_name=d.lecturer_full_name,
-                    decision=d.decision,
-                    expected_scopus_id=d.expected_scopus_id,
-                    target_in_scopus_corpus=None,
-                    generated_candidate_count=0,
-                    generated_scopus_ids=(),
-                    match_found=None,
-                    expected_candidate_rule_ids=(),
-                    expected_candidate_has_publication_evidence=None,
-                )
-            )
-            continue
+        lec = resolved_lecturers[d.lecturer_source_id]  # guaranteed present after check above
 
         pairs: tuple[_GeneratedPair, ...] = generated_pairs_by_lecturer_db_id.get(lec.db_id, ())
         generated_ids = tuple(sorted(p.scopus_id for p in pairs))
@@ -721,82 +783,72 @@ def load_scopus_corpus_ids(session: Any) -> frozenset[str]:
     return frozenset(rows)
 
 
-def load_generated_pairs(
-    lecturer_db_ids: frozenset[UUID],
+def generate_pairs_from_current_production(
+    resolved_lecturers: dict[str, "_EvaluationLecturer"],
     session: Any,
 ) -> dict[UUID, tuple[_GeneratedPair, ...]]:
-    """Load generated candidate pairs for a set of lecturer DB IDs.
+    """Generate candidate pairs using the CURRENT production CandidateGenerator.
 
-    Uses only the latest-COMPLETED observation per candidate, consistent with
-    the review queue convention. Read-only SELECT.
+    This replaces the previous load_generated_pairs() which read persisted
+    LecturerScopusCandidate rows filtered by PENDING status.  Persisted
+    candidate state depends on workflow decisions (ACCEPTED/REJECTED) and
+    older generation runs — it does NOT reliably reflect current retrieval
+    algorithm behaviour.
+
+    This function:
+      1. Calls CandidateGenerator(session).generate_all() — read-only, transient.
+      2. Filters to lecturer DB IDs that appear in resolved_lecturers.
+      3. Enriches with PublicationEvidenceEnricher(session).enrich() — read-only.
+      4. Converts to _GeneratedPair with sorted rule_ids.
+      5. Returns deterministic result sorted by lecturer UUID string, then scopus_id.
+
+    Does NOT read:
+      - LecturerScopusCandidate (persisted)
+      - LecturerScopusCandidateObservation
+      - LecturerScopusCandidateEvidence
+      - Any candidate status (PENDING/ACCEPTED/REJECTED/SUPERSEDED)
     """
-    from sqlalchemy import select as sa_select
+    from app.services.matching.candidate_generator import CandidateGenerator
+    from app.services.matching.publication_evidence_enricher import PublicationEvidenceEnricher
 
-    from app.models.candidate import (
-        LecturerScopusCandidate as _DBCandidate,
-        LecturerScopusCandidateEvidence,
-        LecturerScopusCandidateObservation,
-        CandidateGenerationRun,
-    )
-    from app.models.publication import ScopusAuthor
+    # Build lookup: db_id -> source_id
+    db_id_to_source_id: dict[UUID, str] = {
+        lec.db_id: lec.source_id for lec in resolved_lecturers.values()
+    }
+    reference_db_ids: frozenset[UUID] = frozenset(db_id_to_source_id.keys())
 
-    if not lecturer_db_ids:
+    if not reference_db_ids:
         return {}
 
-    # Load all PENDING candidates for these lecturers
-    candidate_rows = session.execute(
-        sa_select(_DBCandidate, ScopusAuthor.scopus_id)
-        .join(ScopusAuthor, ScopusAuthor.id == _DBCandidate.scopus_author_id)
-        .where(_DBCandidate.lecturer_id.in_(lecturer_db_ids))
-        .where(_DBCandidate.status == "PENDING")
-    ).all()
+    # Step 1: generate all current candidates (transient, read-only)
+    all_candidates = CandidateGenerator(session).generate_all()
 
-    if not candidate_rows:
-        return {lid: () for lid in lecturer_db_ids}
+    # Step 2: filter to reference lecturer set
+    filtered_candidates = tuple(
+        c for c in all_candidates if c.lecturer_id in reference_db_ids
+    )
 
-    candidate_ids = [row[0].id for row in candidate_rows]
-    candidate_map = {row[0].id: (row[0], row[1]) for row in candidate_rows}
+    # Step 3: enrich with publication evidence (read-only)
+    enriched_result = PublicationEvidenceEnricher(session).enrich(filtered_candidates)
 
-    # Load evidence for those candidates (from any observation — for rule listing)
-    evidence_rows = session.execute(
-        sa_select(
-            LecturerScopusCandidateEvidence.observation_id,
-            LecturerScopusCandidateEvidence.rule_id,
-            LecturerScopusCandidateEvidence.evidence_kind,
-            LecturerScopusCandidateObservation.candidate_id,
-        )
-        .join(
-            LecturerScopusCandidateObservation,
-            LecturerScopusCandidateObservation.id
-            == LecturerScopusCandidateEvidence.observation_id,
-        )
-        .where(LecturerScopusCandidateObservation.candidate_id.in_(candidate_ids))
-    ).all()
+    # Step 4: convert to _GeneratedPair
+    # Sort deterministically: lecturer UUID string, then scopus_id
+    enriched_sorted = sorted(
+        enriched_result.candidates,
+        key=lambda c: (str(c.lecturer_id), c.scopus_id),
+    )
 
-    # Build per-candidate rule + publication evidence sets
-    rules_by_candidate: dict[UUID, set[str]] = {}
-    pub_evidence_by_candidate: dict[UUID, bool] = {}
-    for ev_row in evidence_rows:
-        cid = ev_row.candidate_id
-        if cid not in rules_by_candidate:
-            rules_by_candidate[cid] = set()
-            pub_evidence_by_candidate[cid] = False
-        rules_by_candidate[cid].add(ev_row.rule_id)
-        if ev_row.evidence_kind == "PUBLICATION":
-            pub_evidence_by_candidate[cid] = True
-
-    result: dict[UUID, list[_GeneratedPair]] = {lid: [] for lid in lecturer_db_ids}
-    for cand_row, scopus_id in candidate_rows:
-        cand = cand_row
-        rules = tuple(sorted(rules_by_candidate.get(cand.id, set())))
-        has_pub = pub_evidence_by_candidate.get(cand.id, False)
+    result: dict[UUID, list[_GeneratedPair]] = {lid: [] for lid in reference_db_ids}
+    for enriched in enriched_sorted:
+        rule_ids = tuple(sorted(ev.rule_id for ev in enriched.evidence))
+        has_pub = bool(enriched.publication_evidence)
         pair = _GeneratedPair(
-            lecturer_db_id=cand.lecturer_id,
-            scopus_id=scopus_id,
-            rule_ids=rules,
+            lecturer_db_id=enriched.lecturer_id,
+            scopus_id=enriched.scopus_id,
+            rule_ids=rule_ids,
             has_publication_evidence=has_pub,
         )
-        result[cand.lecturer_id].append(pair)
+        result[enriched.lecturer_id].append(pair)
 
     return {lid: tuple(pairs) for lid, pairs in result.items()}
 
@@ -806,6 +858,7 @@ __all__ = [
     "ReferenceRecord",
     "ReferenceValidationIssue",
     "ReferenceValidationError",
+    "EvaluationInputError",
     "ReferenceCaseResult",
     "CandidateRetrievalMetrics",
     "CandidateRetrievalEvaluation",
@@ -814,7 +867,7 @@ __all__ = [
     "evaluate_candidate_retrieval",
     "resolve_lecturers_from_db",
     "load_scopus_corpus_ids",
-    "load_generated_pairs",
+    "generate_pairs_from_current_production",
     "_EvaluationLecturer",
     "_GeneratedPair",
 ]
