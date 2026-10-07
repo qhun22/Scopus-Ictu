@@ -398,4 +398,33 @@ export interface TranslationSchema {
       };
     };
   };
+  search: {
+    title: string;
+    subtitle: string;
+    placeholder: string;
+    button: string;
+    tooShort: string;
+    loading: string;
+    errorTitle: string;
+    errorRetry: string;
+    promptTitle: string;
+    promptSubtitle: string;
+    emptyTitle: string;
+    emptySubtitle: string;
+    lecturersTitle: string;
+    publicationsTitle: string;
+    scopusAuthorsTitle: string;
+    noLecturers: string;
+    noPublications: string;
+    noScopusAuthors: string;
+    staffCode: string;
+    department: string;
+    faculty: string;
+    orcid: string;
+    year: string;
+    source: string;
+    citations: string;
+    documentType: string;
+    scopusId: string;
+  };
 }

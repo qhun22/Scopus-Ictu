@@ -20,6 +20,7 @@ import AuditLogsPage from "./pages/AuditLogs";
 import ProfilePage from "./pages/Profile";
 import IdentityPage from "./pages/Identity";
 import MyPublicationsPage from "./pages/MyPublications";
+import SearchPage from "./pages/Search";
 import PlaceholderPage from "./components/common/PlaceholderPage";
 import PageLoadingBar from "./components/PageLoadingBar";
 
@@ -52,18 +53,10 @@ export default function App() {
             <Route element={<AppLayout />}>
               {/* Universal landing route */}
               <Route path="/home" element={<HomePage />} />
-              <Route
-                path="/search"
-                element={
-                  <PlaceholderPage
-                    title="Tra cứu thông tin"
-                    description="Hệ thống tra cứu tổng hợp giảng viên, công bố Scopus và mã định danh đang được cập nhật."
-                  />
-                }
-              />
 
               {/* Admin + Reviewer Routes */}
               <Route element={<RoleRoute allowedRoles={["ADMIN", "REVIEWER"]} />}>
+                <Route path="/search" element={<SearchPage />} />
                 <Route path="/publications" element={<PublicationsPage />} />
                 <Route path="/publications/:eid" element={<PublicationDetailPage />} />
               </Route>
