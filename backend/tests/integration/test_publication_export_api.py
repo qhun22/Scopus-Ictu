@@ -518,6 +518,24 @@ def test_export_candidate_lecturer_link_excluded(
     assert body["publications"][0]["approved_lecturer_links"] == []
 
 
+def test_export_revoked_lecturer_link_excluded(
+    client: TestClient, authenticate, db_session: Session
+) -> None:
+    p = _pub("2-s2.0-REVK001", "Revoked link pub", year=2023)
+    a = _author("57299999003", "Revoked Author")
+    lec = _lecturer("Revoked Lecturer")
+    db_session.add_all([p, a, lec])
+    db_session.flush()
+    db_session.add(_link(p, a, 1))
+    db_session.add(_identity(lec, a, status="REVOKED"))
+    db_session.commit()
+    authenticate("ADMIN")
+
+    body = client.get(EXPORT_URL, params={"q": "Revoked link"}).json()
+    assert len(body["publications"]) == 1
+    assert body["publications"][0]["approved_lecturer_links"] == []
+
+
 def test_export_pub_no_authors_has_empty_lists(
     client: TestClient, authenticate, db_session: Session
 ) -> None:
@@ -586,7 +604,7 @@ def test_export_no_title_normalized(
 def test_export_audit_written_on_success(
     client: TestClient, authenticate, db_session: Session, seeded
 ) -> None:
-    authenticate("ADMIN")
+    admin = authenticate("ADMIN")
     r = client.get(EXPORT_URL)
     assert r.status_code == 200
 
@@ -597,7 +615,7 @@ def test_export_audit_written_on_success(
     ev = events[0]
     assert ev.entity_type == "publication_export"
     assert ev.actor_type == "USER"
-    assert ev.actor_user_id is not None
+    assert ev.actor_user_id == admin.id
 
 
 def test_export_audit_entity_id_equals_dataset_export_id(
@@ -688,14 +706,9 @@ def test_export_audit_commit_failure_returns_503(
 ) -> None:
     authenticate("ADMIN")
 
-    import app.api.v1.endpoints.publications as pub_ep
-
     original_commit = db_session.commit
 
-    call_count = {"n": 0}
-
     def _fail_commit():
-        call_count["n"] += 1
         from sqlalchemy.exc import OperationalError
         raise OperationalError("commit", {}, Exception("disk full"))
 
@@ -707,6 +720,12 @@ def test_export_audit_commit_failure_returns_503(
 
     assert r.status_code == 503
     assert r.json()["code"] == "DATABASE_UNAVAILABLE"
+
+    # Rollback contract: no audit row must persist after commit failure.
+    events = db_session.query(AuditEvent).filter(
+        AuditEvent.action == "PUBLICATION_DATASET_EXPORTED"
+    ).all()
+    assert events == []
 
 
 # ---------------------------------------------------------------------------
