@@ -87,7 +87,7 @@ export default function AuditLogsPage() {
       controllerRef.current = controller;
 
       setError(null);
-      if (!hasLoadedRef.current) setLoading(true);
+      setLoading(true);
 
       const dateFrom = datetimeLocalToIso(filters.date_from);
       const dateTo = datetimeLocalToIso(filters.date_to);
