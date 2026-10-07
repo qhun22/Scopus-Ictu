@@ -12,7 +12,7 @@
 | A3 | Review History API + UI | completion2/a3-review-history | 5d87354ad6fbaa4eecfd5d69cfc0ae90e65773e8 |
 | A4 | Dashboard Summary API | completion2/a4-dashboard-api | 0fda664144b5f2fb9a28e5e5f95d7703f04d8b49 |
 | A5 | Dashboard UI | completion2/a5-dashboard-ui | c5f1b3450f888ae6912280d824602487fb2a3334 |
-| A6 | Regression / Freeze | completion2/a6-freeze | freeze draft at 85c1b997c9e9b009961d250547d638ef24514023; corrected-freeze-record tip reported in final audit output |
+| A6 | Regression / Freeze | completion2/a6-freeze | Freeze lineage: 85c1b997c9e9b009961d250547d638ef24514023 → c4cc995f043d781a791883ce464614b07d370746 → final documentation-correction tip recorded by Git after this commit |
 
 ## Real Stacked PRs
 
@@ -23,16 +23,18 @@
 | #16 | completion2/a2-audit-logs-ui | Completion-2 A3 — Review History | OPEN/DRAFT |
 | #18 | completion2/a3-review-history | Completion-2 A4 — Dashboard Summary API | OPEN/DRAFT |
 | #20 | completion2/a4-dashboard-api | Completion-2 A5 — Dashboard UI | OPEN/DRAFT |
+| #22 | completion2/a5-dashboard-ui | Completion-2 A6 — Regression and Freeze | OPEN/DRAFT |
 
 ## CI Carrier Runs
 
 | Slice | Carrier PR | CI Run ID | Conclusion |
 |-------|-----------|-----------|------------|
-| A1 | #15 (closed) | 37632090226 | success |
-| A2 | #12 (closed) | 37635609204 | success |
+| A1 | N/A — real PR #13 exact-head CI | 37632090226 | success |
+| A2 | #15 (closed) | 37635609204 | success |
 | A3 | #17 (closed) | 37642235987 | success |
 | A4 | #19 (closed) | 37644901723 | success |
 | A5 | #21 (closed) | 37648194336 | success |
+| A6 | #23 (closed) | 37648803130 | success |
 
 ## Regression Results
 
