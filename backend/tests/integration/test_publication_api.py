@@ -399,6 +399,138 @@ def _get(client: TestClient, role: str, path: str, authenticate) -> object:
     return client.get(path)
 
 
+@pytest.fixture
+def edge_identities(db_session: Session) -> dict[str, Publication]:
+    """Dedicated publication exercising revoked and multi-approved identities.
+
+    One lecturer owns TWO APPROVED identities at different author positions.
+    A REVOKED identity is linked to the same publication but must never appear
+    in approved_lecturer_links.
+    """
+
+    publication = _publication(
+        "EID-EDGE-1",
+        "Edge Identity Study",
+        year=2024,
+        doi="10.1000/edge",
+        source_title="Journal Edge",
+        cited_by_count=0,
+        document_type="Conference Paper",
+        publication_stage="Final",
+        open_access_status="Open",
+    )
+    db_session.add(publication)
+
+    shared_lecturer = Lecturer(
+        id=uuid.uuid4(),
+        staff_code="CB-100",
+        full_name="Lecturer Shared",
+        full_name_normalized="lecturer shared",
+        department="Software Engineering",
+        faculty="ICT",
+        orcid="0000-0002-1825-0098",
+        version=1,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    revoked_lecturer = Lecturer(
+        id=uuid.uuid4(),
+        staff_code="CB-101",
+        full_name="Lecturer Revoked",
+        full_name_normalized="lecturer revoked",
+        department=None,
+        faculty=None,
+        orcid=None,
+        version=1,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    db_session.add_all([shared_lecturer, revoked_lecturer])
+
+    first_author = ScopusAuthor(
+        id=uuid.uuid4(),
+        scopus_id="2001",
+        preferred_name="Shared Position One",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    second_author = ScopusAuthor(
+        id=uuid.uuid4(),
+        scopus_id="2002",
+        preferred_name="Shared Position Five",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    revoked_author = ScopusAuthor(
+        id=uuid.uuid4(),
+        scopus_id="2003",
+        preferred_name="Revoked Position",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    db_session.add_all([first_author, second_author, revoked_author])
+    db_session.flush()
+
+    db_session.add_all(
+        [
+            PublicationAuthor(
+                id=uuid.uuid4(),
+                publication_id=publication.id,
+                scopus_author_id=first_author.id,
+                author_order=1,
+                created_at=datetime.now(UTC),
+            ),
+            PublicationAuthor(
+                id=uuid.uuid4(),
+                publication_id=publication.id,
+                scopus_author_id=revoked_author.id,
+                author_order=3,
+                created_at=datetime.now(UTC),
+            ),
+            PublicationAuthor(
+                id=uuid.uuid4(),
+                publication_id=publication.id,
+                scopus_author_id=second_author.id,
+                author_order=5,
+                created_at=datetime.now(UTC),
+            ),
+        ]
+    )
+    db_session.add_all(
+        [
+            LecturerScopusIdentity(
+                id=uuid.uuid4(),
+                lecturer_id=shared_lecturer.id,
+                scopus_author_id=first_author.id,
+                status="APPROVED",
+                version=1,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            ),
+            LecturerScopusIdentity(
+                id=uuid.uuid4(),
+                lecturer_id=shared_lecturer.id,
+                scopus_author_id=second_author.id,
+                status="APPROVED",
+                version=1,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            ),
+            LecturerScopusIdentity(
+                id=uuid.uuid4(),
+                lecturer_id=revoked_lecturer.id,
+                scopus_author_id=revoked_author.id,
+                status="REVOKED",
+                version=1,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            ),
+        ]
+    )
+    db_session.commit()
+    return {"publication": publication}
+
+
 @pytest.mark.parametrize("role", ["ADMIN", "REVIEWER"])
 def test_list_allows_admin_and_reviewer(
     client: TestClient, authenticate, role: str, catalog
@@ -515,6 +647,106 @@ def test_list_preserves_null_fields(client: TestClient, authenticate, catalog) -
     item = response.json()["items"][0]
     assert item["doi"] is None
     assert item["cited_by_count"] == 1
+
+
+def test_list_preserves_null_citation(client: TestClient, authenticate, catalog) -> None:
+    authenticate("ADMIN")
+    response = client.get("/api/v1/publications", params={"q": "Delta"})
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["eid"] for item in items] == ["EID-NULL-D"]
+    assert items[0]["cited_by_count"] is None
+
+
+def test_list_preserves_zero_citation(client: TestClient, authenticate, catalog) -> None:
+    authenticate("ADMIN")
+    response = client.get("/api/v1/publications", params={"q": "EID-2024-B"})
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["eid"] for item in items] == ["EID-2024-B"]
+    item = items[0]
+    assert "cited_by_count" in item
+    assert item["cited_by_count"] == 0
+    assert item["cited_by_count"] is not None
+    assert item["cited_by_count"] is not False
+
+
+def test_list_null_year_is_preserved_and_ordered_last(
+    client: TestClient, authenticate, catalog
+) -> None:
+    authenticate("ADMIN")
+    response = client.get("/api/v1/publications", params={"page_size": 100})
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["eid"] for item in items] == [
+        "EID-2024-A",
+        "EID-2024-B",
+        "EID-2023-G",
+        "EID-2022-E",
+        "EID-NULL-D",
+    ]
+    null_year_items = [item for item in items if item["year"] is None]
+    assert len(null_year_items) == 1
+    assert null_year_items[0]["eid"] == "EID-NULL-D"
+    assert null_year_items[0]["year"] is None
+    assert items[-1] is null_year_items[0]
+
+
+def test_list_combined_filters_use_and_semantics(
+    client: TestClient, authenticate, catalog
+) -> None:
+    authenticate("ADMIN")
+    response = client.get(
+        "/api/v1/publications",
+        params={"year": "2024", "document_type": "Conference Paper"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["eid"] for item in body["items"]] == ["EID-2024-B"]
+    assert body["total"] == 1
+
+    narrowed = client.get(
+        "/api/v1/publications",
+        params={
+            "year": "2024",
+            "document_type": "Conference Paper",
+            "publication_stage": "Article in Press",
+            "open_access_status": "Closed",
+        },
+    )
+    assert narrowed.status_code == 200
+    narrowed_body = narrowed.json()
+    assert [item["eid"] for item in narrowed_body["items"]] == ["EID-2024-B"]
+    assert narrowed_body["total"] == 1
+
+    conflicting = client.get(
+        "/api/v1/publications",
+        params={"year": "2024", "document_type": "Review"},
+    )
+    assert conflicting.status_code == 200
+    conflict_body = conflicting.json()
+    assert conflict_body["items"] == []
+    assert conflict_body["total"] == 0
+
+
+def test_list_filtered_total_counts_before_pagination(
+    client: TestClient, authenticate, catalog
+) -> None:
+    authenticate("ADMIN")
+    unfiltered = client.get("/api/v1/publications", params={"q": "journal"})
+    assert unfiltered.status_code == 200
+    assert unfiltered.json()["total"] == 4
+
+    response = client.get(
+        "/api/v1/publications", params={"q": "journal", "page": 1, "page_size": 1}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["items"]) == 1
+    assert body["total"] == 4
+    assert body["total"] != 1
+    assert body["page"] == 1
+    assert body["page_size"] == 1
 
 
 @pytest.mark.parametrize("role", ["ADMIN", "REVIEWER"])
@@ -642,6 +874,69 @@ def test_detail_preserves_null_semantics(client: TestClient, authenticate, catal
     assert body["authors"] == []
     assert body["approved_lecturer_links"] == []
     assert body["provenance"] == []
+
+
+def test_detail_preserves_zero_citation(client: TestClient, authenticate, catalog) -> None:
+    authenticate("ADMIN")
+    response = client.get("/api/v1/publications/EID-2024-B")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["eid"] == "EID-2024-B"
+    assert "cited_by_count" in body
+    assert body["cited_by_count"] == 0
+    assert body["cited_by_count"] is not None
+
+
+def test_detail_revoked_identity_is_not_an_approved_link(
+    client: TestClient, authenticate, edge_identities
+) -> None:
+    authenticate("ADMIN")
+    response = client.get("/api/v1/publications/EID-EDGE-1")
+    assert response.status_code == 200
+    body = response.json()
+
+    author_scopus_ids = [author["scopus_id"] for author in body["authors"]]
+    assert "2003" in author_scopus_ids
+
+    link_scopus_ids = [link["scopus_id"] for link in body["approved_lecturer_links"]]
+    assert "2003" not in link_scopus_ids
+    assert all(
+        link["full_name"] != "Lecturer Revoked"
+        for link in body["approved_lecturer_links"]
+    )
+
+
+def test_detail_multi_approved_identities_for_same_lecturer(
+    client: TestClient, authenticate, edge_identities
+) -> None:
+    authenticate("ADMIN")
+    response = client.get("/api/v1/publications/EID-EDGE-1")
+    assert response.status_code == 200
+    body = response.json()
+
+    links = body["approved_lecturer_links"]
+    assert [
+        (link["author_order"], link["scopus_id"], link["full_name"]) for link in links
+    ] == [
+        (1, "2001", "Lecturer Shared"),
+        (5, "2002", "Lecturer Shared"),
+    ]
+
+
+def test_detail_database_errors_map_to_stable_503(
+    client: TestClient, authenticate, catalog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authenticate("ADMIN")
+
+    def fail(*_args, **_kwargs):
+        raise OperationalError("select", {}, RuntimeError("database unavailable"))
+
+    monkeypatch.setattr(
+        publications_endpoint, "get_publication_detail", fail
+    )
+    response = client.get("/api/v1/publications/EID-2024-A")
+    assert response.status_code == 503
+    assert response.json()["code"] == "DATABASE_UNAVAILABLE"
 
 
 def test_api_is_read_only(client: TestClient, authenticate, catalog, db_session: Session) -> None:
