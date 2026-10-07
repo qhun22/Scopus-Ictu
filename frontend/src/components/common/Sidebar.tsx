@@ -94,6 +94,15 @@ export default function Sidebar({
           ),
         },
         {
+          to: "/review-history",
+          label: t.nav.reviewHistory,
+          icon: (active) => (
+            <svg className={`h-5 w-5 ${active ? "text-[#3A5FC3]" : "text-slate-500"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ),
+        },
+        {
           to: "/audit-logs",
           label: t.nav.auditLogs,
           icon: (active) => (
