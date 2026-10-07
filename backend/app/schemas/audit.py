@@ -1,24 +1,38 @@
-"""Audit schemas — M0 scaffold.
+"""Audit schemas — safe read-only DTO (C2-A1).
 
-ADR-003: audit is append-only.
+ADR-003: audit is append-only; this module only exposes the safe subset
+of AuditEvent fields (no entity_id, actor_user_id, before_state,
+after_state, event_metadata, ip_address, user_agent, request_id,
+correlation_id).
 """
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
 
-class AuditEventResponse(BaseModel):
-    """M0 stub."""
+class AuditListItem(BaseModel):
+    """Safe projection of a single AuditEvent row."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    actor_user_id: int | None = None
+    id: uuid.UUID
+    entity_type: str
     action: str
-    entity_type: str | None = None
-    entity_id: int | None = None
-    payload: dict | None = None
-    occurred_at: datetime | None = None
+    actor_type: str
+    actor_display_name: str | None
+    actor_service: str | None
+    reason: str | None
+    created_at: datetime
+
+
+class AuditListResponse(BaseModel):
+    """Paginated audit log envelope."""
+
+    items: list[AuditListItem]
+    total: int
+    page: int
+    page_size: int
