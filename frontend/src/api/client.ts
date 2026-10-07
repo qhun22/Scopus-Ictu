@@ -211,3 +211,40 @@ export function apiDelete<T = { message: string }>(
 ): Promise<T> {
   return request<T>("DELETE", path, undefined, options);
 }
+
+export interface DownloadResult {
+  blob: Blob;
+  filename: string;
+}
+
+/**
+ * Fetch a file download using HttpOnly-cookie auth (credentials:"include").
+ * Honors VITE_API_BASE_URL. Extracts the filename from Content-Disposition.
+ * Throws ApiError on non-2xx, propagating the backend { detail, code } contract.
+ */
+export async function apiDownload(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<DownloadResult> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "GET",
+    headers: { Accept: "application/json, application/octet-stream" },
+    credentials: "include",
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    const error = await createApiError("GET", response);
+    if (!options.skipGlobalAuthHandling) {
+      publishSessionAuthError(error);
+    }
+    throw error;
+  }
+
+  const cd = response.headers.get("Content-Disposition") ?? "";
+  const match = cd.match(/filename[^;=\n]*=\s*(?:['"]?)([^'"\n;]+)(?:['"]?)/i);
+  const filename = match?.[1]?.trim() ?? path.split("/").pop() ?? "download";
+
+  const blob = await response.blob();
+  return { blob, filename };
+}
