@@ -49,28 +49,48 @@ Canonical publication read API  (A1)
 - Roles: ADMIN, REVIEWER
 - Query params: `page`, `page_size`, `q` (substring, LIKE-escaped), `year`, `document_type`, `publication_stage`, `open_access_status`
 - Response: paginated `{ items: [...], total, page, page_size }`
-- Items include: `eid`, `title`, `year`, `doi`, `source_title`, `cited_by_count`, `document_type`, `publication_stage`, `open_access_status`
-- No internal UUIDs exposed
+- List item fields: `publication_id` (UUID), `eid`, `title`, `year`, `doi`, `source_title`, `cited_by_count`, `document_type`, `publication_stage`, `open_access_status`
+- **UUID exposure**: the A1 `PublicationListItem` schema exposes `publication_id` (internal UUID) to authorized ADMIN/REVIEWER callers. Nested authors and lecturer links do NOT expose internal author or lecturer UUIDs. A4 export deliberately excludes `publication_id`.
+- A2 browser UI receives `publication_id` in the API response but does not visibly render or surface it as a user-facing value.
 
 ### `GET /api/v1/publications/{eid}`
 - Roles: ADMIN, REVIEWER
 - Path: EID URL-encoded
-- Response: publication detail + `authors[]` (ordered by `author_order`) + `approved_lecturer_links[]` (APPROVED status only)
+- Response: `publication_id` (UUID) + canonical metadata fields (`eid`, `doi`, `title`, `year`, `source_title`, `volume`, `issue`, `art_no`, `page_start`, `page_end`, `cited_by_count`, `document_type`, `publication_stage`, `open_access_status`) + `authors[]` (ordered by `author_order`) + `approved_lecturer_links[]` (APPROVED status only) + safe provenance fields (see provenance contract below)
+- Nested `authors[]` do NOT expose internal author UUID — each author exposes `author_order`, `scopus_id`, `preferred_name` only.
+- Nested `approved_lecturer_links[]` do NOT expose internal lecturer or identity UUIDs.
 - 404 `PUBLICATION_NOT_FOUND` for unknown EID
 
 ### `GET /api/v1/search`
 - Roles: ADMIN, REVIEWER
 - Query param: `q` (minimum 2 characters; 422 if shorter)
 - Response: `{ lecturers: [...], publications: [...], scopus_authors: [...] }`
-- No internal UUIDs exposed
+- Intentionally exposes NO internal UUID fields in any group.
 
 ### `GET /api/v1/publications/export`
 - Role: ADMIN only
 - Query params: `q`, `year`, `document_type`, `publication_stage`, `open_access_status` (same filter semantics as `/publications`)
 - Response: `Content-Type: application/json; charset=utf-8`, `Content-Disposition: attachment; filename="ictu_publications_<timestamp>.json"`
 - No pagination — all matching records returned
+- Intentionally exposes NO internal UUID fields (`publication_id` excluded).
 - **CRITICAL**: `/export` route declared statically before `/{eid}` — "export" never resolves as an EID
 - Authentication: HttpOnly-cookie (`credentials: "include"`) — NOT localStorage token
+
+## A1 detail safe provenance contract
+
+`GET /api/v1/publications/{eid}` intentionally exposes a set of **safe provenance fields** to authorized ADMIN/REVIEWER callers:
+
+- `file_name` — source CSV filename
+- `file_sha256` — SHA-256 digest of the source CSV file
+- `row_number` — row index within the source CSV
+- `imported_at` — timestamp of ingest
+
+These are an intentional internal audit/traceability contract for authorized users. They are **not** a UUID or security leak. The existing A1 regression suite verifies:
+- deterministic provenance ordering
+- exact safe provenance field set
+- raw_payload / validation_errors / error_summary / normalization_summary / row_hash / audit internals are **excluded**
+
+**A4 export does NOT include any of these provenance fields.** The absence of `file_name`, `file_sha256`, and `row_number` from the export payload is an intentional export contract exclusion — not an A1 leak.
 
 ## Export contract (JSON v1.0)
 
@@ -83,16 +103,42 @@ Canonical publication read API  (A1)
     "export_id": "<uuid>",
     "exported_at": "<ISO-8601>",
     "record_count": <int>,
-    "filters_applied": { <non-empty filter values only> }
+    "filters_applied": { "<non-empty filter key>": "<value>" }
   },
   "publications": [
     {
-      "eid": "...", "doi": "...", "title": "...",
-      "year": <int|null>, "source_title": "...",
+      "eid": "...",
+      "doi": "...",
+      "title": "...",
+      "source_title": "...",
+      "year": <int|null>,
+      "volume": "...",
+      "issue": "...",
+      "art_no": "...",
+      "page_start": "...",
+      "page_end": "...",
       "cited_by_count": <int|null>,
-      "document_type": "...", "publication_stage": "...", "open_access_status": "...",
-      "authors": [{ "scopus_id": "...", "preferred_name": "...", "author_order": <int> }],
-      "approved_lecturer_links": [{ "staff_code": "...", "full_name": "...", "scopus_id": "..." }]
+      "document_type": "...",
+      "publication_stage": "...",
+      "open_access_status": "...",
+      "authors": [
+        {
+          "author_order": <int>,
+          "scopus_id": "...",
+          "preferred_name": "..."
+        }
+      ],
+      "approved_lecturer_links": [
+        {
+          "author_order": <int>,
+          "scopus_id": "...",
+          "full_name": "...",
+          "staff_code": "...",
+          "department": "...",
+          "faculty": "...",
+          "orcid": "..."
+        }
+      ]
     }
   ]
 }
@@ -102,15 +148,31 @@ Canonical publication read API  (A1)
 
 **Audit link**: `dataset.export_id == AuditEvent.entity_id` (entity_type `publication_export`, action `PUBLICATION_DATASET_EXPORTED`). Audit commit failure → 503 `DATABASE_UNAVAILABLE`, no file returned.
 
-**Leakage exclusions**: no `id`, `publication_id`, `scopus_author_id`, `lecturer_id`, `raw_record_id`, `import_id`, `file_sha256`, `row_number`, `file_name`, `title_normalized`, `password_hash`, `auth_version`.
+**Intentional exclusions from export** (fields present in A1 API but absent from export by design):
+
+| Excluded field | Reason |
+|---|---|
+| `publication_id` | Internal UUID — not safe for bulk export |
+| `scopus_author_id` | Internal author UUID |
+| `lecturer_id` | Internal lecturer UUID |
+| `raw_record_id` / `import_id` | Raw ingest references |
+| `title_normalized` | Internal search normalization artifact |
+| `version` | Internal OCC version field |
+| `created_at` / `updated_at` | Internal model timestamps |
+| `file_name` / `file_sha256` / `row_number` / `imported_at` | A1 safe provenance — intentionally excluded from export |
+| `password_hash` / `auth_version` | Security fields |
 
 **APPROVED links only**: `LecturerScopusIdentity.status == "APPROVED"`. CANDIDATE, REJECTED, REVOKED identities excluded.
 
-## Isolated runtime verification
+## Runtime verification
 
-Verified 2026-10-07 against a disposable schema on `scopus_m12_test` (37/37 checks PASS).
+Verified 2026-10-07 against a disposable schema on `scopus_m12_test`.
 
-### A1/A2 Publication browser
+### Verification scope
+
+**API-level isolated runtime** (37/37 checks PASS, executed directly in A5):
+
+#### A1/A2 Publication browser
 - ADMIN list access: PASS
 - REVIEWER list access: PASS
 - LECTURER blocked (403): PASS
@@ -118,22 +180,22 @@ Verified 2026-10-07 against a disposable schema on `scopus_m12_test` (37/37 chec
 - `q` filter: PASS
 - Structured filter (`year`): PASS
 - Pagination fields present: PASS
-- NULL year preserved: PASS
-- NULL `cited_by_count` preserved: PASS
-- Zero `cited_by_count` != null: PASS
+- NULL year preserved (API response): PASS
+- NULL `cited_by_count` preserved (API response): PASS
+- Zero `cited_by_count` != null (API response): PASS
 - Detail route: PASS
 - Ordered authors (by `author_order`): PASS
 - APPROVED lecturer links: PASS
-- No internal UUID exposed: PASS
+- `publication_id` not verified absent in list — A1 contract exposes it intentionally; A5 runtime check did not assert `id` absent in detail (which exposes `publication_id`): NOT_APPLICABLE
 
-### A3 Global search
+#### A3 Global search
 - ADMIN search: PASS
 - REVIEWER search: PASS
 - LECTURER blocked (403): PASS
 - Short query (`q`<2 chars) rejected 422: PASS
 - Grouped results (`lecturers`, `publications`, `scopus_authors`): PASS
 
-### A4 Publication export
+#### A4 Publication export
 - ADMIN export: PASS
 - REVIEWER blocked (403): PASS
 - JSON schema_version 1.0: PASS
@@ -142,7 +204,7 @@ Verified 2026-10-07 against a disposable schema on `scopus_m12_test` (37/37 chec
 - Zero citation preserved: PASS
 - Authors included: PASS
 - APPROVED lecturer links only: PASS
-- No internal UUID / raw provenance / security fields: PASS
+- No internal UUID / raw provenance / security fields in export payload: PASS
 - `q` filter applies: PASS
 - `filters_applied` recorded in dataset: PASS
 - Deterministic ordering (year DESC NULLS LAST): PASS
@@ -150,16 +212,38 @@ Verified 2026-10-07 against a disposable schema on `scopus_m12_test` (37/37 chec
 - `actor_user_id` equals the requesting admin: PASS
 - Audit event written on success: PASS
 
-**Browser automation**: NOT_AVAILABLE (no Playwright/Cypress installed; API-level verification used).
+**Automated regression suite** (verified by 585-test backend suite):
+- Safe provenance detail contract (A1 provenance ordering, field set, raw exclusions)
+- Async frontend build contracts
+- Publication list/detail/export full filter/ordering/authorization matrix
+
+**NOT directly verified by A5 browser automation** (`NOT_RUN_IN_A5_BROWSER`):
+- Visual rendering of `publication_id` absence from user-facing UI elements
+- Visual NULL/zero citation presentation in the browser
+- `/search?q=` auto-search UX trigger behavior
+- Publication-result navigation by clicking search results
+- ADMIN export-button visibility in Publications page
+- REVIEWER export-button absence from Publications page
+- Actual browser file-download interaction (blob URL, save dialog)
+- Browser console state during export
+
+These items are NOT marked FAIL. They were not executed during A5 because browser automation (Playwright/Cypress) is not installed. The automated regression suite and API-level checks provide contractual coverage.
 
 ## Acceptance boundary
 
-| Database | Role | Usage in Completion-1 |
+| Database | Role | Notes |
 |---|---|---|
-| `scopus_ictu_acceptance_v2` | READ-ONLY reference | Connection unavailable during A5 freeze — snapshot NOT_AVAILABLE |
+| `scopus_ictu_acceptance_v2` | READ-ONLY reference | Not used for functional runtime in Completion-1 |
 | `scopus_m12_test` | Functional runtime | Disposable schema per test run; all schemas dropped after run |
 
-No writes, user creation, or export-audit events were performed on `scopus_ictu_acceptance_v2`.
+**Precise statement**:
+- `scopus_ictu_acceptance_v2` was not used for any functional runtime operation during Completion-1 or A5.
+- No acceptance write, user creation, or export-audit action was intentionally executed against that database by A5.
+- A5 attempted a read-only row-count snapshot of `scopus_ictu_acceptance_v2`; the connection failed.
+- `ACCEPTANCE_SNAPSHOT=NOT_AVAILABLE` — the snapshot could not be obtained; this is NOT a before/after count proof of database integrity.
+- `ACCEPTANCE_MUTATION=NONE` means A5 performed no intentional acceptance mutation action. It is NOT a before/after count proof.
+
+Never print credentials or database connection URLs.
 
 ## Regression
 
@@ -217,6 +301,9 @@ C1_RUNTIME_VERIFIED=true
 C1_INTEGRATION_READY=true
 COMPLETION1_STATUS=FROZEN
 PRODUCTION_CODE_TIP=486ee2fe43ff2c6f2ef942cf7b55b9733b9c3fb8
+ACCEPTANCE_SNAPSHOT=NOT_AVAILABLE
 ACCEPTANCE_MUTATION=NONE
 LOCAL_DB_CREDENTIAL_ROTATION_RECOMMENDED=true
+BROWSER_RUNTIME_VERIFIED=false
+API_RUNTIME_VERIFIED=true
 ```
