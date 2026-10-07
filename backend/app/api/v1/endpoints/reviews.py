@@ -10,6 +10,8 @@ from sqlalchemy import and_, case, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from datetime import datetime
+
 from app.api.dependencies import require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
@@ -25,6 +27,8 @@ from app.models.publication import (
     ScopusAuthor,
     ScopusAuthorNameVariant,
 )
+from app.schemas.review_history_api import ReviewHistoryResponse
+from app.services.review_history_queries import list_review_history
 from app.schemas.review_api import (
     ReviewAmbiguityContext,
     ReviewAuthorDetail,
@@ -523,6 +527,48 @@ def decide_review_candidate(
         resulting_identity_id=result.resulting_identity_id,
         idempotent=result.idempotent,
     )
+
+
+HistoryUser = Annotated[User, Depends(require_role("ADMIN", "REVIEWER"))]
+
+
+@router.get(
+    "/history",
+    response_model=ReviewHistoryResponse,
+    summary="List review history (read-only, append-only source of truth)",
+)
+def list_review_history_endpoint(
+    _user: HistoryUser,
+    db: DatabaseSession,
+    action: str | None = Query(
+        default=None, pattern="^(ACCEPT|REJECT|REOPEN)$"
+    ),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> ReviewHistoryResponse:
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise APIError(
+            status_code=422,
+            detail="date_from must be earlier than or equal to date_to.",
+            code="INVALID_DATE_RANGE",
+        )
+    try:
+        return list_review_history(
+            db,
+            page=page,
+            page_size=page_size,
+            action=action,
+            date_from=date_from,
+            date_to=date_to,
+        )
+    except SQLAlchemyError as exc:
+        raise APIError(
+            status_code=503,
+            detail="Review history is temporarily unavailable.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
 
 
 __all__ = ["router"]

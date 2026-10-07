@@ -123,6 +123,39 @@ export type ReviewDecisionRequest =
       reason: string;
     };
 
+// --- Review History (C2-A3) ---
+
+export type ReviewHistoryAction = "ACCEPT" | "REJECT" | "REOPEN";
+
+export interface ReviewHistoryItem {
+  id: string;
+  action: ReviewHistoryAction;
+  from_status: string;
+  to_status: string;
+  reason: string | null;
+  created_at: string;
+  reviewer_display_name: string | null;
+  lecturer_full_name: string | null;
+  lecturer_staff_code: string | null;
+  scopus_author_scopus_id: string | null;
+  scopus_author_preferred_name: string | null;
+}
+
+export interface ReviewHistoryResponse {
+  items: ReviewHistoryItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ReviewHistoryQueryParams {
+  page: number;
+  page_size: number;
+  action?: ReviewHistoryAction;
+  date_from?: string;
+  date_to?: string;
+}
+
 export interface ReviewDecisionResponse {
   review_id: string;
   candidate_id: string;
