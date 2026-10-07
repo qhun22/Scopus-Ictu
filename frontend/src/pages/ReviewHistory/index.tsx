@@ -61,7 +61,11 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function ReviewHistoryRow({ item, copy }: { item: ReviewHistoryItem; copy: Record<string, string> }) {
+interface RowCopy {
+  noReason: string;
+}
+
+function ReviewHistoryRow({ item, copy }: { item: ReviewHistoryItem; copy: RowCopy }) {
   return (
     <tr className="hover:bg-gray-50">
       <td className="whitespace-nowrap px-4 py-3 text-gray-700">
@@ -78,19 +82,17 @@ function ReviewHistoryRow({ item, copy }: { item: ReviewHistoryItem; copy: Recor
         </div>
       </td>
       <td className="px-4 py-3 text-gray-700">
-        {item.lecturer_full_name ?? copy.unknown}
+        {item.lecturer_full_name}
         {item.lecturer_staff_code && (
           <span className="ml-1.5 text-xs text-gray-400">({item.lecturer_staff_code})</span>
         )}
       </td>
       <td className="px-4 py-3 text-gray-700">
-        {item.scopus_author_preferred_name ?? copy.unknown}
-        {item.scopus_author_scopus_id && (
-          <span className="ml-1.5 text-xs text-gray-400">{item.scopus_author_scopus_id}</span>
-        )}
+        {item.scopus_author_preferred_name}
+        <span className="ml-1.5 text-xs text-gray-400">{item.scopus_author_scopus_id}</span>
       </td>
       <td className="px-4 py-3 text-gray-700">
-        {item.reviewer_display_name ?? copy.unknownReviewer}
+        {item.reviewer_display_name}
       </td>
       <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
         {item.reason ?? copy.noReason}
@@ -344,7 +346,7 @@ export default function ReviewHistoryPage() {
                   <ReviewHistoryRow
                     key={item.id}
                     item={item}
-                    copy={copy as unknown as Record<string, string>}
+                    copy={{ noReason: copy.noReason }}
                   />
                 ))}
               </tbody>

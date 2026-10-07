@@ -34,6 +34,8 @@ def list_review_history(
     if date_to is not None:
         filters.append(LecturerScopusCandidateReview.created_at <= date_to)
 
+    # All joins are INNER: reviewer_user_id NOT NULL FK RESTRICT, lecturer_id NOT NULL,
+    # scopus_author_id NOT NULL — nulls are structurally impossible.
     base = (
         select(LecturerScopusCandidateReview)
         .join(
@@ -42,15 +44,13 @@ def list_review_history(
         )
         .join(Lecturer, Lecturer.id == LecturerScopusCandidate.lecturer_id)
         .join(ScopusAuthor, ScopusAuthor.id == LecturerScopusCandidate.scopus_author_id)
-        .outerjoin(User, LecturerScopusCandidateReview.reviewer_user_id == User.id)
+        .join(User, LecturerScopusCandidateReview.reviewer_user_id == User.id)
     )
     if filters:
         base = base.where(*filters)
 
     total = session.execute(
-        select(func.count()).select_from(
-            base.order_by(None).subquery()
-        )
+        select(func.count()).select_from(base.order_by(None).subquery())
     ).scalar_one()
 
     rows = session.execute(
@@ -73,7 +73,7 @@ def list_review_history(
         )
         .join(Lecturer, Lecturer.id == LecturerScopusCandidate.lecturer_id)
         .join(ScopusAuthor, ScopusAuthor.id == LecturerScopusCandidate.scopus_author_id)
-        .outerjoin(User, LecturerScopusCandidateReview.reviewer_user_id == User.id)
+        .join(User, LecturerScopusCandidateReview.reviewer_user_id == User.id)
         .where(*filters)
         .order_by(
             LecturerScopusCandidateReview.created_at.desc(),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, case, func, select
@@ -540,9 +540,7 @@ HistoryUser = Annotated[User, Depends(require_role("ADMIN", "REVIEWER"))]
 def list_review_history_endpoint(
     _user: HistoryUser,
     db: DatabaseSession,
-    action: str | None = Query(
-        default=None, pattern="^(ACCEPT|REJECT|REOPEN)$"
-    ),
+    action: Literal["ACCEPT", "REJECT", "REOPEN"] | None = Query(default=None),
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
     page: int = Query(1, ge=1),
