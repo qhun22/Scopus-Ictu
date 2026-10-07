@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     notifications,
     publications,
     reviews,
+    search,
     users,
 )
 
@@ -39,3 +40,4 @@ router.include_router(authors.router, prefix="/authors", tags=["authors"])
 router.include_router(matching.router, prefix="/matching", tags=["matching"])
 router.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
 router.include_router(audits.router, prefix="/audits", tags=["audits"])
+router.include_router(search.router, prefix="/search", tags=["search"])
