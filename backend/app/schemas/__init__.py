@@ -40,6 +40,14 @@ from app.schemas.publication import (
     ScopusAuthorCreate,
     ScopusAuthorResponse,
 )
+from app.schemas.publication_api import (
+    PublicationAuthorRead,
+    PublicationDetailResponse,
+    PublicationListItem,
+    PublicationListResponse,
+    PublicationLecturerLinkRead,
+    PublicationProvenanceRead,
+)
 from app.schemas.scopus_import import (
     ImportStatus,
     ScopusImportConfigResponse,
@@ -81,6 +89,12 @@ __all__ = [
     "ScopusAuthorCreate",
     "ScopusAuthorResponse",
     "PublicationAuthorResponse",
+    "PublicationAuthorRead",
+    "PublicationDetailResponse",
+    "PublicationListItem",
+    "PublicationListResponse",
+    "PublicationLecturerLinkRead",
+    "PublicationProvenanceRead",
     # scopus_author
     "ScopusAuthorNameVariantResponse",
     # identity_review
