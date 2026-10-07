@@ -193,19 +193,19 @@ class TestAuthEnforcement:
         finally:
             app.dependency_overrides.pop(get_current_user, None)
 
-    def test_non_admin_user_in_memory_returns_403(
+    def test_lecturer_returns_403(
         self, db_session: Session, client: TestClient
     ):
-        """An in-memory user object with role=REVIEWER triggers 403 via require_role."""
-        non_admin = User(
+        """An in-memory LECTURER user triggers 403 via require_role without DB write."""
+        lecturer = User(
             id=uuid.uuid4(),
-            email="nonadmin@test.local",
+            email="lecturer@test.local",
             password_hash="x",
-            display_name="Non-Admin",
-            role="REVIEWER",
+            display_name="Lecturer User",
+            role="LECTURER",
             is_active=True,
         )
-        app.dependency_overrides[get_current_user] = lambda: non_admin
+        app.dependency_overrides[get_current_user] = lambda: lecturer
         try:
             resp = client.get(AUDIT_URL)
             assert resp.status_code == 403
