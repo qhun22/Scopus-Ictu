@@ -20,6 +20,41 @@ interface AppliedFilters {
   open_access_status: string | undefined;
 }
 
+/**
+ * Compare two normalized AppliedFilters structurally. Treats undefined as
+ * equal to undefined. Used to derive the "draft differs from applied" dirty
+ * state for the Apply button.
+ */
+function filtersEqual(a: AppliedFilters, b: AppliedFilters): boolean {
+  const aYear = a.year ?? null;
+  const bYear = b.year ?? null;
+  return (
+    aYear === bYear &&
+    (a.document_type ?? null) === (b.document_type ?? null) &&
+    (a.publication_stage ?? null) === (b.publication_stage ?? null) &&
+    (a.open_access_status ?? null) === (b.open_access_status ?? null)
+  );
+}
+
+/**
+ * Build the AppliedFilters object from current draft input values. Trims
+ * string filters so that " Article " and "Article" yield identical
+ * normalized state.
+ */
+function buildFiltersFromDraft(
+  draftYear: string,
+  draftDocType: string,
+  draftStage: string,
+  draftOa: string,
+): AppliedFilters {
+  return {
+    year: draftYear.trim() ? Number(draftYear.trim()) : undefined,
+    document_type: draftDocType.trim() ? draftDocType.trim() : undefined,
+    publication_stage: draftStage.trim() ? draftStage.trim() : undefined,
+    open_access_status: draftOa.trim() ? draftOa.trim() : undefined,
+  };
+}
+
 export default function PublicationsPage() {
   const navigate = useNavigate();
   const { locale } = useI18n();
@@ -30,7 +65,7 @@ export default function PublicationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // ── Search state (debounced, used directly as applied q) ────────────────
+  // ── Search state ───────────────────────────────────────────────────────
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
 
@@ -55,32 +90,52 @@ export default function PublicationsPage() {
   // ── Error state ──────────────────────────────────────────────────────────
   const [error, setError] = useState<string | null>(null);
 
-  // ── Request generation counter for stale-request guard ──────────────────
+  // ── Stale-request defenses: AbortController + monotonic generation ─────
+  const abortRef = useRef<AbortController | null>(null);
   const genRef = useRef(0);
 
   const fetchPublications = useCallback(
     async (currentPage: number, currentPageSize: number, currentGen: number) => {
+      // Explicitly establish the complete loading state for THIS request
+      // BEFORE awaiting. This prevents a stale earlier request from leaving
+      // the UI in an indeterminate loading state.
       const isFirstPage = currentPage === 1;
-      if (isFirstPage) setLoading(true);
-      else setLoadingMore(true);
-
+      if (isFirstPage) {
+        setLoading(true);
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+        setLoadingMore(true);
+      }
       setError(null);
 
-      try {
-        const data = await getPublications({
-          page: currentPage,
-          page_size: currentPageSize,
-          q: qDebounced || undefined,
-          ...appliedFilters,
-        });
+      // Abort any previous in-flight request and create a new controller
+      // for THIS request.
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-        // Guard: only update state if this request is still the latest
+      try {
+        const data = await getPublications(
+          {
+            page: currentPage,
+            page_size: currentPageSize,
+            q: qDebounced || undefined,
+            ...appliedFilters,
+          },
+          { signal: controller.signal },
+        );
+
+        // Generation guard: only commit if THIS request is still current.
         if (currentGen !== genRef.current) return;
 
         setItems(data.items);
         setTotal(data.total);
       } catch (err) {
+        // AbortError is silent — neither error nor state is updated.
         if ((err as Error).name === "AbortError") return;
+        // Generation guard also blocks state updates for stale non-aborted
+        // requests (defensive even though we already aborted the previous).
         if (currentGen !== genRef.current) return;
 
         setError(
@@ -89,39 +144,46 @@ export default function PublicationsPage() {
             : "Không thể tải danh sách công bố. Vui lòng thử lại.",
         );
       } finally {
+        // Only the CURRENT request clears its own loading flag. A stale
+        // request's finally is a no-op, so loading can never stick.
         if (currentGen !== genRef.current) return;
-        if (isFirstPage) setLoading(false);
-        else setLoadingMore(false);
+        setLoading(false);
+        setLoadingMore(false);
       }
     },
     [qDebounced, appliedFilters],
   );
 
-  // ── Single trigger: appliedFilters + page + pageSize ────────────────────
+  // ── Single trigger: appliedFilters + page + pageSize + qDebounced ────────
   useEffect(() => {
     genRef.current += 1;
     const currentGen = genRef.current;
     fetchPublications(page, pageSize, currentGen);
-    // fetchPublications is stable wrt appliedFilters (captured in closure)
+    // Cleanup: on unmount or before the next effect run, abort in-flight.
+    return () => {
+      abortRef.current?.abort();
+    };
+    // fetchPublications is stable wrt appliedFilters/qDebounced (captured in
+    // closure); we list page + pageSize + appliedFilters + qDebounced to drive
+    // the trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, appliedFilters, fetchPublications]);
+  }, [page, pageSize, appliedFilters, qDebounced]);
 
-  // ── Debounce free-text search ──────────────────────────────────────────
+  // ── Debounce free-text search + reset to page 1 when it changes ─────────
   useEffect(() => {
+    if (q === qDebounced) return;
     const timer = window.setTimeout(() => {
-      if (q !== qDebounced) setQDebounced(q);
+      setQDebounced(q);
+      setPage(1);
     }, FILTER_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [q, qDebounced]);
 
   // ── Filter actions ────────────────────────────────────────────────────
   const handleApply = () => {
-    setAppliedFilters({
-      year: draftYear ? Number(draftYear) : undefined,
-      document_type: draftDocType.trim() || undefined,
-      publication_stage: draftStage.trim() || undefined,
-      open_access_status: draftOa.trim() || undefined,
-    });
+    setAppliedFilters(
+      buildFiltersFromDraft(draftYear, draftDocType, draftStage, draftOa),
+    );
     setPage(1);
   };
 
@@ -147,8 +209,25 @@ export default function PublicationsPage() {
   };
 
   // ── Derived ───────────────────────────────────────────────────────────
-  const hasDraftFilters =
-    !!draftYear || !!draftDocType || !!draftStage || !!draftOa || !!q;
+  const draftFiltersNormalized = buildFiltersFromDraft(
+    draftYear,
+    draftDocType,
+    draftStage,
+    draftOa,
+  );
+  const isApplyDirty = !filtersEqual(draftFiltersNormalized, appliedFilters);
+
+  const hasAnyInput =
+    !!q ||
+    !!qDebounced ||
+    !!draftYear ||
+    !!draftDocType ||
+    !!draftStage ||
+    !!draftOa ||
+    !!appliedFilters.year ||
+    !!appliedFilters.document_type ||
+    !!appliedFilters.publication_stage ||
+    !!appliedFilters.open_access_status;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const isFiltering = loading || loadingMore;
@@ -294,7 +373,7 @@ export default function PublicationsPage() {
             <button
               type="button"
               onClick={handleApply}
-              disabled={!hasDraftFilters}
+              disabled={!isApplyDirty}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -306,7 +385,7 @@ export default function PublicationsPage() {
             <button
               type="button"
               onClick={handleClear}
-              disabled={!hasDraftFilters}
+              disabled={!hasAnyInput}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50/50 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

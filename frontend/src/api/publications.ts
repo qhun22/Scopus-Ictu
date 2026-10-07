@@ -38,10 +38,15 @@ export async function getPublications(
 /**
  * Fetch a single canonical publication by its EID.
  * Returns 404 PUBLICATION_NOT_FOUND when the EID is not in the canonical DB.
+ *
+ * The dynamic EID path segment is URL-encoded so that any reserved
+ * characters in the EID do not corrupt the request path. The rest of the
+ * URL is left untouched.
  */
 export async function getPublicationByEid(
   eid: string,
   options = {},
 ): Promise<PublicationDetailResponse> {
-  return apiGet<PublicationDetailResponse>(`/api/v1/publications/${eid}`, options);
+  const encodedEid = encodeURIComponent(eid);
+  return apiGet<PublicationDetailResponse>(`/api/v1/publications/${encodedEid}`, options);
 }
