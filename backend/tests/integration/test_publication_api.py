@@ -972,10 +972,12 @@ def test_database_errors_map_to_stable_503(
     assert response.json()["code"] == "DATABASE_UNAVAILABLE"
 
 
-def test_openapi_contains_only_a1_read_paths() -> None:
+def test_openapi_contains_publication_paths() -> None:
     paths = app.openapi()["paths"]
     assert "/api/v1/publications" in paths
     assert "/api/v1/publications/{eid}" in paths
-    assert "/api/v1/publications/export" not in paths
+    # A4 export route registered (static /export before dynamic /{eid})
+    assert "/api/v1/publications/export" in paths
     assert "get" in paths["/api/v1/publications"]
     assert "get" in paths["/api/v1/publications/{eid}"]
+    assert "get" in paths["/api/v1/publications/export"]
