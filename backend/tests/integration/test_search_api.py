@@ -421,24 +421,26 @@ def test_search_lecturer_order_is_total_with_null_staff_code(
     client: TestClient, authenticate, db_session: Session
 ) -> None:
     """Lecturers with the same full_name_normalized and NULL staff_code must
-    still sort deterministically via the UUID tie-breaker."""
+    sort deterministically via the UUID tie-breaker (id_a < id_b → LOW_ID
+    appears before HIGH_ID in the response)."""
     import uuid as _uuid
 
+    # id_a < id_b, so id_a should sort first.
     id_a = _uuid.UUID("00000000-0000-0000-0000-000000000001")
     id_b = _uuid.UUID("00000000-0000-0000-0000-000000000002")
     now = datetime.now(UTC)
-    for lecturer_id, name in [(id_a, "Tie Lecturer"), (id_b, "Tie Lecturer")]:
+    for lecturer_id, dept in [(id_a, "LOW_ID"), (id_b, "HIGH_ID")]:
         db_session.add(
             Lecturer(
                 id=lecturer_id,
                 staff_code=None,
-                full_name=name,
+                full_name="Tie Lecturer",
                 full_name_normalized="tie lecturer",
                 email=None,
                 academic_rank=None,
                 academic_degree=None,
                 position=None,
-                department=None,
+                department=dept,
                 faculty=None,
                 repository_profile_url=None,
                 repository_profile_id=None,
@@ -455,10 +457,13 @@ def test_search_lecturer_order_is_total_with_null_staff_code(
     first = client.get(SEARCH_URL, params={"q": "Tie Lecturer", "limit": 20}).json()
     second = client.get(SEARCH_URL, params={"q": "Tie Lecturer", "limit": 20}).json()
 
-    ids_first = [item.get("staff_code") for item in first["lecturers"]]
-    ids_second = [item.get("staff_code") for item in second["lecturers"]]
-    assert ids_first == ids_second, "Order must be deterministic across repeated calls"
     assert len(first["lecturers"]) == 2
+    depts_first = [item["department"] for item in first["lecturers"]]
+    depts_second = [item["department"] for item in second["lecturers"]]
+    assert depts_first == ["LOW_ID", "HIGH_ID"], (
+        f"Expected id_a (LOW_ID) before id_b (HIGH_ID); got {depts_first}"
+    )
+    assert depts_first == depts_second, "Order must be identical across repeated calls"
 
 
 def test_search_reports_database_unavailable(
