@@ -17,6 +17,7 @@ import PublicationsPage from "./pages/Publications";
 import PublicationDetailPage from "./pages/Publications/Detail";
 import ApprovalQueuePage from "./pages/ApprovalQueue";
 import AuditLogsPage from "./pages/AuditLogs";
+import ReviewHistoryPage from "./pages/ReviewHistory";
 import ProfilePage from "./pages/Profile";
 import IdentityPage from "./pages/Identity";
 import MyPublicationsPage from "./pages/MyPublications";
@@ -83,7 +84,7 @@ export default function App() {
                 <Route path="/approval-queue" element={<ApprovalQueuePage />} />
                 <Route
                   path="/review-history"
-                  element={<PlaceholderPage title="Lịch sử review" icon="history" />}
+                  element={<ReviewHistoryPage />}
                 />
               </Route>
 

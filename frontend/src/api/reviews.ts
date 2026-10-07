@@ -7,6 +7,8 @@ import {
   ReviewCandidateDetail,
   ReviewDecisionRequest,
   ReviewDecisionResponse,
+  ReviewHistoryQueryParams,
+  ReviewHistoryResponse,
   ReviewQueueResponse,
 } from "../types/review";
 import { apiGet, apiPost, ApiRequestOptions } from "./client";
@@ -41,6 +43,19 @@ export function getReviewCandidate(
     `/api/v1/reviews/candidates/${encodeURIComponent(candidateId)}`,
     options,
   );
+}
+
+export function getReviewHistory(
+  params: ReviewHistoryQueryParams,
+  options: ApiRequestOptions = {},
+): Promise<ReviewHistoryResponse> {
+  const qs = new URLSearchParams();
+  qs.set("page", String(params.page));
+  qs.set("page_size", String(params.page_size));
+  if (params.action) qs.set("action", params.action);
+  if (params.date_from) qs.set("date_from", params.date_from);
+  if (params.date_to) qs.set("date_to", params.date_to);
+  return apiGet<ReviewHistoryResponse>(`/api/v1/reviews/history?${qs.toString()}`, options);
 }
 
 export function decideReviewCandidate(
