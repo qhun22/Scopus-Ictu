@@ -22,6 +22,36 @@ from app.models.governance import AuditEvent, User
 
 AUDIT_URL = "/api/v1/audits"
 
+_SAFE_DTO_KEYS = frozenset(
+    {
+        "id",
+        "entity_type",
+        "action",
+        "actor_type",
+        "actor_display_name",
+        "actor_service",
+        "reason",
+        "created_at",
+    }
+)
+
+_FORBIDDEN_KEYS = frozenset(
+    {
+        "password_hash",
+        "auth_version",
+        "entity_id",
+        "actor_user_id",
+        "before_state",
+        "after_state",
+        "event_metadata",
+        "metadata",
+        "request_id",
+        "correlation_id",
+        "ip_address",
+        "user_agent",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Schema / session / client / auth fixtures
@@ -70,36 +100,33 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
-def authenticate(db_session: Session):
-    def _auth(role: str) -> User:
+def make_user(db_session: Session):
+    def _make(role: str = "ADMIN", is_active: bool = True) -> User:
         u = User(
             id=uuid.uuid4(),
             email=f"{role.lower()}-{uuid.uuid4().hex[:8]}@a1.test",
             password_hash="x",
             display_name=f"{role} User",
             role=role,
-            is_active=True,
+            is_active=is_active,
         )
         db_session.add(u)
         db_session.flush()
         return u
 
-    return _auth
+    return _make
 
 
 @pytest.fixture
-def admin_client(db_session: Session, client: TestClient, authenticate):
-    admin = authenticate("ADMIN")
+def admin_client(db_session: Session, client: TestClient, make_user):
+    admin = make_user("ADMIN")
 
-    def _override():
-        return admin
-
-    app.dependency_overrides[get_current_user] = _override
+    app.dependency_overrides[get_current_user] = lambda: admin
     yield client, admin
     app.dependency_overrides.pop(get_current_user, None)
 
 
-def _make_user_event(
+def _user_event(
     session: Session,
     actor: User,
     entity_type: str = "publication",
@@ -124,7 +151,7 @@ def _make_user_event(
     return ev
 
 
-def _make_system_event(
+def _system_event(
     session: Session,
     entity_type: str = "scopus_import",
     action: str = "IMPORT_STARTED",
@@ -148,7 +175,7 @@ def _make_system_event(
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# Auth enforcement
 # ---------------------------------------------------------------------------
 
 
@@ -157,10 +184,8 @@ class TestAuthEnforcement:
         resp = client.get(AUDIT_URL)
         assert resp.status_code == 401
 
-    def test_reviewer_returns_403(
-        self, db_session: Session, client: TestClient, authenticate
-    ):
-        reviewer = authenticate("REVIEWER")
+    def test_reviewer_returns_403(self, db_session: Session, client: TestClient, make_user):
+        reviewer = make_user("REVIEWER")
         app.dependency_overrides[get_current_user] = lambda: reviewer
         try:
             resp = client.get(AUDIT_URL)
@@ -168,23 +193,19 @@ class TestAuthEnforcement:
         finally:
             app.dependency_overrides.pop(get_current_user, None)
 
-    def test_lecturer_returns_403(
-        self, db_session: Session, client: TestClient, authenticate
+    def test_non_admin_user_in_memory_returns_403(
+        self, db_session: Session, client: TestClient
     ):
-        # LECTURER role requires lecturer_id — use REVIEWER trick with role override
-        user = User(
+        """An in-memory user object with role=REVIEWER triggers 403 via require_role."""
+        non_admin = User(
             id=uuid.uuid4(),
-            email=f"lec-{uuid.uuid4().hex[:8]}@a1.test",
+            email="nonadmin@test.local",
             password_hash="x",
-            display_name="Lecturer User",
+            display_name="Non-Admin",
             role="REVIEWER",
             is_active=True,
         )
-        db_session.add(user)
-        db_session.flush()
-        # Manually override role in-memory to simulate LECTURER without FK constraint
-        user.role = "LECTURER"
-        app.dependency_overrides[get_current_user] = lambda: user
+        app.dependency_overrides[get_current_user] = lambda: non_admin
         try:
             resp = client.get(AUDIT_URL)
             assert resp.status_code == 403
@@ -192,8 +213,13 @@ class TestAuthEnforcement:
             app.dependency_overrides.pop(get_current_user, None)
 
 
+# ---------------------------------------------------------------------------
+# Empty result
+# ---------------------------------------------------------------------------
+
+
 class TestEmptyResult:
-    def test_empty_list(self, admin_client):
+    def test_empty_list_envelope(self, admin_client):
         client, _ = admin_client
         resp = client.get(AUDIT_URL)
         assert resp.status_code == 200
@@ -204,212 +230,296 @@ class TestEmptyResult:
         assert body["page_size"] == 50
 
 
+# ---------------------------------------------------------------------------
+# Safe DTO — exact key contract
+# ---------------------------------------------------------------------------
+
+
 class TestSafeDTO:
-    def test_response_fields_safe(self, db_session: Session, admin_client, authenticate):
+    def test_item_has_exactly_safe_keys(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
-        _make_user_event(db_session, admin, reason="test reason")
+        _user_event(db_session, admin)
 
         resp = client.get(AUDIT_URL)
         assert resp.status_code == 200
         item = resp.json()["items"][0]
 
-        # Safe fields present
-        assert "id" in item
-        assert "entity_type" in item
-        assert "action" in item
-        assert "actor_type" in item
-        assert "actor_display_name" in item
-        assert "actor_service" in item
-        assert "reason" in item
-        assert "created_at" in item
+        assert set(item.keys()) == _SAFE_DTO_KEYS
 
-        # Sensitive fields absent
-        for forbidden in (
-            "entity_id",
-            "actor_user_id",
-            "before_state",
-            "after_state",
-            "event_metadata",
-            "metadata",
-            "ip_address",
-            "user_agent",
-            "request_id",
-            "correlation_id",
-        ):
-            assert forbidden not in item, f"Sensitive field '{forbidden}' leaked in DTO"
-
-    def test_user_actor_display_name_populated(
-        self, db_session: Session, admin_client, authenticate
-    ):
+    def test_forbidden_fields_absent(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
-        _make_user_event(db_session, admin)
+        _user_event(db_session, admin)
 
         resp = client.get(AUDIT_URL)
         item = resp.json()["items"][0]
+
+        for key in _FORBIDDEN_KEYS:
+            assert key not in item, f"Sensitive field '{key}' leaked in DTO"
+
+    def test_user_actor_display_name_populated(
+        self, db_session: Session, admin_client, make_user
+    ):
+        client, admin = admin_client
+        _user_event(db_session, admin)
+
+        item = client.get(AUDIT_URL).json()["items"][0]
         assert item["actor_display_name"] == admin.display_name
         assert item["actor_service"] is None
         assert item["actor_type"] == "USER"
 
     def test_system_actor_service_populated(self, db_session: Session, admin_client):
         client, _ = admin_client
-        _make_system_event(db_session)
+        _system_event(db_session)
 
-        resp = client.get(AUDIT_URL)
-        item = resp.json()["items"][0]
+        item = client.get(AUDIT_URL).json()["items"][0]
         assert item["actor_service"] == "scopus-importer"
         assert item["actor_display_name"] is None
         assert item["actor_type"] == "SYSTEM"
 
-    def test_reason_null_when_not_set(self, db_session: Session, admin_client, authenticate):
+    def test_reason_null_when_not_set(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
-        _make_user_event(db_session, admin, reason=None)
+        _user_event(db_session, admin, reason=None)
 
-        resp = client.get(AUDIT_URL)
-        item = resp.json()["items"][0]
+        item = client.get(AUDIT_URL).json()["items"][0]
         assert item["reason"] is None
+
+    def test_reason_present_when_set(self, db_session: Session, admin_client, make_user):
+        client, admin = admin_client
+        _user_event(db_session, admin, reason="manual correction")
+
+        item = client.get(AUDIT_URL).json()["items"][0]
+        assert item["reason"] == "manual correction"
+
+
+# ---------------------------------------------------------------------------
+# Pagination
+# ---------------------------------------------------------------------------
 
 
 class TestPagination:
-    def test_default_page_size(self, db_session: Session, admin_client, authenticate):
+    def test_default_page_size(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
         for _ in range(3):
-            _make_user_event(db_session, admin)
+            _user_event(db_session, admin)
 
-        resp = client.get(AUDIT_URL)
-        body = resp.json()
+        body = client.get(AUDIT_URL).json()
         assert body["total"] == 3
         assert len(body["items"]) == 3
         assert body["page"] == 1
         assert body["page_size"] == 50
 
-    def test_custom_page_size(self, db_session: Session, admin_client, authenticate):
+    def test_custom_page_size(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
         for _ in range(5):
-            _make_user_event(db_session, admin)
+            _user_event(db_session, admin)
 
-        resp = client.get(AUDIT_URL, params={"page_size": 2})
-        body = resp.json()
+        body = client.get(AUDIT_URL, params={"page_size": 2}).json()
         assert body["total"] == 5
         assert len(body["items"]) == 2
         assert body["page_size"] == 2
 
-    def test_page_2(self, db_session: Session, admin_client, authenticate):
+    def test_page_2(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
         for _ in range(5):
-            _make_user_event(db_session, admin)
+            _user_event(db_session, admin)
 
-        resp = client.get(AUDIT_URL, params={"page": 2, "page_size": 3})
-        body = resp.json()
+        body = client.get(AUDIT_URL, params={"page": 2, "page_size": 3}).json()
         assert len(body["items"]) == 2
         assert body["page"] == 2
 
-    def test_page_size_capped_at_100(self, db_session: Session, admin_client, authenticate):
-        client, admin = admin_client
-        resp = client.get(AUDIT_URL, params={"page_size": 200})
-        # page_size > 100 should be rejected by FastAPI Query validation
+    def test_page_size_above_100_rejected(self, admin_client):
+        client, _ = admin_client
+        resp = client.get(AUDIT_URL, params={"page_size": 101})
         assert resp.status_code == 422
 
-    def test_ordering_created_at_desc(self, db_session: Session, admin_client, authenticate):
+    def test_ordering_created_at_desc(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
         now = datetime.now(UTC)
-        ev1 = _make_user_event(
-            db_session, admin, action="PUBLISHED", created_at=now - timedelta(minutes=2)
-        )
-        ev2 = _make_user_event(
-            db_session, admin, action="REVOKED", created_at=now - timedelta(minutes=1)
-        )
-        ev3 = _make_user_event(
-            db_session, admin, action="APPROVED", created_at=now
-        )
+        ev1 = _user_event(db_session, admin, action="PUBLISHED", created_at=now - timedelta(minutes=2))
+        ev2 = _user_event(db_session, admin, action="REVOKED", created_at=now - timedelta(minutes=1))
+        ev3 = _user_event(db_session, admin, action="APPROVED", created_at=now)
 
-        resp = client.get(AUDIT_URL)
-        items = resp.json()["items"]
+        items = client.get(AUDIT_URL).json()["items"]
         assert items[0]["id"] == str(ev3.id)
         assert items[1]["id"] == str(ev2.id)
         assert items[2]["id"] == str(ev1.id)
 
+    def test_ordering_id_tiebreak_desc(self, db_session: Session, admin_client, make_user):
+        """Two events with the same created_at must sort by id DESC (larger UUID first)."""
+        client, admin = admin_client
+        fixed_ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
+
+        # Choose UUIDs where the lexicographic ordering is predictable
+        id_low = uuid.UUID("10000000-0000-0000-0000-000000000001")
+        id_high = uuid.UUID("90000000-0000-0000-0000-000000000002")
+
+        ev_low = AuditEvent(
+            id=id_low,
+            entity_type="publication",
+            entity_id=uuid.uuid4(),
+            action="PUBLISHED",
+            actor_type="USER",
+            actor_user_id=admin.id,
+            actor_service=None,
+            reason=None,
+        )
+        ev_low.created_at = fixed_ts
+        db_session.add(ev_low)
+
+        ev_high = AuditEvent(
+            id=id_high,
+            entity_type="publication",
+            entity_id=uuid.uuid4(),
+            action="APPROVED",
+            actor_type="USER",
+            actor_user_id=admin.id,
+            actor_service=None,
+            reason=None,
+        )
+        ev_high.created_at = fixed_ts
+        db_session.add(ev_high)
+        db_session.flush()
+
+        items = client.get(AUDIT_URL).json()["items"]
+        assert items[0]["id"] == str(id_high)
+        assert items[1]["id"] == str(id_low)
+
+
+# ---------------------------------------------------------------------------
+# Filters
+# ---------------------------------------------------------------------------
+
 
 class TestFilters:
-    def test_filter_by_action(self, db_session: Session, admin_client, authenticate):
+    def test_filter_by_action_exact(self, db_session: Session, admin_client, make_user):
         client, admin = admin_client
-        ev = _make_user_event(db_session, admin, action="PUBLISHED")
-        _make_user_event(db_session, admin, action="REVOKED")
+        ev = _user_event(db_session, admin, action="PUBLISHED")
+        _user_event(db_session, admin, action="REVOKED")
 
-        resp = client.get(AUDIT_URL, params={"action": "PUBLISHED"})
-        body = resp.json()
+        body = client.get(AUDIT_URL, params={"action": "PUBLISHED"}).json()
         assert body["total"] == 1
         assert body["items"][0]["id"] == str(ev.id)
 
-    def test_filter_by_entity_type(self, db_session: Session, admin_client, authenticate):
-        client, admin = admin_client
-        ev = _make_user_event(db_session, admin, entity_type="publication")
-        _make_system_event(db_session, entity_type="scopus_import")
-
-        resp = client.get(AUDIT_URL, params={"entity_type": "publication"})
-        body = resp.json()
-        assert body["total"] == 1
-        assert body["items"][0]["id"] == str(ev.id)
-
-    def test_filter_by_actor_type_user(
-        self, db_session: Session, admin_client, authenticate
+    def test_filter_action_leading_trailing_whitespace_trimmed(
+        self, db_session: Session, admin_client, make_user
     ):
         client, admin = admin_client
-        ev = _make_user_event(db_session, admin)
-        _make_system_event(db_session)
+        ev = _user_event(db_session, admin, action="PUBLISHED")
+        _user_event(db_session, admin, action="REVOKED")
 
-        resp = client.get(AUDIT_URL, params={"actor_type": "USER"})
-        body = resp.json()
+        body = client.get(AUDIT_URL, params={"action": "  PUBLISHED  "}).json()
+        assert body["total"] == 1
+        assert body["items"][0]["id"] == str(ev.id)
+
+    def test_filter_action_whitespace_only_omits_filter(
+        self, db_session: Session, admin_client, make_user
+    ):
+        client, admin = admin_client
+        _user_event(db_session, admin, action="PUBLISHED")
+        _user_event(db_session, admin, action="REVOKED")
+
+        body = client.get(AUDIT_URL, params={"action": "   "}).json()
+        assert body["total"] == 2
+
+    def test_filter_entity_type_exact(self, db_session: Session, admin_client, make_user):
+        client, admin = admin_client
+        ev = _user_event(db_session, admin, entity_type="publication")
+        _system_event(db_session, entity_type="scopus_import")
+
+        body = client.get(AUDIT_URL, params={"entity_type": "publication"}).json()
+        assert body["total"] == 1
+        assert body["items"][0]["id"] == str(ev.id)
+
+    def test_filter_entity_type_whitespace_trimmed(
+        self, db_session: Session, admin_client, make_user
+    ):
+        client, admin = admin_client
+        ev = _user_event(db_session, admin, entity_type="publication")
+        _system_event(db_session, entity_type="scopus_import")
+
+        body = client.get(AUDIT_URL, params={"entity_type": "  publication  "}).json()
+        assert body["total"] == 1
+        assert body["items"][0]["id"] == str(ev.id)
+
+    def test_filter_entity_type_whitespace_only_omits_filter(
+        self, db_session: Session, admin_client, make_user
+    ):
+        client, admin = admin_client
+        _user_event(db_session, admin, entity_type="publication")
+        _system_event(db_session, entity_type="scopus_import")
+
+        body = client.get(AUDIT_URL, params={"entity_type": "  "}).json()
+        assert body["total"] == 2
+
+    def test_filter_by_actor_type_user(
+        self, db_session: Session, admin_client, make_user
+    ):
+        client, admin = admin_client
+        ev = _user_event(db_session, admin)
+        _system_event(db_session)
+
+        body = client.get(AUDIT_URL, params={"actor_type": "USER"}).json()
         assert body["total"] == 1
         assert body["items"][0]["id"] == str(ev.id)
 
     def test_filter_by_actor_type_system(
-        self, db_session: Session, admin_client, authenticate
+        self, db_session: Session, admin_client, make_user
     ):
         client, admin = admin_client
-        _make_user_event(db_session, admin)
-        ev = _make_system_event(db_session)
+        _user_event(db_session, admin)
+        ev = _system_event(db_session)
 
-        resp = client.get(AUDIT_URL, params={"actor_type": "SYSTEM"})
-        body = resp.json()
+        body = client.get(AUDIT_URL, params={"actor_type": "SYSTEM"}).json()
         assert body["total"] == 1
         assert body["items"][0]["id"] == str(ev.id)
 
-    def test_filter_actor_type_invalid(self, admin_client):
+    def test_filter_actor_type_invalid_returns_422(self, admin_client):
         client, _ = admin_client
         resp = client.get(AUDIT_URL, params={"actor_type": "INVALID"})
         assert resp.status_code == 422
 
-    def test_filter_date_from(self, db_session: Session, admin_client, authenticate):
+    def test_filter_date_from_inclusive(
+        self, db_session: Session, admin_client, make_user
+    ):
+        client, admin = admin_client
+        ts = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
+        ev = _user_event(db_session, admin, created_at=ts)
+
+        body = client.get(AUDIT_URL, params={"date_from": ts.isoformat()}).json()
+        assert body["total"] == 1
+        assert body["items"][0]["id"] == str(ev.id)
+
+    def test_filter_date_to_inclusive(
+        self, db_session: Session, admin_client, make_user
+    ):
+        client, admin = admin_client
+        ts = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
+        ev = _user_event(db_session, admin, created_at=ts)
+
+        body = client.get(AUDIT_URL, params={"date_to": ts.isoformat()}).json()
+        assert body["total"] == 1
+        assert body["items"][0]["id"] == str(ev.id)
+
+    def test_filter_combined_date_range(
+        self, db_session: Session, admin_client, make_user
+    ):
         client, admin = admin_client
         now = datetime.now(UTC)
-        old = _make_user_event(
-            db_session, admin, created_at=now - timedelta(days=2)
-        )
-        recent = _make_user_event(db_session, admin, created_at=now)
+        old = _user_event(db_session, admin, created_at=now - timedelta(days=10))
+        mid = _user_event(db_session, admin, created_at=now - timedelta(days=5))
+        recent = _user_event(db_session, admin, created_at=now)
 
-        cutoff = (now - timedelta(days=1)).isoformat()
-        resp = client.get(AUDIT_URL, params={"date_from": cutoff})
-        body = resp.json()
-        ids = [i["id"] for i in body["items"]]
-        assert str(recent.id) in ids
+        d_from = (now - timedelta(days=7)).isoformat()
+        d_to = (now - timedelta(days=3)).isoformat()
+        body = client.get(
+            AUDIT_URL, params={"date_from": d_from, "date_to": d_to}
+        ).json()
+        ids = {i["id"] for i in body["items"]}
+        assert str(mid.id) in ids
         assert str(old.id) not in ids
-
-    def test_filter_date_to(self, db_session: Session, admin_client, authenticate):
-        client, admin = admin_client
-        now = datetime.now(UTC)
-        old = _make_user_event(
-            db_session, admin, created_at=now - timedelta(days=2)
-        )
-        recent = _make_user_event(db_session, admin, created_at=now)
-
-        cutoff = (now - timedelta(days=1)).isoformat()
-        resp = client.get(AUDIT_URL, params={"date_to": cutoff})
-        body = resp.json()
-        ids = [i["id"] for i in body["items"]]
-        assert str(old.id) in ids
         assert str(recent.id) not in ids
 
-    def test_date_range_inverted_returns_422(self, admin_client):
+    def test_date_range_inverted_returns_422_top_level_code(self, admin_client):
         client, _ = admin_client
         now = datetime.now(UTC)
         resp = client.get(
@@ -420,35 +530,48 @@ class TestFilters:
             },
         )
         assert resp.status_code == 422
-        detail = resp.json()["detail"]
-        assert detail["code"] == "INVALID_DATE_RANGE"
+        body = resp.json()
+        assert body["code"] == "INVALID_DATE_RANGE"
+        assert "detail" in body
+
+
+# ---------------------------------------------------------------------------
+# Actor resolution
+# ---------------------------------------------------------------------------
 
 
 class TestActorResolution:
-    def test_actor_display_name_resolves_for_inactive_user(
-        self, db_session: Session, admin_client, authenticate
+    def test_active_user_display_name_resolved(
+        self, db_session: Session, admin_client, make_user
     ):
-        """Inactive users must still resolve display_name via LEFT JOIN."""
-        client, _ = admin_client
-        inactive = User(
-            id=uuid.uuid4(),
-            email=f"inactive-{uuid.uuid4().hex[:8]}@a1.test",
-            password_hash="x",
-            display_name="Inactive Person",
-            role="REVIEWER",
-            is_active=False,
-        )
-        db_session.add(inactive)
-        db_session.flush()
-        _make_user_event(db_session, inactive)
+        client, admin = admin_client
+        _user_event(db_session, admin)
 
-        resp = client.get(AUDIT_URL, params={"actor_type": "USER"})
-        item = resp.json()["items"][0]
-        assert item["actor_display_name"] == "Inactive Person"
+        item = client.get(AUDIT_URL).json()["items"][0]
+        assert item["actor_display_name"] == admin.display_name
+
+    def test_inactive_user_display_name_still_resolved(
+        self, db_session: Session, admin_client, make_user
+    ):
+        """Inactive users must still resolve via LEFT JOIN."""
+        client, _ = admin_client
+        inactive = make_user("REVIEWER", is_active=False)
+        inactive.display_name = "Inactive Person"
+        db_session.flush()
+        _user_event(db_session, inactive)
+
+        body = client.get(AUDIT_URL, params={"actor_type": "USER"}).json()
+        names = [i["actor_display_name"] for i in body["items"]]
+        assert "Inactive Person" in names
+
+
+# ---------------------------------------------------------------------------
+# DB failure contract
+# ---------------------------------------------------------------------------
 
 
 class TestDBFailure:
-    def test_db_failure_returns_503(self, admin_client):
+    def test_db_failure_returns_503_top_level_code(self, admin_client):
         client, _ = admin_client
 
         from sqlalchemy.exc import OperationalError
@@ -460,31 +583,52 @@ class TestDBFailure:
             resp = client.get(AUDIT_URL)
 
         assert resp.status_code == 503
-        detail = resp.json()["detail"]
-        assert detail["code"] == "DATABASE_UNAVAILABLE"
+        body = resp.json()
+        assert body["code"] == "DATABASE_UNAVAILABLE"
+        assert "detail" in body
 
-    def test_db_failure_does_not_create_audit_rows(
-        self, db_session: Session, admin_client, authenticate
+    def test_db_failure_no_sensitive_exception_string(self, admin_client):
+        client, _ = admin_client
+
+        from sqlalchemy.exc import OperationalError
+
+        with patch(
+            "app.api.v1.endpoints.audits.list_audits",
+            side_effect=OperationalError(
+                "conn", None, Exception("password=secret host=db")
+            ),
+        ):
+            resp = client.get(AUDIT_URL)
+
+        body_text = resp.text
+        assert "password=secret" not in body_text
+        assert "host=db" not in body_text
+
+    def test_read_does_not_create_audit_rows(
+        self, db_session: Session, admin_client, make_user
     ):
-        """Reading audits must never write AuditEvent rows."""
+        """GET /audits must never write any AuditEvent rows."""
+        from sqlalchemy import func, select
+
         client, admin = admin_client
-        _make_user_event(db_session, admin)
+        _user_event(db_session, admin)
 
         before = db_session.execute(
-            __import__("sqlalchemy", fromlist=["select"]).select(
-                __import__("sqlalchemy", fromlist=["func"]).func.count()
-            ).select_from(AuditEvent)
+            select(func.count()).select_from(AuditEvent)
         ).scalar_one()
 
         client.get(AUDIT_URL)
 
         after = db_session.execute(
-            __import__("sqlalchemy", fromlist=["select"]).select(
-                __import__("sqlalchemy", fromlist=["func"]).func.count()
-            ).select_from(AuditEvent)
+            select(func.count()).select_from(AuditEvent)
         ).scalar_one()
 
         assert after == before
+
+
+# ---------------------------------------------------------------------------
+# No /ping endpoint
+# ---------------------------------------------------------------------------
 
 
 class TestNoPingEndpoint:

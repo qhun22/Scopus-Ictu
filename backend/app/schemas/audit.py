@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -22,7 +23,7 @@ class AuditListItem(BaseModel):
     id: uuid.UUID
     entity_type: str
     action: str
-    actor_type: str
+    actor_type: Literal["USER", "SYSTEM"]
     actor_display_name: str | None
     actor_service: str | None
     reason: str | None

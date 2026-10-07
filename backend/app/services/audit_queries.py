@@ -18,6 +18,14 @@ _MAX_PAGE_SIZE = 100
 _DEFAULT_PAGE_SIZE = 50
 
 
+def _normalize_str_filter(value: str | None) -> str | None:
+    """Trim whitespace; return None if empty or None."""
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped if stripped else None
+
+
 def list_audits(
     session: Session,
     *,
@@ -31,16 +39,20 @@ def list_audits(
 ) -> AuditListResponse:
     """Return a paginated, filtered list of audit events.
 
+    action and entity_type are trimmed; empty-after-trim treated as absent.
     Actor LEFT JOIN: inactive users still resolve display_name because
     the FK is RESTRICT (no deleted users exist in the system).
     """
     page_size = min(page_size, _MAX_PAGE_SIZE)
     offset = (page - 1) * page_size
 
-    base_filter = _build_filters(action, entity_type, actor_type, date_from, date_to)
+    action = _normalize_str_filter(action)
+    entity_type = _normalize_str_filter(entity_type)
+
+    filters = _build_filters(action, entity_type, actor_type, date_from, date_to)
 
     total: int = session.execute(
-        select(func.count()).select_from(AuditEvent).where(*base_filter)
+        select(func.count()).select_from(AuditEvent).where(*filters)
     ).scalar_one()
 
     rows = session.execute(
@@ -55,7 +67,7 @@ def list_audits(
             AuditEvent.created_at,
         )
         .outerjoin(User, AuditEvent.actor_user_id == User.id)
-        .where(*base_filter)
+        .where(*filters)
         .order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc())
         .offset(offset)
         .limit(page_size)
