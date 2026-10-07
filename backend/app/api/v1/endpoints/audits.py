@@ -9,12 +9,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user, require_role
+from app.api.dependencies import require_role
 from app.core.database import get_session
+from app.core.exceptions import APIError
 from app.models.governance import User
 from app.schemas.audit import AuditListResponse
 from app.services.audit_queries import list_audits
@@ -41,9 +42,10 @@ def get_audit_list(
     session: Session = Depends(get_session),
 ) -> AuditListResponse:
     if date_from is not None and date_to is not None and date_from > date_to:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"code": "INVALID_DATE_RANGE", "message": "date_from must be <= date_to"},
+        raise APIError(
+            status_code=422,
+            code="INVALID_DATE_RANGE",
+            detail="date_from phải nhỏ hơn hoặc bằng date_to",
         )
 
     try:
@@ -58,7 +60,8 @@ def get_audit_list(
             date_to=date_to,
         )
     except SQLAlchemyError:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": "DATABASE_UNAVAILABLE", "message": "Database unavailable"},
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            detail="Cơ sở dữ liệu tạm thời không khả dụng",
         )
