@@ -20,23 +20,26 @@ export default function PublicationDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAllProvenance, setShowAllProvenance] = useState(false);
 
-  const abortRef = useRef<AbortController | null>(null);
+  // ── Generation counter for stale-request guard ──────────────────────────
+  const genRef = useRef(0);
 
   const fetchDetail = useCallback(async () => {
     if (!eid) return;
 
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const currentGen = ++genRef.current;
 
     setLoading(true);
     setError(null);
 
     try {
-      const data = await getPublicationByEid(eid, { signal: controller.signal });
+      const data = await getPublicationByEid(eid);
+      // Guard: only commit state if this request is still the latest
+      if (currentGen !== genRef.current) return;
       setPublication(data);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
+      if (currentGen !== genRef.current) return;
+
       if (err instanceof ApiError && err.status === 404) {
         setError(
           locale === "vi"
@@ -53,13 +56,13 @@ export default function PublicationDetailPage() {
         );
       }
     } finally {
+      if (currentGen !== genRef.current) return;
       setLoading(false);
     }
   }, [eid, locale]);
 
   useEffect(() => {
     fetchDetail();
-    return () => { abortRef.current?.abort(); };
   }, [fetchDetail]);
 
   // ── Display helpers ──────────────────────────────────────────────────────
@@ -107,6 +110,16 @@ export default function PublicationDetailPage() {
   const colRowNum = locale === "vi" ? "Dòng" : "Row";
   const colImportedAt = locale === "vi" ? "Thời gian nhập" : "Imported At";
   const colSha256 = "SHA-256";
+
+  const emptyAuthorsLabel = locale === "vi"
+    ? "Không có dữ liệu tác giả."
+    : "No author data available.";
+  const emptyLinksLabel = locale === "vi"
+    ? "Chưa có liên kết giảng viên được phê duyệt."
+    : "No approved lecturer links yet.";
+  const emptyProvenanceLabel = locale === "vi"
+    ? "Không có dữ liệu truy vết."
+    : "No provenance data available.";
 
   if (loading) {
     return (
@@ -169,7 +182,7 @@ export default function PublicationDetailPage() {
       <button
         type="button"
         onClick={() => navigate("/publications")}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -206,13 +219,15 @@ export default function PublicationDetailPage() {
         </div>
       </section>
 
-      {/* ── Section B: Ordered Scopus Authors ─────────────────────────── */}
-      {authors.length > 0 && (
-        <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
-          <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-            {sectionAuthors}
-          </h2>
+      {/* ── Section B: Ordered Scopus Authors (always visible) ─────────── */}
+      <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
+          {sectionAuthors}
+        </h2>
 
+        {authors.length === 0 ? (
+          <p className="py-6 text-center text-xs text-slate-400">{emptyAuthorsLabel}</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
@@ -233,16 +248,18 @@ export default function PublicationDetailPage() {
               </tbody>
             </table>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
-      {/* ── Section C: Approved Lecturer Links ─────────────────────────── */}
-      {approved_lecturer_links.length > 0 && (
-        <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
-          <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-            {sectionLinks}
-          </h2>
+      {/* ── Section C: Approved Lecturer Links (always visible) ─────────── */}
+      <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
+          {sectionLinks}
+        </h2>
 
+        {approved_lecturer_links.length === 0 ? (
+          <p className="py-6 text-center text-xs text-slate-400">{emptyLinksLabel}</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
@@ -258,7 +275,7 @@ export default function PublicationDetailPage() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {approved_lecturer_links.map((link, idx) => (
-                  <tr key={`link-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={`link-${idx}-${link.author_order}-${link.scopus_id}`} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-3 py-2.5 text-center text-slate-500">{link.author_order}</td>
                     <td className="px-3 py-2.5 font-medium text-slate-800">{link.full_name}</td>
                     <td className="px-3 py-2.5 font-mono text-slate-600">{fmtField(link.staff_code)}</td>
@@ -271,58 +288,62 @@ export default function PublicationDetailPage() {
               </tbody>
             </table>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
-      {/* ── Section D: Safe Provenance ────────────────────────────────── */}
-      {provenance.length > 0 && (
-        <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
-          <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-            {sectionProvenance}
-          </h2>
+      {/* ── Section D: Safe Provenance (always visible) ────────────────── */}
+      <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
+          {sectionProvenance}
+        </h2>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
-                <tr>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colFileName}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colRowNum}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colImportedAt}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap hidden lg:table-cell">{colSha256}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {provenanceToShow.map((p) => (
-                  <tr key={`${p.file_name}-${p.row_number}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-3 py-2.5 font-medium text-slate-800 max-w-0">
-                      <span className="block max-w-[200px] truncate" title={p.file_name}>{p.file_name}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center text-slate-600">{p.row_number}</td>
-                    <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{fmtProvenanceDate(p.imported_at)}</td>
-                    <td className="px-3 py-2.5 font-mono text-[10px] text-slate-400 hidden lg:table-cell">
-                      <span className="block max-w-[120px] truncate" title={p.file_sha256}>{p.file_sha256}</span>
-                    </td>
+        {provenance.length === 0 ? (
+          <p className="py-6 text-center text-xs text-slate-400">{emptyProvenanceLabel}</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colFileName}</th>
+                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colRowNum}</th>
+                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colImportedAt}</th>
+                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap hidden lg:table-cell">{colSha256}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {hasMoreProvenance && (
-            <div className="mt-3 text-center">
-              <button
-                type="button"
-                onClick={() => setShowAllProvenance((v) => !v)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
-              >
-                {showAllProvenance
-                  ? (locale === "vi" ? "Thu gọn" : "Show less")
-                  : `${locale === "vi" ? "Xem thêm" : "Show all"} (${provenance.length})`}
-              </button>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {provenanceToShow.map((p, idx) => (
+                    <tr key={`${p.file_name}-${p.row_number}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-3 py-2.5 font-medium text-slate-800 max-w-0">
+                        <span className="block max-w-[200px] truncate" title={p.file_name}>{p.file_name}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-slate-600">{p.row_number}</td>
+                      <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{fmtProvenanceDate(p.imported_at)}</td>
+                      <td className="px-3 py-2.5 font-mono text-[10px] text-slate-400 hidden lg:table-cell">
+                        <span className="block max-w-[120px] truncate" title={p.file_sha256}>{p.file_sha256}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </section>
-      )}
+
+            {hasMoreProvenance && (
+              <div className="mt-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAllProvenance((v) => !v)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                >
+                  {showAllProvenance
+                    ? (locale === "vi" ? "Thu gọn" : "Show less")
+                    : `${locale === "vi" ? "Xem thêm" : "Show all"} (${provenance.length})`}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }

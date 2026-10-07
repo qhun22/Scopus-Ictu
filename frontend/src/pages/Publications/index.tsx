@@ -11,6 +11,14 @@ const FILTER_DELAY_MS = 350;
 
 const NULL_YEAR = "Chưa rõ";
 const NULL_CITATION = "Chưa có dữ liệu";
+const NULL_STRING = "Chưa cập nhật";
+
+interface AppliedFilters {
+  year: number | undefined;
+  document_type: string | undefined;
+  publication_stage: string | undefined;
+  open_access_status: string | undefined;
+}
 
 export default function PublicationsPage() {
   const navigate = useNavigate();
@@ -22,13 +30,23 @@ export default function PublicationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // ── Filter state ──────────────────────────────────────────────────────────
+  // ── Search state (debounced, used directly as applied q) ────────────────
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
-  const [year, setYear] = useState("");
-  const [documentType, setDocumentType] = useState("");
-  const [publicationStage, setPublicationStage] = useState("");
-  const [openAccessStatus, setOpenAccessStatus] = useState("");
+
+  // ── Draft filter state (controlled inputs) ──────────────────────────────
+  const [draftYear, setDraftYear] = useState("");
+  const [draftDocType, setDraftDocType] = useState("");
+  const [draftStage, setDraftStage] = useState("");
+  const [draftOa, setDraftOa] = useState("");
+
+  // ── Applied filter state (triggers requests) ────────────────────────────
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({
+    year: undefined,
+    document_type: undefined,
+    publication_stage: undefined,
+    open_access_status: undefined,
+  });
 
   // ── Pagination state ─────────────────────────────────────────────────────
   const [page, setPage] = useState(1);
@@ -37,16 +55,11 @@ export default function PublicationsPage() {
   // ── Error state ──────────────────────────────────────────────────────────
   const [error, setError] = useState<string | null>(null);
 
-  // ── Abort controller for race condition prevention ───────────────────────
-  const abortRef = useRef<AbortController | null>(null);
+  // ── Request generation counter for stale-request guard ──────────────────
+  const genRef = useRef(0);
 
   const fetchPublications = useCallback(
-    async (currentPage: number, currentPageSize: number) => {
-      // Cancel any in-flight request
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
+    async (currentPage: number, currentPageSize: number, currentGen: number) => {
       const isFirstPage = currentPage === 1;
       if (isFirstPage) setLoading(true);
       else setLoadingMore(true);
@@ -54,79 +67,77 @@ export default function PublicationsPage() {
       setError(null);
 
       try {
-        const data = await getPublications(
-          {
-            page: currentPage,
-            page_size: currentPageSize,
-            q: qDebounced || undefined,
-            year: year ? Number(year) : undefined,
-            document_type: documentType || undefined,
-            publication_stage: publicationStage || undefined,
-            open_access_status: openAccessStatus || undefined,
-          },
-          { signal: controller.signal },
-        );
+        const data = await getPublications({
+          page: currentPage,
+          page_size: currentPageSize,
+          q: qDebounced || undefined,
+          ...appliedFilters,
+        });
+
+        // Guard: only update state if this request is still the latest
+        if (currentGen !== genRef.current) return;
 
         setItems(data.items);
         setTotal(data.total);
-        setPage(currentPage);
-        setPageSize(currentPageSize);
       } catch (err) {
-        if ((err as Error).name === "AbortError") return; // silently ignore cancellations
+        if ((err as Error).name === "AbortError") return;
+        if (currentGen !== genRef.current) return;
+
         setError(
           err instanceof ApiError
             ? getApiErrorMessage(err)
             : "Không thể tải danh sách công bố. Vui lòng thử lại.",
         );
       } finally {
+        if (currentGen !== genRef.current) return;
         if (isFirstPage) setLoading(false);
         else setLoadingMore(false);
       }
     },
-    [qDebounced, year, documentType, publicationStage, openAccessStatus],
+    [qDebounced, appliedFilters],
   );
 
-  // Reset to page 1 whenever filters change
+  // ── Single trigger: appliedFilters + page + pageSize ────────────────────
   useEffect(() => {
-    fetchPublications(1, pageSize);
+    genRef.current += 1;
+    const currentGen = genRef.current;
+    fetchPublications(page, pageSize, currentGen);
+    // fetchPublications is stable wrt appliedFilters (captured in closure)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qDebounced, year, documentType, publicationStage, openAccessStatus, pageSize]);
+  }, [page, pageSize, appliedFilters, fetchPublications]);
 
-  // Re-fetch when page changes (without re-triggering filter effect)
-  const prevPageRef = useRef(1);
-  useEffect(() => {
-    if (page === prevPageRef.current) return;
-    prevPageRef.current = page;
-    fetchPublications(page, pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize]);
-
-  // Debounce free-text search
+  // ── Debounce free-text search ──────────────────────────────────────────
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (q !== qDebounced) {
-        setQDebounced(q);
-        setPage(1);
-      }
+      if (q !== qDebounced) setQDebounced(q);
     }, FILTER_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [q, qDebounced]);
 
-  // ── Filter helpers ───────────────────────────────────────────────────────
-  const hasActiveFilters =
-    !!qDebounced || !!year || !!documentType || !!publicationStage || !!openAccessStatus;
-
-  const handleClearFilters = () => {
-    setQ("");
-    setQDebounced("");
-    setYear("");
-    setDocumentType("");
-    setPublicationStage("");
-    setOpenAccessStatus("");
+  // ── Filter actions ────────────────────────────────────────────────────
+  const handleApply = () => {
+    setAppliedFilters({
+      year: draftYear ? Number(draftYear) : undefined,
+      document_type: draftDocType.trim() || undefined,
+      publication_stage: draftStage.trim() || undefined,
+      open_access_status: draftOa.trim() || undefined,
+    });
     setPage(1);
   };
 
-  const handleApplyYear = () => {
+  const handleClear = () => {
+    setQ("");
+    setQDebounced("");
+    setDraftYear("");
+    setDraftDocType("");
+    setDraftStage("");
+    setDraftOa("");
+    setAppliedFilters({
+      year: undefined,
+      document_type: undefined,
+      publication_stage: undefined,
+      open_access_status: undefined,
+    });
     setPage(1);
   };
 
@@ -135,10 +146,14 @@ export default function PublicationsPage() {
     setPage(1);
   };
 
+  // ── Derived ───────────────────────────────────────────────────────────
+  const hasDraftFilters =
+    !!draftYear || !!draftDocType || !!draftStage || !!draftOa || !!q;
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const isFiltering = loading || loadingMore;
 
-  // ── Display helpers ──────────────────────────────────────────────────────
+  // ── Display helpers ────────────────────────────────────────────────────
   const fmtYear = (y: number | null) =>
     y === null ? NULL_YEAR : String(y);
 
@@ -148,9 +163,10 @@ export default function PublicationsPage() {
     return String(c);
   };
 
-  const fmtField = (v: string | null) => v || "—";
+  const fmtField = (v: string | null) =>
+    v && v.trim() ? v.trim() : NULL_STRING;
 
-  // ── Column headers ───────────────────────────────────────────────────────
+  // ── Labels ────────────────────────────────────────────────────────────
   const colTitle = locale === "vi" ? "Công bố" : "Publication";
   const colEid = "EID";
   const colYear = locale === "vi" ? "Năm" : "Year";
@@ -170,6 +186,7 @@ export default function PublicationsPage() {
     ? "Hãy thử từ khóa hoặc bộ lọc khác."
     : "Try a different keyword or filter.";
   const resetLabel = locale === "vi" ? "Đặt lại" : "Reset";
+  const applyLabel = locale === "vi" ? "Áp dụng" : "Apply";
   const viewDetailLabel = locale === "vi" ? "Chi tiết" : "Details";
   const subtitleText = locale === "vi"
     ? "Danh mục công bố khoa học chuẩn hóa toàn trường ICTU."
@@ -220,9 +237,8 @@ export default function PublicationsPage() {
               type="number"
               min="1900"
               max="2100"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && (setPage(1), handleApplyYear())}
+              value={draftYear}
+              onChange={(e) => setDraftYear(e.target.value)}
               placeholder="VD: 2023"
               className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
@@ -236,8 +252,8 @@ export default function PublicationsPage() {
             <input
               id="pub-filter-doc-type"
               type="text"
-              value={documentType}
-              onChange={(e) => setDocumentType(e.target.value)}
+              value={draftDocType}
+              onChange={(e) => setDraftDocType(e.target.value)}
               placeholder={locale === "vi" ? "VD: Article" : "e.g. Article"}
               className="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
@@ -251,8 +267,8 @@ export default function PublicationsPage() {
             <input
               id="pub-filter-stage"
               type="text"
-              value={publicationStage}
-              onChange={(e) => setPublicationStage(e.target.value)}
+              value={draftStage}
+              onChange={(e) => setDraftStage(e.target.value)}
               placeholder={locale === "vi" ? "VD: Published" : "e.g. Published"}
               className="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
@@ -266,8 +282,8 @@ export default function PublicationsPage() {
             <input
               id="pub-filter-oa"
               type="text"
-              value={openAccessStatus}
-              onChange={(e) => setOpenAccessStatus(e.target.value)}
+              value={draftOa}
+              onChange={(e) => setDraftOa(e.target.value)}
               placeholder={locale === "vi" ? "VD: Open Access" : "e.g. Open Access"}
               className="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
@@ -277,20 +293,20 @@ export default function PublicationsPage() {
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={() => { setPage(1); }}
-              disabled={!hasActiveFilters}
+              onClick={handleApply}
+              disabled={!hasDraftFilters}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
-              <span>{locale === "vi" ? "Áp dụng" : "Apply"}</span>
+              <span>{applyLabel}</span>
             </button>
 
             <button
               type="button"
-              onClick={handleClearFilters}
-              disabled={!hasActiveFilters}
+              onClick={handleClear}
+              disabled={!hasDraftFilters}
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50/50 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,7 +328,7 @@ export default function PublicationsPage() {
             <span className="font-semibold">{error}</span>
             <button
               type="button"
-              onClick={() => fetchPublications(page, pageSize)}
+              onClick={() => { genRef.current += 1; fetchPublications(page, pageSize, genRef.current); }}
               className="self-start rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
             >
               {locale === "vi" ? "Thử lại" : "Retry"}
@@ -399,7 +415,7 @@ export default function PublicationsPage() {
                     <td className="px-4 py-3 text-center">
                       <button
                         type="button"
-                        onClick={() => navigate(`/publications/${pub.eid}`)}
+                        onClick={() => navigate(`/publications/${encodeURIComponent(pub.eid)}`)}
                         className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
                       >
                         {viewDetailLabel}
