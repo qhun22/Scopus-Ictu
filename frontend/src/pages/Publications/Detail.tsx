@@ -20,7 +20,8 @@ export default function PublicationDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAllProvenance, setShowAllProvenance] = useState(false);
 
-  // ── Generation counter for stale-request guard ──────────────────────────
+  // ── Stale-request defenses: AbortController + monotonic generation ─────
+  const abortRef = useRef<AbortController | null>(null);
   const genRef = useRef(0);
 
   const fetchDetail = useCallback(async () => {
@@ -28,15 +29,22 @@ export default function PublicationDetailPage() {
 
     const currentGen = ++genRef.current;
 
+    // Establish the complete loading state for THIS request BEFORE awaiting.
     setLoading(true);
     setError(null);
 
+    // Abort any previous in-flight request and create a new controller.
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
-      const data = await getPublicationByEid(eid);
-      // Guard: only commit state if this request is still the latest
+      const data = await getPublicationByEid(eid, { signal: controller.signal });
+      // Generation guard: only commit if THIS request is still current.
       if (currentGen !== genRef.current) return;
       setPublication(data);
     } catch (err) {
+      // AbortError is silent — neither error nor state is updated.
       if ((err as Error).name === "AbortError") return;
       if (currentGen !== genRef.current) return;
 
@@ -56,6 +64,8 @@ export default function PublicationDetailPage() {
         );
       }
     } finally {
+      // Only the CURRENT request clears its own loading flag. A stale
+      // request's finally is a no-op, so loading can never stick.
       if (currentGen !== genRef.current) return;
       setLoading(false);
     }
@@ -63,6 +73,10 @@ export default function PublicationDetailPage() {
 
   useEffect(() => {
     fetchDetail();
+    // Cleanup on unmount or before the next effect run: abort in-flight.
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [fetchDetail]);
 
   // ── Display helpers ──────────────────────────────────────────────────────
