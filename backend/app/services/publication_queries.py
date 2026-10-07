@@ -46,7 +46,7 @@ def _escaped_substring(value: str) -> str:
     return f"%{escaped}%"
 
 
-def _publication_filters(
+def publication_filters(
     *,
     q: str | None,
     year: int | None,
@@ -91,7 +91,7 @@ def _list_statement(
     open_access_status: str | None,
 ):
     return select(Publication).where(
-        *_publication_filters(
+        *publication_filters(
             q=q,
             year=year,
             document_type=document_type,
@@ -308,4 +308,5 @@ __all__ = [
     "MAX_PAGE_SIZE",
     "get_publication_detail",
     "list_publications",
+    "publication_filters",
 ]
