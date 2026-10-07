@@ -46,6 +46,7 @@ from app.schemas.review_api import (
     ReviewQueueResponse,
 )
 from app.services.candidate_review_queries import (
+    current_reviewable_candidates_subquery,
     current_reviewable_observation,
     latest_completed_observations_subquery,
 )
@@ -116,7 +117,7 @@ def _queue_statement(
     evidence_category: str | None,
     ambiguity: str | None,
 ):
-    latest = latest_completed_observations_subquery()
+    reviewable = current_reviewable_candidates_subquery(candidate_status)
     evidence_counts = _evidence_counts_subquery()
     ambiguity_counts = _candidate_ambiguity_subquery()
     publication_count = func.coalesce(
@@ -127,7 +128,7 @@ def _queue_statement(
             LecturerScopusCandidate.id.label("candidate_id"),
             LecturerScopusCandidate.status.label("candidate_status"),
             LecturerScopusCandidate.version.label("candidate_version"),
-            latest.c.observation_id.label("current_observation_id"),
+            reviewable.c.current_observation_id.label("current_observation_id"),
             Lecturer.id.label("lecturer_id"),
             Lecturer.full_name.label("lecturer_full_name"),
             ScopusAuthor.id.label("scopus_author_id"),
@@ -152,21 +153,17 @@ def _queue_statement(
             ScopusAuthor.id == LecturerScopusCandidate.scopus_author_id,
         )
         .join(
-            latest,
-            and_(
-                latest.c.candidate_id == LecturerScopusCandidate.id,
-                latest.c.observation_rank == 1,
-            ),
+            reviewable,
+            reviewable.c.candidate_id == LecturerScopusCandidate.id,
         )
         .outerjoin(
             evidence_counts,
-            evidence_counts.c.observation_id == latest.c.observation_id,
+            evidence_counts.c.observation_id == reviewable.c.current_observation_id,
         )
         .join(
             ambiguity_counts,
             ambiguity_counts.c.lecturer_id == LecturerScopusCandidate.lecturer_id,
         )
-        .where(LecturerScopusCandidate.status == candidate_status)
     )
     if evidence_category == "publication-supported":
         statement = statement.where(publication_count > 0)
