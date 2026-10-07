@@ -30,13 +30,14 @@ DatabaseSession = Annotated[Session, Depends(get_session)]
 def global_search_endpoint(
     _reader: SearchReader,
     db: DatabaseSession,
-    q: Annotated[str, Query(max_length=MAX_QUERY_LENGTH)],
+    q: Annotated[str, Query()],
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
 ) -> SearchResponse:
     """Search lecturers, publications, and Scopus authors by literal substring.
 
-    Query terms are trimmed before semantic validation, so a blank or
-    single-character term rejects with 422 instead of matching everything.
+    ``q`` is trimmed before semantic validation. Surrounding whitespace is
+    stripped so a padded-but-valid query is never rejected for raw length, and
+    a blank or single-character term rejects with 422 after trimming.
     LIKE control characters (``%``, ``_``, ``\\``) are matched literally.
     """
 
@@ -46,6 +47,12 @@ def global_search_endpoint(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Từ khóa tìm kiếm phải có ít nhất {MIN_QUERY_LENGTH} ký tự.",
             code="SEARCH_QUERY_TOO_SHORT",
+        )
+    if len(trimmed_q) > MAX_QUERY_LENGTH:
+        raise APIError(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Từ khóa tìm kiếm không được vượt quá {MAX_QUERY_LENGTH} ký tự.",
+            code="SEARCH_QUERY_TOO_LONG",
         )
 
     try:
