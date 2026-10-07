@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     audits,
     auth,
     authors,
+    dashboard,
     imports,
     lecturer_scopus,
     lecturers,
@@ -41,3 +42,4 @@ router.include_router(matching.router, prefix="/matching", tags=["matching"])
 router.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
 router.include_router(audits.router, prefix="/audits", tags=["audits"])
 router.include_router(search.router, prefix="/search", tags=["search"])
+router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models.candidate import (
     CandidateGenerationRun,
+    LecturerScopusCandidate,
     LecturerScopusCandidateObservation,
 )
 
@@ -58,6 +59,29 @@ def latest_completed_observations_subquery():
         .subquery("latest_completed_observations")
     )
     return ranked
+
+
+def current_reviewable_candidates_subquery(candidate_status: str):
+    """Return a subquery of candidates that have a current COMPLETED observation.
+
+    Shared semantic boundary for both the review queue and the dashboard
+    pending-review count so the two cannot silently drift.
+    """
+    latest = latest_completed_observations_subquery()
+    return (
+        select(
+            LecturerScopusCandidate.id.label("candidate_id"),
+            latest.c.observation_id.label("current_observation_id"),
+        )
+        .select_from(LecturerScopusCandidate)
+        .join(
+            latest,
+            (latest.c.candidate_id == LecturerScopusCandidate.id)
+            & (latest.c.observation_rank == 1),
+        )
+        .where(LecturerScopusCandidate.status == candidate_status)
+        .subquery("current_reviewable_candidates")
+    )
 
 
 def current_reviewable_observation(
@@ -105,4 +129,8 @@ def current_reviewable_observation(
     return observation
 
 
-__all__ = ["current_reviewable_observation", "latest_completed_observations_subquery"]
+__all__ = [
+    "current_reviewable_candidates_subquery",
+    "current_reviewable_observation",
+    "latest_completed_observations_subquery",
+]
