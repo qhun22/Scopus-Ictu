@@ -14,8 +14,18 @@ database name are never printed.
 
 On success writes the archive and a metadata JSON (Alembic revision, snapshot
 id, archive SHA-256, nine row counts, fingerprint v1).  On any failure the
-transaction is rolled back, the partial archive is deleted, and no metadata
-is written.
+transaction is rolled back, all owned partial/staging files are deleted, and
+no metadata is written.
+
+**R4**: archive and metadata output paths are rejected if they resolve to the
+same filesystem object (checked via ``Path.resolve`` and ``os.stat`` inode
+comparison for symlinks).  This check runs before any session is opened.
+
+**R5**: metadata is written atomically via a staging tempfile (flush+fsync)
+and promoted with ``os.link`` (exclusive no-clobber).  If metadata promotion
+fails after archive promotion, the archive is also removed.
+
+**R6**: archive promotion uses ``os.link`` (exclusive no-clobber).
 
 Exit codes: 0 success, 1 verification/environment/database/dump error,
 2 usage/file/import error.
@@ -49,6 +59,12 @@ def run(args: argparse.Namespace) -> int:
 
     archive = Path(args.archive_out)
     metadata_out = Path(args.metadata_out)
+
+    # R4: reject same-path before opening any session.
+    if sd._same_path(archive, metadata_out):
+        _emit_error("archive-out and metadata-out must not refer to the same path.")
+        return 1
+
     for path in (archive, metadata_out, sd.partial_path_for(archive)):
         if path.exists():
             _emit_error(f"Refusing to overwrite existing file: {path.name}")
@@ -76,6 +92,7 @@ def run(args: argparse.Namespace) -> int:
         database=settings.db_name,
     )
     engine = create_engine(settings.database_url)
+    result = None
     try:
         with Session(engine) as session:
             result = sd.dump_source_snapshot(
@@ -94,16 +111,44 @@ def run(args: argparse.Namespace) -> int:
     finally:
         engine.dispose()
 
-    payload = result.metadata(archive.name)
-    text_out = json.dumps(payload, ensure_ascii=False, indent=2)
-    try:
-        metadata_out.write_text(text_out + "\n", encoding="utf-8")
-    except OSError:
-        # An archive without its metadata is not a published copy.
-        archive.unlink(missing_ok=True)
-        _emit_error("Could not write metadata; archive removed.")
+    if result is None:
+        _emit_error("Source dump did not complete.")
         return 1
-    print(text_out)
+
+    # R5: write metadata via staging tempfile, promote with os.link (no-clobber).
+    import os
+
+    payload = result.metadata(archive.name)
+    content = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+    # Verify archive is still present before publishing metadata.
+    if not archive.is_file():
+        _emit_error("Archive disappeared before metadata could be written.")
+        return 1
+
+    meta_staging = None
+    try:
+        meta_staging = sd.write_metadata_atomic(content, metadata_out)
+        sd.exclusive_promote(meta_staging, metadata_out)
+        meta_staging = None  # successfully promoted; no longer needs cleanup
+    except sd.SourceDumpError as exc:
+        _emit_error(f"Metadata publication failed: {exc}")
+        # Archive was promoted; remove it since metadata was not published.
+        cleanup = sd.cleanup_owned_artifacts([archive])
+        if cleanup.incomplete:
+            _emit_error(f"Archive cleanup also incomplete — {cleanup.summary()}.")
+        return 1
+    except OSError:
+        _emit_error("Metadata write failed.")
+        cleanup = sd.cleanup_owned_artifacts([archive])
+        if cleanup.incomplete:
+            _emit_error(f"Archive cleanup also incomplete — {cleanup.summary()}.")
+        return 1
+    finally:
+        if meta_staging is not None:
+            sd.cleanup_owned_artifacts([meta_staging])
+
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 

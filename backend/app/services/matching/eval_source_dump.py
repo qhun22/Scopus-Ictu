@@ -25,6 +25,22 @@ ACCESS SHARE locks block DDL only; acceptance writes continue).
 Credentials reach ``pg_dump`` only through the child process environment
 (``PGUSER``/``PGPASSWORD``/...), never through argv.  Subprocess output is
 never surfaced, so hosts and passwords cannot leak through error messages.
+
+**Artifact publication (R5/R6):**
+
+Archive and metadata are promoted exclusively with ``os.link`` (hard link),
+which raises ``FileExistsError`` on collision.  This guarantees that a file
+written by a concurrent process is never silently overwritten.  ``os.link``
+requires that source and destination reside on the same filesystem; the
+staging files are therefore written to the same parent directory as their
+respective destinations.  The partial archive is created with ``pg_dump``
+itself; the metadata staging file is created with ``tempfile.NamedTemporaryFile``
+so the OS assigns a unique name and the permissions are as restrictive as the
+process umask allows.
+
+Limitations: cleanup is best-effort on SIGKILL or sudden power loss.  A
+leftover staging or partial file after an interrupted run triggers an explicit
+error on the next run; the caller must remove them manually.
 """
 
 from __future__ import annotations
@@ -33,6 +49,7 @@ import hashlib
 import os
 import re
 import subprocess
+import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -256,6 +273,124 @@ def sha256_file(path: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Artifact cleanup helpers (R6)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CleanupResult:
+    """Records which owned artifacts were removed and which failed."""
+
+    removed: list[str]
+    failed: list[str]
+
+    @property
+    def incomplete(self) -> bool:
+        return bool(self.failed)
+
+    def summary(self) -> str:
+        parts = []
+        if self.removed:
+            parts.append(f"removed: {', '.join(self.removed)}")
+        if self.failed:
+            parts.append(f"cleanup incomplete — manual removal required: {', '.join(self.failed)}")
+        return "; ".join(parts) if parts else "nothing to clean"
+
+
+def cleanup_owned_artifacts(paths: Sequence[Path]) -> CleanupResult:
+    """Remove each path if it exists.  Each OSError is recorded, not swallowed.
+
+    Only paths tracked as owned by the current run are passed here; this
+    helper never removes a file it was not given.
+    """
+    removed: list[str] = []
+    failed: list[str] = []
+    for path in paths:
+        try:
+            path.unlink(missing_ok=True)
+            removed.append(path.name)
+        except OSError:
+            failed.append(path.name)
+    return CleanupResult(removed, failed)
+
+
+# ---------------------------------------------------------------------------
+# Exclusive no-clobber promotion helpers (R5/R6)
+# ---------------------------------------------------------------------------
+
+
+def _same_path(a: Path, b: Path) -> bool:
+    """True if ``a`` and ``b`` refer to the same filesystem object.
+
+    Uses ``Path.resolve(strict=False)`` for string comparison first, then
+    ``os.stat``-based inode comparison when both files exist (catches symlinks
+    pointing to the same inode, including on Windows).
+    """
+    if a.resolve() == b.resolve():
+        return True
+    try:
+        sa, sb = os.stat(a), os.stat(b)
+        return (sa.st_ino, sa.st_dev) == (sb.st_ino, sb.st_dev) and sa.st_ino != 0
+    except OSError:
+        return False
+
+
+def exclusive_promote(staging: Path, destination: Path) -> None:
+    """Atomically promote ``staging`` to ``destination`` with no-clobber guarantee.
+
+    Uses ``os.link`` which raises ``FileExistsError`` on Linux and Windows if
+    ``destination`` already exists.  Staging is unlinked only after the link
+    succeeds, so a failed promotion leaves staging intact for cleanup.
+
+    Requirements: staging and destination must be on the same filesystem.
+    On failure (including ``FileExistsError``), staging is not removed; the
+    caller is responsible for cleanup.
+    """
+    try:
+        os.link(staging, destination)
+    except FileExistsError:
+        raise SourceDumpError(
+            f"Exclusive promotion failed: destination appeared after preflight check."
+        ) from None
+    except OSError as exc:
+        raise SourceDumpError(
+            f"Exclusive promotion of archive failed ({exc.errno})."
+        ) from None
+    try:
+        staging.unlink()
+    except OSError:
+        # The hard link succeeded: destination is intact.  Staging is an
+        # orphaned duplicate; report but do not fail the publication.
+        pass
+
+
+def write_metadata_atomic(content: bytes, destination: Path) -> Path:
+    """Write ``content`` to a staging file in the same directory as ``destination``.
+
+    Flushes and fsyncs the staging file before returning.  The staging path is
+    returned; the caller calls ``exclusive_promote(staging, destination)`` and
+    cleans up staging on any error.
+
+    The staging file is created with ``tempfile.NamedTemporaryFile`` so the OS
+    provides a unique name and restrictive permissions (subject to process umask).
+    """
+    staging_fh = tempfile.NamedTemporaryFile(
+        mode="wb",
+        dir=destination.parent,
+        delete=False,
+        suffix=".meta_staging",
+    )
+    staging = Path(staging_fh.name)
+    try:
+        staging_fh.write(content)
+        staging_fh.flush()
+        os.fsync(staging_fh.fileno())
+    finally:
+        staging_fh.close()
+    return staging
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -288,13 +423,6 @@ def partial_path_for(archive_path: Path) -> Path:
     return archive_path.with_name(archive_path.name + ".partial")
 
 
-def _remove_quietly(path: Path) -> None:
-    try:
-        path.unlink(missing_ok=True)
-    except OSError:
-        pass
-
-
 def dump_source_snapshot(
     session: Any,
     *,
@@ -308,10 +436,25 @@ def dump_source_snapshot(
 ) -> SourceDumpResult:
     """Fingerprint + snapshot export + pg_dump inside ONE open transaction.
 
-    ``session`` must be fresh (no statement executed yet).  The archive is
-    written to ``<archive>.partial`` and renamed to ``archive_path`` only
-    after pg_dump, the ToC check and the SHA-256 all succeeded and the
-    transaction was closed.  Any failure rolls back and deletes the partial.
+    Publication lifecycle (R5/R6):
+      1. ``pg_dump`` writes to ``<archive>.partial`` (owned: partial).
+      2. Transaction closes.
+      3. ``os.link(partial, archive_path)`` — exclusive no-clobber promotion.
+         On success, partial is an orphaned duplicate and is unlinked.
+      4. ``write_metadata_atomic`` writes metadata to a staging tempfile
+         (owned: meta_staging).
+      5. ``os.link(meta_staging, metadata_out)`` — exclusive no-clobber.
+         Caller passes ``metadata_out``; this function only handles the archive.
+         Metadata publication is handled in the CLI (``run()``), which calls
+         this function and then promotes metadata itself.
+
+    This function returns after archive exclusive-promotion.  The caller is
+    responsible for writing and promoting metadata, and for cleaning up the
+    archive if metadata publication fails.
+
+    On any failure all artifacts owned by this run are cleaned up.  If cleanup
+    itself raises ``OSError``, a ``SourceDumpError`` with "cleanup incomplete"
+    is raised so the caller knows manual intervention is needed.
     """
     from sqlalchemy import text
 
@@ -323,6 +466,10 @@ def dump_source_snapshot(
     fingerprint_fn = compute_fingerprint if compute_fingerprint is not None else ve.compute_input_fingerprint
     inherited = os.environ if base_env is None else base_env
 
+    # Owned artifacts for this run: only what we created.
+    owned: list[Path] = []
+
+    primary_error: BaseException | None = None
     try:
         try:
             session.execute(text(ve.READ_ONLY_SNAPSHOT_SQL))
@@ -333,6 +480,9 @@ def dump_source_snapshot(
         fingerprint = fingerprint_fn(session)
         snapshot_id = export_snapshot(session)
 
+        # Track the partial before pg_dump runs so any file it writes is cleaned
+        # up even if pg_dump exits non-zero or raises.
+        owned.append(partial)
         # The exporting transaction is still open here; pg_dump attaches to it.
         _run(
             runner,
@@ -343,6 +493,7 @@ def dump_source_snapshot(
         )
         if not partial.is_file():
             raise SourceDumpError("pg_dump reported success but wrote no archive.")
+
         listing = _run(
             runner,
             [pg_restore, "--list", str(partial)],
@@ -352,22 +503,42 @@ def dump_source_snapshot(
         )
         toc = check_archive_toc(listing)
         archive_sha256 = sha256_file(partial)
-    except BaseException:
+    except BaseException as exc:
+        primary_error = exc
         _safe_rollback(session)
-        _remove_quietly(partial)
+        result = cleanup_owned_artifacts(owned)
+        if result.incomplete:
+            raise SourceDumpError(
+                f"Source dump failed and cleanup incomplete — {result.summary()}."
+            ) from exc
         raise
 
     # Read-only transaction: nothing to commit.  Ending it releases the snapshot.
     try:
         session.rollback()
-    except Exception:
-        _remove_quietly(partial)
-        raise SourceDumpError("Could not close the source snapshot transaction cleanly.") from None
+    except Exception as exc:
+        result = cleanup_owned_artifacts(owned)
+        msg = "Could not close the source snapshot transaction cleanly."
+        if result.incomplete:
+            msg += f" Additionally, cleanup incomplete — {result.summary()}."
+        raise SourceDumpError(msg) from None
+
+    # R6: exclusive no-clobber promotion of the archive (os.link, same filesystem).
     try:
-        os.replace(partial, archive_path)
-    except OSError:
-        _remove_quietly(partial)
-        raise SourceDumpError("Could not move the verified archive into place.") from None
+        exclusive_promote(partial, archive_path)
+    except SourceDumpError:
+        # partial is still owned; clean it up.
+        result = cleanup_owned_artifacts(owned)
+        if result.incomplete:
+            raise SourceDumpError(
+                "Archive promotion failed and cleanup incomplete — "
+                f"{result.summary()}."
+            ) from None
+        raise
+
+    # partial was either promoted (hard link) and unlinked, or orphaned.
+    # Either way it is no longer an output artifact to protect; drop from owned.
+    owned.clear()
     return SourceDumpResult(fingerprint, revision, snapshot_id, archive_sha256, toc)
 
 
@@ -379,6 +550,7 @@ def _safe_rollback(session: Any) -> None:
 
 
 __all__ = [
+    "CleanupResult",
     "ConnectionParams",
     "DUMP_SCHEMA",
     "DUMP_TABLES",
@@ -391,11 +563,14 @@ __all__ = [
     "build_pg_dump_argv",
     "check_archive_toc",
     "child_environment",
+    "cleanup_owned_artifacts",
     "dump_source_snapshot",
+    "exclusive_promote",
     "is_parent_before_child",
     "is_source_database",
     "parse_toc_entries",
     "partial_path_for",
     "verify_alembic_revision",
     "verify_connected_source",
+    "write_metadata_atomic",
 ]
