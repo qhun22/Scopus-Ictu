@@ -2,6 +2,11 @@
 
 Mocks only: fake session, fake subprocess runner.  pg_dump / pg_restore are
 never executed and no database is contacted.
+
+R4/R5/R6 tests verify actual side-effects on temporary files:
+- R4: same-path rejection before any session is opened.
+- R5: metadata atomic no-clobber promotion (os.link staging).
+- R6: archive exclusive promotion (os.link partial -> archive).
 """
 
 from __future__ import annotations
@@ -513,10 +518,13 @@ class TestSeparation:
         assert not (_names_in(_SCRIPT) & _EVALUATE_PATH)
 
     def test_no_write_apis_in_source_dump(self):
+        # "flush" is permitted in write_metadata_atomic (file I/O flush+fsync).
+        # "delete" is permitted in NamedTemporaryFile(delete=False).
+        _db_write_attrs = {"commit", "add", "add_all", "add_all", "merge"}
         for path in (Path(inspect.getsourcefile(sd)), _SCRIPT):
             for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.Attribute):
-                    assert node.attr not in {"commit", "add", "add_all", "flush", "delete", "merge"}
+                    assert node.attr not in _db_write_attrs
                 if isinstance(node, ast.Constant) and isinstance(node.value, str):
                     upper = node.value.upper()
                     assert not upper.lstrip().startswith(("INSERT", "UPDATE", "DELETE", "ALTER", "DROP",
@@ -640,3 +648,335 @@ class TestCli:
         assert state.disposed is True and list(tmp_path.iterdir()) == []
         out = capsys.readouterr()
         assert _PASSWORD not in out.out + out.err and _HOST not in out.out + out.err
+
+
+# ===========================================================================
+# R4 — Same-path rejection (archive vs metadata)
+# ===========================================================================
+
+
+class TestR4SamePath:
+    """All rejections must happen before any DB session is opened."""
+
+    def _load_cli(self):
+        spec = importlib.util.spec_from_file_location("dump_c3_eval_source_r4", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _setup_no_db(self, monkeypatch):
+        import sqlalchemy
+        state = SimpleNamespace(engine_created=False)
+
+        def _boom(*_a, **_k):
+            state.engine_created = True
+            raise AssertionError("Engine must not be created for same-path rejection")
+
+        monkeypatch.setattr(sqlalchemy, "create_engine", _boom)
+        from app.core.config import settings
+        monkeypatch.setattr(settings, "environment", "local")
+        monkeypatch.setattr(settings, "db_name", sd.SOURCE_DATABASE_NAME)
+        monkeypatch.setattr(settings, "db_password", "x")
+        monkeypatch.setattr(settings, "db_host", "h")
+        return state
+
+    def test_same_literal_path_rejected(self, monkeypatch, capsys, tmp_path):
+        cli = self._load_cli()
+        state = self._setup_no_db(monkeypatch)
+        path = str(tmp_path / "out.dump")
+        assert cli.main(["--archive-out", path, "--metadata-out", path]) == 1
+        assert not state.engine_created
+        err = capsys.readouterr().err
+        assert _PASSWORD not in err and _HOST not in err
+        assert not any(tmp_path.iterdir())
+
+    def test_same_path_via_resolve_rejected(self, monkeypatch, capsys, tmp_path):
+        cli = self._load_cli()
+        self._setup_no_db(monkeypatch)
+        # Two lexically different strings resolving to the same path.
+        a = str(tmp_path / "sub" / ".." / "out.dump")
+        b = str(tmp_path / "out.dump")
+        assert cli.main(["--archive-out", a, "--metadata-out", b]) == 1
+
+    def test_same_path_via_symlink_rejected(self, monkeypatch, capsys, tmp_path):
+        cli = self._load_cli()
+        self._setup_no_db(monkeypatch)
+        real = tmp_path / "out.dump"
+        link = tmp_path / "link.dump"
+        real.write_bytes(b"x")
+        try:
+            link.symlink_to(real)
+        except (OSError, NotImplementedError):
+            pytest.skip("Symlink creation not supported in this environment")
+        assert cli.main(["--archive-out", str(real), "--metadata-out", str(link)]) == 1
+
+    def test_same_path_helper_unit(self, tmp_path):
+        a = tmp_path / "x.dump"
+        b = tmp_path / "x.dump"
+        assert sd._same_path(a, b) is True
+        assert sd._same_path(a, tmp_path / "y.dump") is False
+
+    def test_same_path_resolve_alias(self, tmp_path):
+        # sub/../x.dump resolves to x.dump
+        a = tmp_path / "sub" / ".." / "x.dump"
+        b = tmp_path / "x.dump"
+        assert sd._same_path(a, b) is True
+
+    def test_same_path_inode_existing_files(self, tmp_path):
+        a = tmp_path / "x.dump"
+        b = tmp_path / "y.dump"
+        a.write_bytes(b"data")
+        import os
+        os.link(a, b)  # hard link: same inode
+        assert sd._same_path(a, b) is True
+
+
+# ===========================================================================
+# R6 — Exclusive archive promotion (os.link no-clobber)
+# ===========================================================================
+
+
+class TestR6ArchivePromotion:
+    def test_exclusive_promote_succeeds(self, tmp_path):
+        staging = tmp_path / "staging"
+        staging.write_bytes(b"archive-data")
+        dest = tmp_path / "archive.dump"
+        sd.exclusive_promote(staging, dest)
+        assert dest.read_bytes() == b"archive-data"
+        assert not staging.exists()
+
+    def test_exclusive_promote_collision_raises(self, tmp_path):
+        staging = tmp_path / "staging"
+        staging.write_bytes(b"new")
+        dest = tmp_path / "archive.dump"
+        dest.write_bytes(b"existing")
+        with pytest.raises(sd.SourceDumpError, match="promotion"):
+            sd.exclusive_promote(staging, dest)
+        # Destination is untouched; staging is preserved for cleanup.
+        assert dest.read_bytes() == b"existing"
+        assert staging.exists()
+
+    def test_archive_promotion_collision_via_exclusive_promote(self, tmp_path):
+        """exclusive_promote raises when destination exists; pre-existing content survives."""
+        staging = tmp_path / "source.dump.partial"
+        staging.write_bytes(b"new-archive-data")
+        dest = tmp_path / "source.dump"
+        dest.write_bytes(b"concurrent-write")
+        with pytest.raises(sd.SourceDumpError, match="promotion"):
+            sd.exclusive_promote(staging, dest)
+        assert dest.read_bytes() == b"concurrent-write"
+        assert staging.exists()
+
+    def test_cleanup_oserror_tracked_not_swallowed(self, tmp_path, monkeypatch):
+        """If cleanup itself raises OSError, result reports it (incomplete=True)."""
+        f = tmp_path / "leftover.dump"
+        f.write_bytes(b"x")
+        orig = Path.unlink
+
+        def _fail(self, missing_ok=False):
+            raise OSError("simulated unlink failure")
+
+        monkeypatch.setattr(Path, "unlink", _fail)
+        result = sd.cleanup_owned_artifacts([f])
+        assert result.incomplete
+        assert "incomplete" in result.summary()
+        assert _PASSWORD not in result.summary() and _HOST not in result.summary()
+
+
+# ===========================================================================
+# R5 — Metadata atomic no-clobber promotion
+# ===========================================================================
+
+
+class TestR5MetadataPromotion:
+    def _run_cli_with_real_orchestrator(self, monkeypatch, tmp_path, *, runner_kwargs=None,
+                                        session=None):
+        """CLI with mocked DB but real orchestrator + real file ops."""
+        import sqlalchemy
+        import sqlalchemy.orm
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "environment", "local")
+        monkeypatch.setattr(settings, "db_name", sd.SOURCE_DATABASE_NAME)
+        monkeypatch.setattr(settings, "db_password", _PASSWORD)
+        monkeypatch.setattr(settings, "db_host", _HOST)
+
+        sess = session or _Session()
+
+        class _Engine:
+            def dispose(self): pass
+
+        class _SessionCtx:
+            def __init__(self, *_a, **_k): pass
+            def __enter__(self): return sess
+            def __exit__(self, *_a): return False
+
+        monkeypatch.setattr(sqlalchemy, "create_engine", lambda *_a, **_k: _Engine())
+        monkeypatch.setattr(sqlalchemy.orm, "Session", _SessionCtx)
+
+        runner = _Runner(sess, **(runner_kwargs or {}))
+        real = sd.dump_source_snapshot
+
+        def _with_fp(s, **kwargs):
+            return real(s, runner=runner, compute_fingerprint=lambda _s: _fingerprint(), **kwargs)
+
+        monkeypatch.setattr(sd, "dump_source_snapshot", _with_fp)
+        return sess, runner
+
+    def test_metadata_written_atomically_and_archive_present(self, monkeypatch, tmp_path):
+        """Success path: both archive and metadata are present; no staging leftover."""
+        spec = importlib.util.spec_from_file_location("dump_cli_r5_ok", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        self._run_cli_with_real_orchestrator(monkeypatch, tmp_path)
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+
+        assert module.main(["--archive-out", str(archive), "--metadata-out", str(meta)]) == 0
+        assert archive.is_file()
+        assert meta.is_file()
+        payload = json.loads(meta.read_text(encoding="utf-8"))
+        assert payload["alembic_revision"] == "d3f7a1c9e2b4"
+        # No staging files left over.
+        assert not any(p.suffix == ".meta_staging" for p in tmp_path.iterdir())
+
+    def test_metadata_destination_collision_removes_archive(self, monkeypatch, capsys, tmp_path):
+        """If metadata destination appears after preflight, archive is removed."""
+        spec = importlib.util.spec_from_file_location("dump_cli_r5_col", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+
+        self._run_cli_with_real_orchestrator(monkeypatch, tmp_path)
+
+        # Intercept exclusive_promote to simulate a race on the metadata dest.
+        real_promote = sd.exclusive_promote
+        call_count = [0]
+
+        def _racing_promote(staging, destination):
+            call_count[0] += 1
+            if destination == meta:
+                # Concurrent write to metadata destination.
+                meta.write_bytes(b"concurrent-meta")
+            return real_promote(staging, destination)
+
+        monkeypatch.setattr(sd, "exclusive_promote", _racing_promote)
+
+        assert module.main(["--archive-out", str(archive), "--metadata-out", str(meta)]) == 1
+        # Archive must be removed because metadata failed.
+        assert not archive.exists()
+        # The concurrent metadata file must not be overwritten.
+        assert meta.read_bytes() == b"concurrent-meta"
+        out = capsys.readouterr()
+        assert _PASSWORD not in out.out + out.err
+
+    def test_metadata_write_failure_removes_archive(self, monkeypatch, capsys, tmp_path):
+        """If metadata staging write raises OSError, archive is removed."""
+        spec = importlib.util.spec_from_file_location("dump_cli_r5_wr", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+
+        self._run_cli_with_real_orchestrator(monkeypatch, tmp_path)
+
+        def _boom_write(content, destination):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(sd, "write_metadata_atomic", _boom_write)
+        assert module.main(["--archive-out", str(archive), "--metadata-out", str(meta)]) == 1
+        assert not archive.exists()
+        assert not meta.exists()
+
+    def test_existing_metadata_not_overwritten(self, monkeypatch, capsys, tmp_path):
+        """Pre-existing metadata file is never touched."""
+        spec = importlib.util.spec_from_file_location("dump_cli_r5_ex", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+        meta.write_text("existing", encoding="utf-8")
+
+        self._run_cli_with_real_orchestrator(monkeypatch, tmp_path)
+        assert module.main(["--archive-out", str(archive), "--metadata-out", str(meta)]) == 1
+        assert meta.read_text(encoding="utf-8") == "existing"
+        assert not archive.exists()
+
+    def test_no_staging_leftover_on_metadata_failure(self, monkeypatch, tmp_path):
+        """After metadata promotion failure, no .meta_staging file remains."""
+        spec = importlib.util.spec_from_file_location("dump_cli_r5_stg", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+        meta.write_bytes(b"block")  # pre-existing to trigger promotion failure
+
+        self._run_cli_with_real_orchestrator(monkeypatch, tmp_path)
+        assert module.main(["--archive-out", str(archive), "--metadata-out", str(meta)]) == 1
+        assert not any(p.suffix == ".meta_staging" for p in tmp_path.iterdir())
+
+    def test_write_metadata_atomic_produces_correct_content(self, tmp_path):
+        content = b'{"key": "value"}\n'
+        dest = tmp_path / "meta.json"
+        staging = sd.write_metadata_atomic(content, dest)
+        assert staging.is_file()
+        assert staging.read_bytes() == content
+        assert staging != dest
+        assert staging.parent == dest.parent
+        staging.unlink()
+
+    def test_exclusive_promote_metadata_no_clobber(self, tmp_path):
+        staging = tmp_path / "meta.staging"
+        staging.write_bytes(b"new-meta")
+        dest = tmp_path / "meta.json"
+        dest.write_bytes(b"old-meta")
+        with pytest.raises(sd.SourceDumpError, match="promotion"):
+            sd.exclusive_promote(staging, dest)
+        assert dest.read_bytes() == b"old-meta"
+        assert staging.exists()
+
+
+# ===========================================================================
+# R4/R5/R6 — CleanupResult helper
+# ===========================================================================
+
+
+class TestCleanupResult:
+    def test_all_removed(self, tmp_path):
+        f1, f2 = tmp_path / "a", tmp_path / "b"
+        f1.write_bytes(b"x")
+        f2.write_bytes(b"y")
+        r = sd.cleanup_owned_artifacts([f1, f2])
+        assert not r.incomplete
+        assert not f1.exists() and not f2.exists()
+
+    def test_missing_file_not_an_error(self, tmp_path):
+        r = sd.cleanup_owned_artifacts([tmp_path / "nonexistent"])
+        assert not r.incomplete
+
+    def test_oserror_recorded_not_swallowed(self, tmp_path, monkeypatch):
+        f = tmp_path / "locked"
+        f.write_bytes(b"x")
+        orig = Path.unlink
+
+        def _fail(self, missing_ok=False):
+            raise OSError("permission denied")
+
+        monkeypatch.setattr(Path, "unlink", _fail)
+        r = sd.cleanup_owned_artifacts([f])
+        assert r.incomplete
+        assert "incomplete" in r.summary()
+        assert "locked" in r.summary()
+
+    def test_summary_contains_no_sensitive_data(self, tmp_path):
+        f = tmp_path / "archive.dump"
+        f.write_bytes(b"x")
+        r = sd.cleanup_owned_artifacts([f])
+        summary = r.summary()
+        assert _PASSWORD not in summary and _HOST not in summary
