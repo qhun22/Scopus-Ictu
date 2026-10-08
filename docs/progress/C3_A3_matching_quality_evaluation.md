@@ -102,7 +102,8 @@ notes, reviewer data, internal UUIDs, or database information.
 
 Local, Phase 1:
 
-- `test_matching_quality_evaluation.py`: 79 passed
+- `test_matching_quality_evaluation.py`: 79 passed at the initial Phase-1
+  commit; 92 passed after the frozen-dataset correction
 - Further regression results are recorded in the final task report.
 
 ## 8. CI Evidence
@@ -124,6 +125,35 @@ No results are reported.
 - Production matching changed: false
 - Migration: false
 - Frontend: false
+
+## Phase-1 Audit Correction — Frozen Dataset Snapshot
+
+- Initial Phase-1 tooling SHA: `387aea002115d45a671f153f9623c9bf11b86d76`
+  (historical exact-head CI run 37715869332; historical evidence only).
+- Independent review classification:
+  - line-ending dual representation: NON_BLOCKING
+  - current worktree cohort binding: NON_BLOCKING
+  - official dataset Phase-1 snapshot binding: SHOULD_FIX_BEFORE_HUMAN_REVIEW
+- Reason: a later dataset revision could keep the same 50 source IDs while
+  changing names or emails. An A2 package built from it would be internally
+  consistent but would not represent the snapshot the cohort was fixed on.
+- Final correction contract:
+  - Only the exact Phase-1 dataset hashes are accepted, in two byte forms:
+    LF `9428e0a2b009ecff1043b4dc796ed69a0fc64054594b0fb40ffa27bbed4ec82e` and
+    CRLF `ac4ed2d3f3c5fc7e73912ac9386b5710f4e015bbd7028e5b48a656dae3d4c3d4`.
+    Any third hash fails closed, in both `prepare-cohort` and `evaluate`.
+  - The A2 manifest still binds the exact bytes actually used for review. An
+    LF/CRLF mismatch between the dataset and the manifest is rejected.
+  - Sampling algorithm, seed, size, and the committed cohort file are
+    unchanged. Matching production code is unchanged.
+  - No `.gitattributes`, no line-ending normalization, no Git config change.
+- Status at this correction: human review has NOT started, the A2 review
+  package has NOT been generated, and the official evaluation has NOT run.
+
+Final corrected Phase-1 SHA: see Git commit containing this record and final
+Phase-1 audit report.
+
+New corrected CI: NOT_AVAILABLE_AT_COMMIT_TIME.
 
 ## 11. Limitations
 
