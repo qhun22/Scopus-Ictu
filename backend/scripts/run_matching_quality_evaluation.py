@@ -6,10 +6,16 @@ Subcommands:
                   seed C3-A3-ICTU-PRIMARY-2026-V1, size 50).  Uses only the
                   official lecturer dataset; no database, no candidate data.
 
+  compute-fingerprint
+                  Compute the evaluation-input fingerprint of the approved
+                  evaluation database (scopus_c3_eval_v1) in one
+                  REPEATABLE READ READ ONLY snapshot.  Needs no pinned value.
+
   evaluate        Verify the frozen A2 review package, the human-confirmed
-                  reference copy, dataset/cohort/rule/code provenance, then
-                  run the frozen A1 evaluator READ-ONLY against the approved
-                  runtime/test database only, and write a safe result JSON.
+                  reference copy, dataset/cohort/rule/code provenance, the
+                  pinned input fingerprint (refused while UNPINNED), then run
+                  the frozen A1 evaluator READ-ONLY against the approved
+                  evaluation database only, and write a safe result JSON.
 
 Exit codes: 0 success, 1 verification/environment/database error,
 2 usage/file/import error.  Raw database errors, the database URL and the
@@ -42,6 +48,10 @@ def _build_parser() -> argparse.ArgumentParser:
     prep.add_argument("--lecturer-dataset", required=True)
     prep.add_argument("--out", required=True)
     prep.add_argument("--overwrite", action="store_true")
+
+    fp = sub.add_parser("compute-fingerprint", help="Compute the evaluation-input fingerprint.")
+    fp.add_argument("--json-out", default=None)
+    fp.add_argument("--overwrite", action="store_true")
 
     ev = sub.add_parser("evaluate", help="Run the verified official evaluation.")
     ev.add_argument("--review-dir", required=True)
@@ -86,6 +96,61 @@ def _prepare_cohort(args: argparse.Namespace) -> int:
     return 0
 
 
+def _approved_engine(settings, ve):
+    """Configuration-level gates; returns an engine or None after emitting an error."""
+    if settings.environment.lower() == "prod":
+        _emit_error("Refused: environment=prod.")
+        return None
+    if not ve.is_approved_database(settings.database_url):
+        _emit_error("Configured database is not the approved C3 evaluation database.")
+        return None
+    from sqlalchemy import create_engine
+
+    return create_engine(settings.database_url)
+
+
+def _compute_fingerprint(args: argparse.Namespace) -> int:
+    from app.core.config import settings
+    from app.services.matching import verified_evaluation as ve
+
+    json_out = Path(args.json_out) if args.json_out else None
+    if json_out is not None and json_out.exists() and not args.overwrite:
+        _emit_error(f"Refusing to overwrite existing file: {json_out.name}")
+        return 1
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+    from sqlalchemy.orm import Session
+
+    engine = _approved_engine(settings, ve)
+    if engine is None:
+        return 1
+    try:
+        with Session(engine) as session:
+            try:
+                session.execute(text(ve.READ_ONLY_SNAPSHOT_SQL))
+            except Exception:
+                _emit_error("Could not establish a read-only snapshot transaction. Refusing to continue.")
+                return 1
+            ve.verify_connected_database(session)
+            fingerprint = ve.compute_input_fingerprint(session)
+    except ve.VerificationError as exc:
+        _emit_error(f"Verification failed: {exc}")
+        return 1
+    except SQLAlchemyError:
+        _emit_error("Database fingerprint computation failed safely.")
+        return 1
+    finally:
+        engine.dispose()
+
+    payload = {"database_identity_verified": True, **fingerprint.as_dict()}
+    text_out = json.dumps(payload, ensure_ascii=False, indent=2)
+    if json_out is not None:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(text_out + "\n", encoding="utf-8")
+    print(text_out)
+    return 0
+
+
 def _evaluate(args: argparse.Namespace) -> int:
     from app.core.config import settings
     from app.services.matching import verified_evaluation as ve
@@ -105,16 +170,22 @@ def _evaluate(args: argparse.Namespace) -> int:
         _emit_error(f"Refusing to overwrite existing result: {json_out.name}")
         return 1
 
-    # --- every provenance gate runs before any database connection ----------
+    # Each file is read exactly once; the same bytes feed every gate below.
+    candidate_review_bytes = paths["candidate_review.csv"].read_bytes()
+    labeling_sheet_bytes = paths["reference_labeling_sheet.csv"].read_bytes()
+    dataset_bytes = dataset_path.read_bytes()
+    source_id_file_bytes = source_path.read_bytes()
+
+    # --- every offline provenance gate runs before any database connection ---
     try:
         verified = ve.verify_offline_inputs(
-            candidate_review_bytes=paths["candidate_review.csv"].read_bytes(),
-            labeling_sheet_bytes=paths["reference_labeling_sheet.csv"].read_bytes(),
+            candidate_review_bytes=candidate_review_bytes,
+            labeling_sheet_bytes=labeling_sheet_bytes,
             manifest_bytes=paths["review_manifest.json"].read_bytes(),
             confirmed_bytes=confirmed_path.read_bytes(),
-            dataset_bytes=dataset_path.read_bytes(),
+            dataset_bytes=dataset_bytes,
             dataset_path=dataset_path,
-            source_id_file_bytes=source_path.read_bytes(),
+            source_id_file_bytes=source_id_file_bytes,
             committed_cohort_bytes=COMMITTED_COHORT_PATH.read_bytes(),
             repo_root=REPO_ROOT,
         )
@@ -122,32 +193,40 @@ def _evaluate(args: argparse.Namespace) -> int:
         _emit_error(f"Verification failed: {exc}")
         return 1
 
-    # --- database gate --------------------------------------------------------
-    if settings.environment.lower() == "prod":
-        _emit_error("Evaluation refused: environment=prod.")
-        return 1
-    if not ve.is_approved_database(settings.database_url):
-        _emit_error("Configured database is not the approved C3 runtime/test database.")
-        return 1
-
+    # --- pinned input fingerprint (refused while UNPINNED, before any DB) ----
     try:
-        from sqlalchemy import create_engine, text
-        from sqlalchemy.exc import SQLAlchemyError
-        from sqlalchemy.orm import Session
-    except ImportError as exc:
-        _emit_error(f"SQLAlchemy import failed: {exc}")
-        return 2
+        ve.require_pinned_fingerprint()
+    except ve.VerificationError as exc:
+        _emit_error(f"Verification failed: {exc}")
+        return 1
 
-    engine = create_engine(settings.database_url)
+    # --- database gates -------------------------------------------------------
+    from sqlalchemy import text
+    from sqlalchemy.exc import SQLAlchemyError
+    from sqlalchemy.orm import Session
+
+    engine = _approved_engine(settings, ve)
+    if engine is None:
+        return 1
     try:
         with Session(engine) as session:
             try:
-                session.execute(text("SET TRANSACTION READ ONLY"))
+                session.execute(text(ve.READ_ONLY_SNAPSHOT_SQL))
             except Exception:
-                _emit_error(
-                    "Could not establish a read-only database transaction. Refusing to continue."
-                )
+                _emit_error("Could not establish a read-only snapshot transaction. Refusing to continue.")
                 return 1
+            # One REPEATABLE READ snapshot for identity, fingerprint, re-render and evaluation.
+            ve.verify_connected_database(session)
+            fingerprint = ve.compute_input_fingerprint(session)
+            ve.verify_input_fingerprint(fingerprint)
+            rerender = ve.verify_package_rerender(
+                session,
+                manifest=verified.manifest,
+                candidate_review_bytes=candidate_review_bytes,
+                labeling_sheet_bytes=labeling_sheet_bytes,
+                dataset_bytes=dataset_bytes,
+                source_id_file_bytes=source_id_file_bytes,
+            )
             evaluation = ve.run_frozen_a1_evaluation(verified.records, session)
     except ve.VerificationError as exc:
         _emit_error(f"Verification failed: {exc}")
@@ -158,7 +237,7 @@ def _evaluate(args: argparse.Namespace) -> int:
     finally:
         engine.dispose()
 
-    result = ve.build_result(verified, evaluation, datetime.now(timezone.utc))
+    result = ve.build_result(verified, evaluation, datetime.now(timezone.utc), fingerprint, rerender)
     json_out.parent.mkdir(parents=True, exist_ok=True)
     json_out.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"written": json_out.name, "metrics": result["metrics"]}, ensure_ascii=False, indent=2))
@@ -170,6 +249,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "prepare-cohort":
             return _prepare_cohort(args)
+        if args.command == "compute-fingerprint":
+            return _compute_fingerprint(args)
         return _evaluate(args)
     except ImportError as exc:
         _emit_error(f"Import failed: {exc}. Run from repo root with backend/ on PYTHONPATH.")

@@ -21,11 +21,12 @@ import re
 import subprocess
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from app.services.matching import evaluation as a1
+from app.services.matching import review_package as rp
 from app.services.matching.candidate_persistence import (
     CANDIDATE_RULE_SET_ID,
     CANDIDATE_RULE_SET_VERSION,
@@ -70,8 +71,28 @@ PHASE1_ACCEPTED_DATASET_SHA256: tuple[str, ...] = (
     PHASE1_OFFICIAL_DATASET_SHA256_CRLF,
 )
 
-APPROVED_DATABASE_NAME = "scopus_m12_test"
+APPROVED_DATABASE_NAME = "scopus_c3_eval_v1"
+# Explicitly named for clarity; every name other than the approved one is refused.
+REJECTED_DATABASE_NAMES: tuple[str, ...] = ("scopus_m12_test", "scopus_ictu_acceptance_v2")
 RESULT_SCHEMA_VERSION = "1.0"
+
+# Evaluation-input fingerprint.  None == UNPINNED: official evaluation refused.
+FINGERPRINT_SCHEMA_VERSION = 1
+EXPECTED_INPUT_FINGERPRINT_SHA256: str | None = None
+
+# Columns actually read by CandidateGenerator, PublicationEvidenceEnricher and
+# lecturer resolution.  Names are listed sorted; every table's PK is "id".
+FINGERPRINT_CONTENT_COLUMNS: dict[str, tuple[str, ...]] = {
+    "lecturer_known_publications": ("doi_normalized", "id", "lecturer_id", "snapshot_id", "title_normalized"),
+    "lecturer_source_snapshots": ("id", "lecturer_id"),
+    "lecturers": ("full_name", "id", "repository_profile_url"),
+    "publication_authors": ("id", "publication_id", "scopus_author_id"),
+    "publications": ("doi", "eid", "id", "title", "title_normalized"),
+    "scopus_author_name_variants": ("id", "scopus_author_id", "variant_name", "variant_type"),
+    "scopus_authors": ("id", "preferred_name", "scopus_id"),
+}
+# Structural (primary-key set) only: raw payloads are never hashed.
+FINGERPRINT_KEY_TABLES: tuple[str, ...] = ("raw_scopus_records", "scopus_imports")
 
 LABEL_COLUMNS: tuple[str, ...] = (
     "decision",
@@ -470,12 +491,255 @@ def verify_offline_inputs(
 
 
 def is_approved_database(database_url: str) -> bool:
+    """Configuration-level check (settings URL).  Not sufficient on its own."""
     from sqlalchemy.engine import make_url
 
     try:
-        return make_url(database_url).database == APPROVED_DATABASE_NAME
+        name = make_url(database_url).database
     except Exception:
         return False
+    return name == APPROVED_DATABASE_NAME and name not in REJECTED_DATABASE_NAMES
+
+
+READ_ONLY_SNAPSHOT_SQL = "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+
+
+def verify_connected_database(session: Any) -> None:
+    """Connection-level check: the server's current_database() must match."""
+    from sqlalchemy import text
+
+    actual = session.execute(text("SELECT current_database()")).scalar_one()
+    if actual != APPROVED_DATABASE_NAME or actual in REJECTED_DATABASE_NAMES:
+        raise VerificationError("Connected database is not the approved C3 evaluation database.")
+
+
+# ---------------------------------------------------------------------------
+# Evaluation-input fingerprint (schema_version 1)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class TableFingerprint:
+    table: str
+    hash_kind: str  # "content" | "primary_key"
+    columns: tuple[str, ...]
+    row_count: int
+    sha256: str
+
+
+@dataclass(frozen=True)
+class InputFingerprint:
+    schema_version: int
+    sha256: str
+    tables: tuple[TableFingerprint, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "sha256": self.sha256,
+            "tables": [
+                {
+                    "table": t.table,
+                    "hash_kind": t.hash_kind,
+                    "columns": list(t.columns),
+                    "row_count": t.row_count,
+                    "sha256": t.sha256,
+                }
+                for t in self.tables
+            ],
+        }
+
+
+def canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def _canonical_scalar(value: Any) -> Any:
+    from uuid import UUID
+
+    if value is None or isinstance(value, str):
+        return value
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    raise VerificationError(f"Unsupported value type in fingerprint input: {type(value).__name__}")
+
+
+def _content_digest(table: str, columns: tuple[str, ...], rows: Iterable[Mapping[str, Any]]) -> TableFingerprint:
+    canonical_rows: list[dict[str, Any]] = []
+    for row in rows:
+        missing = set(columns) - set(row)
+        if missing:
+            raise VerificationError(f"Fingerprint input for {table} is missing columns {sorted(missing)}.")
+        canonical_rows.append({column: _canonical_scalar(row[column]) for column in columns})
+    canonical_rows.sort(key=lambda r: r["id"])
+    ids = [r["id"] for r in canonical_rows]
+    if len(ids) != len(set(ids)) or any(not isinstance(i, str) for i in ids):
+        raise VerificationError(f"Fingerprint input for {table} has duplicate or invalid primary keys.")
+    return TableFingerprint(
+        table, "content", columns, len(canonical_rows), sha256_hex(canonical_json_bytes(canonical_rows))
+    )
+
+
+def _key_digest(table: str, keys: Iterable[Any]) -> TableFingerprint:
+    canonical_keys = sorted(_canonical_scalar(k) for k in keys)
+    if len(canonical_keys) != len(set(canonical_keys)) or any(not isinstance(k, str) for k in canonical_keys):
+        raise VerificationError(f"Fingerprint input for {table} has duplicate or invalid primary keys.")
+    return TableFingerprint(
+        table, "primary_key", ("id",), len(canonical_keys), sha256_hex(canonical_json_bytes(canonical_keys))
+    )
+
+
+def fingerprint_from_rows(
+    content_rows: Mapping[str, Iterable[Mapping[str, Any]]],
+    key_rows: Mapping[str, Iterable[Any]],
+    *,
+    schema_version: int = FINGERPRINT_SCHEMA_VERSION,
+) -> InputFingerprint:
+    """Pure fingerprint over already-loaded values (order of input irrelevant)."""
+    if set(content_rows) != set(FINGERPRINT_CONTENT_COLUMNS) or set(key_rows) != set(FINGERPRINT_KEY_TABLES):
+        raise VerificationError("Fingerprint input does not cover exactly the contracted tables.")
+    tables = [
+        _content_digest(table, FINGERPRINT_CONTENT_COLUMNS[table], content_rows[table])
+        for table in FINGERPRINT_CONTENT_COLUMNS
+    ] + [_key_digest(table, key_rows[table]) for table in FINGERPRINT_KEY_TABLES]
+    tables.sort(key=lambda t: t.table)
+    final_object = {
+        "schema_version": schema_version,
+        "tables": [
+            {
+                "table": t.table,
+                "hash_kind": t.hash_kind,
+                "columns": list(t.columns),
+                "row_count": t.row_count,
+                "sha256": t.sha256,
+            }
+            for t in tables
+        ],
+    }
+    return InputFingerprint(schema_version, sha256_hex(canonical_json_bytes(final_object)), tuple(tables))
+
+
+def _fingerprint_models() -> dict[str, Any]:
+    from app.models.master_lecturer import Lecturer, LecturerKnownPublication, LecturerSourceSnapshot
+    from app.models.publication import Publication, PublicationAuthor, ScopusAuthor, ScopusAuthorNameVariant
+    from app.models.scopus_raw import RawScopusRecord, ScopusImport
+
+    return {
+        "lecturer_known_publications": LecturerKnownPublication,
+        "lecturer_source_snapshots": LecturerSourceSnapshot,
+        "lecturers": Lecturer,
+        "publication_authors": PublicationAuthor,
+        "publications": Publication,
+        "scopus_author_name_variants": ScopusAuthorNameVariant,
+        "scopus_authors": ScopusAuthor,
+        "raw_scopus_records": RawScopusRecord,
+        "scopus_imports": ScopusImport,
+    }
+
+
+def compute_input_fingerprint(session: Any) -> InputFingerprint:
+    """SELECT-only load of the contracted columns, then the pure fingerprint.
+
+    Call inside a REPEATABLE READ READ ONLY transaction so all tables come from
+    one snapshot.  Raw payload columns are never selected.
+    """
+    from sqlalchemy import select
+
+    models = _fingerprint_models()
+    content_rows: dict[str, list[dict[str, Any]]] = {}
+    for table, columns in FINGERPRINT_CONTENT_COLUMNS.items():
+        model = models[table]
+        if model.__tablename__ != table:
+            raise VerificationError(f"Fingerprint model mapping mismatch for {table}.")
+        result = session.execute(select(*(getattr(model, c) for c in columns)))
+        content_rows[table] = [dict(row) for row in result.mappings().all()]
+    key_rows: dict[str, list[Any]] = {}
+    for table in FINGERPRINT_KEY_TABLES:
+        model = models[table]
+        if model.__tablename__ != table:
+            raise VerificationError(f"Fingerprint model mapping mismatch for {table}.")
+        key_rows[table] = list(session.execute(select(model.id)).scalars().all())
+    return fingerprint_from_rows(content_rows, key_rows)
+
+
+def require_pinned_fingerprint(expected: str | None = None) -> str:
+    """Official evaluation is refused while the expected fingerprint is UNPINNED."""
+    value = EXPECTED_INPUT_FINGERPRINT_SHA256 if expected is None else expected
+    if value is None:
+        raise VerificationError("Expected input fingerprint is UNPINNED; official evaluation refused.")
+    if not isinstance(value, str) or not _SHA256_RE.match(value):
+        raise VerificationError("Expected input fingerprint is malformed; official evaluation refused.")
+    return value
+
+
+_RERENDER_GENERATED_AT = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def verify_package_rerender(
+    session: Any,
+    *,
+    manifest: Mapping[str, Any],
+    candidate_review_bytes: bytes,
+    labeling_sheet_bytes: bytes,
+    dataset_bytes: bytes,
+    source_id_file_bytes: bytes,
+) -> dict[str, Any]:
+    """Prove the review package was produced from THIS database snapshot.
+
+    Re-runs the frozen A2 pipeline (same functions the A2 builder CLI calls)
+    with inputs taken only from the verified dataset/cohort bytes and the
+    given session, then requires byte-equality of both CSVs and equality of
+    every manifest field except ``generated_at``.  Package candidate data is
+    never used to build the expected bytes.
+    """
+    # Hashes are recomputed from the supplied files, never trusted as declared.
+    verify_package_hashes(manifest, candidate_review_bytes, labeling_sheet_bytes)
+    try:
+        official = rp.parse_official_lecturers(dataset_bytes)
+        selected = rp.select_lecturers(official, rp.parse_source_id_file(source_id_file_bytes))
+        canonical_ids = rp.resolve_canonical_lecturers_from_db(selected, session)
+        enriched, conflicts = rp.generate_review_inputs(canonical_ids, session)
+        rerendered = rp.build_review_package(
+            selected=selected,
+            canonical_ids=canonical_ids,
+            enriched_candidates=enriched,
+            conflicts=conflicts,
+            official_dataset_bytes=dataset_bytes,
+            source_id_file_bytes=source_id_file_bytes,
+            rule_set_id=CANDIDATE_RULE_SET_ID,
+            rule_set_version=CANDIDATE_RULE_SET_VERSION,
+            generated_at=_RERENDER_GENERATED_AT,
+        )
+    except ReviewPackageError as exc:
+        raise VerificationError(f"Review package re-render failed: {exc}") from None
+
+    if rerendered.candidate_review_csv != candidate_review_bytes:
+        raise VerificationError("candidate_review.csv is not byte-equal to the re-render from the database snapshot.")
+    if rerendered.reference_labeling_sheet_csv != labeling_sheet_bytes:
+        raise VerificationError(
+            "reference_labeling_sheet.csv is not byte-equal to the re-render from the database snapshot."
+        )
+    differing = sorted(
+        key
+        for key in set(rerendered.manifest) | set(manifest)
+        if key != "generated_at" and rerendered.manifest.get(key) != manifest.get(key)
+    )
+    if differing:
+        raise VerificationError(f"review_manifest.json does not match the re-render for fields: {differing}")
+    return {
+        "verified": True,
+        "candidate_review_sha256": sha256_hex(candidate_review_bytes),
+        "reference_labeling_sheet_sha256": sha256_hex(labeling_sheet_bytes),
+        "compared_manifest_fields": sorted(k for k in rerendered.manifest if k != "generated_at"),
+    }
+
+
+def verify_input_fingerprint(actual: InputFingerprint, expected: str | None = None) -> None:
+    pinned = require_pinned_fingerprint(expected)
+    if actual.schema_version != FINGERPRINT_SCHEMA_VERSION or actual.sha256 != pinned:
+        raise VerificationError("Evaluation database fingerprint does not match the pinned fingerprint.")
 
 
 def run_frozen_a1_evaluation(
@@ -530,6 +794,8 @@ def build_result(
     verified: VerifiedInputs,
     evaluation: a1.CandidateRetrievalEvaluation,
     evaluated_at: datetime,
+    input_fingerprint: InputFingerprint | None = None,
+    package_rerender: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     metrics = {
         field.name: getattr(evaluation.metrics, field.name)
@@ -550,6 +816,8 @@ def build_result(
         },
         "rule_provenance": dict(verified.rule_provenance),
         "code_provenance": [dict(item) for item in verified.code_provenance],
+        "input_fingerprint": input_fingerprint.as_dict() if input_fingerprint is not None else None,
+        "review_package_rerender": dict(package_rerender) if package_rerender is not None else None,
         "reference_row_count": len(verified.records),
         "reference_match_count": match_count,
         "reference_no_match_count": len(verified.records) - match_count,
@@ -560,6 +828,21 @@ def build_result(
 
 __all__ = [
     "APPROVED_DATABASE_NAME",
+    "EXPECTED_INPUT_FINGERPRINT_SHA256",
+    "FINGERPRINT_CONTENT_COLUMNS",
+    "FINGERPRINT_KEY_TABLES",
+    "FINGERPRINT_SCHEMA_VERSION",
+    "InputFingerprint",
+    "READ_ONLY_SNAPSHOT_SQL",
+    "REJECTED_DATABASE_NAMES",
+    "TableFingerprint",
+    "canonical_json_bytes",
+    "compute_input_fingerprint",
+    "fingerprint_from_rows",
+    "require_pinned_fingerprint",
+    "verify_connected_database",
+    "verify_input_fingerprint",
+    "verify_package_rerender",
     "COHORT_ALGORITHM",
     "COHORT_SEED",
     "COHORT_SIZE",

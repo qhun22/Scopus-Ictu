@@ -59,7 +59,8 @@ is rejected.
 1. Build the A2 package with the frozen builder and **this** cohort file:
    `build_matching_review_package.py --source-id-file
    data/matching/evaluation/primary_cohort_source_ids.txt`, against the
-   approved runtime/test database only. Keep the output outside Git.
+   approved evaluation database `scopus_c3_eval_v1` only, after its
+   fingerprint is pinned. Keep the output outside Git.
 2. **Never edit** `candidate_review.csv`, `reference_labeling_sheet.csv` or
    `review_manifest.json`.
 3. Copy `reference_labeling_sheet.csv` to `reference_confirmed.csv` (in a
@@ -116,12 +117,104 @@ CRLF, so their SHA-256 differs from the LF repository content. Build the A2
 package and run `evaluate` from the same checkout so the bytes are consistent.
 The cohort content check compares lines, not bytes.
 
-## Database restriction
+## Evaluation database and input fingerprint
 
-`evaluate` refuses `environment=prod` and refuses any configured database
-whose name is not `scopus_m12_test` (generic message; the name and URL are
-never printed). It runs `SET TRANSACTION READ ONLY` (fail closed), redacts
-database errors, disposes the engine, and performs no writes.
+C3 evaluation runs only against a dedicated database named exactly
+**`scopus_c3_eval_v1`**. `scopus_m12_test` is a pytest scratch database, not a
+research corpus. Acceptance is never used. Every other name is refused.
+
+Database identity is checked twice:
+
+- **configuration:** `settings.database_url`, composed only from `DB_*`
+  settings. Process environment variables take precedence over
+  `backend/.env`, and there is no raw `DATABASE_URL` setting.
+- **live connection:** `SELECT current_database()`.
+
+Errors are generic: the name and URL are never printed. `prod` is refused.
+
+Both `compute-fingerprint` and `evaluate` open one
+`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY` snapshot as the
+first statement. Failure is fail-closed. Database errors are redacted, the
+engine is disposed, and there are no writes.
+
+### Input fingerprint, schema_version 1
+
+- **Content tables (7).** Only the columns read by `CandidateGenerator`,
+  `PublicationEvidenceEnricher` and lecturer resolution are hashed. Column
+  names are sorted, and every table's primary key is `id`:
+  - `lecturers`: `full_name, id, repository_profile_url`
+  - `lecturer_source_snapshots`: `id, lecturer_id`
+  - `lecturer_known_publications`:
+    `doi_normalized, id, lecturer_id, snapshot_id, title_normalized`
+  - `publications`: `doi, eid, id, title, title_normalized`
+  - `publication_authors`: `id, publication_id, scopus_author_id`
+  - `scopus_authors`: `id, preferred_name, scopus_id`
+  - `scopus_author_name_variants`:
+    `id, scopus_author_id, variant_name, variant_type`
+- **Structural tables (2): `scopus_imports`, `raw_scopus_records`.** Only the
+  row count and the sorted primary-key set are hashed. This checks structure
+  and the key set only; it does not prove that raw content is unchanged.
+  `raw_payload` is never selected or hashed.
+- **Encoding.**
+  - Canonical JSON is
+    `json.dumps(v, sort_keys=True, separators=(",", ":"), ensure_ascii=False)`,
+    encoded as UTF-8 and hashed with SHA-256.
+  - UUIDs become their canonical lowercase string. `NULL` becomes `null`,
+    which is distinct from `""`. Integers stay numbers. Strings are taken
+    verbatim: no trim, case folding, or Unicode normalization.
+  - Any other value type is rejected.
+  - Rows are sorted by `id` string in Python, so the result never depends on
+    the order PostgreSQL returns rows in.
+  - A duplicate `id` is rejected.
+- **Table hash.** Content tables hash the list of row objects. Structural
+  tables hash the sorted list of key strings.
+- **Final hash.** SHA-256 of
+  `{"schema_version": 1, "tables": [...]}`. Each `tables` entry is
+  `{"table", "hash_kind": "content"|"primary_key", "columns", "row_count",
+  "sha256"}`, and entries are sorted by table name.
+
+The same implementation serves both modes:
+
+- **`compute-fingerprint`** needs no pinned value. It verifies identity and
+  prints the digest, per-table counts and hashes. It never prints row data.
+- **`evaluate`** is refused while the expected fingerprint is **UNPINNED**,
+  before any database connection. After pinning, everything below happens in
+  one snapshot:
+  1. Require the live-snapshot fingerprint to equal the pinned value.
+  2. **Re-render the review package** from that snapshot with the frozen A2
+     functions (`parse_official_lecturers` → `parse_source_id_file` →
+     `select_lecturers` → `resolve_canonical_lecturers_from_db` →
+     `generate_review_inputs` → `build_review_package`). Inputs are only the
+     verified dataset and cohort bytes plus the database. Require
+     `candidate_review.csv` and `reference_labeling_sheet.csv` to be
+     **byte-equal**, and every manifest field except `generated_at` to be
+     equal.
+  3. Run the frozen A1 evaluation.
+
+  Any mismatch fails closed. The result records the fingerprint and the
+  re-render outcome. A self-declared manifest or sidecar is never trusted in
+  place of re-computation.
+
+### Operational conditions for the next step (not performed yet)
+
+1. Acceptance is read only.
+2. Create `scopus_c3_eval_v1` with the repo's Alembic.
+3. Verify FKs before copying. The only required parents are
+   `raw_scopus_records.import_id → scopus_imports.id` and
+   `scopus_author_name_variants.first_seen_raw_record_id →
+   raw_scopus_records.id`. `scopus_imports` has no FK, and none of the 9
+   tables references `users`.
+4. Copy the 9 tables, preserving UUIDs.
+5. Compare source and target row counts, and the contract fingerprint
+   (content and key sets), each on a consistent snapshot.
+6. Restrict the application role to `SELECT` on the data. Check effective
+   write privileges, including ownership and inherited roles.
+7. Check that all 50 cohort lecturers resolve to exactly one row each.
+8. Pin the fingerprint (A3 Commit #2) before generating the review package.
+9. Verify the fingerprint immediately before and after the frozen A2
+   builder. Publish the package only if both match.
+10. Never run pytest against this database.
+11. `evaluate` re-checks the fingerprint and the package/label links.
 
 ## Outputs and data policy
 
