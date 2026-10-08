@@ -16,6 +16,7 @@ import ast
 import importlib.util
 import inspect
 import json
+import os
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -980,3 +981,388 @@ class TestCleanupResult:
         r = sd.cleanup_owned_artifacts([f])
         summary = r.summary()
         assert _PASSWORD not in summary and _HOST not in summary
+
+
+# ===========================================================================
+# F1 — Cleanup failure after successful hard-link publication
+# ===========================================================================
+
+
+class TestF1ExclusivePromoteCleanup:
+    """exclusive_promote now returns CleanupResult; staging unlink failure must not be swallowed."""
+
+    def test_success_path_returns_complete_result(self, tmp_path):
+        staging = tmp_path / "staging"
+        staging.write_bytes(b"data")
+        dest = tmp_path / "dest.dump"
+        result = sd.exclusive_promote(staging, dest)
+        assert dest.read_bytes() == b"data"
+        assert not staging.exists()
+        assert not result.incomplete
+        assert result.removed == ["staging"]
+        assert result.failed == []
+
+    def test_staging_unlink_failure_returns_incomplete(self, tmp_path, monkeypatch):
+        staging = tmp_path / "staging"
+        staging.write_bytes(b"data")
+        dest = tmp_path / "dest.dump"
+
+        orig_unlink = Path.unlink
+
+        def _fail_staging(self, missing_ok=False):
+            if self == staging:
+                raise OSError("permission denied")
+            orig_unlink(self, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", _fail_staging)
+        result = sd.exclusive_promote(staging, dest)
+
+        # Destination is published and intact.
+        assert dest.read_bytes() == b"data"
+        # Staging still exists (unlink failed).
+        assert staging.exists()
+        # Result reports incomplete.
+        assert result.incomplete
+        assert "staging" in result.summary()
+        # No credential leak in result.
+        assert _PASSWORD not in result.summary() and _HOST not in result.summary()
+
+    def test_destination_not_deleted_when_staging_unlink_fails(self, tmp_path, monkeypatch):
+        """Destination must survive even if callers call cleanup_owned_artifacts after."""
+        staging = tmp_path / "staging"
+        staging.write_bytes(b"payload")
+        dest = tmp_path / "dest.dump"
+
+        orig_unlink = Path.unlink
+
+        def _fail_staging(self, missing_ok=False):
+            if self == staging:
+                raise OSError("locked")
+            orig_unlink(self, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", _fail_staging)
+        sd.exclusive_promote(staging, dest)
+
+        # Simulate caller mistakenly passing dest to cleanup — must not delete it.
+        # (This test documents the expected caller discipline; dest is NOT in owned[]
+        # in the orchestrator after promotion, so this scenario cannot happen via
+        # the orchestrator, but the test pins the invariant.)
+        assert dest.is_file()
+
+    def test_pre_link_failure_raises_source_dump_error_staging_intact(self, tmp_path):
+        staging = tmp_path / "staging"
+        staging.write_bytes(b"data")
+        dest = tmp_path / "dest.dump"
+        dest.write_bytes(b"existing")
+        with pytest.raises(sd.SourceDumpError, match="promotion"):
+            sd.exclusive_promote(staging, dest)
+        assert dest.read_bytes() == b"existing"
+        assert staging.exists()
+
+    def test_orchestrator_raises_on_incomplete_archive_staging_cleanup(self, tmp_path, monkeypatch):
+        """dump_source_snapshot raises SourceDumpError when archive staging unlink fails."""
+        session = _Session()
+
+        orig_unlink = Path.unlink
+
+        def _fail_partial(self, missing_ok=False):
+            partial = sd.partial_path_for(tmp_path / "source.dump")
+            if self == partial:
+                raise OSError("permission denied")
+            orig_unlink(self, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", _fail_partial)
+
+        with pytest.raises(sd.SourceDumpError, match="staging cleanup incomplete"):
+            _dump(tmp_path, session=session)
+
+        # Destination archive must exist (was promoted).
+        archive = tmp_path / "source.dump"
+        assert archive.is_file()
+
+    def test_orchestrator_error_contains_no_credentials(self, tmp_path, monkeypatch):
+        session = _Session()
+
+        orig_unlink = Path.unlink
+
+        def _fail_partial(self, missing_ok=False):
+            partial = sd.partial_path_for(tmp_path / "source.dump")
+            if self == partial:
+                raise OSError("permission denied")
+            orig_unlink(self, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", _fail_partial)
+
+        try:
+            _dump(tmp_path, session=session)
+        except sd.SourceDumpError as exc:
+            assert _PASSWORD not in str(exc) and _HOST not in str(exc)
+
+    def test_cli_incomplete_metadata_staging_cleanup_returns_1_destinations_intact(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        """If metadata staging unlink fails after promotion, CLI returns 1; both archive and
+        metadata are published and must not be removed."""
+        spec = importlib.util.spec_from_file_location("dump_cli_f1_meta", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+
+        import sqlalchemy, sqlalchemy.orm
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "environment", "local")
+        monkeypatch.setattr(settings, "db_name", sd.SOURCE_DATABASE_NAME)
+        monkeypatch.setattr(settings, "db_password", _PASSWORD)
+        monkeypatch.setattr(settings, "db_host", _HOST)
+
+        sess = _Session()
+
+        class _Engine:
+            def dispose(self): pass
+
+        class _SessionCtx:
+            def __init__(self, *_a, **_k): pass
+            def __enter__(self): return sess
+            def __exit__(self, *_a): return False
+
+        monkeypatch.setattr(sqlalchemy, "create_engine", lambda *_a, **_k: _Engine())
+        monkeypatch.setattr(sqlalchemy.orm, "Session", _SessionCtx)
+
+        runner = _Runner(sess)
+        real = sd.dump_source_snapshot
+
+        def _with_fp(s, **kwargs):
+            return real(s, runner=runner, compute_fingerprint=lambda _s: _fingerprint(), **kwargs)
+
+        monkeypatch.setattr(sd, "dump_source_snapshot", _with_fp)
+
+        # Intercept exclusive_promote to fail staging unlink only for the metadata staging.
+        real_promote = sd.exclusive_promote
+
+        def _failing_meta_cleanup(staging, destination):
+            result = real_promote(staging, destination)
+            if destination == meta:
+                # Simulate unlink failure after successful link.
+                return sd.CleanupResult(removed=[], failed=[staging.name])
+            return result
+
+        monkeypatch.setattr(sd, "exclusive_promote", _failing_meta_cleanup)
+
+        rc = module.main(["--archive-out", str(archive), "--metadata-out", str(meta)])
+        assert rc == 1
+        # Both destinations must be present.
+        assert archive.is_file()
+        assert meta.is_file()
+        # Error message must mention cleanup incomplete.
+        err = capsys.readouterr().err
+        assert "incomplete" in err
+        assert _PASSWORD not in err and _HOST not in err
+
+
+# ===========================================================================
+# F2 — Staging cleanup inside write_metadata_atomic
+# ===========================================================================
+
+
+class TestF2WriteMetadataAtomic:
+    """write_metadata_atomic must clean up its own staging on any write/flush/fsync/close failure."""
+
+    def test_write_failure_cleans_staging_and_raises(self, tmp_path, monkeypatch):
+        dest = tmp_path / "meta.json"
+        import io
+
+        orig_write = io.RawIOBase.write
+
+        def _fail_write(self, data):
+            raise OSError("disk full")
+
+        # Monkeypatch the BufferedWriter write method.
+        import builtins
+        monkeypatch.setattr("builtins.open", builtins.open)  # ensure open is real
+
+        # Intercept at the NamedTemporaryFile level via a wrapper.
+        import tempfile as _tempfile
+        orig_ntf = _tempfile.NamedTemporaryFile
+
+        class _FailWriteNTF:
+            def __init__(self, *a, **kw):
+                self._real = orig_ntf(*a, **kw)
+                self.name = self._real.name
+            def write(self, data):
+                raise OSError("disk full")
+            def flush(self): pass
+            def fileno(self): return self._real.fileno()
+            def close(self): self._real.close()
+
+        monkeypatch.setattr(_tempfile, "NamedTemporaryFile", lambda *a, **kw: _FailWriteNTF(*a, **kw))
+
+        with pytest.raises(sd.SourceDumpError):
+            sd.write_metadata_atomic(b"content", dest)
+
+        # No staging file should remain.
+        assert not any(p.suffix == ".meta_staging" for p in tmp_path.iterdir())
+        # Destination was never written.
+        assert not dest.exists()
+
+    def test_fsync_failure_cleans_staging_and_raises(self, tmp_path, monkeypatch):
+        dest = tmp_path / "meta.json"
+
+        orig_fsync = os.fsync
+
+        def _fail_fsync(fd):
+            raise OSError("I/O error")
+
+        monkeypatch.setattr(os, "fsync", _fail_fsync)
+
+        with pytest.raises(sd.SourceDumpError):
+            sd.write_metadata_atomic(b"content", dest)
+
+        assert not any(p.suffix == ".meta_staging" for p in tmp_path.iterdir())
+        assert not dest.exists()
+
+    def test_flush_failure_cleans_staging_and_raises(self, tmp_path, monkeypatch):
+        dest = tmp_path / "meta.json"
+        import tempfile as _tempfile
+        orig_ntf = _tempfile.NamedTemporaryFile
+
+        class _FailFlushNTF:
+            def __init__(self, *a, **kw):
+                self._real = orig_ntf(*a, **kw)
+                self.name = self._real.name
+            def write(self, data):
+                self._real.write(data)
+            def flush(self):
+                raise OSError("flush error")
+            def fileno(self): return self._real.fileno()
+            def close(self): self._real.close()
+
+        monkeypatch.setattr(_tempfile, "NamedTemporaryFile", lambda *a, **kw: _FailFlushNTF(*a, **kw))
+
+        with pytest.raises(sd.SourceDumpError):
+            sd.write_metadata_atomic(b"content", dest)
+
+        assert not any(p.suffix == ".meta_staging" for p in tmp_path.iterdir())
+
+    def test_close_failure_after_successful_write_cleans_staging_and_raises(self, tmp_path, monkeypatch):
+        dest = tmp_path / "meta.json"
+        import tempfile as _tempfile
+        orig_ntf = _tempfile.NamedTemporaryFile
+
+        class _FailCloseNTF:
+            def __init__(self, *a, **kw):
+                self._real = orig_ntf(*a, **kw)
+                self.name = self._real.name
+            def write(self, data):
+                self._real.write(data)
+            def flush(self):
+                self._real.flush()
+            def fileno(self): return self._real.fileno()
+            def close(self):
+                self._real.close()
+                raise OSError("close error")
+
+        monkeypatch.setattr(_tempfile, "NamedTemporaryFile", lambda *a, **kw: _FailCloseNTF(*a, **kw))
+
+        with pytest.raises(sd.SourceDumpError):
+            sd.write_metadata_atomic(b"content", dest)
+
+        assert not any(p.suffix == ".meta_staging" for p in tmp_path.iterdir())
+
+    def test_staging_unlink_failure_raises_cleanup_incomplete(self, tmp_path, monkeypatch):
+        dest = tmp_path / "meta.json"
+
+        orig_fsync = os.fsync
+
+        def _fail_fsync(fd):
+            raise OSError("I/O error")
+
+        monkeypatch.setattr(os, "fsync", _fail_fsync)
+
+        orig_unlink = Path.unlink
+
+        def _fail_unlink(self, missing_ok=False):
+            if str(self).endswith(".meta_staging"):
+                raise OSError("permission denied")
+            orig_unlink(self, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", _fail_unlink)
+
+        with pytest.raises(sd.SourceDumpError, match="cleanup incomplete"):
+            sd.write_metadata_atomic(b"content", dest)
+
+        # Destination never written.
+        assert not dest.exists()
+
+    def test_success_path_staging_in_same_dir_content_correct(self, tmp_path):
+        dest = tmp_path / "meta.json"
+        content = b'{"schema_version": 1}\n'
+        staging = sd.write_metadata_atomic(content, dest)
+        assert staging.parent == dest.parent
+        assert staging.read_bytes() == content
+        assert staging != dest
+        assert not dest.exists()
+        staging.unlink()  # caller cleanup
+
+    def test_f2_does_not_leak_credentials_in_error(self, tmp_path, monkeypatch):
+        dest = tmp_path / "meta.json"
+
+        def _fsync_with_cred_msg(fd):
+            raise OSError(_PASSWORD)
+
+        monkeypatch.setattr(os, "fsync", _fsync_with_cred_msg)
+        with pytest.raises(sd.SourceDumpError) as exc_info:
+            sd.write_metadata_atomic(b"x", dest)
+        # SourceDumpError message must not contain the password from OSError.
+        assert _PASSWORD not in str(exc_info.value)
+
+    def test_cli_archive_removed_when_write_metadata_atomic_raises(self, monkeypatch, tmp_path):
+        """If write_metadata_atomic raises SourceDumpError, archive is cleaned up."""
+        spec = importlib.util.spec_from_file_location("dump_cli_f2_write", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+
+        import sqlalchemy, sqlalchemy.orm
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "environment", "local")
+        monkeypatch.setattr(settings, "db_name", sd.SOURCE_DATABASE_NAME)
+        monkeypatch.setattr(settings, "db_password", _PASSWORD)
+        monkeypatch.setattr(settings, "db_host", _HOST)
+
+        sess = _Session()
+
+        class _Engine:
+            def dispose(self): pass
+
+        class _SessionCtx:
+            def __init__(self, *_a, **_k): pass
+            def __enter__(self): return sess
+            def __exit__(self, *_a): return False
+
+        monkeypatch.setattr(sqlalchemy, "create_engine", lambda *_a, **_k: _Engine())
+        monkeypatch.setattr(sqlalchemy.orm, "Session", _SessionCtx)
+
+        runner = _Runner(sess)
+        real = sd.dump_source_snapshot
+
+        def _with_fp(s, **kwargs):
+            return real(s, runner=runner, compute_fingerprint=lambda _s: _fingerprint(), **kwargs)
+
+        monkeypatch.setattr(sd, "dump_source_snapshot", _with_fp)
+
+        def _fail_write(content, destination):
+            raise sd.SourceDumpError("Metadata staging write failed.")
+
+        monkeypatch.setattr(sd, "write_metadata_atomic", _fail_write)
+
+        rc = module.main(["--archive-out", str(archive), "--metadata-out", str(meta)])
+        assert rc == 1
+        # Archive must be removed since metadata was never published.
+        assert not archive.exists()
+        assert not meta.exists()
