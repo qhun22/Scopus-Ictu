@@ -375,6 +375,55 @@ class TestLecturerDatasetCrossCheck:
         )
         validate_against_lecturer_dataset((rec,), ds_path)  # must not raise
 
+    def test_reference_email_present_official_email_empty_rejected(self):
+        """Reference provides email; official dataset has none => validation error."""
+        ds_path = self._write_dataset(
+            [
+                {
+                    "source_id": "https://example.com/a/",
+                    "full_name": "TS. Nguyễn Văn A",
+                    "institutional_email": "",  # empty
+                }
+            ]
+        )
+        rec = _make_record(
+            source_id="https://example.com/a/",
+            email="a@ictu.edu.vn",  # reference provides email
+        )
+        with pytest.raises(ReferenceValidationError) as exc_info:
+            validate_against_lecturer_dataset((rec,), ds_path)
+        assert "no email" in str(exc_info.value).lower() or "institutional_email" in str(exc_info.value)
+
+    def test_reference_email_case_and_trim_insensitive_valid(self):
+        ds_path = self._write_dataset(
+            [
+                {
+                    "source_id": "https://example.com/a/",
+                    "full_name": "TS. Nguyễn Văn A",
+                    "institutional_email": "  A@ICTU.edu.vn ",
+                }
+            ]
+        )
+        rec = _make_record(source_id="https://example.com/a/", email="a@ictu.edu.vn")
+        validate_against_lecturer_dataset((rec,), ds_path)  # must not raise
+
+    def test_reference_email_absent_official_email_empty_valid(self):
+        """Reference omits email; official has none => valid if name matches."""
+        ds_path = self._write_dataset(
+            [
+                {
+                    "source_id": "https://example.com/a/",
+                    "full_name": "TS. Nguyễn Văn A",
+                    "institutional_email": "",  # empty
+                }
+            ]
+        )
+        rec = _make_record(
+            source_id="https://example.com/a/",
+            email=None,  # no email in reference
+        )
+        validate_against_lecturer_dataset((rec,), ds_path)  # must not raise
+
     def test_duplicate_official_source_id_rejected(self):
         """Official dataset with two rows sharing the same source_id must be rejected."""
         ds_path = self._write_dataset(
@@ -1020,4 +1069,163 @@ class TestNoRankingMetrics:
                 for forbidden in ("score", "rank", "top_1", "threshold", "confidence", "ndcg", "mrr"):
                     assert forbidden not in f.name.lower(), (
                         f"{cls.__name__}.{f.name} contains forbidden ranking term {forbidden!r}"
+                    )
+
+
+# ===========================================================================
+# CLI DATABASE ERROR REDACTION
+# ===========================================================================
+
+
+class TestEvaluateCliErrorRedaction:
+    """The evaluate CLI must never surface raw database exception details."""
+
+    _SECRETS = ("internal-db", "DO_NOT_LEAK", "secret_db")
+
+    def _load_cli(self):
+        import importlib.util
+
+        script = Path(__file__).resolve().parents[2] / "scripts" / "evaluate_matching_reference.py"
+        spec = importlib.util.spec_from_file_location("evaluate_matching_reference_cli", script)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _fixtures(self) -> tuple[str, str]:
+        td = Path(tempfile.mkdtemp())
+        dataset = td / "lecturers.json"
+        dataset.write_text(
+            json.dumps(
+                {
+                    "lecturers": [
+                        {
+                            "source_id": "https://example.com/a/",
+                            "full_name": "TS. Nguyễn Văn A",
+                            "institutional_email": "a@ictu.edu.vn",
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        reference = td / "reference.csv"
+        reference.write_text(
+            _HEADER
+            + "\nhttps://example.com/a/,a@ictu.edu.vn,TS. Nguyễn Văn A,NO_MATCH,,"
+            "Supervisor,2026-10-01T10:00:00Z,\n",
+            encoding="utf-8",
+        )
+        return str(reference), str(dataset)
+
+    def _sensitive_error(self):
+        from sqlalchemy.exc import OperationalError
+
+        return OperationalError(
+            "SELECT 1",
+            {},
+            Exception("host=internal-db password=DO_NOT_LEAK database=secret_db"),
+        )
+
+    def _patch_env(self, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "environment", "local")
+
+    def _assert_redacted(self, capsys, expected_phrase: str):
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+        for secret in self._SECRETS:
+            assert secret not in combined
+        assert "OperationalError" not in combined
+        assert "Traceback" not in combined
+        assert expected_phrase in combined
+
+    def test_read_only_guard_failure_is_redacted(self, monkeypatch, capsys):
+        import sqlalchemy
+        import sqlalchemy.orm
+
+        cli = self._load_cli()
+        self._patch_env(monkeypatch)
+        error = self._sensitive_error()
+
+        class _FailingSession:
+            def __init__(self, *_a, **_k):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def execute(self, *_a, **_k):
+                raise error
+
+        class _Engine:
+            disposed = False
+
+            def dispose(self):
+                _Engine.disposed = True
+
+        monkeypatch.setattr(sqlalchemy, "create_engine", lambda *_a, **_k: _Engine())
+        monkeypatch.setattr(sqlalchemy.orm, "Session", _FailingSession)
+
+        reference, dataset = self._fixtures()
+        rc = cli.main(["--reference", reference, "--lecturer-dataset", dataset])
+
+        assert rc != 0
+        assert _Engine.disposed is True
+        self._assert_redacted(capsys, "read-only database transaction")
+
+    def test_query_failure_is_redacted(self, monkeypatch, capsys):
+        import sqlalchemy
+        import sqlalchemy.orm
+
+        from app.services.matching import evaluation
+
+        cli = self._load_cli()
+        self._patch_env(monkeypatch)
+        error = self._sensitive_error()
+
+        class _OkSession:
+            def __init__(self, *_a, **_k):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_a):
+                return False
+
+            def execute(self, *_a, **_k):
+                return None
+
+        class _Engine:
+            def dispose(self):
+                pass
+
+        def _boom(*_a, **_k):
+            raise error
+
+        monkeypatch.setattr(sqlalchemy, "create_engine", lambda *_a, **_k: _Engine())
+        monkeypatch.setattr(sqlalchemy.orm, "Session", _OkSession)
+        monkeypatch.setattr(evaluation, "resolve_lecturers_from_db", _boom)
+
+        reference, dataset = self._fixtures()
+        rc = cli.main(["--reference", reference, "--lecturer-dataset", dataset])
+
+        assert rc != 0
+        self._assert_redacted(capsys, "Database evaluation failed safely.")
+
+    def test_cli_source_never_interpolates_exceptions_for_database_paths(self):
+        import ast
+
+        script = Path(__file__).resolve().parents[2] / "scripts" / "evaluate_matching_reference.py"
+        tree = ast.parse(script.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ExceptHandler) and node.type is not None:
+                type_src = ast.unparse(node.type)
+                if type_src in {"Exception", "SQLAlchemyError"}:
+                    assert node.name is None, (
+                        f"except {type_src} must not bind the exception (leak risk)"
                     )

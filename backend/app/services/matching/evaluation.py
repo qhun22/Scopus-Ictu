@@ -407,10 +407,19 @@ def validate_against_lecturer_dataset(
                 )
             )
 
-        # email cross-check (only when provided)
+        # email cross-check (only when reference row provides an email)
         if d.institutional_email:
             official_email = official.get("institutional_email", "") or ""
-            if official_email and _norm_email(d.institutional_email) != _norm_email(official_email):
+            if not official_email:
+                issues.append(
+                    ReferenceValidationIssue(
+                        ref.row_number,
+                        "institutional_email",
+                        f"Reference provides institutional_email={d.institutional_email!r} "
+                        f"but official dataset has no email for this lecturer.",
+                    )
+                )
+            elif _norm_email(d.institutional_email) != _norm_email(official_email):
                 issues.append(
                     ReferenceValidationIssue(
                         ref.row_number,

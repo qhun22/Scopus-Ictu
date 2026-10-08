@@ -12,7 +12,10 @@ added in this slice; that is deferred to C3-A2.
 
 - Branch: `completion3/a1-reference-evaluation-scaffold`
 - Base SHA: `f49281802fe5d46fdc4e1ef872978b0cbaf73c4c`
-- Changed files: 7
+- Changed files: the A1 branch contains the original 7 task artifacts
+  (initial task: 7 new files). The first audit correction modified 4 of them
+  and the final polish modified the same 4; these are subsets of the original
+  7, not contradictory totals.
 - Production matching changed: false
 - Frontend changed: false
 - Migrations: none
@@ -57,14 +60,22 @@ Functions:
 - `evaluate_candidate_retrieval(...)` — pure, stateless metric computation
 - `resolve_lecturers_from_db(records, session)` — read-only DB lookup
 - `load_scopus_corpus_ids(session)` — read-only corpus load
-- `load_generated_pairs(ids, session)` — read-only candidate pair load
+- `generate_pairs_from_current_production(resolved_lecturers, session)` —
+  runs `CandidateGenerator(session).generate_all()`, filters to resolved
+  reference lecturers, enriches with `PublicationEvidenceEnricher(session).enrich()`,
+  converts to `_GeneratedPair` (no persisted candidate reads)
 
 ### CLIs
 
 - `validate_matching_reference.py`: no DB, parses + cross-checks reference CSV,
   exits 0/1/2, emits concise JSON summary.
-- `evaluate_matching_reference.py`: validates reference CSV, connects to DB
-  read-only (`SET TRANSACTION READ ONLY`), runs candidate retrieval evaluation,
+- `evaluate_matching_reference.py`: validates reference CSV, connects with
+  `settings.database_url` (never printed), refuses to run when
+  `settings.environment` is `prod`, explicitly issues
+  `SET TRANSACTION READ ONLY` before any SELECT (failure to establish it
+  stops the run, fail-closed), runs candidate retrieval evaluation, redacts
+  raw database exception details at the CLI boundary (generic messages
+  only), disposes the engine in `finally`,
   emits deterministic JSON with `schema_version`, `evaluated_at`,
   `reference_dataset_sha256`, `candidate_rule_set_id`,
   `candidate_rule_set_version`, `metrics`, `cases`.
@@ -180,12 +191,20 @@ applied a corrective commit on the same branch:
 - **Production matching algorithms unchanged**: `candidate_generator.py`,
   `candidate_types.py`, `publication_evidence_enricher.py`,
   `candidate_persistence.py` are unmodified.
+- **DB exception messages redacted at CLI boundary**: the evaluate CLI catches
+  `SQLAlchemyError` and emits a generic safe message; no raw exception text,
+  host, port, database name, or username is written to output.  The read-only
+  transaction failure path also emits only a generic safe message.
+- **Institutional email cross-check tightened**: when a reference row provides
+  `institutional_email` and the official dataset row has no corresponding email,
+  a validation error is now raised (previously silently accepted).
+- **No production matching algorithm changed** across all audit corrections.
 
-Corrected authoritative SHA: see Git commit containing this record and final
+Final authoritative A1 SHA: see Git commit containing this record and final
 A1 audit report.
 
-Corrected CI evidence: NOT_AVAILABLE_AT_COMMIT_TIME.  Final corrected CI
-evidence will be reported externally in the audit report.
+Final corrected CI evidence: NOT_AVAILABLE_AT_COMMIT_TIME.  Final CI evidence
+will be reported externally in the audit report.
 
 ## Known Limitations
 

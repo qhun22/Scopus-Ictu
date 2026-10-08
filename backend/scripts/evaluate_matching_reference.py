@@ -136,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     # --- Step 3: connect to DB using application settings ------------------
     try:
         from sqlalchemy import create_engine, text
+        from sqlalchemy.exc import SQLAlchemyError
         from sqlalchemy.orm import Session
     except ImportError as exc:
         _emit_error(f"SQLAlchemy import failed: {exc}", args.json_out)
@@ -151,11 +152,13 @@ def main(argv: list[str] | None = None) -> int:
         with Session(engine) as session:
             # Fail-closed read-only transaction guard.
             # If PostgreSQL refuses, exit immediately — do NOT continue.
+            # Do NOT emit raw exception text (may contain host/credentials).
             try:
                 session.execute(text("SET TRANSACTION READ ONLY"))
-            except Exception as exc:
+            except Exception:
                 _emit_error(
-                    f"Could not establish read-only transaction: {exc}. Refusing to continue.",
+                    "Could not establish a read-only database transaction. "
+                    "Refusing to continue.",
                     args.json_out,
                 )
                 return 1
@@ -184,6 +187,9 @@ def main(argv: list[str] | None = None) -> int:
         )
     except EvaluationInputError as exc:
         _emit_error(str(exc), args.json_out)
+        return 1
+    except SQLAlchemyError:
+        _emit_error("Database evaluation failed safely.", args.json_out)
         return 1
     finally:
         engine.dispose()
