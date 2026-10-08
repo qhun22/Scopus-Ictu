@@ -23,7 +23,13 @@ from types import SimpleNamespace
 import pytest
 
 from app.services.matching import evaluation as a1
+from app.services.matching import review_package as rp
 from app.services.matching import verified_evaluation as ve
+from app.services.matching.candidate_types import (
+    CandidateEvidence,
+    EnrichedLecturerScopusCandidate,
+    PublicationEvidenceConflict,
+)
 from app.services.matching.candidate_persistence import (
     CANDIDATE_RULE_SET_ID,
     CANDIDATE_RULE_SET_VERSION,
@@ -98,6 +104,35 @@ def _fill(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     return filled
 
 
+def _synthetic_candidates(canonical, cohort) -> tuple:
+    """Deterministic transient candidates for a few cohort lecturers."""
+
+    def candidate(source_id, scopus_id, author_int):
+        return EnrichedLecturerScopusCandidate(
+            lecturer_id=canonical[source_id],
+            scopus_author_id=uuid.UUID(int=author_int),
+            scopus_id=scopus_id,
+            preferred_name=f"Author {scopus_id}",
+            evidence=(
+                CandidateEvidence(
+                    rule_id="RULE_EXACT_N0",
+                    lecturer_source_value="Lecturer",
+                    lecturer_comparison_value="lecturer",
+                    scopus_surface_type="PREFERRED_NAME",
+                    scopus_surface_value=f"Author {scopus_id}",
+                    scopus_comparison_value="lecturer",
+                ),
+            ),
+            publication_evidence=(),
+        )
+
+    return (
+        candidate(cohort[0], "57000000001", 9001),
+        candidate(cohort[1], "57000000002", 9002),
+        candidate(cohort[1], "57000000003", 9003),
+    )
+
+
 class _Fixture:
     def __init__(self, n: int = 60):
         self.rows = _dataset_rows(n)
@@ -109,12 +144,24 @@ class _Fixture:
         self.cohort_bytes = ve.render_cohort_file(self.cohort)
         official = {l.source_id: l for l in parse_official_lecturers(self.dataset)}
         selected = tuple(official[s] for s in self.cohort)
+        self.selected = selected
         self.canonical = {s: uuid.uuid4() for s in self.cohort}
+        self.enriched = _synthetic_candidates(self.canonical, self.cohort)
+        self.conflicts = (
+            PublicationEvidenceConflict(
+                known_publication_id=uuid.UUID(int=4242),
+                lecturer_id=self.canonical[self.cohort[5]],
+                lecturer_snapshot_id=uuid.UUID(int=4343),
+                reason="TITLE_AMBIGUOUS",
+                doi_publication_ids=(),
+                title_publication_ids=(uuid.UUID(int=1), uuid.UUID(int=2)),
+            ),
+        )
         pkg = build_review_package(
             selected=selected,
             canonical_ids=self.canonical,
-            enriched_candidates=(),
-            conflicts=(),
+            enriched_candidates=self.enriched,
+            conflicts=self.conflicts,
             official_dataset_bytes=self.dataset,
             source_id_file_bytes=self.cohort_bytes,
             rule_set_id=CANDIDATE_RULE_SET_ID,
@@ -668,6 +715,69 @@ class TestSafeResult:
 # ===========================================================================
 
 
+_PINNED_TEST_DIGEST = "a" * 64
+
+
+def _patch_a2_db_reads(monkeypatch, fx, log, enriched=None, conflicts=None, canonical=None):
+    """Simulate the frozen A2 DB reads; the 'database state' is passed explicitly."""
+    state_canonical = dict(fx.canonical if canonical is None else canonical)
+    state_enriched = fx.enriched if enriched is None else enriched
+    state_conflicts = fx.conflicts if conflicts is None else conflicts
+
+    def resolve(selected, session):
+        log.append(("a2_resolve", id(session)))
+        return {lecturer.source_id: state_canonical[lecturer.source_id] for lecturer in selected}
+
+    def generate(canonical_ids, session):
+        log.append(("a2_generate", id(session)))
+        return tuple(state_enriched), tuple(state_conflicts)
+
+    monkeypatch.setattr(rp, "resolve_canonical_lecturers_from_db", resolve)
+    monkeypatch.setattr(rp, "generate_review_inputs", generate)
+
+
+def _fake_fingerprint(digest: str) -> "ve.InputFingerprint":
+    return ve.InputFingerprint(schema_version=ve.FINGERPRINT_SCHEMA_VERSION, sha256=digest, tables=())
+
+
+def _install_fake_db(monkeypatch, execute_error=None, connected_db="scopus_c3_eval_v1"):
+    import sqlalchemy
+    import sqlalchemy.orm
+
+    state = SimpleNamespace(created=False, disposed=False, statements=[])
+
+    class _Engine:
+        def dispose(self):
+            state.disposed = True
+
+    class _Session:
+        def __init__(self, *_a, **_k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def execute(self, statement, *_a, **_k):
+            state.statements.append(str(statement))
+            if execute_error is not None:
+                raise execute_error
+            return SimpleNamespace(scalar_one=lambda: connected_db)
+
+        def commit(self):
+            raise AssertionError("commit must never be called")
+
+    def _create(*_a, **_k):
+        state.created = True
+        return _Engine()
+
+    monkeypatch.setattr(sqlalchemy, "create_engine", _create)
+    monkeypatch.setattr(sqlalchemy.orm, "Session", _Session)
+    return state
+
+
 class TestCli:
     _SECRETS = ("internal-db", "DO_NOT_LEAK", "secret_db")
 
@@ -678,10 +788,27 @@ class TestCli:
         spec.loader.exec_module(module)
         return module
 
-    def _setup(self, monkeypatch, fx, db_name="scopus_m12_test", environment="local"):
+    def _setup(
+        self,
+        monkeypatch,
+        fx,
+        db_name="scopus_c3_eval_v1",
+        environment="local",
+        pinned=_PINNED_TEST_DIGEST,
+        actual=_PINNED_TEST_DIGEST,
+    ):
         from app.core.config import settings
 
         cli = self._load()
+        monkeypatch.setattr(ve, "EXPECTED_INPUT_FINGERPRINT_SHA256", pinned)
+        self.sessions_used = []
+
+        def _fingerprint(session):
+            self.sessions_used.append(("fingerprint", id(session)))
+            return _fake_fingerprint(actual)
+
+        monkeypatch.setattr(ve, "compute_input_fingerprint", _fingerprint)
+        _patch_a2_db_reads(monkeypatch, fx, self.sessions_used)
         td = Path(tempfile.mkdtemp())
         review = td / "review"
         review.mkdir()
@@ -713,37 +840,8 @@ class TestCli:
         ]
         return cli, args, td
 
-    def _fake_db(self, monkeypatch, execute_error=None):
-        import sqlalchemy
-        import sqlalchemy.orm
-
-        state = SimpleNamespace(created=False, disposed=False)
-
-        class _Engine:
-            def dispose(self):
-                state.disposed = True
-
-        class _Session:
-            def __init__(self, *_a, **_k):
-                pass
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *_a):
-                return False
-
-            def execute(self, *_a, **_k):
-                if execute_error is not None:
-                    raise execute_error
-
-        def _create(*_a, **_k):
-            state.created = True
-            return _Engine()
-
-        monkeypatch.setattr(sqlalchemy, "create_engine", _create)
-        monkeypatch.setattr(sqlalchemy.orm, "Session", _Session)
-        return state
+    def _fake_db(self, monkeypatch, execute_error=None, connected_db="scopus_c3_eval_v1"):
+        return _install_fake_db(monkeypatch, execute_error=execute_error, connected_db=connected_db)
 
     def _sensitive(self):
         from sqlalchemy.exc import OperationalError
@@ -752,6 +850,7 @@ class TestCli:
 
     def _patch_a1_db(self, monkeypatch, fx, error=None):
         def resolve(records, _session):
+            getattr(self, "sessions_used", []).append(("a1_resolve", id(_session)))
             if error is not None:
                 raise error
             return (
@@ -817,15 +916,65 @@ class TestCli:
         state = self._fake_db(monkeypatch)
         assert cli.main(args) != 0 and state.created is False
 
-    @pytest.mark.parametrize("db_name", ["scopus_ictu_acceptance_v2", "scopus_other"])
+    @pytest.mark.parametrize("db_name", ["scopus_ictu_acceptance_v2", "scopus_m12_test", "scopus_other"])
     def test_unapproved_database_refused_without_disclosure(self, monkeypatch, fx, capsys, db_name):
         cli, args, td = self._setup(monkeypatch, fx, db_name=db_name)
         state = self._fake_db(monkeypatch)
         assert cli.main(args) != 0
         assert state.created is False
         out = self._out(capsys)
-        assert "not the approved C3 runtime/test database" in out
+        assert "not the approved C3 evaluation database" in out
         assert db_name not in out and "postgresql" not in out
+        assert not (td / "out" / "evaluation_result.json").exists()
+
+    @pytest.mark.parametrize("connected", ["scopus_m12_test", "scopus_ictu_acceptance_v2", "postgres"])
+    def test_valid_config_but_wrong_connected_database_refused(self, monkeypatch, fx, capsys, connected):
+        cli, args, td = self._setup(monkeypatch, fx)
+        state = self._fake_db(monkeypatch, connected_db=connected)
+        self._patch_a1_db(monkeypatch, fx)
+        assert cli.main(args) != 0
+        assert state.disposed is True
+        out = self._out(capsys)
+        assert "Connected database is not the approved C3 evaluation database." in out
+        assert connected not in out
+        assert not (td / "out" / "evaluation_result.json").exists()
+
+    def test_unpinned_fingerprint_refuses_before_database(self, monkeypatch, fx, capsys):
+        cli, args, td = self._setup(monkeypatch, fx, pinned=None)
+        state = self._fake_db(monkeypatch)
+        assert cli.main(args) != 0
+        assert state.created is False
+        assert "UNPINNED" in self._out(capsys)
+        assert not (td / "out" / "evaluation_result.json").exists()
+
+    def test_fingerprint_mismatch_refused(self, monkeypatch, fx, capsys):
+        cli, args, td = self._setup(monkeypatch, fx, actual="b" * 64)
+        state = self._fake_db(monkeypatch)
+        self._patch_a1_db(monkeypatch, fx)
+        assert cli.main(args) != 0
+        assert state.disposed is True
+        assert "does not match the pinned fingerprint" in self._out(capsys)
+        assert not (td / "out" / "evaluation_result.json").exists()
+
+    def test_snapshot_transaction_is_first_statement_and_shared(self, monkeypatch, fx, capsys):
+        cli, args, _ = self._setup(monkeypatch, fx)
+        state = self._fake_db(monkeypatch)
+        self._patch_a1_db(monkeypatch, fx)
+        assert cli.main(args) == 0
+        assert state.statements[0] == "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+        assert state.statements[1] == "SELECT current_database()"
+        steps = [step for step, _ in self.sessions_used]
+        assert steps == ["fingerprint", "a2_resolve", "a2_generate", "a1_resolve"]
+        assert len({session_id for _, session_id in self.sessions_used}) == 1
+
+    def test_rerender_mismatch_fails_closed_without_result(self, monkeypatch, fx, capsys):
+        cli, args, td = self._setup(monkeypatch, fx)
+        state = self._fake_db(monkeypatch)
+        self._patch_a1_db(monkeypatch, fx)
+        _patch_a2_db_reads(monkeypatch, fx, [], enriched=fx.enriched[:-1])
+        assert cli.main(args) != 0
+        assert state.disposed is True
+        assert "not byte-equal to the re-render" in self._out(capsys)
         assert not (td / "out" / "evaluation_result.json").exists()
 
     def test_verification_runs_before_db(self, monkeypatch, fx, capsys):
@@ -840,7 +989,7 @@ class TestCli:
         assert cli.main(args) != 0
         assert state.disposed is True
         out = self._out(capsys)
-        assert "read-only database transaction" in out
+        assert "read-only snapshot transaction" in out
         assert not any(s in out for s in self._SECRETS)
 
     def test_sqlalchemy_error_redacted(self, monkeypatch, fx, capsys):
@@ -865,9 +1014,13 @@ class TestCli:
         result_text = (td / "out" / "evaluation_result.json").read_text(encoding="utf-8")
         result = json.loads(result_text)
         assert result["reference_row_count"] == 50
+        assert result["input_fingerprint"]["sha256"] == _PINNED_TEST_DIGEST
+        assert result["input_fingerprint"]["schema_version"] == 1
+        assert result["review_package_rerender"]["verified"] is True
+        assert result["review_package_rerender"]["candidate_review_sha256"] == hashlib.sha256(fx.candidate_review).hexdigest()
         assert _SECRET_SOURCE not in result_text and _SECRET_NOTE not in result_text
         out = self._out(capsys)
-        assert _SECRET_SOURCE not in out and "scopus_m12_test" not in out
+        assert _SECRET_SOURCE not in out and "scopus_c3_eval_v1" not in out
 
     def test_cli_never_binds_database_exceptions(self):
         tree = ast.parse((_REPO_ROOT / "backend/scripts/run_matching_quality_evaluation.py").read_text(encoding="utf-8"))
@@ -875,3 +1028,572 @@ class TestCli:
             if isinstance(node, ast.ExceptHandler) and node.type is not None:
                 if ast.unparse(node.type) in {"Exception", "SQLAlchemyError"}:
                     assert node.name is None
+
+
+# ===========================================================================
+# DATABASE IDENTITY GUARD
+# ===========================================================================
+
+
+class TestDatabaseGuard:
+    def _url(self, name: str) -> str:
+        return f"postgresql+psycopg2://u:p@localhost:5432/{name}"
+
+    def test_approved_name_exact(self):
+        assert ve.APPROVED_DATABASE_NAME == "scopus_c3_eval_v1"
+        assert ve.is_approved_database(self._url("scopus_c3_eval_v1")) is True
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            "scopus_m12_test",
+            "scopus_ictu_acceptance_v2",
+            "scopus_c3_eval_v2",
+            "SCOPUS_C3_EVAL_V1",
+            "scopus_c3_eval_v1_copy",
+            "",
+        ],
+    )
+    def test_other_names_rejected(self, name):
+        assert ve.is_approved_database(self._url(name)) is False
+
+    def test_malformed_url_rejected(self):
+        assert ve.is_approved_database("not a url") is False
+
+    def test_connected_database_must_match(self):
+        ok = SimpleNamespace(execute=lambda _s: SimpleNamespace(scalar_one=lambda: "scopus_c3_eval_v1"))
+        ve.verify_connected_database(ok)
+        for actual in ("scopus_m12_test", "scopus_ictu_acceptance_v2", "postgres"):
+            bad = SimpleNamespace(execute=lambda _s, a=actual: SimpleNamespace(scalar_one=lambda: a))
+            with pytest.raises(VerificationError) as exc_info:
+                ve.verify_connected_database(bad)
+            assert actual not in str(exc_info.value)
+
+    def test_settings_have_no_raw_url_override_path(self):
+        from app.core.config import Settings
+
+        fields = set(Settings.model_fields)
+        assert "database_url" not in fields  # computed from DB_* only
+        assert "db_name" in fields
+
+
+# ===========================================================================
+# INPUT FINGERPRINT (schema_version 1)
+# ===========================================================================
+
+
+def _uuid(n: int) -> uuid.UUID:
+    return uuid.UUID(int=n)
+
+
+def _fp_rows():
+    lec, snap, kp, pub, auth, var, pa = (_uuid(i) for i in range(1, 8))
+    imp, raw = _uuid(100), _uuid(101)
+    content = {
+        "lecturers": [{"id": lec, "full_name": "TS. Nguyễn Văn A", "repository_profile_url": "https://r/a/"}],
+        "lecturer_source_snapshots": [{"id": snap, "lecturer_id": lec}],
+        "lecturer_known_publications": [
+            {"id": kp, "lecturer_id": lec, "snapshot_id": snap, "doi_normalized": None, "title_normalized": "t"}
+        ],
+        "publications": [{"id": pub, "eid": "2-s2.0-1", "doi": None, "title": "T", "title_normalized": "t"}],
+        "scopus_authors": [{"id": auth, "scopus_id": "57000000001", "preferred_name": "Nguyen, A."}],
+        "scopus_author_name_variants": [
+            {"id": var, "scopus_author_id": auth, "variant_type": "AUTHOR_FULL_NAME", "variant_name": "Nguyen Van A"}
+        ],
+        "publication_authors": [{"id": pa, "publication_id": pub, "scopus_author_id": auth}],
+    }
+    keys = {"scopus_imports": [imp], "raw_scopus_records": [raw]}
+    return content, keys
+
+
+def _with_extra_rows(content, keys):
+    content = {t: list(r) for t, r in content.items()}
+    keys = {t: list(k) for t, k in keys.items()}
+    content["lecturers"].append({"id": _uuid(50), "full_name": "B", "repository_profile_url": None})
+    content["publications"].append(
+        {"id": _uuid(51), "eid": "2-s2.0-2", "doi": "10.1/x", "title": "U", "title_normalized": "u"}
+    )
+    keys["raw_scopus_records"].append(_uuid(52))
+    return content, keys
+
+
+def _copy_content(content):
+    return {t: [dict(r) for r in rows] for t, rows in content.items()}
+
+
+def _cj(value) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+class TestInputFingerprint:
+    def test_contract_columns_and_tables(self):
+        assert ve.FINGERPRINT_SCHEMA_VERSION == 1
+        assert set(ve.FINGERPRINT_CONTENT_COLUMNS) | set(ve.FINGERPRINT_KEY_TABLES) == {
+            "scopus_imports",
+            "raw_scopus_records",
+            "scopus_authors",
+            "scopus_author_name_variants",
+            "publications",
+            "publication_authors",
+            "lecturers",
+            "lecturer_source_snapshots",
+            "lecturer_known_publications",
+        }
+        for columns in ve.FINGERPRINT_CONTENT_COLUMNS.values():
+            assert list(columns) == sorted(columns) and "id" in columns
+            assert "raw_payload" not in columns
+        assert ve.FINGERPRINT_CONTENT_COLUMNS["scopus_author_name_variants"] == (
+            "id",
+            "scopus_author_id",
+            "variant_name",
+            "variant_type",
+        )
+
+    def test_matches_independent_reference_computation(self):
+        content, keys = _fp_rows()
+        fp = ve.fingerprint_from_rows(content, keys)
+        tables = []
+        for table in sorted([*ve.FINGERPRINT_CONTENT_COLUMNS, *ve.FINGERPRINT_KEY_TABLES]):
+            if table in ve.FINGERPRINT_CONTENT_COLUMNS:
+                cols = ve.FINGERPRINT_CONTENT_COLUMNS[table]
+                rows = sorted(
+                    (
+                        {c: (str(v) if isinstance(v, uuid.UUID) else v) for c, v in r.items() if c in cols}
+                        for r in content[table]
+                    ),
+                    key=lambda r: r["id"],
+                )
+                tables.append(
+                    {
+                        "table": table,
+                        "hash_kind": "content",
+                        "columns": list(cols),
+                        "row_count": len(rows),
+                        "sha256": hashlib.sha256(_cj(rows)).hexdigest(),
+                    }
+                )
+            else:
+                ks = sorted(str(k) for k in keys[table])
+                tables.append(
+                    {
+                        "table": table,
+                        "hash_kind": "primary_key",
+                        "columns": ["id"],
+                        "row_count": len(ks),
+                        "sha256": hashlib.sha256(_cj(ks)).hexdigest(),
+                    }
+                )
+        expected = hashlib.sha256(_cj({"schema_version": 1, "tables": tables})).hexdigest()
+        assert fp.sha256 == expected
+        assert fp.as_dict()["tables"] == tables
+
+    def test_order_independent(self):
+        content, keys = _with_extra_rows(*_fp_rows())
+        a = ve.fingerprint_from_rows(content, keys)
+        rev_content = {t: list(reversed(r)) for t, r in content.items()}
+        rev_keys = {t: list(reversed(k)) for t, k in keys.items()}
+        assert ve.fingerprint_from_rows(rev_content, rev_keys).sha256 == a.sha256
+
+    @pytest.mark.parametrize(
+        "table,column,value",
+        [
+            ("lecturers", "full_name", "TS. Nguyễn Văn B"),
+            ("lecturers", "repository_profile_url", "https://r/b/"),
+            ("scopus_authors", "preferred_name", "Nguyen, B."),
+            ("scopus_authors", "scopus_id", "57000000002"),
+            ("scopus_author_name_variants", "variant_name", "Nguyen Van B"),
+            ("scopus_author_name_variants", "variant_type", "AUTHOR_DISPLAY"),
+            ("lecturer_known_publications", "title_normalized", "t2"),
+            ("lecturer_known_publications", "snapshot_id", uuid.UUID(int=996)),
+            ("publications", "eid", "2-s2.0-9"),
+            ("publication_authors", "scopus_author_id", uuid.UUID(int=999)),
+            ("lecturer_source_snapshots", "lecturer_id", uuid.UUID(int=998)),
+            ("lecturers", "id", uuid.UUID(int=997)),
+        ],
+    )
+    def test_business_column_or_uuid_change_changes_digest(self, table, column, value):
+        content, keys = _fp_rows()
+        base = ve.fingerprint_from_rows(content, keys).sha256
+        changed = _copy_content(content)
+        changed[table][0][column] = value
+        assert ve.fingerprint_from_rows(changed, keys).sha256 != base
+
+    def test_null_distinct_from_empty_string(self):
+        content, keys = _fp_rows()
+        base = ve.fingerprint_from_rows(content, keys).sha256
+        changed = _copy_content(content)
+        changed["publications"][0]["doi"] = ""
+        assert ve.fingerprint_from_rows(changed, keys).sha256 != base
+
+    def test_strings_not_normalized(self):
+        content, keys = _fp_rows()
+        base = ve.fingerprint_from_rows(content, keys).sha256
+        for variant in ("TS. Nguyễn Văn A ", "ts. nguyễn văn a"):
+            changed = _copy_content(content)
+            changed["lecturers"][0]["full_name"] = variant
+            assert ve.fingerprint_from_rows(changed, keys).sha256 != base
+
+    @pytest.mark.parametrize(
+        "table",
+        [
+            "lecturers",
+            "lecturer_source_snapshots",
+            "lecturer_known_publications",
+            "publications",
+            "scopus_authors",
+            "scopus_author_name_variants",
+            "publication_authors",
+        ],
+    )
+    def test_row_count_change_changes_digest(self, table):
+        content, keys = _fp_rows()
+        base = ve.fingerprint_from_rows(content, keys).sha256
+        changed = _copy_content(content)
+        changed[table].append(dict(changed[table][0], id=uuid.UUID(int=12345)))
+        assert ve.fingerprint_from_rows(changed, keys).sha256 != base
+
+    @pytest.mark.parametrize("table", ["scopus_imports", "raw_scopus_records"])
+    def test_raw_key_set_change_changes_digest(self, table):
+        content, keys = _fp_rows()
+        base = ve.fingerprint_from_rows(content, keys).sha256
+        added = {t: list(k) for t, k in keys.items()}
+        added[table].append(uuid.UUID(int=777))
+        replaced = {t: list(k) for t, k in keys.items()}
+        replaced[table] = [uuid.UUID(int=778)]
+        assert ve.fingerprint_from_rows(content, added).sha256 != base
+        assert ve.fingerprint_from_rows(content, replaced).sha256 != base
+
+    def test_raw_payload_change_with_same_keys_does_not_change_digest(self):
+        content, keys = _fp_rows()
+        base = ve.fingerprint_from_rows(content, keys).sha256
+        with_payload_a = {t: [dict(r, raw_payload={"x": 1}) for r in rows] for t, rows in content.items()}
+        with_payload_b = {t: [dict(r, raw_payload={"x": 2}) for r in rows] for t, rows in content.items()}
+        assert ve.fingerprint_from_rows(with_payload_a, keys).sha256 == base
+        assert ve.fingerprint_from_rows(with_payload_b, keys).sha256 == base
+
+    def test_schema_version_changes_digest(self):
+        content, keys = _fp_rows()
+        v1 = ve.fingerprint_from_rows(content, keys).sha256
+        assert v1 != ve.fingerprint_from_rows(content, keys, schema_version=2).sha256
+
+    def test_duplicate_primary_key_rejected(self):
+        content, keys = _fp_rows()
+        content["lecturers"].append(dict(content["lecturers"][0]))
+        with pytest.raises(VerificationError):
+            ve.fingerprint_from_rows(content, keys)
+
+    def test_missing_table_or_column_rejected(self):
+        content, keys = _fp_rows()
+        partial = dict(content)
+        del partial["publications"]
+        with pytest.raises(VerificationError):
+            ve.fingerprint_from_rows(partial, keys)
+        content["publications"][0].pop("doi")
+        with pytest.raises(VerificationError):
+            ve.fingerprint_from_rows(content, keys)
+
+    def test_unsupported_value_type_rejected(self):
+        content, keys = _fp_rows()
+        content["publications"][0]["doi"] = 1.5
+        with pytest.raises(VerificationError):
+            ve.fingerprint_from_rows(content, keys)
+
+
+class _FingerprintSession:
+    """Fake session serving SELECTs from in-memory rows; refuses anything else."""
+
+    def __init__(self, content, keys, reverse=False):
+        self.content = content
+        self.keys = keys
+        self.reverse = reverse
+        self.statements: list[str] = []
+
+    def execute(self, statement, *_a, **_k):
+        sql = str(statement)
+        self.statements.append(sql)
+        assert sql.lstrip().upper().startswith("SELECT"), sql
+        assert "raw_payload" not in sql
+        table = statement.get_final_froms()[0].name
+        names = [c.name for c in statement.selected_columns]
+        if table in self.content:
+            rows = [{n: r[n] for n in names} for r in self.content[table]]
+        else:
+            rows = [{"id": k} for k in self.keys[table]]
+        if self.reverse:
+            rows = list(reversed(rows))
+        return SimpleNamespace(
+            mappings=lambda: SimpleNamespace(all=lambda: rows),
+            scalars=lambda: SimpleNamespace(all=lambda: [r["id"] for r in rows]),
+        )
+
+
+class TestFingerprintLoader:
+    def test_loader_is_select_only_and_order_independent(self):
+        content, keys = _with_extra_rows(*_fp_rows())
+        expected = ve.fingerprint_from_rows(content, keys).sha256
+        forward = _FingerprintSession(content, keys)
+        backward = _FingerprintSession(content, keys, reverse=True)
+        assert ve.compute_input_fingerprint(forward).sha256 == expected
+        assert ve.compute_input_fingerprint(backward).sha256 == expected
+        assert len(forward.statements) == 9
+
+    def test_no_write_apis_in_fingerprint_code(self):
+        functions = [ve.compute_input_fingerprint, ve.fingerprint_from_rows, ve.verify_connected_database]
+        for fn in functions:
+            tree = ast.parse(inspect.getsource(fn).lstrip())
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Attribute):
+                    assert node.attr not in {"commit", "add", "add_all", "flush", "delete", "merge", "insert", "update"}
+        assert ve.READ_ONLY_SNAPSHOT_SQL == "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+
+
+class TestPinnedFingerprint:
+    def test_expected_fingerprint_is_unpinned_in_this_commit(self):
+        assert ve.EXPECTED_INPUT_FINGERPRINT_SHA256 is None
+
+    def test_unpinned_refused(self):
+        with pytest.raises(VerificationError, match="UNPINNED"):
+            ve.require_pinned_fingerprint()
+        with pytest.raises(VerificationError, match="UNPINNED"):
+            ve.verify_input_fingerprint(_fake_fingerprint("c" * 64))
+
+    @pytest.mark.parametrize("bad", ["", "abc", "Z" * 64, "A" * 64])
+    def test_malformed_pin_refused(self, bad):
+        with pytest.raises(VerificationError, match="malformed"):
+            ve.require_pinned_fingerprint(bad)
+
+    def test_match_and_mismatch(self):
+        ve.verify_input_fingerprint(_fake_fingerprint("c" * 64), expected="c" * 64)
+        with pytest.raises(VerificationError, match="does not match"):
+            ve.verify_input_fingerprint(_fake_fingerprint("d" * 64), expected="c" * 64)
+        wrong_version = ve.InputFingerprint(schema_version=2, sha256="c" * 64, tables=())
+        with pytest.raises(VerificationError):
+            ve.verify_input_fingerprint(wrong_version, expected="c" * 64)
+
+
+class TestComputeFingerprintCli:
+    def _load(self):
+        script = _REPO_ROOT / "backend/scripts/run_matching_quality_evaluation.py"
+        spec = importlib.util.spec_from_file_location("run_matching_quality_evaluation_cli_fp", script)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _env(self, monkeypatch, db_name="scopus_c3_eval_v1", environment="local"):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "environment", environment)
+        monkeypatch.setattr(settings, "db_name", db_name)
+
+    def test_compute_works_while_unpinned(self, monkeypatch, capsys):
+        assert ve.EXPECTED_INPUT_FINGERPRINT_SHA256 is None
+        cli = self._load()
+        self._env(monkeypatch)
+        state = _install_fake_db(monkeypatch)
+        content, keys = _fp_rows()
+        expected = ve.fingerprint_from_rows(content, keys)
+        monkeypatch.setattr(ve, "compute_input_fingerprint", lambda _s: expected)
+        out_file = Path(tempfile.mkdtemp()) / "fingerprint.json"
+        assert cli.main(["compute-fingerprint", "--json-out", str(out_file)]) == 0
+        payload = json.loads(out_file.read_text(encoding="utf-8"))
+        assert payload["sha256"] == expected.sha256 and payload["schema_version"] == 1
+        assert payload["database_identity_verified"] is True
+        assert state.statements[:2] == [
+            "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+            "SELECT current_database()",
+        ]
+        assert state.disposed is True
+        out = capsys.readouterr()
+        assert "scopus_c3_eval_v1" not in out.out + out.err
+
+    @pytest.mark.parametrize("db_name", ["scopus_m12_test", "scopus_ictu_acceptance_v2"])
+    def test_compute_refuses_wrong_configured_database(self, monkeypatch, capsys, db_name):
+        cli = self._load()
+        self._env(monkeypatch, db_name=db_name)
+        state = _install_fake_db(monkeypatch)
+        assert cli.main(["compute-fingerprint"]) != 0
+        assert state.created is False
+
+    def test_compute_refuses_wrong_connected_database(self, monkeypatch, capsys):
+        cli = self._load()
+        self._env(monkeypatch)
+        state = _install_fake_db(monkeypatch, connected_db="scopus_ictu_acceptance_v2")
+        monkeypatch.setattr(ve, "compute_input_fingerprint", lambda _s: pytest.fail("must not fingerprint"))
+        assert cli.main(["compute-fingerprint"]) != 0
+        assert state.disposed is True
+        out = capsys.readouterr()
+        assert "scopus_ictu_acceptance_v2" not in out.out + out.err
+
+    def test_compute_refuses_prod(self, monkeypatch, capsys):
+        cli = self._load()
+        self._env(monkeypatch, environment="prod")
+        state = _install_fake_db(monkeypatch)
+        assert cli.main(["compute-fingerprint"]) != 0
+        assert state.created is False
+
+    def test_compute_redacts_database_errors(self, monkeypatch, capsys):
+        from sqlalchemy.exc import OperationalError
+
+        cli = self._load()
+        self._env(monkeypatch)
+        state = _install_fake_db(
+            monkeypatch,
+            execute_error=OperationalError("SELECT 1", {}, Exception("host=internal-db password=DO_NOT_LEAK")),
+        )
+        assert cli.main(["compute-fingerprint"]) != 0
+        assert state.disposed is True
+        out = capsys.readouterr()
+        assert "DO_NOT_LEAK" not in out.out + out.err and "internal-db" not in out.out + out.err
+
+
+# ===========================================================================
+# REVIEW PACKAGE RE-RENDER (byte-equal provenance)
+# ===========================================================================
+
+
+def _with_sha(manifest: dict, **files: bytes) -> dict:
+    """An attacker-consistent manifest: hashes recomputed for tampered files."""
+    out = dict(manifest)
+    if "candidate_review" in files:
+        out["candidate_review_sha256"] = hashlib.sha256(files["candidate_review"]).hexdigest()
+    if "sheet" in files:
+        out["reference_labeling_sheet_sha256"] = hashlib.sha256(files["sheet"]).hexdigest()
+    return out
+
+
+def _flip_one_byte(data: bytes, needle: bytes) -> bytes:
+    index = data.index(needle)
+    return data[:index] + bytes([data[index] ^ 0x01]) + data[index + 1 :]
+
+
+class TestPackageRerender:
+    SESSION = object()
+
+    def _run(self, fx, *, manifest=None, candidate_review=None, sheet=None):
+        return ve.verify_package_rerender(
+            self.SESSION,
+            manifest=fx.manifest if manifest is None else manifest,
+            candidate_review_bytes=fx.candidate_review if candidate_review is None else candidate_review,
+            labeling_sheet_bytes=fx.sheet if sheet is None else sheet,
+            dataset_bytes=fx.dataset,
+            source_id_file_bytes=fx.cohort_bytes,
+        )
+
+    def test_matching_rerender_passes(self, monkeypatch, fx):
+        log: list = []
+        _patch_a2_db_reads(monkeypatch, fx, log)
+        result = self._run(fx)
+        assert result["verified"] is True
+        assert result["candidate_review_sha256"] == hashlib.sha256(fx.candidate_review).hexdigest()
+        assert "generated_at" not in result["compared_manifest_fields"]
+        assert [step for step, _ in log] == ["a2_resolve", "a2_generate"]
+        assert {sid for _, sid in log} == {id(self.SESSION)}
+
+    def test_fixture_package_is_non_trivial(self, fx):
+        rows = list(csv.DictReader(io.StringIO(fx.candidate_review.decode("utf-8"))))
+        assert sum(1 for r in rows if r["suggestion_status"] == "CANDIDATE") == 3
+        assert any(r["lecturer_publication_conflict_count"] == "1" for r in rows)
+
+    def test_one_byte_change_in_candidate_csv_rejected_even_with_consistent_manifest(self, monkeypatch, fx):
+        _patch_a2_db_reads(monkeypatch, fx, [])
+        tampered = _flip_one_byte(fx.candidate_review, b"57000000002")
+        with pytest.raises(VerificationError, match="candidate_review.csv is not byte-equal"):
+            self._run(fx, manifest=_with_sha(fx.manifest, candidate_review=tampered), candidate_review=tampered)
+
+    def test_one_byte_change_in_blank_sheet_rejected_even_with_consistent_manifest(self, monkeypatch, fx):
+        _patch_a2_db_reads(monkeypatch, fx, [])
+        tampered = _flip_one_byte(fx.sheet, b"Lecturer 0")
+        with pytest.raises(VerificationError, match="reference_labeling_sheet.csv is not byte-equal"):
+            self._run(fx, manifest=_with_sha(fx.manifest, sheet=tampered), sheet=tampered)
+
+    def test_manifest_hash_not_matching_actual_file_rejected(self, monkeypatch, fx):
+        _patch_a2_db_reads(monkeypatch, fx, [])
+        with pytest.raises(VerificationError, match="does not match the review manifest hash"):
+            self._run(fx, candidate_review=fx.candidate_review + b"\n")
+
+    @pytest.mark.parametrize(
+        "field,value",
+        [
+            ("candidate_pair_count", 99),
+            ("ambiguous_lecturer_count", 0),
+            ("publication_conflict_count", 0),
+            ("publication_rule_set_version", "tampered"),
+        ],
+    )
+    def test_self_declared_manifest_fields_not_trusted(self, monkeypatch, fx, field, value):
+        _patch_a2_db_reads(monkeypatch, fx, [])
+        with pytest.raises(VerificationError, match=field):
+            self._run(fx, manifest={**fx.manifest, field: value})
+
+    def test_generated_at_is_the_only_free_field(self, monkeypatch, fx):
+        _patch_a2_db_reads(monkeypatch, fx, [])
+        assert self._run(fx, manifest={**fx.manifest, "generated_at": "2030-01-01T00:00:00+00:00"})["verified"]
+
+    @pytest.mark.parametrize(
+        "change",
+        ["drop_candidate", "extra_conflict", "different_lecturer_uuid_map"],
+    )
+    def test_different_database_state_rejected(self, monkeypatch, fx, change):
+        kwargs = {}
+        if change == "drop_candidate":
+            kwargs["enriched"] = fx.enriched[:-1]
+        elif change == "extra_conflict":
+            kwargs["conflicts"] = fx.conflicts + (
+                PublicationEvidenceConflict(
+                    known_publication_id=uuid.UUID(int=5151),
+                    lecturer_id=fx.canonical[fx.cohort[7]],
+                    lecturer_snapshot_id=uuid.UUID(int=5252),
+                    reason="DOI_AMBIGUOUS",
+                    doi_publication_ids=(),
+                    title_publication_ids=(),
+                ),
+            )
+        else:
+            kwargs["canonical"] = {s: uuid.uuid4() for s in fx.cohort}
+        _patch_a2_db_reads(monkeypatch, fx, [], **kwargs)
+        with pytest.raises(VerificationError):
+            self._run(fx)
+
+    def test_expected_bytes_come_from_database_inputs_not_package(self, monkeypatch, fx):
+        captured = {}
+        real_build = rp.build_review_package
+
+        def spy(**kwargs):
+            captured.update(kwargs)
+            return real_build(**kwargs)
+
+        _patch_a2_db_reads(monkeypatch, fx, [])
+        monkeypatch.setattr(rp, "build_review_package", spy)
+        self._run(fx)
+        assert tuple(captured["enriched_candidates"]) == fx.enriched
+        assert tuple(captured["conflicts"]) == fx.conflicts
+        assert captured["official_dataset_bytes"] == fx.dataset
+        assert captured["source_id_file_bytes"] == fx.cohort_bytes
+        assert captured["rule_set_id"] == CANDIDATE_RULE_SET_ID
+        for value in captured.values():
+            assert value is not fx.candidate_review and value is not fx.sheet
+
+    def test_rerender_source_never_reads_package_csv_for_inputs(self):
+        source = inspect.getsource(ve.verify_package_rerender)
+        tree = ast.parse(source)
+        call_names = {
+            getattr(node.func, "attr", None) or getattr(node.func, "id", None)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+        }
+        assert {"resolve_canonical_lecturers_from_db", "generate_review_inputs", "build_review_package"} <= call_names
+        assert "DictReader" not in call_names and "reader" not in call_names
+
+    def test_unresolved_lecturer_in_database_fails_closed(self, monkeypatch, fx):
+        def resolve(selected, session):
+            raise rp.ReviewPackageError("Canonical lecturer resolution failed")
+
+        monkeypatch.setattr(rp, "resolve_canonical_lecturers_from_db", resolve)
+        with pytest.raises(VerificationError, match="re-render failed"):
+            self._run(fx)
+
+    def test_rerender_performs_no_writes(self):
+        tree = ast.parse(inspect.getsource(ve.verify_package_rerender))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute):
+                assert node.attr not in {"commit", "add", "add_all", "flush", "delete", "merge", "write_bytes", "write_text"}

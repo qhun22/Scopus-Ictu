@@ -86,9 +86,15 @@ All gates fail closed and run before any database connection:
 - all 50 labels are complete and valid under the frozen A1 parser and the
   dataset cross-check
 
-Database gate: `prod` refused; the database must be named `scopus_m12_test`
-(never printed); `SET TRANSACTION READ ONLY` fail-closed; database errors
-redacted; engine disposed.
+Database gate (as of A3 Commit #1):
+
+- `prod` is refused.
+- The configured and the live (`SELECT current_database()`) database must
+  both be exactly `scopus_c3_eval_v1`. The name is never printed.
+- A `REPEATABLE READ READ ONLY` snapshot transaction is fail-closed.
+- The input fingerprint must equal the pinned value; it is UNPINNED in
+  Commit #1, so evaluation is refused.
+- Database errors are redacted and the engine is disposed.
 
 ## 6. Evaluation Contract
 
@@ -155,6 +161,90 @@ Phase-1 audit report.
 
 New corrected CI: NOT_AVAILABLE_AT_COMMIT_TIME.
 
+## A3 Commit #1 — Evaluation Database Guard and Input Fingerprint
+
+Reason: `scopus_m12_test` turned out to be a pytest scratch database, with 1
+lecturer, 1 Scopus author and 22 publications. The frozen A2 builder failed
+closed: 50 of 50 cohort lecturers were unresolved. Decision (Option 3): use a
+dedicated evaluation database `scopus_c3_eval_v1`, created by Alembic and
+selectively copied from read-only acceptance. That is a separate operational
+step, not performed here.
+
+Verified from models and the initial Alembic migration:
+
+- **Primary keys.** All 9 tables have a UUID PK `id`.
+- **Foreign keys.** The only required parents are
+  `raw_scopus_records.import_id → scopus_imports.id` and
+  `scopus_author_name_variants.first_seen_raw_record_id` (NOT NULL) →
+  `raw_scopus_records.id`. `scopus_imports` has no FK, and none of the 9
+  tables references `users`.
+- **Other constraints.**
+  - Composite FK
+    `lecturer_known_publications(snapshot_id, lecturer_id) →
+    lecturer_source_snapshots(id, lecturer_id)`.
+  - Unique constraints: `publications.eid`, `scopus_authors.scopus_id`,
+    `scopus_author_name_variants(scopus_author_id, variant_type,
+    variant_name)`, `publication_authors(publication_id, author_order)` and
+    `(publication_id, scopus_author_id)`,
+    `raw_scopus_records(import_id, row_number)`.
+- **`publication_raw_sources`** is not read by the generator or enricher, so
+  it is excluded.
+
+Changes:
+
+- The approved database is `scopus_c3_eval_v1`. `scopus_m12_test` and the
+  acceptance DB are explicitly rejected.
+- The live-connection `current_database()` check was added.
+- The snapshot is now `REPEATABLE READ READ ONLY`.
+- Input fingerprint schema_version 1: 7 content tables plus 2 primary-key
+  tables, with a canonical JSON and SHA-256 contract (see
+  `data/matching/evaluation/README.md`).
+- New `compute-fingerprint` mode.
+- `evaluate` is refused while the fingerprint is UNPINNED, and refused on any
+  mismatch. The result records `input_fingerprint`.
+- `EXPECTED_INPUT_FINGERPRINT_SHA256 = None` (UNPINNED) in this commit.
+  Pinning is Commit #2, after the operational database build.
+- Matching code, the frozen A2 builder, schema and models are unchanged.
+
+Review-package binding, assessed:
+
+- **Already bound:**
+  - the manifest ↔ the package files
+  - the manifest ↔ the dataset bytes and cohort file
+  - the rule-set provenance
+  - the frozen code blobs
+  - the blank sheet ↔ the confirmed copy (identity columns)
+  - the confirmed labels ↔ the cohort (all 50)
+- **Package ↔ database snapshot, now bound by re-render.** The frozen A2
+  manifest does not record a database fingerprint. So, inside the same
+  `REPEATABLE READ READ ONLY` snapshot as the fingerprint check, `evaluate`
+  re-runs the frozen A2 pipeline:
+  1. It uses the same functions the A2 builder CLI calls, in
+     `review_package.py`: `parse_official_lecturers`, `parse_source_id_file`,
+     `select_lecturers`, `resolve_canonical_lecturers_from_db`,
+     `generate_review_inputs` and `build_review_package`.
+  2. Inputs come only from the verified dataset and cohort bytes, the database
+     session, and the candidate rule-set constants. Package CSV data is never
+     used to build the expected bytes.
+  3. It requires byte-equality of `candidate_review.csv` and
+     `reference_labeling_sheet.csv` with the re-render.
+  4. It requires equality of every manifest field except `generated_at`.
+  5. File hashes are recomputed from the supplied files, never trusted as
+     declared.
+
+  Any mismatch fails closed before a result is written. The result records
+  `review_package_rerender`. The A2 builder is unchanged.
+- **Residual gap:** labels ↔ the exact package the reviewer saw. The confirmed
+  CSV follows the A1 8-column contract and carries no package identity. Two
+  packages built from different database states share the same blank sheet,
+  because identity columns come only from the dataset and cohort. A3 proves
+  that the evaluated package matches the pinned database, but it cannot
+  prove from the labels alone that the reviewer viewed that package rather
+  than an earlier one. Mitigation is operational: a provenance sidecar, with
+  the fingerprint checked before and after the builder and the package SHAs
+  recorded at hand-off. A sidecar is not a signature, so the evaluator never
+  trusts it in place of re-render.
+
 ## 11. Limitations
 
 - Assisted human review may introduce incorporation bias.
@@ -168,5 +258,8 @@ New corrected CI: NOT_AVAILABLE_AT_COMMIT_TIME.
 
 ## 12. Next Gate
 
-Human confirmation of every primary-cohort row (50/50), from an A2 package
-built against the approved `scopus_m12_test` database with this cohort file.
+1. Operational build of `scopus_c3_eval_v1`.
+2. A3 Commit #2: pin the fingerprint.
+3. Generate the A2 package with the fingerprint checked before and after the
+   builder.
+4. Human confirmation of every primary-cohort row (50/50).
