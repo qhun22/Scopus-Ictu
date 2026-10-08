@@ -95,6 +95,37 @@ NOT_AVAILABLE_AT_COMMIT_TIME
 - Force push: false
 - Canonical unrelated WIP modified: false
 
+## Provenance Correction
+
+Initial A2 SHA `89164cf01a6059e80a5f0f18c48a93956a30b79c` passed historical
+exact-head CI run 37709743978 (historical evidence only).
+
+An independent audit found that `candidate_rule_set_id/version` alone cannot
+reproduce the publication evidence and conflict context shown to human
+reviewers: candidate retrieval rules can stay unchanged while publication
+enrichment/reconciliation rules change `publication_evidence_json`,
+`publication_evidence_count` and the conflict diagnostics.
+
+Correction (additive, 4 files modified: `review_package.py`, the unit test
+file, the review README, and this document):
+
+- `review_manifest.json` now also records `publication_rule_set_id/version`
+  and `generation_rule_set_id/version` alongside the existing candidate
+  fields (six provenance fields total).
+- Values are imported from the existing `PUBLICATION_RULE_SET_*` and
+  `GENERATION_RULE_SET_*` constants in `candidate_persistence.py`; nothing is
+  hardcoded or invented, and that module is unmodified.
+- The CLI is unchanged; it still supplies the candidate fields as before.
+- No production matching behavior changed; `candidate_review.csv` and the
+  blank labeling sheet are unchanged; no ground truth was created.
+- Provenance is metadata only (not a score, rank, confidence, or quality
+  estimate).
+
+Final authoritative A2 SHA: see Git commit containing this record and final
+A2 audit report.
+
+Corrected CI evidence: NOT_AVAILABLE_AT_COMMIT_TIME.
+
 ## 9. Known Limitations
 
 - A2 generates no real confirmed labels and reports no precision/recall/F1.

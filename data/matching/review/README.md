@@ -97,11 +97,29 @@ evidence is copied here. Once a human fills it, it validates with
 Fields: `schema_version`, `generated_at`, `official_lecturer_dataset_sha256`,
 `source_id_file_sha256` (null without `--source-id-file`),
 `candidate_rule_set_id`, `candidate_rule_set_version`,
+`publication_rule_set_id`, `publication_rule_set_version`,
+`generation_rule_set_id`, `generation_rule_set_version`,
 `selected_lecturer_count`, `lecturers_with_candidates`,
 `lecturers_without_candidates`, `candidate_pair_count`,
 `ambiguous_lecturer_count`, `publication_conflict_count`,
 `candidate_review_sha256`, `reference_labeling_sheet_sha256`.
 
+- **Rule provenance** (taken from the `CANDIDATE_*`, `PUBLICATION_*` and
+  `GENERATION_*` rule-set constants in `candidate_persistence.py`; never
+  duplicated or invented here):
+  - `candidate_rule_set_*` identifies the candidate **retrieval** rules that
+    produced the suggestions.
+  - `publication_rule_set_*` identifies the publication evidence /
+    reconciliation rules that produced `publication_evidence_json`,
+    `publication_evidence_count` and the conflict diagnostics shown to the
+    reviewer.
+  - `generation_rule_set_*` identifies the combined evidence-generation
+    contract (candidate + publication evidence).
+
+  This lets C3-A3 demonstrate exactly which review context the human reviewer
+  saw: retrieval rules can stay the same while publication rules change the
+  evidence shown. These fields are provenance only; they are not a score,
+  rank, confidence, or quality estimate.
 - `ambiguous_lecturer_count` is exactly the number of selected lecturers with
   `candidate_count > 1`. It is descriptive only, not "uncertain" or "wrong".
 - `publication_conflict_count` counts the underlying conflict descriptors

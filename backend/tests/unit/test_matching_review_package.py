@@ -26,6 +26,14 @@ from app.services.matching.candidate_types import (
     PublicationEvidence,
     PublicationEvidenceConflict,
 )
+from app.services.matching.candidate_persistence import (
+    CANDIDATE_RULE_SET_ID,
+    CANDIDATE_RULE_SET_VERSION,
+    GENERATION_RULE_SET_ID,
+    GENERATION_RULE_SET_VERSION,
+    PUBLICATION_RULE_SET_ID,
+    PUBLICATION_RULE_SET_VERSION,
+)
 from app.services.matching.evaluation import parse_reference_csv
 from app.services.matching.review_package import (
     CANDIDATE_REVIEW_COLUMNS,
@@ -136,8 +144,8 @@ def _build(
         conflicts=conflicts,
         official_dataset_bytes=dataset,
         source_id_file_bytes=selection,
-        rule_set_id="M2.7A_CANDIDATE_GENERATOR",
-        rule_set_version="M2.7A-2",
+        rule_set_id=CANDIDATE_RULE_SET_ID,
+        rule_set_version=CANDIDATE_RULE_SET_VERSION,
         generated_at=_NOW,
     )
 
@@ -634,8 +642,67 @@ class TestLabelingSheet:
 class TestManifest:
     def test_exact_field_set(self):
         pkg = _build(_official(SRC_A), {SRC_A: uuid.uuid4()})
-        assert set(pkg.manifest) == set(MANIFEST_FIELDS)
+        assert MANIFEST_FIELDS == (
+            "schema_version",
+            "generated_at",
+            "official_lecturer_dataset_sha256",
+            "source_id_file_sha256",
+            "candidate_rule_set_id",
+            "candidate_rule_set_version",
+            "publication_rule_set_id",
+            "publication_rule_set_version",
+            "generation_rule_set_id",
+            "generation_rule_set_version",
+            "selected_lecturer_count",
+            "lecturers_with_candidates",
+            "lecturers_without_candidates",
+            "candidate_pair_count",
+            "ambiguous_lecturer_count",
+            "publication_conflict_count",
+            "candidate_review_sha256",
+            "reference_labeling_sheet_sha256",
+        )
+        assert tuple(pkg.manifest) == MANIFEST_FIELDS
         assert json.loads(pkg.manifest_json) == pkg.manifest
+
+    def test_rule_provenance_comes_from_authoritative_constants(self):
+        m = _build(_official(SRC_A), {SRC_A: uuid.uuid4()}).manifest
+        assert m["candidate_rule_set_id"] == CANDIDATE_RULE_SET_ID
+        assert m["candidate_rule_set_version"] == CANDIDATE_RULE_SET_VERSION
+        assert m["publication_rule_set_id"] == PUBLICATION_RULE_SET_ID
+        assert m["publication_rule_set_version"] == PUBLICATION_RULE_SET_VERSION
+        assert m["generation_rule_set_id"] == GENERATION_RULE_SET_ID
+        assert m["generation_rule_set_version"] == GENERATION_RULE_SET_VERSION
+        for key in (
+            "publication_rule_set_id",
+            "publication_rule_set_version",
+            "generation_rule_set_id",
+            "generation_rule_set_version",
+        ):
+            assert isinstance(m[key], str) and m[key]
+
+    def test_implementation_does_not_hardcode_rule_set_literals(self):
+        literals = {
+            PUBLICATION_RULE_SET_ID,
+            PUBLICATION_RULE_SET_VERSION,
+            GENERATION_RULE_SET_ID,
+            GENERATION_RULE_SET_VERSION,
+        }
+        tree = ast.parse(inspect.getsource(rp))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                assert node.value not in literals
+
+    def test_provenance_does_not_alter_csv_outputs(self):
+        la = uuid.uuid4()
+        pkg = _build(_official(SRC_A), {SRC_A: la}, [_candidate(la, "S1")])
+        assert pkg.candidate_review_csv.decode("utf-8").splitlines()[0].split(",") == list(
+            CANDIDATE_REVIEW_COLUMNS
+        )
+        assert pkg.reference_labeling_sheet_csv.decode("utf-8").splitlines()[0].split(",") == list(
+            LABELING_SHEET_COLUMNS
+        )
+        assert "rule_set" not in pkg.reference_labeling_sheet_csv.decode("utf-8")
 
     def test_hashes_use_exact_bytes(self):
         dataset = b'{"lecturers": []}\n'
@@ -695,8 +762,8 @@ class TestManifest:
         text = pkg.manifest_json.decode("utf-8").lower()
         for word in ("postgres", "password", "host", "port", "database", "token", "secret", str(la)):
             assert word not in text
-        assert pkg.manifest["candidate_rule_set_id"] == "M2.7A_CANDIDATE_GENERATOR"
-        assert pkg.manifest["candidate_rule_set_version"] == "M2.7A-2"
+        assert pkg.manifest["candidate_rule_set_id"] == CANDIDATE_RULE_SET_ID
+        assert pkg.manifest["candidate_rule_set_version"] == CANDIDATE_RULE_SET_VERSION
 
     def test_determinism(self):
         la = uuid.uuid4()

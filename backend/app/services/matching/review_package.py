@@ -23,6 +23,13 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from app.services.matching.candidate_persistence import (
+    GENERATION_RULE_SET_ID,
+    GENERATION_RULE_SET_VERSION,
+    PUBLICATION_RULE_SET_ID,
+    PUBLICATION_RULE_SET_VERSION,
+)
+
 SCHEMA_VERSION = "1.0"
 
 SUGGESTION_CANDIDATE = "CANDIDATE"
@@ -64,6 +71,10 @@ MANIFEST_FIELDS: tuple[str, ...] = (
     "source_id_file_sha256",
     "candidate_rule_set_id",
     "candidate_rule_set_version",
+    "publication_rule_set_id",
+    "publication_rule_set_version",
+    "generation_rule_set_id",
+    "generation_rule_set_version",
     "selected_lecturer_count",
     "lecturers_with_candidates",
     "lecturers_without_candidates",
@@ -518,6 +529,10 @@ def build_review_package(
         ),
         "candidate_rule_set_id": rule_set_id,
         "candidate_rule_set_version": rule_set_version,
+        "publication_rule_set_id": PUBLICATION_RULE_SET_ID,
+        "publication_rule_set_version": PUBLICATION_RULE_SET_VERSION,
+        "generation_rule_set_id": GENERATION_RULE_SET_ID,
+        "generation_rule_set_version": GENERATION_RULE_SET_VERSION,
         "selected_lecturer_count": counts.selected_lecturer_count,
         "lecturers_with_candidates": counts.lecturers_with_candidates,
         "lecturers_without_candidates": counts.lecturers_without_candidates,
