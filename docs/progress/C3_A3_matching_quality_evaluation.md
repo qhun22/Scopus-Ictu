@@ -245,6 +245,83 @@ Review-package binding, assessed:
   recorded at hand-off. A sidecar is not a signature, so the evaluator never
   trusts it in place of re-render.
 
+## A3 P1 — Source-Snapshot Dump Orchestrator (code only)
+
+Decision: P0 closes the survey. P1 is code with mock tests only. P2 and any
+real dump remain NO-GO.
+
+Why an orchestrator: an exported snapshot lives only while the exporting
+transaction is open. A fingerprint printed by a process that has exited
+cannot be bound to a later `pg_dump`. So there is no standalone
+`source-fingerprint` mode; fingerprint and dump share one transaction.
+
+New files (no existing file changed):
+
+- `backend/app/services/matching/eval_source_dump.py`
+- `backend/scripts/dump_c3_eval_source.py`
+- `backend/tests/unit/test_c3_eval_source_dump.py`
+
+`dump_source_snapshot(session, ...)`, in one open transaction:
+
+1. `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY` first.
+2. Live `current_database()` must be `scopus_ictu_acceptance_v2` (the only
+   allowlisted source; the configured URL is checked too). `alembic_version`
+   must be exactly `d3f7a1c9e2b4`.
+3. Fingerprint v1 via the committed `compute_input_fingerprint(session)`.
+4. `SELECT pg_export_snapshot()`; the id is format-checked before use.
+5. `pg_dump --format=custom --data-only --no-password --strict-names
+   --lock-wait-timeout=30s --snapshot=<id> --file=<archive>.partial` with one
+   `--table=public.<t>` for each of the nine fingerprint tables. No
+   `--disable-triggers`.
+6. `pg_restore --list` on the partial: exactly nine `TABLE DATA` entries for
+   the contracted tables, no other table, sequence or schema entry.
+   Parent-before-child order is recorded, not enforced
+   (`archive_parent_before_child`); restore uses `-L` only when it is false.
+7. SHA-256 of the archive, then the transaction ends (rollback; nothing to
+   commit), then `<archive>.partial` is renamed into place.
+
+Any failure: rollback, delete the partial, no metadata, and the fingerprint
+is not reported as bound to any dump. No explicit locks; `pg_dump`'s ACCESS
+SHARE locks block DDL only. Acceptance writes are not blocked. DDL and
+migrations are forbidden operationally during the dump window.
+
+Credentials: `DB_USER`/`DB_PASSWORD` (and host, port, name) reach `pg_dump`
+only as `PGUSER`/`PGPASSWORD`/`PGHOST`/`PGPORT`/`PGDATABASE` in the child
+environment. Every inherited `PG*` variable is stripped first. argv carries
+no credentials. Subprocess output is never surfaced.
+
+Metadata JSON (operational, not a replacement for fingerprint v1):
+`alembic_revision`, `snapshot_id`, `archive_sha256`, archive ToC order, the
+nine row counts, and `input_fingerprint` (v1, unchanged). The binding between
+dump and fingerprint is the shared open transaction, not this file.
+
+Integrity of a copy is the archive SHA-256 plus the nine row counts.
+Fingerprint v1 covers the seven content tables and the key sets of
+`scopus_imports` and `raw_scopus_records`; it does not cover `raw_payload`.
+v1 is unchanged.
+
+Unchanged: `evaluate`, `compute-fingerprint`, `is_approved_database`
+(still rejects acceptance), `EXPECTED_INPUT_FINGERPRINT_SHA256 = None`. Tests
+assert the dump module and script reference none of the evaluate path, and
+that the evaluation CLI still has exactly its three subcommands.
+
+Gates carried forward:
+
+- B1 does not block P1. Linux CI is the gate.
+- B2, B3, B4 block P2 and P3.
+- A `SELECT`-only source role must exist before any real dump.
+- `default_transaction_read_only` on the target is set only after Alembic and
+  restore.
+- Restore (later): inspect the real ToC, one transaction, `--exit-on-error`,
+  no `--disable-triggers`, `-L` only if order is wrong. On error roll back and
+  do not publish the database.
+- P2 is considered only after P1 CI. P3 (real dump) needs the read role, DBA
+  credentials via a separate channel, and a working SQLAlchemy environment.
+
+Validation: local, Windows, `--noconftest` with dummy `DB_*` (no database
+contacted): `test_c3_eval_source_dump.py` 67 passed;
+`test_matching_quality_evaluation.py` 173 passed. CI: NOT_AVAILABLE_AT_COMMIT_TIME.
+
 ## 11. Limitations
 
 - Assisted human review may introduce incorporation bias.
