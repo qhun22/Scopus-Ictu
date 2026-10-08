@@ -159,7 +159,18 @@ def run(args: argparse.Namespace) -> int:
         return 1
     finally:
         if meta_staging is not None:
-            sd.cleanup_owned_artifacts([meta_staging])
+            # meta_staging is set only when write_metadata_atomic succeeded but
+            # exclusive_promote raised (or write_metadata_atomic itself raised and
+            # returned a path before the F2 fix — now impossible).  The exception
+            # handler above already emitted the primary error and will return 1.
+            # Check and report staging cleanup result here so the operator knows
+            # whether manual removal is needed.  No return inside finally.
+            _sc = sd.cleanup_owned_artifacts([meta_staging])
+            if _sc.incomplete:
+                _emit_error(
+                    f"Additionally, metadata staging cleanup incomplete — "
+                    f"{_sc.summary()}. Manual removal required."
+                )
 
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
