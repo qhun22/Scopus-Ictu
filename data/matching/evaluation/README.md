@@ -31,6 +31,29 @@ output. n = 50 is practical for a graduation project and reproducible, but it
 is **not** a high-precision estimate for the whole 410-lecturer population.
 Headline metrics use only this cohort; no challenge set is mixed in.
 
+## Frozen official dataset (Phase 1)
+
+The official lecturer dataset used by C3-A3 is frozen at the snapshot from
+which the cohort was precommitted. Because Git `core.autocrlf` yields two byte
+forms of the same repository text, exactly **two** SHA-256 values of the exact
+dataset bytes are accepted:
+
+- LF (repository content):
+  `9428e0a2b009ecff1043b4dc796ed69a0fc64054594b0fb40ffa27bbed4ec82e`
+- CRLF (Windows checkout):
+  `ac4ed2d3f3c5fc7e73912ac9386b5710f4e015bbd7028e5b48a656dae3d4c3d4`
+
+Any other hash fails closed, both in `prepare-cohort` and before
+evaluation. This holds even if the 50 source IDs are unchanged, because names
+or emails may have changed. Bytes are hashed exactly as supplied, with no
+newline normalization. Arbitrary normalized-equivalent content is **not**
+accepted; only these two exact hashes are.
+
+This does not weaken package provenance. The A2 manifest still records the
+SHA-256 of the exact bytes actually used, and A3 still requires the supplied
+dataset to match it. An LF dataset with a CRLF-built manifest (or the reverse)
+is rejected.
+
 ## Human review workflow
 
 1. Build the A2 package with the frozen builder and **this** cohort file:
@@ -64,7 +87,8 @@ Methodology:
 1. `review_manifest.json` parsed strictly: exact A2 field set, correct types.
 2. SHA-256 of `candidate_review.csv` and `reference_labeling_sheet.csv` equal
    the manifest.
-3. SHA-256 of the official dataset equals the manifest. The source-id file's
+3. The official dataset is one of the two frozen Phase-1 byte forms, **and**
+   its SHA-256 equals the manifest. The source-id file's
    SHA-256 equals the manifest (never null) and the committed cohort file's.
    `selected_lecturer_count == 50`. The file's lines equal the cohort
    recomputed from the dataset.

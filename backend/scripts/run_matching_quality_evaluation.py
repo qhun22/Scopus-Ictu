@@ -58,6 +58,7 @@ def _prepare_cohort(args: argparse.Namespace) -> int:
         VerificationError,
         render_cohort_file,
         select_primary_cohort,
+        verify_frozen_official_dataset,
     )
 
     dataset_path = Path(args.lecturer_dataset)
@@ -69,7 +70,9 @@ def _prepare_cohort(args: argparse.Namespace) -> int:
         _emit_error(f"Refusing to overwrite existing cohort file: {out}")
         return 1
     try:
-        cohort = select_primary_cohort(dataset_path.read_bytes())
+        dataset_bytes = dataset_path.read_bytes()
+        verify_frozen_official_dataset(dataset_bytes)
+        cohort = select_primary_cohort(dataset_bytes)
     except VerificationError as exc:
         _emit_error(str(exc))
         return 1

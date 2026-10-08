@@ -168,8 +168,102 @@ def _git_runner(current: dict[str, str] | None = None, frozen: dict[str, str] | 
 
 
 @pytest.fixture()
-def fx() -> _Fixture:
-    return _Fixture()
+def fx(monkeypatch) -> _Fixture:
+    fixture = _Fixture()
+    # Synthetic datasets are not the frozen Phase-1 snapshot; register this one
+    # explicitly so the other gates can be exercised in isolation.
+    monkeypatch.setattr(
+        ve,
+        "PHASE1_ACCEPTED_DATASET_SHA256",
+        (*ve.PHASE1_ACCEPTED_DATASET_SHA256, hashlib.sha256(fixture.dataset).hexdigest()),
+    )
+    return fixture
+
+
+def _real_dataset_forms() -> tuple[bytes, bytes]:
+    raw = (_REPO_ROOT / "data/lecturers/ictu_lecturers.json").read_bytes()
+    lf = raw.replace(b"\r\n", b"\n")
+    return lf, lf.replace(b"\n", b"\r\n")
+
+
+def _real_cohort_bytes() -> bytes:
+    return (_REPO_ROOT / "data/matching/evaluation/primary_cohort_source_ids.txt").read_bytes()
+
+
+def _real_manifest(dataset_sha: str, cohort_bytes: bytes) -> dict:
+    return {
+        "official_lecturer_dataset_sha256": dataset_sha,
+        "source_id_file_sha256": hashlib.sha256(cohort_bytes).hexdigest(),
+        "selected_lecturer_count": 50,
+    }
+
+
+# ===========================================================================
+# FROZEN PHASE-1 OFFICIAL DATASET
+# ===========================================================================
+
+
+class TestFrozenOfficialDataset:
+    def test_accepted_hash_constants(self):
+        assert ve.PHASE1_ACCEPTED_DATASET_SHA256 == (
+            "9428e0a2b009ecff1043b4dc796ed69a0fc64054594b0fb40ffa27bbed4ec82e",
+            "ac4ed2d3f3c5fc7e73912ac9386b5710f4e015bbd7028e5b48a656dae3d4c3d4",
+        )
+
+    def test_known_lf_snapshot_accepted(self):
+        lf, _ = _real_dataset_forms()
+        assert hashlib.sha256(lf).hexdigest() == ve.PHASE1_OFFICIAL_DATASET_SHA256_LF
+        assert ve.verify_frozen_official_dataset(lf) == ve.PHASE1_OFFICIAL_DATASET_SHA256_LF
+
+    def test_known_crlf_snapshot_accepted(self):
+        _, crlf = _real_dataset_forms()
+        assert hashlib.sha256(crlf).hexdigest() == ve.PHASE1_OFFICIAL_DATASET_SHA256_CRLF
+        assert ve.verify_frozen_official_dataset(crlf) == ve.PHASE1_OFFICIAL_DATASET_SHA256_CRLF
+
+    def test_third_hash_rejected_without_disclosing_it(self):
+        lf, _ = _real_dataset_forms()
+        changed = lf + b"\n"
+        with pytest.raises(VerificationError) as exc_info:
+            ve.verify_frozen_official_dataset(changed)
+        assert "frozen C3-A3 Phase-1 snapshot" in str(exc_info.value)
+        assert hashlib.sha256(changed).hexdigest() not in str(exc_info.value)
+
+    @pytest.mark.parametrize("field", ["full_name", "institutional_email"])
+    def test_same_cohort_ids_but_modified_identity_rejected(self, field):
+        lf, _ = _real_dataset_forms()
+        data = json.loads(lf.decode("utf-8"))
+        cohort = ve.select_primary_cohort(lf)
+        target = next(row for row in data["lecturers"] if row["source_id"].strip() == cohort[0])
+        target[field] = (target.get(field) or "x") + " CHANGED"
+        modified = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        assert ve.select_primary_cohort(modified) == cohort
+        with pytest.raises(VerificationError, match="Phase-1 snapshot"):
+            ve.verify_frozen_official_dataset(modified)
+        cohort_bytes = _real_cohort_bytes()
+        manifest = _real_manifest(hashlib.sha256(modified).hexdigest(), cohort_bytes)
+        with pytest.raises(VerificationError, match="Phase-1 snapshot"):
+            ve.verify_dataset_and_cohort(manifest, modified, cohort_bytes, cohort_bytes)
+
+    @pytest.mark.parametrize("form", [0, 1])
+    def test_frozen_form_with_matching_manifest_valid(self, form):
+        dataset = _real_dataset_forms()[form]
+        cohort_bytes = _real_cohort_bytes()
+        manifest = _real_manifest(hashlib.sha256(dataset).hexdigest(), cohort_bytes)
+        assert len(ve.verify_dataset_and_cohort(manifest, dataset, cohort_bytes, cohort_bytes)) == 50
+
+    @pytest.mark.parametrize("dataset_form,manifest_form", [(0, 1), (1, 0)])
+    def test_manifest_still_binds_exact_bytes(self, dataset_form, manifest_form):
+        forms = _real_dataset_forms()
+        cohort_bytes = _real_cohort_bytes()
+        manifest = _real_manifest(hashlib.sha256(forms[manifest_form]).hexdigest(), cohort_bytes)
+        with pytest.raises(VerificationError, match="review manifest"):
+            ve.verify_dataset_and_cohort(manifest, forms[dataset_form], cohort_bytes, cohort_bytes)
+
+    def test_committed_cohort_file_unchanged(self):
+        content = _real_cohort_bytes().replace(b"\r\n", b"\n")
+        assert hashlib.sha256(content).hexdigest() == (
+            "e91babc67ade4413f0378c199a5821f10cba73da73dbbe22bdbec452fc357878"
+        )
 
 
 # ===========================================================================
@@ -690,6 +784,29 @@ class TestCli:
         out.write_bytes(b"keep")
         assert cli.main(args) != 0 and out.read_bytes() == b"keep"
         assert cli.main(args + ["--overwrite"]) == 0 and out.read_bytes() == fx.cohort_bytes
+
+    def test_prepare_cohort_refuses_unapproved_snapshot_before_writing(self, capsys):
+        cli = self._load()
+        lf, _ = _real_dataset_forms()
+        data = json.loads(lf.decode("utf-8"))
+        data["lecturers"][0]["full_name"] += " CHANGED"
+        td = Path(tempfile.mkdtemp())
+        dataset = td / "lecturers.json"
+        dataset.write_bytes(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+        out = td / "cohort.txt"
+        assert cli.main(["prepare-cohort", "--lecturer-dataset", str(dataset), "--out", str(out)]) != 0
+        assert not out.exists()
+        assert "Phase-1 snapshot" in self._out(capsys)
+
+    def test_prepare_cohort_accepts_frozen_snapshot(self, capsys):
+        cli = self._load()
+        td = Path(tempfile.mkdtemp())
+        for form in _real_dataset_forms():
+            dataset = td / "lecturers.json"
+            dataset.write_bytes(form)
+            out = td / "cohort.txt"
+            assert cli.main(["prepare-cohort", "--lecturer-dataset", str(dataset), "--out", str(out), "--overwrite"]) == 0
+            assert out.read_bytes() == _real_cohort_bytes().replace(b"\r\n", b"\n")
 
     def test_prepare_cohort_does_not_touch_database(self):
         source = inspect.getsource(self._load()._prepare_cohort)

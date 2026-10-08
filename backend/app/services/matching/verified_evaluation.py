@@ -61,6 +61,15 @@ COHORT_ALGORITHM = "SHA256_SEED_RANK_V1"
 COHORT_SEED = "C3-A3-ICTU-PRIMARY-2026-V1"
 COHORT_SIZE = 50
 
+# The frozen Phase-1 official lecturer dataset.  Exactly two byte forms are
+# accepted (Git autocrlf): repository LF content and the Windows CRLF checkout.
+PHASE1_OFFICIAL_DATASET_SHA256_LF = "9428e0a2b009ecff1043b4dc796ed69a0fc64054594b0fb40ffa27bbed4ec82e"
+PHASE1_OFFICIAL_DATASET_SHA256_CRLF = "ac4ed2d3f3c5fc7e73912ac9386b5710f4e015bbd7028e5b48a656dae3d4c3d4"
+PHASE1_ACCEPTED_DATASET_SHA256: tuple[str, ...] = (
+    PHASE1_OFFICIAL_DATASET_SHA256_LF,
+    PHASE1_OFFICIAL_DATASET_SHA256_CRLF,
+)
+
 APPROVED_DATABASE_NAME = "scopus_m12_test"
 RESULT_SCHEMA_VERSION = "1.0"
 
@@ -105,6 +114,24 @@ class VerificationError(Exception):
 
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Frozen Phase-1 official dataset
+# ---------------------------------------------------------------------------
+
+
+def verify_frozen_official_dataset(
+    dataset_bytes: bytes, accepted: Iterable[str] | None = None
+) -> str:
+    """SHA-256 of the exact bytes must be one of the frozen Phase-1 hashes."""
+    accepted_set = frozenset(PHASE1_ACCEPTED_DATASET_SHA256 if accepted is None else accepted)
+    digest = sha256_hex(dataset_bytes)
+    if digest not in accepted_set:
+        raise VerificationError(
+            "Official lecturer dataset is not the frozen C3-A3 Phase-1 snapshot."
+        )
+    return digest
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +220,7 @@ def verify_dataset_and_cohort(
     committed_cohort_bytes: bytes,
 ) -> tuple[str, ...]:
     """Bind manifest, dataset, supplied cohort, committed cohort, and selection."""
+    verify_frozen_official_dataset(dataset_bytes)
     if sha256_hex(dataset_bytes) != manifest["official_lecturer_dataset_sha256"]:
         raise VerificationError("Official lecturer dataset does not match the review manifest hash.")
     if manifest["source_id_file_sha256"] is None:
@@ -538,6 +566,9 @@ __all__ = [
     "FROZEN_A1_SHA",
     "FROZEN_A2_SHA",
     "FROZEN_MATCHING_BLOBS",
+    "PHASE1_ACCEPTED_DATASET_SHA256",
+    "PHASE1_OFFICIAL_DATASET_SHA256_CRLF",
+    "PHASE1_OFFICIAL_DATASET_SHA256_LF",
     "VerificationError",
     "VerifiedInputs",
     "build_result",
@@ -554,6 +585,7 @@ __all__ = [
     "verify_confirmed_identity",
     "verify_dataset_and_cohort",
     "verify_frozen_code",
+    "verify_frozen_official_dataset",
     "verify_offline_inputs",
     "verify_package_hashes",
     "verify_rule_provenance",
