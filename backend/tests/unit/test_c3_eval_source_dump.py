@@ -1366,3 +1366,180 @@ class TestF2WriteMetadataAtomic:
         # Archive must be removed since metadata was never published.
         assert not archive.exists()
         assert not meta.exists()
+
+
+# ===========================================================================
+# R6 residual — Metadata staging cleanup failure reported in finally block
+# ===========================================================================
+
+
+class TestR6ResidualMetadataStagingCleanup:
+    """finally-path cleanup_owned_artifacts result was previously discarded.
+    After the fix, CleanupResult.incomplete is checked and reported via _emit_error.
+    """
+
+    def _setup_cli(self, monkeypatch, tmp_path):
+        """Load CLI module and wire fake DB/session/subprocess."""
+        import sqlalchemy
+        import sqlalchemy.orm
+        from app.core.config import settings
+
+        spec = importlib.util.spec_from_file_location("dump_cli_r6res", _SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        monkeypatch.setattr(settings, "environment", "local")
+        monkeypatch.setattr(settings, "db_name", sd.SOURCE_DATABASE_NAME)
+        monkeypatch.setattr(settings, "db_password", _PASSWORD)
+        monkeypatch.setattr(settings, "db_host", _HOST)
+
+        sess = _Session()
+
+        class _Engine:
+            def dispose(self): pass
+
+        class _SessionCtx:
+            def __init__(self, *_a, **_k): pass
+            def __enter__(self): return sess
+            def __exit__(self, *_a): return False
+
+        monkeypatch.setattr(sqlalchemy, "create_engine", lambda *_a, **_k: _Engine())
+        monkeypatch.setattr(sqlalchemy.orm, "Session", _SessionCtx)
+
+        runner = _Runner(sess)
+        real_dump = sd.dump_source_snapshot
+
+        def _with_fp(s, **kwargs):
+            return real_dump(s, runner=runner, compute_fingerprint=lambda _s: _fingerprint(), **kwargs)
+
+        monkeypatch.setattr(sd, "dump_source_snapshot", _with_fp)
+        return module
+
+    def _make_promote_fail_for_meta(self, meta: Path, monkeypatch):
+        """Patch sd.exclusive_promote to succeed for archive (orchestrator) but
+        raise SourceDumpError when the destination is the metadata path."""
+        real_promote = sd.exclusive_promote
+
+        def _selective_fail(staging, destination):
+            if destination == meta:
+                raise sd.SourceDumpError(
+                    "Exclusive promotion failed: destination appeared after preflight check."
+                )
+            return real_promote(staging, destination)
+
+        monkeypatch.setattr(sd, "exclusive_promote", _selective_fail)
+
+    def test_staging_cleanup_failure_reported_in_stderr(self, monkeypatch, capsys, tmp_path):
+        """When metadata exclusive_promote raises and meta_staging cleanup also raises OSError,
+        stderr must contain 'cleanup incomplete' and the basename of the staging file.
+        Exit code must be non-zero. Staging file must remain on disk (unlink failed).
+        Archive must be removed (metadata was never published).
+        Metadata destination must not exist (never promoted)."""
+        module = self._setup_cli(monkeypatch, tmp_path)
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+
+        # Track the staging path created by write_metadata_atomic.
+        real_wma = sd.write_metadata_atomic
+        created_staging: list[Path] = []
+
+        def _wma_track(content, destination):
+            staging = real_wma(content, destination)
+            created_staging.append(staging)
+            return staging
+
+        monkeypatch.setattr(sd, "write_metadata_atomic", _wma_track)
+
+        # Fail exclusive_promote only for the metadata destination.
+        self._make_promote_fail_for_meta(meta, monkeypatch)
+
+        # Fail Path.unlink ONLY for the metadata staging path.
+        orig_unlink = Path.unlink
+
+        def _fail_staging_unlink(self, missing_ok=False):
+            if created_staging and self == created_staging[0]:
+                raise OSError("permission denied")
+            orig_unlink(self, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", _fail_staging_unlink)
+
+        rc = module.main(["--archive-out", str(archive), "--metadata-out", str(meta)])
+
+        assert rc == 1
+        err = capsys.readouterr().err
+        # Primary error must be present.
+        assert "Metadata publication failed" in err
+        # Cleanup incomplete must also be reported.
+        assert "cleanup incomplete" in err
+        # Basename of staging file must be mentioned.
+        assert created_staging, "staging path was never captured"
+        assert created_staging[0].name in err
+        # No credentials leaked.
+        assert _PASSWORD not in err and _HOST not in err
+        # Staging file still exists on disk (unlink failed).
+        assert created_staging[0].exists()
+        # Metadata destination was never published.
+        assert not meta.exists()
+        # Archive removed (promotion failed before metadata was published).
+        assert not archive.exists()
+
+    def test_staging_cleanup_success_no_spurious_warning(self, monkeypatch, capsys, tmp_path):
+        """When metadata exclusive_promote raises but staging cleanup succeeds,
+        no 'cleanup incomplete' warning is emitted. Exit code is 1 (primary error)."""
+        module = self._setup_cli(monkeypatch, tmp_path)
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+
+        # Fail exclusive_promote only for the metadata destination.
+        self._make_promote_fail_for_meta(meta, monkeypatch)
+
+        rc = module.main(["--archive-out", str(archive), "--metadata-out", str(meta)])
+
+        assert rc == 1
+        err = capsys.readouterr().err
+        # Primary error present.
+        assert "Metadata publication failed" in err
+        # No spurious cleanup warning.
+        assert "cleanup incomplete" not in err
+        # No credentials.
+        assert _PASSWORD not in err and _HOST not in err
+        # No staging file remains.
+        assert not any(p.suffix == ".meta_staging" for p in tmp_path.iterdir())
+
+    def test_metadata_destination_not_touched_on_staging_cleanup_failure(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        """Pre-existing metadata destination must not be overwritten or deleted
+        when staging cleanup fails after a failed promotion."""
+        module = self._setup_cli(monkeypatch, tmp_path)
+        archive = tmp_path / "src.dump"
+        meta = tmp_path / "src.json"
+        meta.write_bytes(b"pre-existing-meta")
+
+        real_wma = sd.write_metadata_atomic
+        created_staging: list[Path] = []
+
+        def _wma_track(content, destination):
+            staging = real_wma(content, destination)
+            created_staging.append(staging)
+            return staging
+
+        monkeypatch.setattr(sd, "write_metadata_atomic", _wma_track)
+
+        # Fail exclusive_promote only for the metadata destination.
+        self._make_promote_fail_for_meta(meta, monkeypatch)
+
+        orig_unlink = Path.unlink
+
+        def _fail_staging_unlink(self, missing_ok=False):
+            if created_staging and self == created_staging[0]:
+                raise OSError("permission denied")
+            orig_unlink(self, missing_ok=missing_ok)
+
+        monkeypatch.setattr(Path, "unlink", _fail_staging_unlink)
+
+        rc = module.main(["--archive-out", str(archive), "--metadata-out", str(meta)])
+
+        assert rc == 1
+        # Pre-existing metadata unchanged.
+        assert meta.read_bytes() == b"pre-existing-meta"
