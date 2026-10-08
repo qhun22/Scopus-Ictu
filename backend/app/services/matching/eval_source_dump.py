@@ -335,7 +335,7 @@ def _same_path(a: Path, b: Path) -> bool:
         return False
 
 
-def exclusive_promote(staging: Path, destination: Path) -> None:
+def exclusive_promote(staging: Path, destination: Path) -> CleanupResult:
     """Atomically promote ``staging`` to ``destination`` with no-clobber guarantee.
 
     Uses ``os.link`` which raises ``FileExistsError`` on Linux and Windows if
@@ -343,33 +343,49 @@ def exclusive_promote(staging: Path, destination: Path) -> None:
     succeeds, so a failed promotion leaves staging intact for cleanup.
 
     Requirements: staging and destination must be on the same filesystem.
-    On failure (including ``FileExistsError``), staging is not removed; the
-    caller is responsible for cleanup.
+
+    Returns a ``CleanupResult`` describing staging cleanup.  If staging unlink
+    fails, ``result.incomplete`` is True — the destination is published and
+    intact; the orphaned staging requires manual removal.  The caller must
+    surface this as an error: the destination must **not** be rolled back.
+
+    On pre-link failure (including ``FileExistsError``), staging is not removed
+    and a ``SourceDumpError`` is raised; the caller is responsible for cleanup.
     """
     try:
         os.link(staging, destination)
     except FileExistsError:
         raise SourceDumpError(
-            f"Exclusive promotion failed: destination appeared after preflight check."
+            "Exclusive promotion failed: destination appeared after preflight check."
         ) from None
     except OSError as exc:
         raise SourceDumpError(
-            f"Exclusive promotion of archive failed ({exc.errno})."
+            f"Exclusive promotion failed ({exc.errno})."
         ) from None
+    # Hard link succeeded: destination is published.  Attempt to remove the
+    # orphaned staging duplicate and report the result to the caller.
+    removed: list[str] = []
+    failed: list[str] = []
     try:
         staging.unlink()
+        removed.append(staging.name)
     except OSError:
-        # The hard link succeeded: destination is intact.  Staging is an
-        # orphaned duplicate; report but do not fail the publication.
-        pass
+        failed.append(staging.name)
+    return CleanupResult(removed, failed)
 
 
 def write_metadata_atomic(content: bytes, destination: Path) -> Path:
     """Write ``content`` to a staging file in the same directory as ``destination``.
 
-    Flushes and fsyncs the staging file before returning.  The staging path is
-    returned; the caller calls ``exclusive_promote(staging, destination)`` and
-    cleans up staging on any error.
+    Flushes and fsyncs the staging file before returning.  On success the
+    staging path is returned; the caller calls
+    ``exclusive_promote(staging, destination)`` and is responsible for cleanup
+    from that point on.
+
+    On any write/flush/fsync/close error this function closes and deletes the
+    staging file before re-raising as ``SourceDumpError``.  If staging deletion
+    also fails, raises ``SourceDumpError`` reporting "cleanup incomplete" so the
+    caller knows manual removal is needed.  The destination is never written.
 
     The staging file is created with ``tempfile.NamedTemporaryFile`` so the OS
     provides a unique name and restrictive permissions (subject to process umask).
@@ -381,12 +397,28 @@ def write_metadata_atomic(content: bytes, destination: Path) -> Path:
         suffix=".meta_staging",
     )
     staging = Path(staging_fh.name)
+    write_ok = False
     try:
         staging_fh.write(content)
         staging_fh.flush()
         os.fsync(staging_fh.fileno())
+        write_ok = True
     finally:
-        staging_fh.close()
+        try:
+            staging_fh.close()
+        except OSError:
+            if write_ok:
+                # write/flush/fsync succeeded but close failed — treat as error.
+                write_ok = False
+        if not write_ok:
+            try:
+                staging.unlink(missing_ok=True)
+            except OSError:
+                raise SourceDumpError(
+                    f"Metadata staging write failed and cleanup incomplete — "
+                    f"{staging.name} requires manual removal."
+                )
+            raise SourceDumpError("Metadata staging write failed.")
     return staging
 
 
@@ -525,9 +557,9 @@ def dump_source_snapshot(
 
     # R6: exclusive no-clobber promotion of the archive (os.link, same filesystem).
     try:
-        exclusive_promote(partial, archive_path)
+        promote_result = exclusive_promote(partial, archive_path)
     except SourceDumpError:
-        # partial is still owned; clean it up.
+        # Pre-link failure: partial not yet promoted, clean it up.
         result = cleanup_owned_artifacts(owned)
         if result.incomplete:
             raise SourceDumpError(
@@ -536,9 +568,17 @@ def dump_source_snapshot(
             ) from None
         raise
 
-    # partial was either promoted (hard link) and unlinked, or orphaned.
-    # Either way it is no longer an output artifact to protect; drop from owned.
+    # Hard link succeeded: archive_path is published.  Do NOT add archive_path
+    # to owned[] — it must never be deleted by cleanup_owned_artifacts.
+    # owned still contains partial; exclusive_promote already attempted unlink.
+    # If staging unlink failed, report it — publication succeeded, but manual
+    # removal of the orphaned partial is needed.
     owned.clear()
+    if promote_result.incomplete:
+        raise SourceDumpError(
+            f"Archive published but staging cleanup incomplete — "
+            f"{promote_result.summary()}."
+        )
     return SourceDumpResult(fingerprint, revision, snapshot_id, archive_sha256, toc)
 
 

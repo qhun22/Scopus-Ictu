@@ -127,16 +127,29 @@ def run(args: argparse.Namespace) -> int:
         return 1
 
     meta_staging = None
+    meta_published = False
     try:
         meta_staging = sd.write_metadata_atomic(content, metadata_out)
-        sd.exclusive_promote(meta_staging, metadata_out)
-        meta_staging = None  # successfully promoted; no longer needs cleanup
+        promote_result = sd.exclusive_promote(meta_staging, metadata_out)
+        meta_staging = None  # exclusive_promote attempted unlink; staging is no longer ours to remove
+        meta_published = True
+        if promote_result.incomplete:
+            # metadata_out is published; archive is published.  Both destinations
+            # must NOT be rolled back.  Report incomplete and return 1.
+            _emit_error(
+                f"Metadata published but staging cleanup incomplete — "
+                f"{promote_result.summary()}. Manual removal required."
+            )
+            return 1
     except sd.SourceDumpError as exc:
         _emit_error(f"Metadata publication failed: {exc}")
-        # Archive was promoted; remove it since metadata was not published.
-        cleanup = sd.cleanup_owned_artifacts([archive])
-        if cleanup.incomplete:
-            _emit_error(f"Archive cleanup also incomplete — {cleanup.summary()}.")
+        if not meta_published:
+            # metadata_out was never promoted — safe to remove archive.
+            cleanup = sd.cleanup_owned_artifacts([archive])
+            if cleanup.incomplete:
+                _emit_error(f"Archive cleanup also incomplete — {cleanup.summary()}.")
+        # If meta_published is True here we fell through from promote_result.incomplete
+        # path above (unreachable), so no archive rollback needed.
         return 1
     except OSError:
         _emit_error("Metadata write failed.")
