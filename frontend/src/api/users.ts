@@ -1,23 +1,11 @@
 import { apiGet, apiPatch, apiPost } from "./client";
 import { User } from "./auth";
 import type { LecturerUser } from "./lecturers";
+import { safeDisplayName } from "../utils/displayName";
 
 export async function getUsers(): Promise<User[]> {
   const users = await apiGet<User[]>("/api/v1/users");
-  return users.map((u) => {
-    let name = u.display_name;
-    if (!name || name.includes("?") || name === "Qu?n tr? vi?n") {
-      if (u.role?.toUpperCase() === "ADMIN") {
-        name = "Quản trị viên";
-      } else {
-        name = name || "Người dùng";
-      }
-    }
-    return {
-      ...u,
-      display_name: name,
-    };
-  });
+  return users.map((u) => ({ ...u, display_name: safeDisplayName(u.display_name, u.role) }));
 }
 
 export function getUser(id: string): Promise<LecturerUser> {

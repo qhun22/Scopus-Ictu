@@ -1,3 +1,4 @@
+import { safeDisplayName } from "../../utils/displayName";
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -33,13 +34,10 @@ export default function HomePage() {
 
   const role = user?.role?.toUpperCase() || "LECTURER";
 
-  const rawName = user?.display_name;
-  const safeDisplayName =
-    rawName && !rawName.includes("?")
-      ? rawName
-      : role === "ADMIN"
-      ? (locale === "vi" ? "Quản trị viên" : "Administrator")
-      : rawName || user?.email || t.home.welcomeGuest;
+  const safeName = safeDisplayName(user?.display_name, user?.role, {
+    locale: locale === "vi" ? "vi" : "en",
+    fallback: user?.email || t.home.welcomeGuest,
+  });
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -403,7 +401,7 @@ export default function HomePage() {
           <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">
             {t.home.welcome},{" "}
             <span className="text-[#3A5FC3]">
-              {safeDisplayName}
+              {safeName}
             </span>
           </h1>
           <p className="mt-1 text-xs text-slate-500 sm:text-sm">

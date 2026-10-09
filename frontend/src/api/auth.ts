@@ -12,6 +12,8 @@ export interface User {
   lecturer_id: string | null;
 }
 
+import { safeDisplayName } from "../utils/displayName";
+
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -23,18 +25,7 @@ export interface LogoutResponse {
 
 function sanitizeUser(u: User): User {
   if (!u) return u;
-  let name = u.display_name;
-  if (!name || name.includes("?") || name === "Qu?n tr? vi?n") {
-    if (u.role?.toUpperCase() === "ADMIN") {
-      name = "Quản trị viên";
-    } else {
-      name = name || "Người dùng";
-    }
-  }
-  return {
-    ...u,
-    display_name: name,
-  };
+  return { ...u, display_name: safeDisplayName(u.display_name, u.role) };
 }
 
 export async function login(credentials: LoginCredentials): Promise<User> {

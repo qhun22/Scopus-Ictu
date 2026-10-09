@@ -17,6 +17,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.config import settings
 from app.core.database import get_session_factory
+from app.core.display_names import repair_display_name
 from app.core.exceptions import APIError
 from app.core.security import password_hasher, token_service
 from app.models.governance import AuditEvent, User
@@ -838,9 +839,7 @@ def to_import_response(
     #   TERMINAL   -> False when in_use else True
     # archive state does NOT block physical deletion; visibility is independent.
     can_delete = terminal and not in_use
-    perf_name = performed_by
-    if perf_name and ("Qu?n tr? vi?n" in perf_name or "?" in perf_name):
-        perf_name = "Quản trị viên"
+    perf_name = repair_display_name(performed_by)
 
     return ScopusImportResponse(
         id=item.id,

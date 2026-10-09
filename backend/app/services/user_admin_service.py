@@ -9,6 +9,7 @@ from fastapi import status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.display_names import repair_display_name
 from app.core.exceptions import APIError
 from app.core.security import password_hasher
 from app.models.governance import AuditEvent, User, UserNotification
@@ -75,9 +76,7 @@ def ensure_expected_version(user: User, expected_version: int) -> None:
 
 
 def to_admin_response(user: User, lecturer: Lecturer | None) -> UserAdminResponse:
-    display_name = user.display_name
-    if display_name and ("Qu?n tr? vi?n" in display_name or (user.role == "ADMIN" and "?" in display_name)):
-        display_name = "Quản trị viên"
+    display_name = repair_display_name(user.display_name, user.role)
 
     return UserAdminResponse(
         id=user.id,

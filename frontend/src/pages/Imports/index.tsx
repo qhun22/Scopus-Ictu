@@ -1,3 +1,4 @@
+import { adminLabel, isCorruptedName } from "../../utils/displayName";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -453,8 +454,8 @@ export default function ImportsPage() {
     if (!name || name === "Không xác định") {
       return locale === "vi" ? "Không xác định" : "Unknown";
     }
-    if (name.includes("?") || name === "Qu?n tr? vi?n") {
-      return locale === "vi" ? "Quản trị viên" : "Administrator";
+    if (isCorruptedName(name)) {
+      return adminLabel(locale === "vi" ? "vi" : "en");
     }
     return name;
   };

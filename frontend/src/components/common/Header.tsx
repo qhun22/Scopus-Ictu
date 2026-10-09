@@ -1,3 +1,4 @@
+import { safeDisplayName } from "../../utils/displayName";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -25,13 +26,10 @@ export default function Header({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const rawName = user?.display_name;
-  const safeDisplayName =
-    rawName && !rawName.includes("?")
-      ? rawName
-      : user?.role?.toUpperCase() === "ADMIN"
-      ? (locale === "vi" ? "Quản trị viên" : "Administrator")
-      : rawName || user?.email || (locale === "vi" ? "Người dùng" : "User");
+  const safeName = safeDisplayName(user?.display_name, user?.role, {
+    locale: locale === "vi" ? "vi" : "en",
+    fallback: user?.email || (locale === "vi" ? "Người dùng" : "User"),
+  });
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -231,12 +229,12 @@ export default function Header({
             aria-haspopup="true"
           >
             <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-sm shrink-0">
-              {safeDisplayName.charAt(0).toUpperCase()}
+              {safeName.charAt(0).toUpperCase()}
             </div>
 
             <div className="hidden flex-col md:flex min-w-0 max-w-[140px] lg:max-w-[180px]">
               <span className="text-xs font-semibold text-slate-800 leading-tight truncate">
-                {safeDisplayName}
+                {safeName}
               </span>
               <span className="text-[10px] text-slate-500 leading-tight truncate">
                 {user?.email}
@@ -261,7 +259,7 @@ export default function Header({
               <div className="border-b border-slate-100 px-3 py-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-900">
-                    {safeDisplayName}
+                    {safeName}
                   </span>
                   <div className="sm:hidden">{renderRoleBadge(user?.role)}</div>
                 </div>

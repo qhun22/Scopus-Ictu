@@ -20,15 +20,14 @@ from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.core.security import password_hasher, token_service
 from app.models.governance import User, UserNotification
+from app.core.display_names import repair_display_name
 from app.schemas.auth import LoginRequest, MessageResponse, UserResponse
 
 router = APIRouter()
 
 
 def _normalize_display_name(name: str | None, role: str) -> str | None:
-    if name and ("Qu?n tr? vi?n" in name or (role == "ADMIN" and "?" in name)):
-        return "Quản trị viên"
-    return name
+    return repair_display_name(name, role)
 
 
 def _public_user(user: User) -> UserResponse:
