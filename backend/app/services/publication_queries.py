@@ -9,6 +9,11 @@ from datetime import datetime
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.affiliation import (
+    Organization,
+    PublicationAuthorAffiliation,
+    PublicationAuthorAffiliationResolution,
+)
 from app.models.identity import LecturerScopusIdentity
 from app.models.master_lecturer import Lecturer
 from app.models.publication import (
@@ -19,6 +24,11 @@ from app.models.publication import (
 )
 from app.models.scopus_raw import RawScopusRecord, ScopusImport
 from app.schemas.publication_api import (
+    AffiliationOrganizationRead,
+    AffiliationProvenanceRead,
+    AffiliationResolutionRead,
+    AffiliationSummaryRead,
+    AuthorAffiliationRead,
     PublicationAuthorRead,
     PublicationDetailResponse,
     PublicationListItem,
@@ -230,6 +240,137 @@ def _provenance_rows(
     ).all()
 
 
+_STATUS_RANK = {"VERIFIED": 2, "CORROBORATED": 1, "UNRESOLVED": 0}
+
+
+def _affiliation_blocks(session: Session, publication_id: uuid.UUID) -> dict[int, dict]:
+    """Per author_order affiliation data, from two set-based queries.
+
+    Affiliations are loaded separately from authors, so many affiliations can
+    never duplicate, drop or reorder authors.  Only the latest resolution per
+    (author position, source system) is current.
+    """
+
+    res_rows = session.execute(
+        select(PublicationAuthor.author_order, PublicationAuthorAffiliationResolution)
+        .join(
+            PublicationAuthorAffiliationResolution,
+            PublicationAuthorAffiliationResolution.publication_author_id == PublicationAuthor.id,
+        )
+        .where(PublicationAuthor.publication_id == publication_id)
+        .order_by(
+            PublicationAuthor.author_order.asc(),
+            PublicationAuthorAffiliationResolution.source_system.asc(),
+            PublicationAuthorAffiliationResolution.created_at.desc(),
+            PublicationAuthorAffiliationResolution.id.asc(),
+        )
+    ).all()
+    current: dict[tuple[int, str], PublicationAuthorAffiliationResolution] = {}
+    for order, res in res_rows:
+        current.setdefault((order, res.source_system), res)  # first row = newest
+    aff_by_res: dict[uuid.UUID, list[tuple[PublicationAuthorAffiliation, Organization | None]]] = {}
+    ids = [r.id for r in current.values() if r.link_status != "UNRESOLVED"]
+    if ids:
+        for aff, org in session.execute(
+            select(PublicationAuthorAffiliation, Organization)
+            .outerjoin(Organization, Organization.id == PublicationAuthorAffiliation.organization_id)
+            .where(PublicationAuthorAffiliation.resolution_id.in_(ids))
+            .order_by(PublicationAuthorAffiliation.resolution_id, PublicationAuthorAffiliation.ord)
+        ).all():
+            aff_by_res.setdefault(aff.resolution_id, []).append((aff, org))
+
+    blocks: dict[int, dict] = {}
+    for (order, _source), res in sorted(current.items(), key=lambda kv: (kv[0][0], kv[0][1])):
+        block = blocks.setdefault(order, {"resolutions": [], "affiliations": []})
+        block["resolutions"].append(
+            AffiliationResolutionRead(
+                source_system=res.source_system,
+                link_status=res.link_status,
+                link_method=res.link_method,
+                unresolved_reason=res.unresolved_reason,
+                affiliation_presence=res.affiliation_presence,
+                retrieved_at=res.retrieved_at,
+                source_work_id=res.source_work_id,
+            )
+        )
+        if res.link_status == "UNRESOLVED":
+            continue
+        # one item per raw string; organizations attached to the same raw string are grouped
+        groups: dict[object, AuthorAffiliationRead] = {}
+        for aff, org in aff_by_res.get(res.id, []):
+            gkey = aff.raw_index if aff.raw_index is not None else ("org", aff.id)
+            item = groups.get(gkey)
+            if item is None:
+                item = AuthorAffiliationRead(
+                    link_status=res.link_status,
+                    source_system=res.source_system,
+                    raw_affiliation_text=aff.raw_affiliation_text,
+                    organizations=[],
+                    retrieved_at=res.retrieved_at,
+                    provenance=AffiliationProvenanceRead(
+                        link_method=res.link_method,
+                        source_work_id=res.source_work_id,
+                        source_doi=res.source_doi,
+                        external_position=res.external_position,
+                        external_author_name=res.external_author_name,
+                        evidence=res.evidence or {},
+                    ),
+                )
+                groups[gkey] = item
+            if org is not None:
+                item.organizations.append(
+                    AffiliationOrganizationRead(
+                        source_system=org.source_system,
+                        source_org_id=org.source_org_id,
+                        ror=org.ror,
+                        display_name=org.display_name,
+                        country_code=org.country_code,
+                    )
+                )
+        block["affiliations"].extend(groups.values())
+    for block in blocks.values():
+        block["affiliations"].sort(key=lambda a: (-_STATUS_RANK[a.link_status], a.source_system))
+    return blocks
+
+
+def _apply_affiliations(
+    authors: list[PublicationAuthorRead], blocks: dict[int, dict]
+) -> AffiliationSummaryRead:
+    counts = {"vw": 0, "vo": 0, "cw": 0, "co": 0, "un": 0, "nr": 0}
+    for author in authors:
+        block = blocks.get(author.author_order)
+        if not block:
+            counts["nr"] += 1
+            continue
+        resolutions = block["resolutions"]
+        best = max(resolutions, key=lambda r: _STATUS_RANK[r.link_status]).link_status
+        trusted = [r for r in resolutions if r.link_status != "UNRESOLVED"]
+        best_has = any(r.link_status == best and r.affiliation_presence == "PRESENT" for r in resolutions)
+        author.affiliation_status = best
+        author.affiliation_resolutions = resolutions
+        author.affiliations = block["affiliations"]
+        if trusted:
+            author.source_has_affiliation = any(r.affiliation_presence == "PRESENT" for r in trusted)
+        if best == "VERIFIED":
+            counts["vw" if best_has else "vo"] += 1
+        elif best == "CORROBORATED":
+            counts["cw" if best_has else "co"] += 1
+        else:
+            counts["un"] += 1
+    n = len(authors)
+    return AffiliationSummaryRead(
+        authors=n,
+        verified_with_affiliation=counts["vw"],
+        verified_without_affiliation=counts["vo"],
+        corroborated_with_affiliation=counts["cw"],
+        corroborated_without_affiliation=counts["co"],
+        unresolved=counts["un"],
+        not_reconciled=counts["nr"],
+        all_authors_verified_with_affiliation=n > 0 and counts["vw"] == n,
+        all_authors_verified_or_corroborated_with_affiliation=n > 0 and counts["vw"] + counts["cw"] == n,
+    )
+
+
 def get_publication_detail(
     session: Session, *, eid: str
 ) -> PublicationDetailResponse | None:
@@ -249,6 +390,7 @@ def get_publication_detail(
             session, publication.id
         )
     ]
+    affiliation_summary = _apply_affiliations(authors, _affiliation_blocks(session, publication.id))
     lecturer_links = [
         PublicationLecturerLinkRead(
             author_order=author_order,
@@ -298,6 +440,7 @@ def get_publication_detail(
         publication_stage=publication.publication_stage,
         open_access_status=publication.open_access_status,
         authors=authors,
+        affiliation_summary=affiliation_summary,
         approved_lecturer_links=lecturer_links,
         provenance=provenance,
     )
