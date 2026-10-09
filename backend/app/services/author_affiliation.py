@@ -70,6 +70,15 @@ class ExternalOrganization:
 
 
 @dataclass(frozen=True, slots=True)
+class AffiliationEntry:
+    """One raw affiliation string of the source and the organizations the source
+    itself attached to that string (empty when the source could not normalize it)."""
+
+    raw_text: str | None
+    organizations: tuple[ExternalOrganization, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ExternalAuthorship:
     source: str  # "openalex" | "crossref"
     position: int  # 1-based
@@ -77,6 +86,7 @@ class ExternalAuthorship:
     orcid: str | None = None
     raw_affiliations: tuple[str, ...] = ()
     organizations: tuple[ExternalOrganization, ...] = ()
+    entries: tuple[AffiliationEntry, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,10 +101,13 @@ class AuthorAffiliationLink:
     external_name: str | None = None
     raw_affiliations: tuple[str, ...] = ()
     organizations: tuple[ExternalOrganization, ...] = ()
+    entries: tuple[AffiliationEntry, ...] = ()
 
     @property
     def has_affiliation(self) -> bool:
-        return self.status != UNRESOLVED and bool(self.raw_affiliations or self.organizations)
+        return self.status != UNRESOLVED and bool(
+            self.entries or self.raw_affiliations or self.organizations
+        )
 
 
 # --------------------------------------------------------------------------- names
@@ -148,6 +161,36 @@ def _orcid(value: str | None) -> str | None:
     return m.group(1) if m else None
 
 
+def _openalex_entries(
+    authorship: Mapping,
+    orgs: tuple[ExternalOrganization, ...],
+    raws: tuple[str, ...],
+) -> tuple[AffiliationEntry, ...]:
+    """Pair each raw string with the institutions OpenAlex attached to it.
+
+    Uses the source's own ``affiliations`` pairing; nothing is inferred.  When
+    that pairing is absent, raw strings are kept without organizations and the
+    institutions are kept as organization-only entries.
+    """
+    by_id = {o.source_org_id: o for o in orgs}
+    paired = authorship.get("affiliations")
+    entries: list[AffiliationEntry] = []
+    used: set[str | None] = set()
+    if paired:
+        for item in paired:
+            raw = (item.get("raw_affiliation_string") or "").strip() or None
+            ids = [i for i in (item.get("institution_ids") or []) if i in by_id]
+            used.update(ids)
+            if raw is None and not ids:
+                continue
+            entries.append(AffiliationEntry(raw, tuple(by_id[i] for i in ids)))
+    else:
+        entries.extend(AffiliationEntry(r) for r in raws)
+    leftovers = tuple(o for o in orgs if o.source_org_id not in used)
+    entries.extend(AffiliationEntry(None, (o,)) for o in leftovers)
+    return tuple(entries)
+
+
 def parse_openalex_authorships(work: Mapping) -> list[ExternalAuthorship]:
     out: list[ExternalAuthorship] = []
     for i, a in enumerate(work.get("authorships") or [], start=1):
@@ -170,6 +213,7 @@ def parse_openalex_authorships(work: Mapping) -> list[ExternalAuthorship]:
                 orcid=_orcid(author.get("orcid")),
                 raw_affiliations=raws,
                 organizations=orgs,
+                entries=_openalex_entries(a, orgs, raws),
             )
         )
     return out
@@ -189,6 +233,7 @@ def parse_crossref_authors(work: Mapping) -> list[ExternalAuthorship]:
                 display_name=name,
                 orcid=_orcid(a.get("ORCID")),
                 raw_affiliations=raws,
+                entries=tuple(AffiliationEntry(r) for r in raws),
             )
         )
     return out
@@ -220,6 +265,7 @@ def _link(slot: ScopusAuthorSlot, ext: ExternalAuthorship | None, status: str, *
         external_name=ext.display_name if ext else None,
         raw_affiliations=ext.raw_affiliations if ext and status != UNRESOLVED else (),
         organizations=ext.organizations if ext and status != UNRESOLVED else (),
+        entries=ext.entries if ext and status != UNRESOLVED else (),
         **kw,
     )
 
@@ -303,6 +349,7 @@ def unresolved_no_work(slots: Sequence[ScopusAuthorSlot], *, source: str) -> lis
 
 
 __all__ = [
+    "AffiliationEntry",
     "AuthorAffiliationLink",
     "CORROBORATED",
     "ExternalAuthorship",

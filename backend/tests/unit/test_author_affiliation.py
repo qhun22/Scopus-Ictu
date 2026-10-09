@@ -136,3 +136,40 @@ def test_crossref_parser_and_orcid_scopus_extraction() -> None:
         ]
     )
     assert ids == frozenset({"57218489216", "56719215900"})
+
+
+def test_openalex_entries_keep_the_sources_own_raw_to_organization_pairing() -> None:
+    work = {
+        "authorships": [
+            {
+                "author": {"display_name": "Ann Alpha"},
+                "raw_affiliation_strings": ["Dept A, University X, Country", "Unknown Lab"],
+                "affiliations": [
+                    {"raw_affiliation_string": "Dept A, University X, Country", "institution_ids": ["I1", "I2"]},
+                    {"raw_affiliation_string": "Unknown Lab", "institution_ids": []},
+                ],
+                "institutions": [
+                    {"id": "I1", "display_name": "University X", "ror": "r1", "country_code": "VN"},
+                    {"id": "I2", "display_name": "Consortium Y", "ror": None, "country_code": None},
+                ],
+            }
+        ]
+    }
+    entries = parse_openalex_authorships(work)[0].entries
+    assert [e.raw_text for e in entries] == ["Dept A, University X, Country", "Unknown Lab"]
+    assert [o.source_org_id for o in entries[0].organizations] == ["I1", "I2"]
+    assert entries[1].organizations == ()  # not normalized by the source -> stays unnormalized
+
+
+def test_openalex_entries_without_pairing_do_not_invent_it() -> None:
+    work = {
+        "authorships": [
+            {
+                "author": {"display_name": "Ann Alpha"},
+                "raw_affiliation_strings": ["Somewhere"],
+                "institutions": [{"id": "I9", "display_name": "Org Nine"}],
+            }
+        ]
+    }
+    entries = parse_openalex_authorships(work)[0].entries
+    assert [(e.raw_text, [o.source_org_id for o in e.organizations]) for e in entries] == [("Somewhere", []), (None, ["I9"])]
