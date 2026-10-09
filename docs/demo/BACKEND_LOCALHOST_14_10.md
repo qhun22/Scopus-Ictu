@@ -1,7 +1,8 @@
-# Backend localhost — hướng dẫn trình diễn 14/10/2026
+# Backend + Frontend localhost — hướng dẫn trình diễn 14/10/2026
 
 Tài liệu này **không chứa mật khẩu, token hay DSN**. Mọi bí mật nằm ngoài Git (xem mục 1).
-`<DOAN>` là thư mục dự án trên máy demo (chứa `Integration-Backend-14-10/` và `_postgres_demo_14_10/`).
+`<DOAN>` là thư mục dự án trên máy demo (chứa **`Scopus-Ictu/`** — repository chính, branch `main` — và `_postgres_demo_14_10/`).
+Các thư mục `Backend-Localhost-14-10/`, `Integration-*` chỉ là worktree trung gian, **không** dùng để chạy demo.
 
 ## 0. Hiện trạng dữ liệu (đã nghiệm thu)
 
@@ -19,7 +20,7 @@ Tài liệu này **không chứa mật khẩu, token hay DSN**. Mọi bí mật 
 
 | Thành phần | Vị trí | Ghi chú |
 |---|---|---|
-| Mã nguồn tích hợp | `<DOAN>/Integration-Backend-14-10` (branch `integration/backend-demo-20261014`) | Trong Git |
+| Mã nguồn (Backend + Frontend) | `<DOAN>/Scopus-Ictu` (branch `main`, local) | Trong Git |
 | PostgreSQL demo 17 | `<DOAN>/_postgres_demo_14_10/data`, `127.0.0.1:55432` | Cluster **riêng**, không phải service 5432 |
 | Python | `<DOAN>/_venv_backend_demo_py312` (Python 3.12) | |
 | Cấu hình + mật khẩu | `<DOAN>/_postgres_demo_14_10/secrets/` | **Ngoài Git**, ACL chỉ SYSTEM + chủ máy |
@@ -32,8 +33,10 @@ Các database `*_test_*` chỉ dùng để thử nghiệm/ghi dữ liệu (revie
 ## 2. Khởi động
 
 1. PostgreSQL demo: chạy `start_postgres.cmd` (dùng `pg_ctl ... -D <DOAN>/_postgres_demo_14_10/data`; luôn truyền `-D`, **không** đụng service `postgresql-x64-17` / cổng 5432).
-2. Backend: chạy `start_demo_backend.cmd` (Python 3.12, `uvicorn app.main:app` ở `127.0.0.1:8001`, mã lấy từ worktree tích hợp).
+2. Backend: chạy `start_demo_backend.cmd` (Python 3.12, `uvicorn app.main:app` ở `127.0.0.1:8001`, mã lấy từ `Scopus-Ictu/backend`). Launcher in dòng `backend source: …/Scopus-Ictu/backend/app/__init__.py` và **từ chối chạy** nếu `app` được import từ thư mục khác.
 3. Đợi dòng `Application startup complete`.
+4. Frontend: chạy `start_demo_frontend.cmd` (Vite ở `http://127.0.0.1:5173`, proxy `/api` → backend 8001; biến `VITE_API_PROXY_TARGET`). Cần `Scopus-Ictu/frontend/node_modules` (đã cài sẵn).
+5. Mở `http://127.0.0.1:5173` và đăng nhập (mục 4).
 
 ## 3. Xác nhận đang trỏ đúng database
 
@@ -53,7 +56,21 @@ Backend: `GET http://127.0.0.1:8001/openapi.json` phải có 52 path; schema `Pu
 
 * Swagger: `http://127.0.0.1:8001/docs`
 * OpenAPI: `http://127.0.0.1:8001/openapi.json`
-* Đăng nhập: `POST /api/v1/auth/login` (cookie HttpOnly). Tài khoản demo: `admin@gmail.com` (ADMIN) và `user@gmail.com` (LECTURER, dùng để minh họa 403). Mật khẩu nằm trong `secrets/seed_accounts.env` — **không** ghi vào tài liệu/ảnh chụp màn hình.
+* Giao diện: `http://127.0.0.1:5173` (đăng nhập bằng email + mật khẩu).
+* Đăng nhập API: `POST /api/v1/auth/login` (cookie HttpOnly).
+* Tài khoản ADMIN demo: **`admin@ictu.edu.vn`** (role `ADMIN`, được cấp ngay khi tạo, không có bước phê duyệt). Mật khẩu nằm trong `secrets/demo_admin_bootstrap.env` (ngoài Git) — **không** ghi vào tài liệu/ảnh chụp màn hình.
+* Tài khoản demo cũ vẫn tồn tại và không bị đổi: `admin@gmail.com` (ADMIN), `user@gmail.com` (LECTURER, dùng để minh họa 403). Mật khẩu của chúng nằm trong `secrets/seed_accounts.env`.
+
+### Tạo (hoặc kiểm tra) tài khoản ADMIN demo
+
+Chạy từ `Scopus-Ictu/backend` với môi trường DB demo và file `secrets/demo_admin_bootstrap.env` (`DEMO_BOOTSTRAP_ADMIN_EMAIL`, `DEMO_BOOTSTRAP_ADMIN_PASSWORD`, nạp từ ngoài Git):
+
+```
+python -m scripts.bootstrap_demo_admin --dry-run --expected-database <db> --expected-port 55432 --allow-weak-demo-password
+python -m scripts.bootstrap_demo_admin --apply   --expected-database <db> --expected-port 55432 --allow-weak-demo-password
+```
+
+Script chỉ chạy khi `ENVIRONMENT=local`, DB loopback, cổng khác 5432, tên DB chứa `demo`/`test` và khớp server thật; lưu mật khẩu bằng Argon2id; idempotent; **không bao giờ** sửa tài khoản đã có (nếu email đã tồn tại nhưng không phải ADMIN hợp lệ thì báo lỗi, giữ nguyên). Cờ `--allow-weak-demo-password` chỉ cho phép mật khẩu ngắn trong script này; chính sách mật khẩu của API (≥ 8 ký tự) không bị thay đổi.
 
 ## 5. Thứ tự trình diễn (chỉ đọc trên dữ liệu thật)
 
@@ -65,6 +82,7 @@ Backend: `GET http://127.0.0.1:8001/openapi.json` phải có 52 path; schema `Pu
 | 4 | Công bố | `GET /publications?page_size=20`, `GET /publications/{eid}` | `total=660`; mỗi bài có đúng số tác giả/thứ tự như CSV Scopus |
 | 5 | Affiliation theo tác giả | `GET /publications/{eid}` | xem mục 6 |
 | 6 | Đối sánh | `GET /reviews/candidates?status=PENDING` | 40 `PENDING`; 6 bài có `publication_evidence_count > 0`; 5 candidate có `is_shared_scopus_author=true` |
+| 6b | Giao diện hàng đợi | `http://127.0.0.1:5173/reviews` | cột "Ngữ cảnh mơ hồ" có thẻ đỏ "Tác giả Scopus dùng chung (5 giảng viên)" |
 | 7 | Chi tiết candidate | `GET /reviews/candidates/{id}` | tên, Scopus ID, bằng chứng tên, `observation_id`, `candidate_version`, khối `ambiguity` |
 
 Bài báo gợi ý cho bước 5 (EID Scopus):
@@ -77,6 +95,8 @@ Bài báo gợi ý cho bước 5 (EID Scopus):
 | Có đúng 1 tác giả UNRESOLVED (5 tác giả còn lại CORROBORATED) | `2-s2.0-85122186355` |
 | Toàn bộ UNRESOLVED (bài không có DOI) | `2-s2.0-105026360236` |
 | Tác giả nhiều đơn vị / nhiều tổ chức | `2-s2.0-105032716211` |
+
+Trên giao diện (đăng nhập ADMIN): **Trang chủ** → **Giảng viên** (411/410, tài khoản và vai trò nằm trong trang này) → **Công bố** → mở một EID ở bảng trên (cột "Đơn vị theo tác giả (nguồn ngoài) & độ tin cậy", thanh tóm tắt `VERIFIED/CORROBORATED/UNRESOLVED`, dòng `Chưa có thông tin đơn vị`) → **Duyệt đối sánh** (40 candidate, cảnh báo dùng chung Scopus Author ID). **Không bấm** Xác nhận/Từ chối/Xuất JSON/Nhập trên teacher.
 
 ### Không thực hiện trên teacher DB khi trình diễn
 
@@ -106,7 +126,7 @@ Mọi affiliation có `scope = AUTHOR_ON_PUBLICATION_EXTERNAL_SOURCE`: là đơn
 
 ## 7. Dừng dịch vụ
 
-Chạy `stop_demo.cmd`: dừng đúng tiến trình lắng nghe `127.0.0.1:8001` và dừng cluster demo bằng `pg_ctl stop -D <DOAN>/_postgres_demo_14_10/data -m fast`.
+Chạy `stop_demo.cmd`: dừng đúng tiến trình lắng nghe `127.0.0.1:5173` (frontend) và `127.0.0.1:8001` (backend), rồi dừng cluster demo bằng `pg_ctl stop -D <DOAN>/_postgres_demo_14_10/data -m fast`.
 
 ## 8. JSON nguồn/backup và PostgreSQL runtime
 
@@ -121,5 +141,6 @@ Chạy `stop_demo.cmd`: dừng đúng tiến trình lắng nghe `127.0.0.1:8001`
 * Affiliation là dữ liệu bản chụp 09/10/2026 của OpenAlex/Crossref/ORCID; phần lớn ở mức CORROBORATED; 153 vị trí UNRESOLVED (91 vị trí thuộc 31 bài không có DOI hoặc không tìm thấy ở nguồn ngoài).
 * Số điện thoại (`tel`) và Google Scholar **chưa lưu trong DB** (được ghi là `not_preserved_fields` trong JSON export).
 * Tổ chức được lưu theo từng nguồn, chưa gộp xuyên nguồn.
-* Giao diện (frontend) chưa dùng các trường mới (`affiliation_*`, `is_shared_scopus_author`).
+* Hiển thị tên: chỉ riêng chuỗi hỏng `Qu?n tr? vi?n` được sửa thành `Quản trị viên` (backend + frontend); tên khác chứa `?` được giữ nguyên.
+* Frontend chạy bằng Vite dev server cho buổi demo (chưa có bản triển khai production).
 * Chính sách snapshot (mỗi lần import JSON thêm 410 snapshot) chưa được tối ưu.
