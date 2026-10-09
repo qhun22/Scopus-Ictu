@@ -111,6 +111,20 @@ def _candidate_ambiguity_subquery():
     )
 
 
+def _scopus_author_sharing_subquery():
+    """Read-only: how many candidate roots propose the same Scopus author."""
+    return (
+        select(
+            LecturerScopusCandidate.scopus_author_id.label("scopus_author_id"),
+            func.count(LecturerScopusCandidate.id).label(
+                "candidate_count_for_scopus_author"
+            ),
+        )
+        .group_by(LecturerScopusCandidate.scopus_author_id)
+        .subquery("review_scopus_author_sharing")
+    )
+
+
 def _queue_statement(
     *,
     candidate_status: str,
@@ -120,6 +134,7 @@ def _queue_statement(
     reviewable = current_reviewable_candidates_subquery(candidate_status)
     evidence_counts = _evidence_counts_subquery()
     ambiguity_counts = _candidate_ambiguity_subquery()
+    sharing_counts = _scopus_author_sharing_subquery()
     publication_count = func.coalesce(
         evidence_counts.c.publication_evidence_count, 0
     )
@@ -142,6 +157,9 @@ def _queue_statement(
             ambiguity_counts.c.candidate_count_for_lecturer.label(
                 "candidate_count_for_lecturer"
             ),
+            sharing_counts.c.candidate_count_for_scopus_author.label(
+                "candidate_count_for_scopus_author"
+            ),
             LecturerScopusCandidate.created_at.label("created_at"),
             LecturerScopusCandidate.updated_at.label("updated_at"),
             LecturerScopusCandidate.last_seen_at.label("last_seen_at"),
@@ -163,6 +181,10 @@ def _queue_statement(
         .join(
             ambiguity_counts,
             ambiguity_counts.c.lecturer_id == LecturerScopusCandidate.lecturer_id,
+        )
+        .join(
+            sharing_counts,
+            sharing_counts.c.scopus_author_id == LecturerScopusCandidate.scopus_author_id,
         )
     )
     if evidence_category == "publication-supported":
@@ -276,6 +298,8 @@ def list_review_candidates(
             publication_support_count=int(row["publication_support_count"]),
             candidate_count_for_lecturer=int(row["candidate_count_for_lecturer"]),
             is_ambiguous=int(row["candidate_count_for_lecturer"]) > 1,
+            candidate_count_for_scopus_author=int(row["candidate_count_for_scopus_author"]),
+            is_shared_scopus_author=int(row["candidate_count_for_scopus_author"]) > 1,
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             last_seen_at=row["last_seen_at"],
@@ -419,6 +443,14 @@ def review_candidate_detail(
         )
 
     candidate_count = len(other_candidates) + 1
+    author_candidate_count = int(
+        db.scalar(
+            select(func.count(LecturerScopusCandidate.id)).where(
+                LecturerScopusCandidate.scopus_author_id == author.id
+            )
+        )
+        or 0
+    )
     return ReviewCandidateDetailResponse(
         candidate_id=candidate.id,
         candidate_status=candidate.status,
@@ -451,6 +483,8 @@ def review_candidate_detail(
         ambiguity=ReviewAmbiguityContext(
             candidate_count_for_lecturer=candidate_count,
             is_ambiguous=candidate_count > 1,
+            candidate_count_for_scopus_author=author_candidate_count,
+            is_shared_scopus_author=author_candidate_count > 1,
             other_candidates=[
                 ReviewOtherCandidateSummary(
                     candidate_id=row["candidate_id"],

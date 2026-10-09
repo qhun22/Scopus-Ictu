@@ -48,6 +48,9 @@ class ReviewQueueItem(BaseModel):
     publication_support_count: int
     candidate_count_for_lecturer: int
     is_ambiguous: bool
+    # Read-only warning: the same Scopus Author ID is proposed for >1 lecturer.
+    candidate_count_for_scopus_author: int = 1
+    is_shared_scopus_author: bool = False
     created_at: datetime
     updated_at: datetime
     last_seen_at: datetime
@@ -119,6 +122,8 @@ class ReviewAuthorDetail(ReviewAuthorSummary):
 class ReviewAmbiguityContext(BaseModel):
     candidate_count_for_lecturer: int
     is_ambiguous: bool
+    candidate_count_for_scopus_author: int = 1
+    is_shared_scopus_author: bool = False
     other_candidates: list[ReviewOtherCandidateSummary] = Field(default_factory=list)
 
 
