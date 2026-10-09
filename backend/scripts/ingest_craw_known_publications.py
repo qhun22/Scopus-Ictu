@@ -147,6 +147,7 @@ def preview_summary(preview) -> dict[str, Any]:
         "unmapped_lecturer_count", "ambiguous_lecturer_count", "snapshots_to_create",
         "snapshots_already_present", "known_publications_to_create", "known_publications_already_present",
         "source_duplicates_within_snapshot", "invalid_records", "conflicts",
+        "source_urls_collapsed_into_existing_record",
     )
     out = {k: getattr(preview, k) for k in keys}
     out["error_codes"] = dict(Counter(e.code for e in preview.errors))
@@ -211,7 +212,8 @@ def apply_ingestion(reader: Engine, writer: Engine, data: CrawInput, manifest_pa
     summary = {
         "snapshots_created": result.snapshots_created, "snapshots_reused": result.snapshots_reused,
         "known_publications_created": result.known_publications_created, "known_publications_reused": result.known_publications_reused,
-        "source_duplicates_collapsed": result.source_duplicates_collapsed, "invalid_records": result.invalid_records,
+        "source_duplicates_collapsed": result.source_duplicates_collapsed,
+        "source_urls_collapsed": result.source_urls_collapsed, "invalid_records": result.invalid_records,
         "unmapped": len(result.unmapped_lecturers), "table_deltas": delta,
     }
     manifest.update(status="COMPLETED", result=summary)

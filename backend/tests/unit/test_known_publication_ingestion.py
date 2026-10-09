@@ -474,3 +474,79 @@ class TestIngestionContract:
         # this synthetic test we provided a minimal payload that does
         # NOT contain the URLs. In production, raw_payload is the full
         # Craw lecturer record.)
+
+class TestPreviewMatchesApply:
+    """Regression: preview() must apply the same DOI/title collision rule as apply()."""
+
+    @staticmethod
+    def _source(lid_url):
+        def attr(url, title, doi):
+            return CrawPublicationAttribution(
+                source_publication_url=url, title_raw=title, doi_raw=doi, published_year=2024
+            )
+
+        return CrawLecturerSource(
+            craw_source_id=lid_url,
+            craw_full_name="Lecturer P",
+            raw_payload={"full_name": "Lecturer P", "id": 77},
+            publication_attributions=(
+                attr("https://ictu.example/p/same", "Same Paper", "10.1234/same"),
+                attr("https://ictu.example/p/same-2", "Same Paper", "10.1234/SAME"),
+                attr("https://ictu.example/p/other", "Other Paper", None),
+            ),
+        )
+
+    def test_two_urls_same_doi_preview_equals_apply(self):
+        url = "https://ictu.example/u/77"
+        sess = _FakeSession(lecturer_index={url: uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")})
+        service = KnownPublicationIngestionService()
+        source = self._source(url)
+
+        before = service.preview(sess, [source])
+        assert before.source_publication_attribution_count == 3
+        assert before.snapshots_to_create == 1
+        assert before.known_publications_to_create == 2
+        assert before.known_publications_already_present == 0
+        assert before.source_urls_collapsed_into_existing_record == 1
+
+        result = service.apply(sess, [source])
+        assert result.known_publications_created == before.known_publications_to_create
+        assert result.known_publications_reused == 1
+        assert result.source_urls_collapsed == before.source_urls_collapsed_into_existing_record
+
+        # Provenance: both URLs survive in the snapshot even though one row was written.
+        snap = sess.snapshots[0]
+        assert {"https://ictu.example/p/same", "https://ictu.example/p/same-2"} <= set(
+            snap.raw_payload.get("public_publication_links", [])
+        ) or snap.validation_errors
+        entry = [e for e in snap.validation_errors if e["code"] == "SOURCE_URL_COLLISION"][0]
+        assert sorted(entry["source_publication_urls"]) == [
+            "https://ictu.example/p/same",
+            "https://ictu.example/p/same-2",
+        ]
+
+        # Re-running: nothing new, and preview still equals apply.
+        after = service.preview(sess, [source])
+        assert after.snapshots_to_create == 0 and after.snapshots_already_present == 1
+        assert after.known_publications_to_create == 0
+        assert (
+            after.known_publications_already_present + after.source_urls_collapsed_into_existing_record
+            == after.source_publication_attribution_count
+        )
+        again = service.apply(sess, [source])
+        assert again.known_publications_created == 0 and again.snapshots_created == 0
+        assert again.known_publications_reused == after.known_publications_already_present + after.source_urls_collapsed_into_existing_record
+        assert len(sess.kps) == 2
+
+    def test_planner_is_title_fallback_when_no_doi(self):
+        from app.services.lecturer_dataset.known_publication_ingestion import plan_known_publications
+
+        def attr(url, title, doi):
+            return CrawPublicationAttribution(url, title, doi, 2020)
+
+        plan = plan_known_publications(
+            set(), [attr("u1", "Same Title", None), attr("u2", "same  title", None), attr("u3", "Different", None)]
+        )
+        assert [a for *_x, a in plan] == ["create", "collapse", "create"]
+        plan = plan_known_publications({"t:same title"}, [attr("u1", "Same Title", None), attr("u2", "Same Title", None)])
+        assert [a for *_x, a in plan] == ["reuse_existing", "collapse"]

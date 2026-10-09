@@ -192,6 +192,11 @@ class IngestionPreview:
     invalid_records: int
     conflicts: int
     errors: tuple[IngestionError, ...] = field(default_factory=tuple)
+    # Attributions whose source URL is preserved but whose DOI/title matches a
+    # known-publication row that is created or claimed earlier in the same
+    # snapshot (same rule as apply()). known_publications_to_create already
+    # excludes them.
+    source_urls_collapsed_into_existing_record: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +210,7 @@ class IngestionResult:
     ambiguous_lecturers: tuple[str, ...]
     invalid_records: int
     errors: tuple[IngestionError, ...]
+    source_urls_collapsed: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +249,53 @@ def _validate_attribution(attr: CrawPublicationAttribution) -> IngestionError | 
             source_publication_url=attr.source_publication_url,
         )
     return None
+
+
+def plan_known_publications(
+    existing_keys: Iterable[str],
+    attributions: Sequence[CrawPublicationAttribution],
+) -> list[tuple[CrawPublicationAttribution, str | None, str, str]]:
+    """Decide, for one snapshot, what happens to each valid attribution.
+
+    Single source of truth shared by :meth:`KnownPublicationIngestionService.preview`
+    and :meth:`~KnownPublicationIngestionService.apply`, so both report the
+    same numbers. The dedup policy is unchanged: a row is reused when the
+    snapshot already holds a known publication with the same normalized DOI,
+    or (failing that) the same normalized title.
+
+    Returns ``(attribution, doi_normalized, title_normalized, action)`` where
+    action is one of:
+
+    * ``"create"``          - a new known-publication row is written;
+    * ``"reuse_existing"``  - an existing row (previous apply) is reused;
+    * ``"collapse"``        - the URL is preserved (snapshot payload /
+      validation_errors) but folded into a row created or already claimed
+      earlier in this same pass.
+    """
+    index = set(existing_keys)
+    claimed: set[str] = set()
+    created: set[str] = set()
+    plan: list[tuple[CrawPublicationAttribution, str | None, str, str]] = []
+    for attr in attributions:
+        doi_n = normalize_doi_n0(attr.doi_raw)
+        title_n = normalize_title_t0(attr.title_raw)
+        keys = []
+        if doi_n:
+            keys.append("doi:" + doi_n)
+        if title_n:
+            keys.append("t:" + title_n)
+        hit = [k for k in keys if k in index]
+        if not hit:
+            action = "create"
+            index.update(keys)
+            created.update(keys)
+        elif any(k in created or k in claimed for k in hit):
+            action = "collapse"
+        else:
+            action = "reuse_existing"
+            claimed.update(hit)
+        plan.append((attr, doi_n, title_n, action))
+    return plan
 
 
 # ---------------------------------------------------------------------------
@@ -397,34 +450,42 @@ class KnownPublicationIngestionService:
                 valid_attributions.append(attr)
             per_source_pubs[url] = valid_attributions
 
-        # Existing snapshots and known-publication reuse
+        # Existing snapshots and known-publication reuse. The per-snapshot plan
+        # is the same function apply() executes, so the numbers cannot drift.
         existing_by_hash = self._existing_snapshot_hashes(db, all_hashes)
-        existing_pub_keys = self._existing_known_publication_keys(
-            db, mapped, per_source_hashes, per_source_pubs
+        existing_for: dict[str, LecturerSourceSnapshot | None] = {}
+        for url, h in per_source_hashes.items():
+            matches = [
+                s for s in existing_by_hash.get(h, [])
+                if str(s.lecturer_id) == str(mapped[url])
+            ]
+            existing_for[url] = matches[0] if matches else None
+        keys_by_snapshot = self._existing_keys_by_snapshot(
+            db, [s.id for s in existing_for.values() if s is not None]
         )
 
         snapshots_to_create = 0
         snapshots_already_present = 0
         kp_to_create = 0
         kp_already_present = 0
-        for url, h in per_source_hashes.items():
-            existing_snapshots_for_hash = existing_by_hash.get(h, [])
-            existing_for_lecturer = [
-                s for s in existing_snapshots_for_hash if str(s.lecturer_id) == str(mapped[url])
-            ]
-            if existing_for_lecturer:
-                snapshots_already_present += 1
-                snap = existing_for_lecturer[0]
-                for pub in per_source_pubs[url]:
-                    key = (str(snap.id), pub.source_publication_url)
-                    if key in existing_pub_keys:
-                        kp_already_present += 1
-                    else:
-                        kp_to_create += 1
-            else:
+        collapsed = 0
+        for url in per_source_hashes:
+            snap = existing_for[url]
+            if snap is None:
                 snapshots_to_create += 1
-                for pub in per_source_pubs[url]:
+                existing_keys: set[str] = set()
+            else:
+                snapshots_already_present += 1
+                existing_keys = keys_by_snapshot.get(str(snap.id), set())
+            for _attr, _doi, _title, action in plan_known_publications(
+                existing_keys, per_source_pubs[url]
+            ):
+                if action == "create":
                     kp_to_create += 1
+                elif action == "reuse_existing":
+                    kp_already_present += 1
+                else:
+                    collapsed += 1
 
         return IngestionPreview(
             source_lecturer_count=len(sources),
@@ -442,87 +503,33 @@ class KnownPublicationIngestionService:
             invalid_records=invalid_records,
             conflicts=0,  # legacy field, kept for parity
             errors=tuple(errors),
+            source_urls_collapsed_into_existing_record=collapsed,
         )
 
     # ----------------------------------------------------------------
     # Known-publication reuse lookup
     # ----------------------------------------------------------------
     @staticmethod
-    def _existing_known_publication_keys(
-        db: Session,
-        mapped: dict[str, uuid.UUID],
-        per_source_hashes: dict[str, str],
-        per_source_pubs: dict[str, list[CrawPublicationAttribution]],
-    ) -> set[tuple[str, str]]:
-        """Return set of ``(snapshot_id_str, source_publication_url)``
-        keys that are already present in the database.
-
-        The set is computed by:
-
-        1. finding existing snapshots for each (hash, lecturer_id),
-        2. for each existing snapshot, scanning its
-           ``lecturer_known_publications`` rows and producing a synthetic
-           key from the snapshot id + one of {doi_normalized,
-           title_normalized}.
-
-        Note: there is no ``source_publication_url`` column in the
-        schema, so the synthetic key is the best available approximation.
-        The authoritative reuse decision is taken in :meth:`apply`.
-        """
-        keys: set[tuple[str, str]] = set()
-        all_hashes = list(set(per_source_hashes.values()))
-        if not all_hashes:
-            return keys
+    def _existing_keys_by_snapshot(
+        db: Session, snapshot_ids: Iterable[uuid.UUID]
+    ) -> dict[str, set[str]]:
+        """Map ``str(snapshot_id)`` -> set of ``doi:``/``t:`` dedup keys of the
+        known-publication rows that already exist in that snapshot."""
+        ids = list(set(snapshot_ids))
+        out: dict[str, set[str]] = defaultdict(set)
+        if not ids:
+            return out
         rows = db.execute(
-            select(LecturerSourceSnapshot).where(
-                LecturerSourceSnapshot.snapshot_hash.in_(all_hashes)
-            )
-        ).scalars().all()
-        snap_by_key: dict[tuple[str, str], LecturerSourceSnapshot] = {}
-        for s in rows:
-            snap_by_key[(s.snapshot_hash, str(s.lecturer_id))] = s
-        if not snap_by_key:
-            return keys
-        snap_ids = list({str(s.id) for s in snap_by_key.values()})
-        kp_rows = db.execute(
             select(LecturerKnownPublication).where(
-                LecturerKnownPublication.snapshot_id.in_(
-                    [uuid.UUID(s) for s in snap_ids]
-                )
+                LecturerKnownPublication.snapshot_id.in_(ids)
             )
         ).scalars().all()
-        kp_index: dict[
-            tuple[str, str], list[LecturerKnownPublication]
-        ] = defaultdict(list)
-        for kp in kp_rows:
+        for kp in rows:
             if kp.doi_normalized:
-                kp_index[(str(kp.snapshot_id), "doi:" + kp.doi_normalized)].append(kp)
+                out[str(kp.snapshot_id)].add("doi:" + kp.doi_normalized)
             if kp.title_normalized:
-                kp_index[(str(kp.snapshot_id), "t:" + kp.title_normalized)].append(kp)
-        # Walk the planned (hash, url) -> attribution set and emit
-        # synthetic keys only when the candidate snapshot exists. The
-        # synthetic key carries source_publication_url, so reuse is
-        # only reported when the same planned publication would hit an
-        # existing known-publication row on either DOI or title match.
-        for craw_url, h in per_source_hashes.items():
-            lid = mapped.get(craw_url)
-            if lid is None:
-                continue
-            s = snap_by_key.get((h, str(lid)))
-            if s is None:
-                continue
-            sid = str(s.id)
-            for pub in per_source_pubs[craw_url]:
-                doi_n = normalize_doi_n0(pub.doi_raw)
-                title_n = normalize_title_t0(pub.title_raw)
-                matched = False
-                if doi_n and kp_index.get((sid, "doi:" + doi_n)):
-                    matched = True
-                if not matched and title_n and kp_index.get((sid, "t:" + title_n)):
-                    matched = True
-                if matched:
-                    keys.add((sid, pub.source_publication_url))
-        return keys
+                out[str(kp.snapshot_id)].add("t:" + kp.title_normalized)
+        return out
 
     # ----------------------------------------------------------------
     # APPLY (transactional)
@@ -595,32 +602,17 @@ class KnownPublicationIngestionService:
             for s in s_list:
                 snap_by_key[(s.snapshot_hash, str(s.lecturer_id))] = s
 
-        # Look up existing known publications by (snapshot_id,
-        # doi_normalized or title_normalized) so the apply path can
-        # avoid double-writes even if preview was skipped.
-        snap_ids_for_lookup = list({str(s.id) for s in snap_by_key.values()})
-        existing_kp_index: dict[
-            tuple[str, str], list[LecturerKnownPublication]
-        ] = defaultdict(list)
-        if snap_ids_for_lookup:
-            kp_rows = db.execute(
-                select(LecturerKnownPublication).where(
-                    LecturerKnownPublication.snapshot_id.in_(
-                        [uuid.UUID(s) for s in snap_ids_for_lookup]
-                    )
-                )
-            ).scalars().all()
-            for kp in kp_rows:
-                key = str(kp.snapshot_id)
-                if kp.doi_normalized:
-                    existing_kp_index[(key, "doi:" + kp.doi_normalized)].append(kp)
-                if kp.title_normalized:
-                    existing_kp_index[(key, "t:" + kp.title_normalized)].append(kp)
+        # Existing known-publication dedup keys per snapshot (same lookup the
+        # preview uses) so apply never double-writes even if preview was skipped.
+        existing_keys_by_snapshot = self._existing_keys_by_snapshot(
+            db, [s.id for s in snap_by_key.values()]
+        )
 
         snapshots_created = 0
         snapshots_reused = 0
         kp_created = 0
         kp_reused = 0
+        urls_collapsed = 0
         source_dups_collapsed = 0
 
         try:
@@ -753,49 +745,31 @@ class KnownPublicationIngestionService:
                 # duplicate into the FIRST occurrence. The second URL
                 # remains in snapshot.raw_payload.public_publication_links
                 # AND is now listed in snapshot.validation_errors.
-                for attr in valid_attributions:
-                    doi_n = normalize_doi_n0(attr.doi_raw)
-                    title_n = normalize_title_t0(attr.title_raw)
-                    # Idempotency check: same snapshot + same
-                    # doi_normalized, or same snapshot + same
-                    # title_normalized.
-                    reused = False
-                    if doi_n:
-                        if existing_kp_index.get(
-                            (str(snap.id), "doi:" + doi_n)
-                        ):
-                            reused = True
-                    if not reused and title_n:
-                        if existing_kp_index.get(
-                            (str(snap.id), "t:" + title_n)
-                        ):
-                            reused = True
-                    if reused:
+                # The plan is shared with preview(): create / reuse_existing /
+                # collapse. Dedup policy is unchanged (DOI first, then title).
+                for attr, doi_n, title_n, action in plan_known_publications(
+                    existing_keys_by_snapshot.get(str(snap.id), set()),
+                    valid_attributions,
+                ):
+                    if action != "create":
                         kp_reused += 1
+                        if action == "collapse":
+                            urls_collapsed += 1
                         continue
-                    kp = LecturerKnownPublication(
-                        id=uuid.uuid4(),
-                        lecturer_id=lecturer_id,
-                        snapshot_id=snap.id,
-                        title_raw=str(attr.title_raw),
-                        title_normalized=title_n,
-                        doi_raw=attr.doi_raw,
-                        doi_normalized=doi_n,
-                        source_title_raw=attr.title_raw,
-                        published_year=attr.published_year,
-                        created_at=now,
+                    db.add(
+                        LecturerKnownPublication(
+                            id=uuid.uuid4(),
+                            lecturer_id=lecturer_id,
+                            snapshot_id=snap.id,
+                            title_raw=str(attr.title_raw),
+                            title_normalized=title_n,
+                            doi_raw=attr.doi_raw,
+                            doi_normalized=doi_n,
+                            source_title_raw=attr.title_raw,
+                            published_year=attr.published_year,
+                            created_at=now,
+                        )
                     )
-                    db.add(kp)
-                    # Track locally so subsequent attrs in the same
-                    # snapshot also see the row.
-                    if doi_n:
-                        existing_kp_index.setdefault(
-                            (str(snap.id), "doi:" + doi_n), []
-                        ).append(kp)
-                    if title_n:
-                        existing_kp_index.setdefault(
-                            (str(snap.id), "t:" + title_n), []
-                        ).append(kp)
                     kp_created += 1
 
             db.commit()
@@ -813,6 +787,7 @@ class KnownPublicationIngestionService:
             ambiguous_lecturers=tuple(ambiguous),
             invalid_records=invalid_records,
             errors=tuple(errors),
+            source_urls_collapsed=urls_collapsed,
         )
 
 
@@ -825,4 +800,5 @@ __all__ = [
     "KnownPublicationIngestionService",
     "normalize_doi_n0",
     "normalize_title_t0",
+    "plan_known_publications",
 ]

@@ -140,14 +140,18 @@ def test_preview_is_read_only_and_apply_is_idempotent(env) -> None:
     before = cli.table_counts(env["reader"])
     preview = cli.run_preview(env["reader"], data)
     assert (preview.mapped_lecturer_count, preview.unmapped_lecturer_count, preview.invalid_records) == (2, 0, 0)
-    assert (preview.snapshots_to_create, preview.known_publications_to_create) == (2, 4)
+    # 4 source attributions; p1 / p1-2 share a DOI for lecturer "a" -> 3 rows are created, 1 URL is collapsed
+    assert preview.source_publication_attribution_count == 4
+    assert (preview.snapshots_to_create, preview.known_publications_to_create) == (2, 3)
+    assert preview.source_urls_collapsed_into_existing_record == 1
     assert cli.table_counts(env["reader"]) == before
     assert cli.blocking_problems(data, preview) == []
 
     first = cli.apply_ingestion(env["reader"], env["writer"], data, env["manifest"], env["db"])
     assert first["snapshots_created"] == 2 and first["snapshots_reused"] == 0
     # p1 and p1-2 share a DOI (case-insensitive) for lecturer a -> collapsed by the service, URLs preserved
-    assert first["known_publications_created"] == 3 and first["known_publications_reused"] == 1
+    assert first["known_publications_created"] == preview.known_publications_to_create == 3
+    assert first["known_publications_reused"] == 1
     assert first["table_deltas"] == {"lecturer_source_snapshots": 2, "lecturer_known_publications": 3}
     assert json.loads(env["manifest"].read_text(encoding="utf-8"))["status"] == "COMPLETED"
 
