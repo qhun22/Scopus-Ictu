@@ -521,9 +521,9 @@ export default function PublicationsPage() {
               ) : /* ── Data rows ── */
                 items.map((pub) => (
                   <tr key={pub.eid} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3 max-w-0">
+                    <td className="px-4 py-3 min-w-[200px]">
                       <span
-                        className="block max-w-xs truncate font-semibold text-slate-800"
+                        className="block max-w-[200px] line-clamp-2 break-words font-semibold text-slate-800"
                         title={pub.title}
                       >
                         {pub.title}
