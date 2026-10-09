@@ -10,9 +10,10 @@ Các thư mục `Backend-Localhost-14-10/`, `Integration-*` chỉ là worktree t
 |---|---|
 | Giảng viên | 411 hồ sơ = 410 hồ sơ ICTU (có `source_id`) + 1 hồ sơ seed (tài khoản demo, không có `source_id`) |
 | Công bố Scopus | 660 bài, 1.207 tác giả Scopus, 2.751 vị trí tác giả |
-| Known publications (Craw) | 327 bản ghi / 48 giảng viên (328 liên kết nguồn, 1 liên kết trùng DOI được gộp) |
+| Known publications (Craw) | **328** liên kết nguồn (48 giảng viên, 155 công bố) → **327** bản ghi `lecturer_known_publications` + 48 snapshot `ictu_craw`; liên kết thứ 328 tái sử dụng một bản ghi đã có (`known_publications_reused = 1`, không mất dữ liệu) |
 | Candidate đối sánh | 40 `PENDING` (38 giảng viên, 36 tác giả Scopus), 6 candidate có bằng chứng công bố, 2 generation run `COMPLETED` |
 | Danh tính `APPROVED` | **0** — chưa có review thật nào |
+| Tài khoản đăng nhập (`users`) | **3**: 2 `ADMIN` (`admin@ictu.edu.vn`, `admin@gmail.com`), **0 `REVIEWER`**, 1 `LECTURER` (`user@gmail.com`, hồ sơ seed) |
 | Affiliation theo tác giả | 5.502 resolution (2.751 vị trí × OpenAlex/Crossref), 4.147 dòng affiliation, 217 tổ chức |
 | Alembic head | `a9c2e4f71b30` |
 
@@ -64,7 +65,7 @@ select datname, client_port from pg_stat_activity where usename = 'scopus_demo_u
 -- phiên của uvicorn phải ở database scopus_ictu_demo_teacher_20261014
 ```
 
-Backend: `GET http://127.0.0.1:8001/openapi.json` phải có 52 path; schema `PublicationAuthorRead` có `affiliation_status`.
+Backend: `GET http://127.0.0.1:8001/openapi.json` phải có **52 path (57 thao tác)**; schema `PublicationAuthorRead` có `affiliation_status`.
 
 ## 4. URL
 
@@ -86,11 +87,23 @@ python -m scripts.bootstrap_demo_admin --apply   --expected-database <db> --expe
 
 Script chỉ chạy khi `ENVIRONMENT=local`, DB loopback, cổng khác 5432, tên DB chứa `demo`/`test` và khớp server thật; lưu mật khẩu bằng Argon2id; idempotent; **không bao giờ** sửa tài khoản đã có (nếu email đã tồn tại nhưng không phải ADMIN hợp lệ thì báo lỗi, giữ nguyên). Cờ `--allow-weak-demo-password` chỉ cho phép mật khẩu ngắn trong script này; chính sách mật khẩu của API (≥ 8 ký tự) không bị thay đổi.
 
+## 4b. Ba vai trò và tài khoản demo
+
+| Vai trò | Quyền (đã kiểm chứng bằng trình duyệt trên DB test, Task 17) | Trên teacher DB |
+|---|---|---|
+| `ADMIN` | Toàn bộ chức năng quản trị và duyệt | 2 tài khoản |
+| `REVIEWER` (Phê duyệt viên) | Xem công bố/đơn vị theo tác giả, hàng đợi + bằng chứng, **ACCEPT/REJECT**, lịch sử review, tra cứu; bị chặn (403) mọi API quản trị, nhập dữ liệu, tài khoản, nhật ký, Tổng quan, Xuất JSON | **Chưa có tài khoản nào** |
+| `LECTURER` (Giảng viên) | Hồ sơ cá nhân, công bố của tôi, liên kết Scopus (chỉ của chính mình) | 1 tài khoản (hồ sơ seed) |
+
+* Teacher DB **chưa có REVIEWER**, và **không được tạo** nếu chưa có phê duyệt riêng (teacher là dữ liệu chỉ đọc). Nếu cần minh họa trực tiếp cho thầy: đề xuất một bước bootstrap tài khoản REVIEWER demo **chỉ ghi vào `users` + `audit_events`**, có backup `pg_dump`, kiểm tra danh tính DB, idempotent, và so fingerprint theo hai nhóm (nhóm nghiệp vụ phải giữ nguyên; `users/audit` được phép tăng đúng +1/+1). **Chưa thực hiện.**
+* Trên DB test: tạo REVIEWER bằng giao diện (**Giảng viên → Thêm giảng viên → Vai trò = Phê duyệt viên**) hoặc đổi vai trò trong **Chi tiết**; mật khẩu nằm ngoài Git. ADMIN không thể tự đổi vai trò của chính mình hay hạ quản trị viên cuối cùng (409).
+* Ràng buộc DB: `LECTURER` bắt buộc có `lecturer_id`; `ADMIN`/`REVIEWER` thì không bắt buộc.
+
 ## 5. Thứ tự trình diễn (chỉ đọc trên dữ liệu thật)
 
 | # | Nghiệp vụ | Endpoint (an toàn) | Kết quả cần thấy |
 |---|---|---|---|
-| 1 | Đăng nhập, phân quyền | `POST /auth/login`, `GET /auth/me` | role `ADMIN`; tài khoản LECTURER nhận **403** ở `/reviews/*`, `/publications` |
+| 1 | Đăng nhập, phân quyền | `POST /auth/login`, `GET /auth/me` | role `ADMIN`; tài khoản LECTURER nhận **403** ở `/reviews/*`, `/publications`; (REVIEWER: chỉ minh họa bằng ảnh từ DB test) |
 | 2 | Giảng viên | `GET /lecturers?page=1&page_size=100` | `total=411`; 410 hồ sơ có `profile_url`, 1 hồ sơ seed không có |
 | 3 | JSON preview | `POST /lecturers/import/preview` với file JSON nguồn | `total 410, create 0, update 0, unchanged 410` — chỉ **xem trước**, không ghi |
 | 4 | Công bố | `GET /publications?page_size=20`, `GET /publications/{eid}` | `total=660`; mỗi bài có đúng số tác giả/thứ tự như CSV Scopus |
@@ -136,7 +149,9 @@ Mỗi tác giả trong `authors[]` có:
 
 Mọi affiliation có `scope = AUTHOR_ON_PUBLICATION_EXTERNAL_SOURCE`: là đơn vị của tác giả **trên bài báo** theo **nguồn metadata ngoài** (OpenAlex/Crossref). Đó **không phải**: (a) khẳng định của Scopus, (b) trường `Đơn vị` cấp bài của repository ICTU, (c) đơn vị hiện tại của giảng viên (`approved_lecturer_links`).
 
-`affiliation_summary` đếm vị trí tác giả theo 5 nhóm loại trừ nhau. Toàn bộ 2.751 vị trí: VERIFIED có đơn vị 506, VERIFIED nguồn không có đơn vị 39, CORROBORATED có đơn vị 1.774, CORROBORATED nguồn không có đơn vị 279, UNRESOLVED 153. "474 bài có mọi tác giả VERIFIED hoặc CORROBORATED" **không** có nghĩa là 474 bài đã xác minh hoàn toàn (chỉ 13 bài mọi tác giả đều VERIFIED có đơn vị).
+`affiliation_summary` đếm vị trí tác giả theo 5 nhóm loại trừ nhau, **theo bản đối chiếu có mức tin cậy cao nhất của vị trí đó** (tiêu chí chuẩn của toàn bộ tài liệu). Toàn bộ 2.751 vị trí: VERIFIED có đơn vị 506, VERIFIED nguồn không có đơn vị 39, CORROBORATED có đơn vị 1.774, CORROBORATED nguồn không có đơn vị 279, UNRESOLVED 153. "474 bài có mọi tác giả VERIFIED hoặc CORROBORATED" **không** có nghĩa là 474 bài đã xác minh hoàn toàn (chỉ 13 bài mọi tác giả đều VERIFIED có đơn vị).
+
+> Một số tài liệu cũ ghi 517/28 thay vì 506/39: đó là cách đếm khác ("bất kỳ bản đối chiếu đáng tin nào có đơn vị", trường `source_has_affiliation` của từng tác giả). Chênh 11 vị trí là các tác giả Crossref **VERIFIED** nhưng Crossref không có đơn vị, còn OpenAlex (chỉ CORROBORATED) có đơn vị. Không có dữ liệu sai; chi tiết ở `BAO_CAO_KIEM_THU_CHUC_NANG.md` mục 17.3.
 
 ## 7. Dừng dịch vụ
 

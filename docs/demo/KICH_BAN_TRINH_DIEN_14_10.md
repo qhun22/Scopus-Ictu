@@ -1,6 +1,6 @@
 # KỊCH BẢN TRÌNH DIỄN SCOPUS–ICTU — NGÀY 14/10/2026
 
-> Tài liệu giúp sinh viên trình bày trước giảng viên (10–15 phút). Soạn ngày 09/10/2026 sau khi **thao tác thật** toàn bộ chức năng trên database test.
+> Tài liệu giúp sinh viên trình bày trước giảng viên (10–15 phút). Soạn ngày 09/10/2026 sau khi **thao tác thật** toàn bộ chức năng trên database test; cập nhật Task 17 (đã kiểm thử bằng trình duyệt cả ba vai trò ADMIN / REVIEWER / LECTURER).
 > Mọi số liệu và ví dụ dưới đây đã được đối chiếu trực tiếp với dữ liệu hiện có (teacher DB đọc bằng API chỉ-đọc; giao diện thử trên bản sao test giống hệt về nội dung).
 > **Nguyên tắc vàng: trên teacher DB chỉ XEM. Không bấm bất cứ nút nào làm ghi dữ liệu** (danh sách ở mục 0.2).
 > Không có mật khẩu trong tài liệu này; dùng tài khoản ADMIN demo do nhóm cấp riêng.
@@ -38,7 +38,7 @@ Chỉ mở cửa sổ **Chi tiết** rồi **đóng bằng nút Hủy/Đóng/×*
 |---|---|---|---|
 | 0:00–1:00 | **1. Giới thiệu mục tiêu** | Slide hoặc Trang chủ | Nêu bài toán, 3 nguồn dữ liệu, 3 vai trò |
 | 1:00–2:00 | **2. Khởi động bằng BAT** | Cửa sổ BAT (đã chạy sẵn) | Chỉ vào các dòng `[OK]` PostgreSQL → Backend → Frontend |
-| 2:00–3:00 | **3. Đăng nhập ADMIN** | `/login` → `/home` | Đăng nhập; "Xin chào, Quản trị viên"; chỉ menu bên trái |
+| 2:00–3:00 | **3. Đăng nhập ADMIN + ba vai trò** | `/login` → `/home` | Đăng nhập; "Xin chào, Quản trị viên"; chỉ menu bên trái; nói về REVIEWER/LECTURER bằng **lời hoặc ảnh chụp** (xem mục C.4) — **không** đăng xuất/đăng nhập vai trò khác trên teacher |
 | 3:00–4:00 | **4. Dashboard** | Tổng quan | Đọc 5 thẻ + "Đợt nhập gần nhất" |
 | 4:00–5:00 | **5. Quản lý giảng viên** | Giảng viên | Thẻ 411/1/410; gõ `Nguyễn Văn` → Enter; nói về `source_id` |
 | 5:00–6:00 | **6. Danh sách công bố** | Công bố | Gõ `UML`; lọc Năm `2020` → Áp dụng |
@@ -63,7 +63,7 @@ Chỉ mở cửa sổ **Chi tiết** rồi **đóng bằng nút Hủy/Đóng/×*
 > "Để chạy, em chỉ nhấp đúp một tệp BAT. Tệp này tự khởi động cơ sở dữ liệu PostgreSQL, rồi backend, rồi frontend và mở trình duyệt. Thầy cô có thể thấy ở đây từng bước đều báo OK, và nó kiểm tra đúng cơ sở dữ liệu demo, hiện có 411 hồ sơ giảng viên. Em cố ý để chương trình chỉ chạy trên cơ sở dữ liệu demo riêng và không đụng vào các dữ liệu khác của máy."
 
 ### 3. Đăng nhập (≈ 1 phút)
-> "Em đăng nhập bằng tài khoản quản trị viên. Hệ thống có ba vai trò: quản trị viên làm được tất cả, phê duyệt viên chỉ xem công bố và duyệt đối sánh, giảng viên chỉ xem hồ sơ và công bố của chính mình. Phần phân quyền được kiểm tra ở cả giao diện lẫn máy chủ: ẩn menu chưa đủ, vì ai biết địa chỉ API vẫn có thể gọi, nên máy chủ trả lỗi 403 nếu không đủ quyền. Em đã thử điều đó bằng tài khoản giảng viên."
+> "Em đăng nhập bằng tài khoản quản trị viên. Hệ thống có ba vai trò: quản trị viên làm được tất cả, phê duyệt viên chỉ xem công bố và duyệt đối sánh, giảng viên chỉ xem hồ sơ và công bố của chính mình. Phần phân quyền được kiểm tra ở cả giao diện lẫn máy chủ: ẩn menu chưa đủ, vì ai biết địa chỉ API vẫn có thể gọi, nên máy chủ trả lỗi 403 nếu không đủ quyền. Em đã thử điều đó bằng trình duyệt với cả ba vai trò trên cơ sở dữ liệu thử: phê duyệt viên đăng nhập được, thấy bốn mục menu và duyệt được đối sánh, nhưng gõ địa chỉ trang quản trị thì bị đưa về trang chủ và gọi API quản trị bị từ chối 403; giảng viên chỉ thấy hồ sơ và công bố của chính mình. Trong dữ liệu demo hiện tại em chưa tạo tài khoản phê duyệt viên để giữ nguyên dữ liệu, nên phần này em trình bày bằng ảnh chụp từ cơ sở dữ liệu thử."
 
 ### 4. Dashboard (≈ 1 phút)
 > "Đây là màn hình tổng quan. Hiện có 660 công bố, 411 hồ sơ giảng viên, 1.207 tác giả Scopus và 40 ứng viên đối sánh đang chờ duyệt. 411 là 410 giảng viên ICTU nhập từ kho lưu trữ của trường, cộng một hồ sơ demo để làm tài khoản giảng viên thử. Phần ‘trạng thái định danh’ đều bằng 0 vì chưa có ai được quản trị viên xác nhận; ứng viên là đề xuất của máy, còn định danh là kết luận của người. Em lưu ý đây là số thống kê tại thời điểm tải trang chứ không phải thời gian thực."
@@ -135,9 +135,17 @@ Chỉ mở cửa sổ **Chi tiết** rồi **đóng bằng nút Hủy/Đóng/×*
 - REJECT một ứng viên chỉ-tên → bắt buộc nhập lý do; không tạo danh định.
 - ACCEPT ứng viên thứ hai cùng Scopus ID `59253245500` → 409 "Tác giả Scopus này đã được xác nhận cho một giảng viên khác."
 
+### C.4. Ba vai trò — để nói bằng lời / ảnh chụp (đã thử trên DB test, KHÔNG làm trên teacher)
+| Vai trò | Thấy gì | Làm được | Bị chặn |
+|---|---|---|---|
+| **ADMIN** (Quản trị viên) | 10 mục menu | Tất cả | — (nhưng không thể tự đổi vai trò của mình hay hạ ADMIN cuối cùng) |
+| **REVIEWER** (Phê duyệt viên) | Trang chủ · Công bố · Duyệt đối sánh · Lịch sử review | Xem công bố + đơn vị theo tác giả; xem bằng chứng; ACCEPT/REJECT (người duyệt được ghi đúng tên) | Tổng quan, Nhập/Chuẩn hóa, Giảng viên, Nhật ký, Tài khoản, Xuất JSON → 403 / tự về `/home` |
+| **LECTURER** (Giảng viên) | Trang chủ · Hồ sơ cá nhân · Công bố của tôi · Liên kết Scopus | Xem hồ sơ + công bố của chính mình (sau khi được ACCEPT: ví dụ 19 công bố) | Mọi API quản trị/duyệt → 403; không xem được dữ liệu giảng viên khác |
+Ảnh chụp để minh họa: `_quan_ly_do_an\evidence\task17\screenshots` (REVIEWER đăng nhập + menu, 409 dùng chung, REVIEWER ACCEPT).
+
 ---
 
-## D. 15 CÂU HỎI GIẢNG VIÊN CÓ THỂ HỎI (kèm trả lời ngắn)
+## D. 17 CÂU HỎI GIẢNG VIÊN CÓ THỂ HỎI (kèm trả lời ngắn)
 
 **1. Hệ thống giải quyết bài toán gì?**
 Nối *danh mục giảng viên ICTU* với *dữ liệu công bố Scopus* một cách có kiểm soát, và cho biết mỗi tác giả của từng bài thuộc đơn vị nào cùng độ tin cậy; không tự đoán, mọi quyết định có người chịu trách nhiệm và có lưu vết.
@@ -166,7 +174,7 @@ Vì tên Scopus của người đó khớp với nhiều hồ sơ ICTU trùng/g�
 VERIFIED = có chuỗi định danh (ORCID của tác giả ngoài + hồ sơ ORCID công khai tự khai đúng Scopus ID). CORROBORATED = chỉ khớp *số tác giả + vị trí + tên*, chưa có định danh chung nên chưa phải xác minh. Không tự nâng bậc.
 
 **9. Có thể đảm bảo 100% tổ chức của từng tác giả không?**
-Không, và hệ thống không hứa điều đó. Đơn vị đến từ nguồn ngoài (không phải Scopus); 545/2.751 vị trí VERIFIED, 2.053 CORROBORATED, 153 chưa xác định; một số nguồn không có chuỗi đơn vị. Giao diện luôn hiển thị mức tin cậy bên cạnh.
+Không, và hệ thống không hứa điều đó. Đơn vị đến từ nguồn ngoài (không phải Scopus); 545/2.751 vị trí VERIFIED (506 có đơn vị, 39 nguồn không có đơn vị), 2.053 CORROBORATED, 153 chưa xác định; một số nguồn không có chuỗi đơn vị. Giao diện luôn hiển thị mức tin cậy bên cạnh.
 
 **10. Tại sao có dữ liệu thiếu?**
 Nguồn ngoài không có mọi bài (91 vị trí tác giả không tìm thấy bài ở mỗi nguồn); Crossref nhiều bài không công bố đơn vị; khác số tác giả hoặc tên không khớp thì hệ thống để UNRESOLVED thay vì đoán.
@@ -181,12 +189,15 @@ Sai một liên kết là gán nhầm công bố cho người khác; cần ngư�
 Phân quyền ba vai trò kiểm tra cả ở máy chủ; mật khẩu được băm, không nằm trong JSON xuất; phiên 60 phút, đổi mật khẩu/khóa tài khoản thì phiên cũ vô hiệu; mọi thao tác ghi quan trọng có nhật ký; tách *teacher DB* (chỉ xem) và *DB test* (thử ghi); dữ liệu nguồn không bị sửa; cơ chế khóa phiên bản (version) chống ghi đè.
 
 **14. Hệ thống còn giới hạn gì?**
-Chưa có giao diện cho matching, nạp OpenAlex/Crossref, nạp công bố đã biết (đang là script); trang Tác vụ và biểu đồ trang chủ chưa làm; chưa có định danh nào được duyệt trên dữ liệu demo; Khoa/Bộ môn giảng viên phần lớn trống; JSON xuất không khôi phục được điện thoại/Google Scholar; tìm kiếm phân biệt dấu; chưa có màn hình tạo người dùng độc lập.
+Chưa có giao diện cho matching, nạp OpenAlex/Crossref, nạp công bố đã biết (đang là script); trang Tác vụ và biểu đồ trang chủ chưa làm; chưa có định danh nào được duyệt trên dữ liệu demo; Khoa/Bộ môn giảng viên phần lớn trống; JSON xuất không khôi phục được điện thoại/Google Scholar; chưa có màn hình tạo người dùng độc lập; teacher DB chưa có tài khoản phê duyệt viên (đã kiểm thử đầy đủ ở DB thử).
 
 **15. Nếu phát triển tiếp, nên làm gì?**
-(1) Giao diện chạy matching và theo dõi tiến trình (làm trang Tác vụ thật); (2) nạp affiliation tự động và định kỳ; (3) thêm bằng chứng ORCID/đồng tác giả cho matching; (4) biểu đồ thống kê theo năm/đơn vị; (5) tìm kiếm không phân biệt dấu; (6) tự động hóa kiểm thử giao diện.
+(1) Giao diện chạy matching và theo dõi tiến trình (làm trang Tác vụ thật); (2) nạp affiliation tự động và định kỳ; (3) thêm bằng chứng ORCID/đồng tác giả cho matching; (4) biểu đồ thống kê theo năm/đơn vị; (5) tự động hóa kiểm thử giao diện và chạy kiểm thử trên CI; (6) hoàn tất bộ đánh giá chất lượng đối sánh (Completion-3) với nhãn do con người xác nhận.
 
-**(Câu khó bổ sung) 16. Làm sao biết hai hồ sơ trùng tên là hai người khác nhau?**
+**(Câu khó bổ sung) 16. Phê duyệt viên khác quản trị viên chỗ nào?**
+Phê duyệt viên chỉ xem công bố/đối sánh và quyết định ACCEPT/REJECT; không nhập dữ liệu, không quản lý giảng viên hay tài khoản, không xem nhật ký hay Tổng quan. Mọi quyết định được ghi đúng người duyệt. Máy chủ trả 403 cho mọi API ngoài quyền (đã thử 31 lệnh), không chỉ ẩn menu.
+
+**(Câu khó bổ sung) 17. Làm sao biết hai hồ sơ trùng tên là hai người khác nhau?**
 Mỗi hồ sơ có `source_id` là đường dẫn hồ sơ riêng trên kho lưu trữ ICTU; hệ thống chỉ gộp theo mã nguồn chứ không theo tên.
 
 ---
@@ -201,7 +212,7 @@ Mỗi hồ sơ có `source_id` là đường dẫn hồ sơ riêng trên kho lư
 | **Không đăng nhập được** | Kiểm tra bàn phím (Caps Lock), nhập lại; nếu "Tài khoản đang bị khóa" → báo thầy/nhóm; dùng tài khoản ADMIN dự phòng nếu có | **Không** đặt lại mật khẩu hay mở khóa trên teacher DB lúc demo |
 | **Không tìm thấy bài ví dụ** | Mở thẳng `/publications/<EID>`; dùng bài khác có cùng nhãn (mục C.1); nói thẳng "Cần xác minh" | Không bịa số liệu; không nhập lại CSV |
 | **Trang matching không tải** | F5; kiểm tra bạn vẫn đăng nhập ADMIN (REVIEWER cũng vào được; LECTURER thì không); xem tab Network có `401/403` không | Không bấm ACCEPT/REJECT để "thử cho chắc" |
-| **Trang trắng** | Ctrl+F5 | Không sửa mã khi đang demo |
+| **Màn hình "Đã xảy ra lỗi hiển thị"** hoặc trang trắng | Bấm **Tải lại trang** (hoặc Ctrl+F5); dữ liệu không bị thay đổi | Không sửa mã khi đang demo |
 | **Hết thời gian phiên (60 phút)** | Đăng nhập lại | — |
 | **Lỡ bấm nhầm "Xuất JSON"** | Bình tĩnh: chỉ thêm một dòng nhật ký và tải một tệp; **không** xóa gì; báo lại cho nhóm sau buổi demo (ghi vào biên bản) | Không cố sửa DB |
 | **Lỡ mở cửa sổ Chi tiết giảng viên** | Bấm **Hủy** | Không bấm **Lưu thay đổi** |

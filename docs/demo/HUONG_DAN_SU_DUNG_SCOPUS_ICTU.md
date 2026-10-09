@@ -1,7 +1,7 @@
 # HƯỚNG DẪN SỬ DỤNG PHẦN MỀM SCOPUS–ICTU
 
 > Dành cho sinh viên lần đầu sử dụng hệ thống quản lý dữ liệu khoa học.
-> Tài liệu viết ngày 09/10/2026 (Task 16), **dựa trên thao tác thật trên phần mềm** — mọi tên nút, tên menu, số liệu và ví dụ
+> Tài liệu viết ngày 09/10/2026 (Task 16), cập nhật Task 17 (đã bổ sung vai trò Phê duyệt viên, sửa các số liệu và giới hạn), **dựa trên thao tác thật trên phần mềm** — mọi tên nút, tên menu, số liệu và ví dụ
 > đều lấy từ giao diện và dữ liệu đang có. Chỗ nào chưa được thử bằng trình duyệt sẽ ghi rõ.
 > Tài liệu này **không chứa mật khẩu**. Tài khoản demo do giảng viên hướng dẫn / nhóm cấp riêng.
 
@@ -44,7 +44,7 @@ mọi quyết định đều được lưu lại (lịch sử review + nhật k�
 |---|---|---|
 | Kho lưu trữ ICTU (DSpace, `repository.ictu.edu.vn`) | Hồ sơ 410 giảng viên (tên, email đơn vị, học vị, link hồ sơ…) | Tệp JSON → **Nhập dữ liệu → Thêm giảng viên** |
 | Tệp CSV xuất từ Scopus (`Truong_Quang_Huy_Scopus_Sep2026.csv`) | 660 công bố, tác giả theo từng bài | **Nhập dữ liệu → Thêm tệp Scopus** → **Chuẩn hóa dữ liệu** |
-| Craw ICTU (công bố đã biết của giảng viên) | 327 liên kết "giảng viên – công bố đã biết" | Script dòng lệnh (không có nút trên giao diện) |
+| Craw ICTU (công bố đã biết của giảng viên) | 328 liên kết nguồn (48 giảng viên, 155 công bố) → lưu **327** bản ghi "công bố đã biết" (liên kết thứ 328 tái sử dụng một bản ghi đã có, không mất dữ liệu) | Script dòng lệnh (không có nút trên giao diện) |
 | OpenAlex / Crossref / ORCID (metadata ngoài) | Đơn vị công tác theo từng tác giả trên từng bài | Script dòng lệnh (không có nút trên giao diện) |
 
 > Lưu ý quan trọng: **đơn vị công tác theo tác giả KHÔNG do Scopus cung cấp** trong hệ thống này; nó lấy từ OpenAlex/Crossref và được đối chiếu với tác giả Scopus (xem Chương 4.9 và 6).
@@ -55,10 +55,10 @@ mọi quyết định đều được lưu lại (lịch sử review + nhật k�
 | Vai trò | Là ai | Làm được gì (đã kiểm chứng) |
 |---|---|---|
 | **ADMIN** ("Quản trị viên") | Cán bộ quản trị hệ thống / người trình diễn | Tất cả: nhập dữ liệu, chuẩn hóa, quản lý giảng viên & tài khoản, xem công bố, duyệt đối sánh, xem lịch sử review và nhật ký |
-| **REVIEWER** ("Phê duyệt viên") | Người chỉ chuyên duyệt đối sánh | Xem **Công bố**, **Duyệt đối sánh**, **Lịch sử review**, Tra cứu. **Không** vào được Tổng quan, Nhập dữ liệu, Giảng viên, Nhật ký |
+| **REVIEWER** ("Phê duyệt viên") | Người chỉ chuyên duyệt đối sánh | Xem **Công bố**, **Duyệt đối sánh**, **Lịch sử review**, Tra cứu và **ACCEPT/REJECT**. **Không** vào được Tổng quan, Nhập dữ liệu, Chuẩn hóa, Giảng viên, Nhật ký, Tác vụ, Xuất JSON. Đã `BROWSER_PASS` trên DB test (Task 17); **teacher DB hiện chưa có tài khoản REVIEWER** (3 tài khoản: 2 ADMIN + 1 LECTURER) |
 | **LECTURER** ("Giảng viên") | Giảng viên có tài khoản | Chỉ xem **Hồ sơ cá nhân**, **Công bố của tôi**, **Liên kết Scopus** của chính mình |
 
-Vì sao Frontend ẩn menu nhưng Backend vẫn phải kiểm tra quyền? Vì menu chỉ là giao diện; ai biết địa chỉ API vẫn có thể gọi trực tiếp.
+Ma trận quyền chi tiết (đã kiểm chứng, Task 17) xem mục **4.16**. Vì sao Frontend ẩn menu nhưng Backend vẫn phải kiểm tra quyền? Vì menu chỉ là giao diện; ai biết địa chỉ API vẫn có thể gọi trực tiếp.
 Đã kiểm chứng: tài khoản LECTURER gọi API quản trị nhận **HTTP 403**; chưa đăng nhập nhận **HTTP 401** (`API_PASS`).
 
 ## 1.5. Vấn đề hệ thống giải quyết
@@ -76,8 +76,9 @@ Vì sao Frontend ẩn menu nhưng Backend vẫn phải kiểm tra quyền? Vì m
 - Trường **điện thoại (`tel`)** và **Google Scholar** có trong JSON nguồn nhưng **không có cột trong database**, nên **Xuất JSON không khôi phục được** hai trường này.
 - Khoa / Bộ môn của giảng viên ICTU phần lớn **chưa có dữ liệu** (cột hiển thị "—").
 - Hiện **0 danh tính được APPROVED** trong teacher DB (mọi ứng viên đang PENDING).
-- Tìm kiếm **phân biệt dấu**: "Lương" tìm ra giảng viên, "Luong" thì không; tác giả Scopus lưu tên không dấu ("Luong, Thi Minh-Hue").
-- Ngày giờ hiển thị theo **định dạng của trình duyệt** (ví dụ `10/9/2026` là ngày 9 tháng 10, kiểu Mỹ).
+- Tìm kiếm tên **không phân biệt dấu và hoa/thường** (Task 17): "Luong", "luong", "Lương" đều tìm ra cả giảng viên "Lương Thị Minh Huế" lẫn tác giả Scopus "Luong, Thi Minh-Hue". Chỉ áp dụng cho tra cứu/danh sách; **không** thay đổi luật đối sánh danh tính.
+- Ngày giờ ở Tổng quan, Nhật ký, Lịch sử review hiển thị `HH:mm:ss dd/MM/yyyy` (ví dụ `13:50:38 09/10/2026`, múi giờ trình duyệt). Một số màn hình khác (Nhập dữ liệu, Chuẩn hóa) có định dạng ngắn riêng.
+- Nếu có lỗi hiển thị không lường trước, giao diện hiện thông báo "Đã xảy ra lỗi hiển thị" kèm nút **Tải lại trang** (Error Boundary, Task 17) thay vì màn hình trắng.
 
 ---
 
@@ -133,7 +134,7 @@ Thanh menu bên trái (ADMIN). Trạng thái: ✔ = đã có chức năng thật
 | Nhập dữ liệu | `/imports` | Nhập CSV Scopus; nhập JSON giảng viên; lịch sử các đợt nhập; hoàn tác/xóa đợt nhập | ADMIN | **Ghi** | ✔ |
 | Chuẩn hóa dữ liệu | `/normalization` | Chuẩn hóa công bố; bóc tách tác giả; danh sách tác giả Scopus | ADMIN | **Ghi** (nút chuẩn hóa) / Đọc (danh sách) | ✔ |
 | Giảng viên | `/lecturers` | Danh sách, tìm kiếm, thêm, sửa, xóa hồ sơ; cấp/khóa/mở khóa tài khoản; đặt lại mật khẩu; Xuất JSON | ADMIN | **Ghi** | ✔ |
-| Công bố | `/publications` | Danh sách công bố, lọc, chi tiết bài + tác giả + đơn vị theo tác giả; Xuất JSON | ADMIN, REVIEWER | Đọc (nút Xuất JSON **ghi audit**) | ✔ |
+| Công bố | `/publications` | Danh sách công bố, lọc, chi tiết bài + tác giả + đơn vị theo tác giả; Xuất JSON (**chỉ ADMIN**: REVIEWER không thấy nút, API trả 403) | ADMIN, REVIEWER | Đọc (nút Xuất JSON **ghi audit**) | ✔ |
 | Duyệt đối sánh | `/reviews` (cũng `/approval-queue`) | Hàng đợi ứng viên; xem bằng chứng; ACCEPT / REJECT | ADMIN, REVIEWER | Đọc; **Ghi** khi ACCEPT/REJECT | ✔ |
 | Lịch sử review | `/review-history` | Danh sách quyết định đã ghi (chỉ đọc) | ADMIN, REVIEWER | Chỉ đọc | ✔ |
 | Nhật ký hệ thống | `/audit-logs` | Nhật ký kiểm toán chỉ đọc, có bộ lọc | ADMIN | Chỉ đọc | ✔ |
@@ -232,7 +233,7 @@ Khi hồ sơ **đã** có tài khoản: cửa sổ hiện *Email đăng nhập*,
 - **Đặt lại mật khẩu**: bắt buộc ≥ 8 ký tự (báo "Mật khẩu mới phải có ít nhất 8 ký tự."), có hộp xác nhận; sau khi đặt lại, mật khẩu cũ **không dùng được** (đã thử: cũ → 401, mới → 200) và phiên đang đăng nhập của người đó bị thu hồi (tải lại trang là về đăng nhập). Ghi `USER_PASSWORD_RESET`.
 - **Khóa tài khoản / Mở khóa tài khoản**: có hộp xác nhận; tài khoản khóa không đăng nhập được (HTTP 403 `ACCOUNT_LOCKED`, `API_PASS`). Ghi `USER_LOCKED` / `USER_UNLOCKED`.
 - Người bị khóa/đặt lại mật khẩu nhận **thông báo** (bảng `user_notifications`, hiển thị dạng toast khi họ tải trang; không có trang "Thông báo" riêng).
-- Đổi **Vai trò** (ví dụ LECTURER → REVIEWER) qua `PATCH /users/{id}` (`API_PASS`).
+- Đổi **Vai trò**: ngay trong cửa sổ **Chi tiết** của giảng viên có tài khoản, ô **Vai trò** (Giảng viên / Quản trị viên / Phê duyệt viên) → **Lưu thay đổi** (`BROWSER_PASS`, ghi `USER_ROLE_CHANGED` và gửi thông báo "Quyền tài khoản đã thay đổi" cho người đó); cũng làm được qua `PATCH /users/{id}` (`API_PASS`). **Quy tắc an toàn (Task 17):** ADMIN **không tự đổi vai trò của chính mình** (409 `CANNOT_CHANGE_OWN_ROLE`) và **không thể hạ quản trị viên cuối cùng** (409 `LAST_ADMIN_PROTECTED`); vai trò LECTURER cần có hồ sơ giảng viên (422 `LECTURER_PROFILE_REQUIRED`); ADMIN/REVIEWER thì không bắt buộc.
 - **Không có** nút "Tạo user" độc lập và **không có** trang "Người dùng" riêng (`NOT_IMPLEMENTED`); tài khoản mới tạo qua *Thêm giảng viên* hoặc *Cấp tài khoản*.
 
 ## 4.3. Nhập JSON giảng viên — **[CÓ GHI DỮ LIỆU — chỉ test DB]**
@@ -285,7 +286,7 @@ Tệp bảng tính mà Scopus cho phép "Export" kết quả tìm kiếm. Mỗi 
 - **Vì sao 1.207 tác giả tạo ra 2.751 vị trí?** *Tác giả* đếm mỗi con người một lần (theo Scopus Author ID). *Vị trí tác giả* đếm mỗi lần một người xuất hiện trong một bài. Một tác giả viết nhiều bài ⇒ nhiều vị trí. Ví dụ: tác giả `60319803200` (Luong, Thi Minh-Hue) có mặt trong 19 bài ⇒ 1 tác giả, 19 vị trí.
 - **Nhập trùng:** chọn lại cùng tệp → thông báo vàng "Tệp có nội dung trùng với một đợt nhập trước…" với nút **Xem đợt trước** / **Vẫn nhập lại** (API trả 409 `DUPLICATE_IMPORT_CONFIRMATION_REQUIRED`). **Không bấm "Vẫn nhập lại"** nếu không cần.
 - **Chuẩn hóa lặp lại an toàn (idempotent):** chạy lại chuẩn hóa công bố + tác giả: 0 bản ghi mới, 2.751 "đã tồn tại", số liệu không đổi (`API_PASS`).
-- **Lỗi thường gặp:** tệp `.txt` → "Chỉ hỗ trợ tệp CSV." (UI) / 422 `UNSUPPORTED_IMPORT_FORMAT` (API). **CSV sai cấu trúc nhưng có tiêu đề hợp lệ vẫn được nhập thô** (ví dụ cột `cot1,cot2`): trạng thái "Đã tiếp nhận"; khi **Chuẩn hóa** sẽ báo thất bại từng dòng (`canonical_failed`) và **không tạo công bố nào** (0 công bố). Lưu ý: giao diện vẫn hiển thị "Hoàn thành" cho đợt này; hãy mở **Chi tiết** để xem số lỗi.
+- **Lỗi thường gặp:** tệp `.txt` → "Chỉ hỗ trợ tệp CSV." (UI) / 422 `UNSUPPORTED_IMPORT_FORMAT` (API). **CSV không phải bản xuất Scopus** (thiếu cột `EID`, ví dụ cột `cot1,cot2`) bị từ chối ngay khi nhập (Task 17): đợt nhập có trạng thái **Thất bại** (0/0), mở **Chi tiết** thấy "Chi tiết lỗi: Tệp CSV không phải bản xuất từ Scopus: thiếu cột EID…" (mã `MISSING_EID_COLUMN`); không có dữ liệu thô nào được lưu và không hiện phần "Đi tới chuẩn hóa". (Trước Task 17 tệp này được nhận như dữ liệu thô rồi báo "Hoàn thành".) Nếu một đợt vẫn chuẩn hóa xong nhưng có dòng lỗi, cột kết quả hiện **"Hoàn thành có lỗi"** (màu cam) và đợt được tính vào thẻ **Có lỗi**.
 - **Xóa đợt nhập:** đợt đã chuẩn hóa/đang được dùng → 409 `IMPORT_IN_USE` (không xóa được); đợt chưa dùng xóa được; **Lưu trữ / Khôi phục lịch sử** để ẩn/hiện khỏi danh sách (`API_PASS`).
 - **Đã kiểm thử:** `BROWSER_PASS` (import, chuẩn hóa công bố, bóc tách tác giả, trùng, sai định dạng); `API_PASS` (idempotency, quản lý đợt nhập).
 
@@ -313,7 +314,7 @@ Ví dụ bổ sung: `2-s2.0-105006527625` ("A Road-Adaptive Vibration Reduction 
 
 ## 4.7. Tra cứu tổng hợp (`/search`) — **[CHỈ XEM]**
 Gõ từ khóa ≥ 2 ký tự: hệ thống trả tối đa 5 giảng viên, 5 công bố, 5 tác giả Scopus. Ví dụ: `UML` → 5 công bố; `60319803200` → 1 tác giả; `10.1007/978-981-92-2587-3_9` (DOI) → 1 công bố; `Nguyễn` → 5 giảng viên; `a` → lỗi "Từ khóa tìm kiếm phải có ít nhất 2 ký tự."
-Nhớ: tìm **phân biệt dấu** (`Lương` ≠ `Luong`). (`BROWSER_PASS` + `API_PASS`.)
+Tìm **không phân biệt dấu** (Task 17): `Luong`, `luong`, `Lương`, `LƯƠNG` cho cùng kết quả (`BROWSER_PASS` + `API_PASS`). Mã số (EID, DOI, Scopus ID) vẫn so khớp theo đúng chuỗi gõ.
 
 ## 4.8. Hồ sơ cá nhân của giảng viên (vai trò LECTURER) — **[CHỈ XEM]**
 Đăng nhập bằng tài khoản giảng viên: **Hồ sơ cá nhân** (thông tin cơ bản, học thuật, bộ môn/khoa, ORCID), **Công bố của tôi** (chỉ hiện khi đã có định danh APPROVED; hiển thị thẻ *Tổng số công bố, Tổng lượt trích dẫn, Công bố chưa có dữ liệu trích dẫn, Định danh Scopus đã duyệt*, danh sách và phân bố theo năm), **Liên kết Scopus** (danh sách định danh đã duyệt hoặc "Chưa có định danh Scopus").
@@ -382,11 +383,13 @@ Nhớ: tìm **phân biệt dấu** (`Lương` ≠ `Luong`). (`BROWSER_PASS` + `A
 |---|---|---|
 | Vị trí tác giả (`publication_authors`) | **2.751** | Mỗi tác giả trong mỗi bài |
 | Bản ghi đối chiếu (`..._affiliation_resolutions`) | **5.502** = 2.751 × 2 | Mỗi vị trí được đối chiếu với **2 nguồn**: Crossref và OpenAlex |
-| Vị trí xét theo mức tốt nhất | **545 VERIFIED** (517 có đơn vị + 28 nguồn thiếu đơn vị) · **2.053 CORROBORATED** (1.774 + 279) · **153 UNRESOLVED** | Tổng 2.751 |
+| Vị trí xét theo mức tốt nhất (cách đếm của `affiliation_summary`, cũng là số hiển thị ở dòng tóm tắt trên trang bài) | **545 VERIFIED** (**506** có đơn vị + **39** nguồn không có đơn vị) · **2.053 CORROBORATED** (1.774 có đơn vị + 279 không) · **153 UNRESOLVED** | Tổng 2.751; "có đơn vị" nghĩa là *bản đối chiếu cùng mức tốt nhất đó* có chuỗi đơn vị |
 | Dòng liên kết đơn vị (`publication_author_affiliations`) | **4.147** = 883 VERIFIED + 3.264 CORROBORATED | Mỗi dòng = một chuỗi đơn vị (hoặc một tổ chức do nguồn chuẩn hóa) của một bản ghi đối chiếu |
 | Thẻ đơn vị hiển thị trên giao diện | **3.451** | Giao diện **gộp** các tổ chức cùng một chuỗi gốc thành một thẻ |
 | Tổ chức duy nhất | **217** | Trong đó 3.415 dòng liên kết có tổ chức chuẩn hóa, 732 dòng chỉ có chuỗi gốc |
 | Vị trí có ít nhất một đơn vị | **2.291** | |
+
+> **Vì sao có tài liệu ghi 517/28 thay vì 506/39?** Có 2 cách đếm hợp lệ nhưng khác tiêu chí. **Cách A (chuẩn của đồ án):** vị trí VERIFIED "có đơn vị" khi chính bản đối chiếu VERIFIED có chuỗi đơn vị → **506 / 39**. **Cách B:** vị trí "có đơn vị" khi *bất kỳ* bản đối chiếu đáng tin (cả CORROBORATED) có đơn vị → 517 / 28. Chênh **11 vị trí** là những tác giả được Crossref **VERIFIED** nhưng Crossref không có đơn vị, trong khi OpenAlex chỉ **CORROBORATED** và có đơn vị (ví dụ EID `2-s2.0-105027134268` #4 và #5). Ở các vị trí này giao diện vẫn hiện đơn vị của OpenAlex **kèm nhãn CORROBORATED**, và hệ thống **không nâng** nó thành VERIFIED. Toàn bộ tài liệu dùng **Cách A (506/39)**.
 
 > **4.147 là số dòng liên kết, không phải số tác giả, không phải số vị trí.** Số liên kết lớn hơn số tác giả vì (a) 2 nguồn, (b) một tác giả có nhiều đơn vị, (c) một chuỗi đơn vị được nguồn tách thành nhiều tổ chức.
 
@@ -460,6 +463,24 @@ Một **script dòng lệnh** (`generate_matching_candidates.py`, **không** có
 - Vì sao **Audit Trail** quan trọng: biết *ai*, *khi nào*, *quyết định gì*, *lý do*; không sửa/xóa được (append-only, ADR-003).
 - **Không ACCEPT/REJECT trên teacher DB.**
 
+## 4.11b. Dùng tài khoản Phê duyệt viên (REVIEWER) — **[CÓ GHI DỮ LIỆU khi ACCEPT/REJECT — chỉ test DB]**
+
+> Trạng thái: **`BROWSER_PASS` trên DB test** (Task 17). **Teacher DB hiện chưa có tài khoản REVIEWER** (chỉ 2 ADMIN + 1 LECTURER). Khi demo cho thầy, chỉ giới thiệu vai trò này bằng lời/ảnh chụp từ DB test; không tạo tài khoản trên teacher khi chưa được người dùng duyệt.
+
+**Cấp tài khoản (ADMIN làm).** Cách 1: **Giảng viên → Thêm giảng viên**, chọn **Vai trò = Phê duyệt viên** rồi **Tạo giảng viên** (tạo cả hồ sơ và tài khoản; ghi `LECTURER_CREATED`, không ghi mật khẩu). Cách 2: mở **Chi tiết** của giảng viên đã có tài khoản và đổi ô **Vai trò** sang *Phê duyệt viên (REVIEWER)* → **Lưu thay đổi** (người được đổi nhận thông báo "Quyền tài khoản đã thay đổi"). Mật khẩu đủ ≥ 8 ký tự; **không ghi mật khẩu vào Git/tài liệu**. Tài khoản ADMIN **không** thể tự đổi vai trò của mình.
+
+**Đăng nhập.** Dùng màn hình đăng nhập thông thường. Lời chào hiện "Xin chào, <tên>"; `GET /auth/me` trả `role = REVIEWER`. Trang chủ có ba thẻ: *Đối sánh cần xử lý*, *Công bố khoa học*, *Lịch sử review*.
+
+**Menu thấy được:** Trang chủ · Công bố · Duyệt đối sánh · Lịch sử review (và Tra cứu qua ô tìm). Gõ địa chỉ `/dashboard`, `/imports`, `/normalization`, `/lecturers`, `/users`, `/audit-logs`, `/tasks`, `/profile`, `/my-publications` → tự chuyển về `/home` (9/9 đã thử).
+
+**Quyền được phép** (đều đã thử): xem danh sách và chi tiết công bố, tác giả, đơn vị theo tác giả; xem hàng đợi ứng viên, chi tiết (A–E), bằng chứng tên và công bố, cảnh báo dùng chung; xem Lịch sử review; tra cứu; **ACCEPT / REJECT** (REJECT bắt buộc lý do).
+
+**Quyền bị cấm** (API trả **403**, đã thử 31 thao tác): quản lý giảng viên (xem/thêm/sửa/xóa/xuất), quản lý tài khoản (xem/sửa/khóa/mở khóa/đặt lại mật khẩu), nhập và chuẩn hóa dữ liệu, Tổng quan, Nhật ký hệ thống, danh sách tác giả quản trị, Xuất JSON công bố, các API `/lecturers/me/*` của giảng viên.
+
+**Xem bằng chứng và quyết định.** Giống ADMIN (mục 4.10–4.11): **Duyệt đối sánh → Xem chi tiết → A–E → Xác nhận đối sánh / Từ chối**. Kết quả đã kiểm: trạng thái ứng viên đổi, tạo danh định `APPROVED` + bằng chứng (khi ACCEPT), **người duyệt được ghi đúng là tài khoản REVIEWER** (cột `reviewer_user_id`; nhật ký hiển thị tên người duyệt, không phải ADMIN/SYSTEM), Lịch sử review có dòng mới với cột **Người duyệt**; giảng viên được ACCEPT đăng nhập thấy **19 công bố**.
+
+**Xử lý 409 (xung đột).** Toast "Không thể lưu quyết định — Tác giả Scopus này đã được xác nhận cho một giảng viên khác…" và khung vàng "Dữ liệu có xung đột": tải lại hàng đợi, xem mục E, chọn quyết định khác. Các mã khác: `STALE_CANDIDATE_VERSION` (tải lại), `CANDIDATE_ALREADY_DECIDED_CONFLICT` (đã có người quyết định). Gửi lại ACCEPT đã duyệt cùng phiên bản → idempotent, không ghi trùng.
+
 ## 4.12. Lịch sử review và Nhật ký hệ thống — **[CHỈ XEM]**
 - **Lịch sử review:** bảng *Thời gian · Hành động (ACCEPT/REJECT) · Chuyển trạng thái (PENDING → ACCEPTED) · Giảng viên · Tác giả Scopus · Người duyệt · Lý do*; bộ lọc Hành động, Từ ngày, Đến ngày; nút **Áp dụng / Xóa bộ lọc / Làm mới**. (`BROWSER_PASS` — hiển thị 3 quyết định thử nghiệm trên test DB.)
 - **Nhật ký hệ thống (Nhật ký kiểm toán):** chỉ đọc, "ghi nhận tự động và không thể sửa đổi". Bộ lọc: *Hành động, Loại thực thể, Loại tác nhân (Người dùng/Hệ thống), Từ ngày, Đến ngày*. Các hành động thật đã gặp: `SCOPUS_IMPORT_STARTED/COMPLETED`, `SCOPUS_NORMALIZATION_TRIGGERED`, `LECTURER_DATASET_IMPORTED/EXPORTED/ROLLED_BACK`, `LECTURER_CREATED/UPDATED/DELETED`, `USER_LOCKED/UNLOCKED/PASSWORD_RESET`, `CANDIDATE_ACCEPTED/REJECTED`, `IDENTITY_CREATED_FROM_CANDIDATE`, `SCOPUS_IMPORT_DELETED`, `DEMO_ADMIN_BOOTSTRAPPED`. (`BROWSER_PASS`.)
@@ -473,7 +494,31 @@ Menu **Tác vụ** dẫn tới trang "Tác vụ hệ thống — Tính năng đa
 
 ## 4.15. Chức năng chỉ có ở API (Swagger tại `http://127.0.0.1:8001/docs`)
 Không có nút giao diện, **không thao tác Swagger với dữ liệu teacher**: `GET /lecturers/me/*`, `GET /lecturers/{id}/scopus/{identities|profile|publications}` (`API_PASS`), `GET /auth/users` (bí danh cũ), `PUT/PATCH /lecturers/{id}`, `POST /imports/{id}/cancel`.
-**Cảnh báo:** `DELETE /lecturers/unlinked/cleanup` hiện **hỏng** (trả 500, không xóa gì) — đừng gọi.
+**Lưu ý:** `DELETE /lecturers/unlinked/cleanup` đã bị **gỡ chức năng** (từ Task 16 trả HTTP **410** `LECTURER_BULK_CLEANUP_RETIRED`, không xóa gì; trước đó trả 500 do thiếu hàm). Hồ sơ giảng viên là dữ liệu gốc; chỉ xóa bản ghi thử nghiệm bằng script `clean_orphan_lecturers --lecturer-id`.
+
+---
+
+## 4.16. Ma trận quyền ADMIN / REVIEWER / LECTURER (đã kiểm chứng)
+
+| Chức năng | ADMIN | REVIEWER | LECTURER |
+|---|---|---|---|
+| Đăng nhập, đăng xuất, đổi phiên | ✔ | ✔ | ✔ |
+| Trang chủ | ✔ | ✔ | ✔ |
+| Tổng quan (Dashboard) | ✔ | ✖ 403 | ✖ 403 |
+| Nhập dữ liệu (CSV Scopus / JSON giảng viên), Chuẩn hóa, Bóc tách tác giả | ✔ | ✖ 403 | ✖ 403 |
+| Quản lý giảng viên (xem, thêm, sửa, xóa, Xuất JSON) | ✔ | ✖ 403 | ✖ 403 |
+| Quản lý tài khoản (cấp, đổi vai trò, khóa, mở khóa, đặt lại mật khẩu) | ✔ (không tự đổi vai trò, không hạ ADMIN cuối) | ✖ 403 | ✖ 403 |
+| Công bố: danh sách, chi tiết, tác giả, đơn vị theo tác giả | ✔ | ✔ | ✖ 403 |
+| Xuất JSON công bố | ✔ | ✖ 403 | ✖ 403 |
+| Tra cứu tổng hợp | ✔ | ✔ | ✖ 403 |
+| Hàng đợi đối sánh + chi tiết + bằng chứng | ✔ | ✔ | ✖ 403 |
+| ACCEPT / REJECT | ✔ | ✔ | ✖ 403 |
+| Lịch sử review | ✔ | ✔ | ✖ 403 |
+| Nhật ký hệ thống | ✔ | ✖ 403 | ✖ 403 |
+| Hồ sơ cá nhân, Công bố của tôi, Liên kết Scopus | ✖ (route chuyển về `/home`) | ✖ (về `/home`; API `/lecturers/me/*` 403) | ✔ (chỉ của chính mình) |
+| API xem hồ sơ Scopus của giảng viên khác (`/lecturers/{id}/scopus/*`) | ✔ | ✖ 403 | ✖ 403 |
+
+Chưa đăng nhập: mọi API (trừ đăng nhập, `/health`) trả **401**. Kết quả này lấy từ 31 lệnh gọi API của REVIEWER, 8 của LECTURER và các lần mở route bằng trình duyệt (xem `BAO_CAO_KIEM_THU_CHUC_NANG.md`, chương 18).
 
 ---
 
@@ -549,7 +594,8 @@ Review History + Audit ◄── truy vết mọi quyết định
 | **Không có affiliation** | Tác giả ghi "Chưa xác định được đơn vị" hoặc không có thẻ đơn vị | Bình thường (UNRESOLVED / nguồn không có đơn vị). Không tự điền |
 | **Ứng viên bị conflict (409)** | Toast "Không thể lưu quyết định…" | Đọc ngữ cảnh mơ hồ (E); tải lại hàng đợi; chọn quyết định khác |
 | **Không đủ quyền** | Menu không hiện; API 403 | Đăng nhập tài khoản đúng vai trò |
-| **Trang trắng sau khi sửa mã khi đang chạy dev** | Console: "useI18n must be used within an I18nProvider" | Chỉ xảy ra khi sửa mã nguồn lúc phiên đang mở (hot-reload); tải lại trang |
+| **Màn hình "Đã xảy ra lỗi hiển thị"** | Khung thông báo với nút **Tải lại trang** / **Về trang chủ** (Error Boundary) | Dữ liệu không bị thay đổi; tải lại trang; nếu lặp lại, báo nhóm (chi tiết lỗi ở console trình duyệt) |
+| **Trang trắng khi đang sửa mã ở chế độ dev** | Console: "useI18n must be used within an I18nProvider" | Chỉ xảy ra khi sửa mã nguồn lúc phiên đang mở (hot-reload); tải lại trang |
 
 ---
 

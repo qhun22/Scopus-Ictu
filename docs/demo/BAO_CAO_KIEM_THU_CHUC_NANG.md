@@ -5,6 +5,7 @@
 - Mã nguồn kiểm thử: repository `D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu`, nhánh `task16/sua-loi-trinh-dien` (khởi điểm `main` = `d51a055`).
 - Bằng chứng (ngoài Git): `D:\DataFolder\ProjectIctu\DoAn\_quan_ly_do_an\evidence\task16\` (ảnh chụp, fingerprint JSON, OpenAPI, ma trận), nhật ký `_quan_ly_do_an\logs\task16\`, công cụ `_quan_ly_do_an\tools\task16\`.
 - Báo cáo này phản ánh **lần chạy mới của Task 16**, không dùng baseline cũ làm kết quả.
+- **Cập nhật Task 17 (09/10/2026):** bổ sung kiểm thử trình duyệt vai trò REVIEWER, sửa các số liệu/giới hạn chưa chính xác và các lỗi còn lại — xem **chương 17–19**. Các dòng bị Task 17 thay đổi được đánh dấu *(cập nhật T17)*.
 
 **Quy ước nhãn** (đúng như yêu cầu): `BROWSER_PASS` đã thao tác thành công trên trình duyệt thật · `API_PASS` đã chạy qua API/integration test/CLI · `CODE_ONLY` mới đối chiếu mã · `MANUAL_REQUIRED` · `FAILED` · `BLOCKED` · `NOT_IMPLEMENTED`.
 Nhãn được gán theo bằng chứng **thấp nhất** thực sự có; chỗ chỉ một phần được thao tác bằng trình duyệt có ghi chú.
@@ -70,7 +71,7 @@ Nguồn danh sách: `frontend\src\App.tsx` (14 route + `*`), `Sidebar.tsx` (3 me
 | # | Chức năng | Route / nơi | Quyền | Trạng thái | Ghi chú bằng chứng |
 |---|---|---|---|---|---|
 | F01 | Đăng nhập (đúng/sai), đăng xuất, tải lại, URL bảo vệ, phiên hết hạn/thu hồi | `/login`, mọi trang | — | **BROWSER_PASS** | 01, 03; hết hạn 60' = 401 (API); thu hồi sau đặt lại mật khẩu → về `/login` |
-| F02 | Phân quyền ADMIN / REVIEWER / LECTURER | toàn bộ | 3 vai trò | **BROWSER_PASS** (ADMIN, LECTURER) + **API_PASS** (REVIEWER) | 07; LECTURER vào `/audit-logs` → về `/home`; ma trận 403 |
+| F02 | Phân quyền ADMIN / REVIEWER / LECTURER | toàn bộ | 3 vai trò | **BROWSER_PASS** (ADMIN, LECTURER; REVIEWER bổ sung ở Task 17 — xem chương 18) | 07; LECTURER vào `/audit-logs` → về `/home`; ma trận 403 |
 | F03 | Trang chủ | `/home` | mọi | **BROWSER_PASS** | Biểu đồ/hoạt động là giữ chỗ |
 | F04 | Tổng quan (Dashboard) | `/dashboard` | ADMIN | **BROWSER_PASS** | 02; đối chiếu API/DB |
 | F05 | Giảng viên: danh sách, tìm, phân trang, chi tiết | `/lecturers` | ADMIN | **BROWSER_PASS** | |
@@ -222,7 +223,7 @@ File nguồn dùng: **`D:\DataFolder\ProjectIctu\DoAn\Truong_Quang_Huy_Scopus_Se
 | TC71 | Tìm `UML`; lọc Năm `2020` | Kết quả đúng | Toàn bộ dòng là năm 2020 (20/trang) | BROWSER_PASS |
 | TC72 | `/publications/2-s2.0-000000000` | Thông báo thân thiện | "Không tìm thấy công bố này." | BROWSER_PASS |
 | TC73 | Chi tiết `2-s2.0-105006527625` | 5 tác giả; 8 mục đơn vị; 1 UNRESOLVED | Đúng từng hàng (ảnh 11, 12) | BROWSER_PASS |
-| TC74 | Quét 660 bài (API): tổng đơn vị theo tác giả | Không gắn nhầm | 2.751 vị trí; 3.451 mục hiển thị; trạng thái theo vị trí: 517 V có đơn vị, 28 V thiếu, 1.774 C có, 279 C thiếu, 153 UNRESOLVED | API_PASS |
+| TC74 | Quét 660 bài (API): tổng đơn vị theo tác giả | Không gắn nhầm | 2.751 vị trí; 3.451 mục hiển thị; trạng thái theo vị trí (cách đếm của `affiliation_summary` — *cập nhật T17*): **506** V có đơn vị, **39** V thiếu, 1.774 C có, 279 C thiếu, 153 UNRESOLVED. (Bản Task 16 ghi 517/28 theo cách đếm khác — xem chương 17.3) | API_PASS |
 | TC75 | Các EID ví dụ trên **teacher** | Khớp test DB | `105006527625`, `105035336993`, `105027527591`, `105013367684`, `105036729228`: tóm tắt đúng như tài liệu | API_PASS (T) |
 | TC76 | Đối chiếu số DB teacher | | Đối chiếu: 5.502 bản ghi đối chiếu; 4.147 dòng liên kết (883 V + 3.264 C); 217 tổ chức; 2.291 vị trí có ≥1 đơn vị | API_PASS (SQL đọc) |
 
@@ -266,11 +267,11 @@ Xem tổng hợp mục 5. Nhắc lại: **không** có mục nào bị gọi `BR
 | L3 | PATCH ORCID sai định dạng trả **409 "bị trùng"** (sai nghĩa) | `PATCH /lecturers/{id}` với `"orcid":"123"` | Ràng buộc CHECK của DB bị bắt chung với trùng lặp | Thấp (UI không có ô ORCID) | **Đã sửa** (422) |
 | L4 | `DELETE /lecturers/unlinked/cleanup` trả **500** | Gọi API bằng ADMIN | Hàm `clean_orphan_lecturers` không còn trong script | Thấp (không có trên UI) nhưng hiện trong Swagger | **Đã sửa** (410, không xóa gì) |
 | L5 | Trang Chủ ghi **"Nguồn: Scopus API"**, "Thời gian thực", "Đồng bộ định kỳ" trong khi chỉ là khung giữ chỗ; hệ thống không gọi Scopus API | Mở Trang chủ | Nhãn i18n cứng | Trung bình (dễ bị hỏi vặn) | **Đã sửa** (nhãn trung thực) |
-| L6 | CSV có tiêu đề hợp lệ nhưng **không phải định dạng Scopus** vẫn được nhập thô; chuẩn hóa thất bại nhưng UI ghi "Hoàn thành" | Nhập `bad_scopus.csv` → Chuẩn hóa | Bước nhập thô chỉ kiểm tra tiêu đề trùng/trống | Trung bình | **Chưa sửa** (thay đổi hành vi nhập) — đã ghi trong hướng dẫn |
-| L7 | Khi mã nguồn giao diện được sửa lúc phiên đang mở (Vite hot-reload), trang **trắng** ("useI18n must be used within an I18nProvider"); không có Error Boundary | Sửa `i18n/locales/*.ts` khi đang đăng nhập | Fast Refresh nhân đôi context; không có ErrorBoundary | Thấp (chỉ khi dev); trang trắng khi lỗi render là rủi ro chung | Không sửa; ghi trong hướng dẫn |
+| L6 | CSV có tiêu đề hợp lệ nhưng **không phải định dạng Scopus** vẫn được nhập thô; chuẩn hóa thất bại nhưng UI ghi "Hoàn thành" | Nhập `bad_scopus.csv` → Chuẩn hóa | Bước nhập thô chỉ kiểm tra tiêu đề trùng/trống | Trung bình | **Đã sửa ở Task 17** (từ chối thiếu cột EID; nhãn "Hoàn thành có lỗi") |
+| L7 | Khi mã nguồn giao diện được sửa lúc phiên đang mở (Vite hot-reload), trang **trắng** ("useI18n must be used within an I18nProvider"); không có Error Boundary | Sửa `i18n/locales/*.ts` khi đang đăng nhập | Fast Refresh nhân đôi context; không có ErrorBoundary | Thấp (chỉ khi dev); trang trắng khi lỗi render là rủi ro chung | **Đã giảm ở Task 17**: thêm Error Boundary (lỗi render hiện thông báo + nút tải lại). Lỗi hot-reload chỉ khi dev |
 | L8 | `updated_at` của hồ sơ giảng viên **không đổi** khi sửa (version đổi) | Sửa hồ sơ → xem `updated_at` | Cột chỉ có `server_default`, không `onupdate` | Thấp (không hiển thị trên UI) | Chưa sửa (không cần cho demo) |
-| L9 | Tìm kiếm **phân biệt dấu** (Lương ≠ Luong) | `/search?q=Luong` | So khớp chuỗi thường | Thấp | Chưa sửa; ghi trong hướng dẫn |
-| L10 | Ngày giờ hiển thị theo locale trình duyệt (kiểu Mỹ `10/9/2026`) | Dashboard/Nhật ký | `toLocaleString()` mặc định | Thấp | Chưa sửa; ghi trong hướng dẫn |
+| L9 | Tìm kiếm **phân biệt dấu** (Lương ≠ Luong) | `/search?q=Luong` | So khớp chuỗi thường | Thấp | **Đã sửa ở Task 17** (tìm không phân biệt dấu, thuần SQL, không migration) |
+| L10 | Ngày giờ hiển thị theo locale trình duyệt (kiểu Mỹ `10/9/2026`) | Dashboard/Nhật ký | `toLocaleString()` mặc định | Thấp | **Đã sửa ở Task 17** (định dạng `HH:mm:ss dd/MM/yyyy`) |
 | L11 | Toast tiếng Anh hiện nội dung tiếng Việt từ máy chủ ("Cannot delete lecturer — Hồ sơ này đang…") | EN → Xóa hồ sơ có phụ thuộc | Thông điệp lỗi máy chủ chỉ có tiếng Việt | Rất thấp | Chưa sửa |
 | L12 | Cột "Khoa / Bộ môn" của giảng viên ICTU gần như trống | `/lecturers` | Dữ liệu nguồn chưa có | Giới hạn dữ liệu | Không phải lỗi |
 
@@ -333,6 +334,87 @@ Cũng đã xác minh: hồ sơ giảng viên `empty_t16` sau nhập có mã băm
 | Rủi ro chính | (1) bấm nhầm nút ghi (danh sách "chỉ giới thiệu" trong kịch bản); (2) trang trắng nếu có lỗi render (không có Error Boundary); (3) khởi động PostgreSQL lần đầu sau khi bật máy có thể chậm 30–60 giây |
 | Blocker cho demo | **Không có blocker**. L1 (cột tiêu đề) — rủi ro demo cao nhất — đã sửa |
 | Khuyến nghị | Diễn tập đủ kịch bản trên teacher UI một lần (chỉ đọc); in ảnh chụp trong `evidence\task16\screenshots` làm phương án dự phòng |
+
+## 17. Cập nhật Task 17 — kết quả tổng quan
+
+### 17.1. Môi trường Task 17 (mới, độc lập với Task 16)
+| Hạng mục | Giá trị |
+|---|---|
+| DB test thao tác ghi (bản sao teacher qua `pg_dump -Fc` + `pg_restore`) | `scopus_ictu_test_e2e_t17_20261009` — fingerprint ban đầu **byte-identical** với teacher |
+| DB test sạch (migrate đến `a9c2e4f71b30` + seed 2 tài khoản) | `scopus_ictu_test_empty_t17_20261009` |
+| Backend / Frontend E2E | 8002 / 5174 (e2e, host `127.0.0.1`) và 8003 / 5175 (empty, host `localhost` để tách cookie) |
+| Tài khoản test | Mật khẩu **sinh riêng** (`secrets\t17_test_accounts.env`, ngoài Git); ADMIN `admin@gmail.com`, LECTURER `user@gmail.com` + `lmhue@ictu.edu.vn`, REVIEWER **tạo mới qua giao diện** `reviewer.t17@ictu.edu.vn` |
+| Teacher DB | Chỉ đọc; users = **3** (2 ADMIN, **0 REVIEWER**, 1 LECTURER); `system_identifier` 7694238084633166136 |
+
+### 17.2. Lỗi/vấn đề mới phát hiện trong Task 17 và đã sửa
+| ID | Mô tả | Nguyên nhân | Sửa | Test / kiểm tra lại |
+|---|---|---|---|---|
+| L13 | **ADMIN có thể tự hạ vai trò của chính mình** (và hạ quản trị viên cuối cùng) qua Chi tiết giảng viên hoặc `PATCH /users/{id}`; mất quyền quản trị phải vá DB (trong khi khóa chính mình đã bị chặn) | `update_user` không kiểm tra người thực hiện/đủ ADMIN | 409 `CANNOT_CHANGE_OWN_ROLE`; 409 `LAST_ADMIN_PROTECTED` (`backend/app/services/user_admin_service.py`) | 3 test mới (`test_32/33/34`); API trực tiếp: tự hạ → 409; hạ ADMIN khác khi còn 1 → 200. *Đây là chặn mới mang tính chính sách bảo mật, giống chính sách khóa-chính-mình sẵn có — nêu để người dùng xác nhận.* |
+| L6 | CSV không phải bản xuất Scopus được nhận | (như chương 11) | `MISSING_EID_COLUMN` ở bước phân tích; UI "Thất bại" + chi tiết lỗi; "Hoàn thành có lỗi"; không hiện "Đi tới chuẩn hóa" khi thất bại | 2 test parser mới (3 ca) + cập nhật 3 test cũ; CSV chuẩn vẫn 660/1.207/2.751 và mã băm giống teacher; UI trình duyệt trên DB sạch |
+| L7 | Không có Error Boundary | — | `ErrorBoundary.tsx` bao `App` | Ép lỗi render tạm thời → thấy "Đã xảy ra lỗi hiển thị" + nút; gỡ lỗi → bình thường (ảnh `10_error_boundary_thu_nghiem.jpg`) |
+| L9 | Tìm kiếm phân biệt dấu | — | `text_folding.py` (translate SQL) cho Tra cứu, Công bố, Giảng viên, Tác giả | `test_text_folding.py`; API + trình duyệt: `luong thi minh hue` → "ThS. Lương Thị Minh Huế" |
+| L10 | Ngày giờ theo locale trình duyệt | — | `utils/dateTime.ts` | Trình duyệt: Nhật ký hiện `13:50:38 09/10/2026` |
+
+Không sửa matching rules; không đổi phân loại VERIFIED/CORROBORATED; không migration; không đụng teacher DB.
+
+### 17.3. Đối soát số liệu affiliation 506/39 so với 517/28
+- **Nguồn các số:** `TASK11_SUMMARY.md` (cách đếm "best per position, fail-closed"): VERIFIED có đơn vị 506 · không 39 · CORROBORATED 1.774 · 279 · UNRESOLVED 153 = 2.751. `affiliation_summary` của API (cộng 660 bài) cho **đúng 506/39/1.774/279/153**. Tài liệu Task 16 dùng trường `author.source_has_affiliation` (= *bất kỳ* bản đối chiếu đáng tin có đơn vị) nên ra 517/28.
+- **Nguyên nhân chênh 11 vị trí:** 11 tác giả được **Crossref VERIFIED** (cầu ORCID–Scopus ID) nhưng Crossref **không có chuỗi đơn vị** (`ABSENT`); **OpenAlex** chỉ **CORROBORATED** nhưng **có** đơn vị. Cách A (best-status): bản VERIFIED không có đơn vị → tính vào 39. Cách B: có bản khác có đơn vị → tính vào 517. Ví dụ: `2-s2.0-105027134268` (#4, #5), `2-s2.0-105027196458` (#1), `2-s2.0-105031488737` (#1, #2), `2-s2.0-105032251444` (#4, #7), `2-s2.0-105041696493` (#2, #5), `2-s2.0-105041944066` (#2), `2-s2.0-105000999260` (#1).
+- **Kết luận:** không có dữ liệu sai và không có lỗi logic; chỉ khác tiêu chí đếm. Mọi tài liệu thống nhất **506/39** (cách A, khớp dòng tóm tắt trên giao diện). Giao diện vẫn hiển thị đơn vị của OpenAlex cho 11 vị trí này **kèm nhãn CORROBORATED**, không nâng bậc. Không sửa dữ liệu, không đổi quy tắc chọn nguồn. Công cụ: `_quan_ly_do_an\tools\task17\doi_soat_aff.py`.
+- **Số liên quan:** 5.502 resolution (2.751 × 2 nguồn) · 4.147 dòng liên kết (883 + 3.264) · 3.451 thẻ hiển thị · 217 tổ chức.
+
+### 17.4. Đối soát khác
+- `DELETE /lecturers/unlinked/cleanup`: runtime hiện trả **410** `LECTURER_BULK_CLEANUP_RETIRED` (đã có test); `HUONG_DAN_SU_DUNG` đã sửa (trước còn ghi "500").
+- Craw: **328** liên kết nguồn → **327** bản ghi `lecturer_known_publications` + 48 snapshot `ictu_craw`; liên kết thứ 328 tái sử dụng bản ghi đã có (`known_publications_reused = 1`, `source_duplicates_collapsed = 0`, manifest `teacher_kp_ingest.json`). Không phải "327 liên kết".
+- OpenAPI: **52 path / 57 thao tác** (`BACKEND_LOCALHOST_14_10.md` ghi "52 path" đúng; các tài liệu khác ghi "57 thao tác").
+- Công bố → Xuất JSON: **chỉ ADMIN** (REVIEWER 403 và không có nút). Bản trước ghi "ADMIN, REVIEWER".
+
+## 18. Task 17 — Kiểm thử ba vai trò bằng trình duyệt (DB `e2e_t17`)
+
+### 18.1. Tạo và đăng nhập REVIEWER
+| TC | Bước | Mong đợi | Quan sát | Nhãn |
+|---|---|---|---|---|
+| R01 | ADMIN (trình duyệt): **Giảng viên → Thêm giảng viên**, Vai trò = *Phê duyệt viên*, mật khẩu ≥ 8 ký tự | Tạo hồ sơ + tài khoản REVIEWER; có audit | SQL: `users.role = REVIEWER`, liên kết hồ sơ `Phê duyệt viên Thử T17`; audit `LECTURER_CREATED` (`account_role: REVIEWER`, không mật khẩu) | **BROWSER_PASS** (ảnh 00) |
+| R02 | ADMIN đổi vai trò qua ô **Vai trò** trong Chi tiết: REVIEWER → LECTURER → REVIEWER | Đổi được, ghi audit, có thông báo | Cả hai chiều thành công; audit `USER_ROLE_CHANGED`; người được đổi nhận toast "Quyền tài khoản đã thay đổi" | **BROWSER_PASS** |
+| R03 | Đăng nhập REVIEWER sai mật khẩu | Từ chối | Toast "Đăng nhập thất bại" | **BROWSER_PASS** |
+| R04 | Đăng nhập REVIEWER đúng | Vào `/home`, lời chào đúng, `GET /auth/me` = REVIEWER | "Xin chào, Phê duyệt viên Thử T17"; `role: REVIEWER` (ảnh 01) | **BROWSER_PASS** |
+| R05 | Menu REVIEWER | Trang chủ, Công bố, Duyệt đối sánh, Lịch sử review | Đúng 4 mục; không lộ menu ADMIN/LECTURER | **BROWSER_PASS** |
+| R06 | Gõ trực tiếp 9 route: `/dashboard /imports /lecturers /audit-logs /normalization /tasks /profile /my-publications /users` | Chuyển về `/home` | **9/9** về `/home`, không trắng/lỗi | **BROWSER_PASS** |
+| R07 | Công bố → chi tiết `2-s2.0-105006527625` | Tác giả + đơn vị + tóm tắt; không có nút Xuất JSON | Đủ nội dung; 4 CORROBORATED, 1 UNRESOLVED; không có nút Xuất | **BROWSER_PASS** |
+| R08 | Duyệt đối sánh: hàng đợi, chi tiết ứng viên Lương Thị Minh Huế | 40 ứng viên; phần A–E | "Tổng số: 40"; chi tiết đủ (bằng chứng DOI_EXACT) | **BROWSER_PASS** |
+| R09 | **ACCEPT** (REVIEWER) | `ACCEPTED`; 1 identity; audit; actor = REVIEWER | candidates 39 PENDING/1 ACCEPTED; identity 1; audit `CANDIDATE_ACCEPTED` + `IDENTITY_CREATED_FROM_CANDIDATE` với `actor = reviewer.t17@…`, role REVIEWER (không phải ADMIN/SYSTEM); `lecturer_scopus_candidate_reviews.reviewer_user_id` = REVIEWER | **BROWSER_PASS** (ảnh 01, SQL) |
+| R10 | **REJECT** (REVIEWER) có lý do | `REJECTED`; không identity | Đúng; dòng review có lý do; không tạo identity | **BROWSER_PASS** |
+| R11 | ACCEPT ứng viên dùng chung Scopus ID `59253245500`: lần 1 rồi lần 2 | Lần 2 bị chặn 409 | Lần 1 `ACCEPTED`; lần 2: toast "Không thể lưu quyết định — Tác giả Scopus này đã được xác nhận cho một giảng viên khác…" + khung "Dữ liệu có xung đột" (ảnh 04) | **BROWSER_PASS** |
+| R12 | Lịch sử review (REVIEWER) | 3 dòng, cột Người duyệt | 3 dòng; người duyệt = "Phê duyệt viên Thử T17" | **BROWSER_PASS** |
+| R13 | Stale version / REJECT không lý do / ACCEPT lại / REJECT cái đã ACCEPT / ACCEPT cái đã REJECT / LECTURER POST / ẩn danh | 409 / 422 / 200 idempotent / 409 / 409 / 403 / 401 | Đúng từng trường hợp (`STALE_CANDIDATE_VERSION`, `INVALID_REVIEW_REASON`, `idempotent:true`, `CANDIDATE_ALREADY_DECIDED_CONFLICT` ×2, 403, 401) | **API_PASS** |
+| R14 | **31 lệnh quản trị** bằng REVIEWER (users ×6, lecturers ×6, imports ×7, dashboard/audits/authors/xuất/cleanup/`scopus/profile`/`me/*` ×9, upload ×3) | Tất cả 401/403 | **31/31 là 403**, 0 ngoại lệ (`evidence\task17\reviewer_api_matrix.txt`). Được phép: `/publications`, `/search`, `/reviews/*`, `/notifications/unread`, `/auth/me` = 200 | **BROWSER_PASS** (12 probe `fetch` trong phiên REVIEWER) + **API_PASS** (31 lệnh) |
+| R15 | Audit hiển thị người duyệt | Tên REVIEWER | `/audits`: `CANDIDATE_ACCEPTED / Phê duyệt viên Thử T17` | **API_PASS** + **BROWSER_PASS** (trang) |
+
+### 18.2. LECTURER và ADMIN (regression)
+| TC | Bước | Kết quả | Nhãn |
+|---|---|---|---|
+| L-R01 | Lecturer `lmhue@…` (được REVIEWER ACCEPT) đăng nhập; **Công bố của tôi** | **19** công bố, 1 định danh đã duyệt; menu 4 mục; probe: `/users /lecturers /reviews /audits /publications /search` → 403; `/lecturers/me/*` → 200 | **BROWSER_PASS** |
+| L-R02 | Lecturer `user@gmail.com` (chưa có identity) | `identities = []`, `publications total = 0`; mở trang **không** tạo identity (đếm trước/sau: 2/3 = 2/3) | **API_PASS** |
+| L-R03 | LECTURER xem hồ sơ Scopus của giảng viên khác / sửa giảng viên khác | 403 / 403 / 403 | **API_PASS** |
+| A-R01 | ADMIN đăng nhập lại sau các thay đổi: 10 menu; Tổng quan: `pending 37`, `identity APPROVED 2`; Nhật ký có actor là REVIEWER | Đúng | **BROWSER_PASS** |
+| A-R02 | ADMIN tìm giảng viên `luong thi minh hue` (không dấu) | 1 kết quả đúng | **BROWSER_PASS** |
+| A-R03 | ADMIN tự hạ vai trò / khóa chính mình / hạ ADMIN khác khi còn 1 / ADMIN không hồ sơ → LECTURER | 409 `CANNOT_CHANGE_OWN_ROLE` / 409 `CANNOT_LOCK_CURRENT_USER` / 200 / 422 `LECTURER_PROFILE_REQUIRED` | **API_PASS** |
+| A-R04 | CSV (DB sạch): CSV không phải Scopus → UI "Thất bại" + "Chi tiết lỗi: …thiếu cột EID…"; CSV chuẩn → 660/660; chuẩn hóa → 660/1.207/2.751 giống teacher | Đúng | **BROWSER_PASS** (CSV sai) + **API_PASS** (CSV chuẩn, mã băm) |
+
+### 18.3. Ma trận quyền thực tế
+Xem `HUONG_DAN_SU_DUNG_SCOPUS_ICTU.md` mục **4.16** (15 hàng × 3 vai trò, mỗi ô đã kiểm bằng route hoặc API).
+
+## 19. Task 17 — Gate cuối
+| Hạng mục | Kết quả |
+|---|---|
+| Backend full suite (Python 3.12.10, `pytest_t17.py`, DB `test_roundtrip`, `--basetemp _quan_ly_do_an\tests\pytest_temp\t17_full_final`) | **797 passed, 0 skipped, 0 failed, 0 errors, 10 warnings** — 329,36 giây (baseline đầu Task 17: 784; +13 test mới: 3 vai trò, 2 CSV/EID, 8 tìm kiếm không dấu) |
+| `tsc --noEmit` | PASS (exit 0) |
+| `vite build` (ra `_quan_ly_do_an\tests\t17_build`) | PASS |
+| Teacher DB fingerprint (20 bảng) | **byte-identical** ở cả ba mốc (trước, sau `pg_dump`, cuối) và với mốc cuối Task 16; MD5 tệp `9d3e5afb9e8cf098c7d4179304afc7ba`. Ba bảng affiliation (`organizations`, `…resolutions`, `…affiliations`) giữ mã băm `64720a7b…` / `ab383cb4…` / `e501f79f…` |
+| Teacher DB: 411 / 660 / 1.207 / 2.751 / 4.147 / 40 PENDING / 0 APPROVED / 0 review / users 3 | Giữ nguyên |
+| Launcher (`demo_launcher.py start/status/stop`) | PASS: `start` → PostgreSQL 55432 (cluster demo) + Backend 8001 + Frontend 5173 sẵn sàng; đăng nhập ADMIN teacher + đọc API chỉ-đọc (411/660/40 PENDING/6 có công bố/5 dùng chung; 5 EID ví dụ) không làm đổi fingerprint; `stop` dừng sạch; cổng 5432 không bị chạm. Một BAT duy nhất, không sửa launcher |
+| Git | `main` sau fast-forward (xem báo cáo cuối); 2 stash còn nguyên; worktree/backup nguyên vẹn; **chưa push** |
+
 
 ## Phụ lục A. Danh sách ảnh chụp (ngoài Git)
 `evidence\task16\screenshots\`: 01 đăng nhập sai · 02 Tổng quan · 03 đăng xuất · 04 email trùng · 05 chi tiết giảng viên + tài khoản · 06 xác nhận khóa · 07 LECTURER bị chặn · 10 danh sách công bố sau sửa · 11–12 chi tiết bài + đơn vị theo tác giả · 19 hàng đợi 40 · 20/20b chi tiết ứng viên + xác nhận ACCEPT · 21 REJECT bắt buộc lý do · 22 toast 409 dùng chung · 23 Công bố của tôi (19) · 30–34 JSON (lỗi, preview, nhập, hoàn tác, trùng email) · 40–43 CSV/chuẩn hóa.
