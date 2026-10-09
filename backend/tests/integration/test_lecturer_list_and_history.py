@@ -581,20 +581,19 @@ def test_export_lecturers_json_admin_success(
     client: TestClient,
     mock_db: MagicMock,
 ) -> None:
+    """Export only contains lecturers with a verified source identity.
+
+    A lecturer without an ICTU import snapshot (manual/synthetic) is not
+    exported. Full export/re-import coverage runs against PostgreSQL in
+    ``test_lecturer_json_roundtrip.py``.
+    """
     admin = _create_user(role="ADMIN")
     app.dependency_overrides[get_current_user] = lambda: admin
 
-    lec = _create_lecturer(
-        full_name="GS. TS. Nguyễn Văn A",
-        email="nva@ictu.edu.vn",
-        staff_code="CB001",
-    )
-    lec.academic_rank = "GS"
-    lec.academic_degree = "TS"
-    lec.faculty = "Khoa CNTT"
-    lec.department = "Khoa học máy tính"
-
-    mock_db.execute.return_value.scalars.return_value.all.return_value = [lec]
+    mock_db.execute.return_value.all.return_value = []
+    mock_db.execute.return_value.scalars.return_value.all.return_value = [
+        _create_lecturer(full_name="GS. TS. Nguyễn Văn A", email="nva@ictu.edu.vn", staff_code="CB001")
+    ]
 
     response = client.get("/api/v1/lecturers/export")
     assert response.status_code == 200
@@ -602,30 +601,11 @@ def test_export_lecturers_json_admin_success(
     assert "attachment; filename=" in response.headers["content-disposition"]
 
     data = response.json()
-    assert "dataset" in data
     assert data["dataset"]["schema_version"] == "1.0"
-    assert data["dataset"]["record_count"] == 1
-    assert len(data["lecturers"]) == 1
-
-    item = data["lecturers"][0]
-    assert item["full_name"] == "GS. TS. Nguyễn Văn A"
-    assert item["institutional_email"] == "nva@ictu.edu.vn"
-    assert item["staff_code"] == "CB001"
-    assert item["academic_rank"] == "GS"
-    assert item["academic_degree"] == "TS"
-
-    # Security check: User account and auth fields MUST NOT exist
-    assert "password_hash" not in item
-    assert "auth_version" not in item
-    assert "user_id" not in item
-    assert "role" not in item
-    assert "jwt" not in item
-
-    # Round-trip check with dataset parser
-    from app.services.lecturer_dataset.parser import parse_and_validate
-    envelope = parse_and_validate(response.content, filename="test_export.json")
-    assert envelope["dataset"]["schema_version"] == "1.0"
-    assert len(envelope["lecturers"]) == 1
+    assert data["dataset"]["record_count"] == 0
+    assert data["lecturers"] == []
+    assert data["dataset"]["export"]["not_preserved_fields"] == ["tel", "google_scholar"]
+    assert "nva@ictu.edu.vn" not in response.text
 
 
 def test_export_lecturers_json_forbidden_for_non_admin(

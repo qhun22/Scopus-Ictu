@@ -28,6 +28,13 @@ MAX_FILE_BYTES: int = 20 * 1024 * 1024  # mirrors scopus_import_max_bytes cap
 EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$")
 ORCID_RE = re.compile(r"^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$")
 STAFF_CODE_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+MAX_SOURCE_ID_LENGTH = 2048
+# Provenance keys carried verbatim from the source into the snapshot so that
+# an export can reproduce the original provenance (see exporter).
+PROVENANCE_PASSTHROUGH_KEYS: tuple[str, ...] = ("parser_version", "known_specialisation")
 
 ACADEMIC_DEGREE_VALUES: tuple[str, ...] = ("TS", "ThS", "KS", "CN", "PGS", "GS")
 
@@ -121,6 +128,8 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
     records: list[dict] = []
     seen_emails: dict[str, int] = {}
     seen_staff_codes: dict[str, int] = {}
+    seen_orcids: dict[str, int] = {}
+    seen_source_ids: dict[str, int] = {}
     for idx, rec in enumerate(raw_lecturers):
         location = f"lecturers[{idx}]"
         _require(isinstance(rec, dict), "INVALID_LECTURER_DATASET",
@@ -184,6 +193,14 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
                     f"{location}.orcid không đúng định dạng.",
                     location=f"{location}.orcid",
                 )
+            if orcid is not None:
+                if orcid in seen_orcids:
+                    raise DatasetValidationError(
+                        "DUPLICATE_LECTURER_IDENTITY",
+                        f"ORCID {orcid!r} bị trùng giữa các bản ghi.",
+                        location=location,
+                    )
+                seen_orcids[orcid] = idx
 
         known_pubs = rec.get("known_publications") or []
         _require(isinstance(known_pubs, list), "INVALID_LECTURER_DATASET",
@@ -220,8 +237,46 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
                  f"{location}.provenance.source_urls phải là danh sách không rỗng.",
                  location=f"{location}.provenance.source_urls")
 
+        # ``source_id`` is the identity assigned by the *source* (for ICTU:
+        # the repository profile URL). It is never the internal lecturer UUID.
+        source_id = rec.get("source_id")
+        if source_id is None:
+            source_id = provenance.get("source_record_id")
+        if source_id is not None:
+            _require(isinstance(source_id, str), "INVALID_SOURCE_ID",
+                     f"{location}.source_id phải là chuỗi.",
+                     location=f"{location}.source_id")
+            source_id = source_id.strip() or None
+        if source_id is not None:
+            _require(len(source_id) <= MAX_SOURCE_ID_LENGTH, "INVALID_SOURCE_ID",
+                     f"{location}.source_id vượt quá {MAX_SOURCE_ID_LENGTH} ký tự.",
+                     location=f"{location}.source_id")
+            _require(not UUID_RE.match(source_id), "INVALID_SOURCE_ID",
+                     f"{location}.source_id là UUID nội bộ, không phải định danh nguồn.",
+                     location=f"{location}.source_id")
+            if source_id in seen_source_ids:
+                raise DatasetValidationError(
+                    "DUPLICATE_LECTURER_IDENTITY",
+                    f"source_id bị trùng giữa các bản ghi (vị trí {seen_source_ids[source_id]} và {idx}).",
+                    location=location,
+                )
+            seen_source_ids[source_id] = idx
+
+        source_provenance = {
+            "source_name": str(provenance.get("source_name") or "unknown"),
+            "source_system": str(provenance.get("source_system") or "unknown"),
+            "source_urls": list(source_urls),
+            "source_record_id": provenance.get("source_record_id"),
+            "retrieved_at": provenance.get("retrieved_at"),
+        }
+        for key in PROVENANCE_PASSTHROUGH_KEYS:
+            if provenance.get(key) is not None:
+                source_provenance[key] = provenance[key]
+        if isinstance(provenance.get("export"), dict):
+            source_provenance["export"] = provenance["export"]
+
         records.append({
-            "source_id": rec.get("source_id"),
+            "source_id": source_id,
             "staff_code": staff_code,
             "full_name": full_name,
             "full_name_normalized": full_name.casefold(),
@@ -235,13 +290,7 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
             "profile_url": rec.get("profile_url"),
             "orcid": orcid,
             "is_active": bool(rec.get("is_active", True)),
-            "provenance": {
-                "source_name": str(provenance.get("source_name") or "unknown"),
-                "source_system": str(provenance.get("source_system") or "unknown"),
-                "source_urls": list(source_urls),
-                "source_record_id": provenance.get("source_record_id"),
-                "retrieved_at": provenance.get("retrieved_at"),
-            },
+            "provenance": source_provenance,
             "known_publications": normalised_pubs,
         })
 

@@ -81,6 +81,9 @@ class LecturerDatasetConflict(BaseModel):
     existing_id: str
     existing_full_name: str
     existing_email: str | None = None
+    blocking: bool = False
+    reason: str | None = None
+    source_id: str | None = None
 
 
 class LecturerDatasetMetadata(BaseModel):

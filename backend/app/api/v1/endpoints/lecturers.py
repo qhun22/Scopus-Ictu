@@ -40,6 +40,7 @@ from app.services.lecturer_dataset import (
     LecturerImportService,
     LecturerPreviewService,
 )
+from app.services.lecturer_dataset.exporter import ICTU_SOURCE_SYSTEM, build_lecturer_export
 from app.services.lecturer_dataset.parser import (
     DatasetValidationError,
     MAX_FILE_BYTES as LECTURER_IMPORT_MAX_BYTES,
@@ -406,55 +407,26 @@ def list_lecturers(
         ) from exc
 
 
-@router.get("/export", summary="Export all lecturer master data in compatible JSON format")
+@router.get("/export", summary="Export the ICTU lecturer dataset (verified source identities) as importable JSON")
 def export_lecturers(
     admin: Annotated[User, Depends(require_role("ADMIN"))],
     db: Annotated[Session, Depends(get_session)],
+    source_system: Annotated[str, Query(min_length=1, max_length=50)] = ICTU_SOURCE_SYSTEM,
 ) -> Response:
-    """Export all current canonical lecturer master data to JSON without user/account/security fields."""
+    """Export canonical lecturer master data for one verified source.
+
+    Only lecturers whose import snapshots recorded a source identity
+    (``source_id``) for ``source_system`` are exported; synthetic/manual
+    records and every user/account/security field are excluded. ``tel`` and
+    Google Scholar are not stored in PostgreSQL and are therefore not
+    exported (see ``dataset.export.not_preserved_fields``).
+    """
     from datetime import UTC, datetime
     import json
     from app.models.governance import AuditEvent
 
     now = datetime.now(UTC)
-    all_lecturers = db.execute(
-        select(Lecturer).order_by(Lecturer.full_name.asc(), Lecturer.id.asc())
-    ).scalars().all()
-
-    lecturers_data = []
-    for row in all_lecturers:
-        source_url = row.repository_profile_url or f"https://repository.ictu.edu.vn/giang-vien/{row.id}"
-        lecturers_data.append({
-            "source_id": str(row.id),
-            "staff_code": row.staff_code,
-            "full_name": row.full_name,
-            "full_name_normalized": row.full_name_normalized,
-            "institutional_email": row.email,
-            "academic_degree": row.academic_degree,
-            "academic_rank": row.academic_rank,
-            "position": row.position,
-            "faculty": row.faculty,
-            "department": row.department,
-            "profile_url": row.repository_profile_url,
-            "orcid": row.orcid,
-            "is_active": row.is_active,
-            "provenance": {
-                "source_urls": [source_url],
-                "source_system": "scopus_ictu_master",
-                "extracted_at": now.isoformat(),
-            },
-        })
-
-    payload = {
-        "dataset": {
-            "name": "ICTU Lecturer Master Dataset",
-            "schema_version": "1.0",
-            "exported_at": now.isoformat(),
-            "record_count": len(lecturers_data),
-            "source": "SCOPUS_ICTU_SYSTEM_EXPORT",
-        },
-        "lecturers": lecturers_data,
-    }
+    exported = build_lecturer_export(db, now=now, source_system=source_system)
 
     # Record export audit event
     audit = AuditEvent(
@@ -464,7 +436,9 @@ def export_lecturers(
         actor_type="USER",
         actor_user_id=admin.id,
         event_metadata={
-            "record_count": len(lecturers_data),
+            "record_count": exported.record_count,
+            "excluded_without_source_id": exported.excluded_without_source_id,
+            "source_system": source_system,
             "format": "JSON",
             "exported_at": now.isoformat(),
         },
@@ -472,7 +446,7 @@ def export_lecturers(
     db.add(audit)
     db.commit()
 
-    content = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+    content = json.dumps(exported.payload, ensure_ascii=False, indent=2).encode("utf-8")
     timestamp_str = now.strftime("%Y%m%d_%H%M%S")
     filename = f"ictu_lecturers_{timestamp_str}.json"
 
@@ -1001,6 +975,9 @@ async def preview_lecturer_dataset(
             "update": summary.update,
             "unchanged": summary.unchanged,
             "conflicts": summary.conflicts,
+            "blocking_conflicts": summary.blocking_conflicts,
+            "absent_from_file": summary.absent_from_file,
+            "deleted": 0,
         },
         conflicts=[LecturerDatasetConflict(**c) for c in summary.conflict_samples],
         filename=summary.filename,
@@ -1046,9 +1023,10 @@ async def import_lecturer_dataset(
         ) from exc
     except LecturerDatasetError as exc:
         raise APIError(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=exc.status_code,
             detail=exc.message,
             code=exc.code,
+            data={"conflicts": exc.conflicts} if exc.conflicts else None,
         ) from exc
     return LecturerImportResponse(
         dataset=_lecturer_import_dataset_meta(result.dataset),
@@ -1058,6 +1036,9 @@ async def import_lecturer_dataset(
             "updated": result.updated,
             "unchanged": result.unchanged,
             "conflicts": result.conflicts,
+            "blocking_conflicts": result.blocking_conflicts,
+            "absent_from_file": result.absent_from_file,
+            "deleted": 0,
         },
         conflicts=[LecturerDatasetConflict(**c) for c in result.conflict_samples],
         snapshot_ids=result.snapshot_ids,
