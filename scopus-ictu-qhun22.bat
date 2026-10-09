@@ -1,64 +1,61 @@
 @echo off
 setlocal
 
+rem ============================================================
+rem  Scopus-Ictu - MOT file khoi dong duy nhat (nhap dup de chay)
+rem  PostgreSQL demo -> Backend -> Frontend -> mo trinh duyet.
+rem  Dung phan mem:  chon S o cuoi, hoac chay:  scopus-ictu-qhun22.bat stop
+rem  Mat khau/cau hinh nam o thu muc secrets NGOAI Git (khong nam trong tep nay).
+rem ============================================================
+
 set "ROOT=%~dp0"
-set "LOG_DIR=%ROOT%logs"
-set "BACKEND_DIR=%ROOT%backend"
-set "FRONTEND_DIR=%ROOT%frontend"
-set "PYTHON=%ROOT%.venv\Scripts\python.exe"
+if not exist "%ROOT%backend\scripts\demo_launcher.py" (
+    if exist "%ROOT%Scopus-Ictu\backend\scripts\demo_launcher.py" (
+        set "ROOT=%ROOT%Scopus-Ictu\"
+    )
+)
+for %%I in ("%ROOT%..") do set "DOAN=%%~fI"
+set "PYTHON=%DOAN%\_venv_backend_demo_py312\Scripts\python.exe"
+set "LAUNCHER=%ROOT%backend\scripts\demo_launcher.py"
+set "PYTHONUTF8=1"
 
 if not exist "%PYTHON%" (
-    echo [ERROR] Khong tim thay Python virtual environment:
-    echo         %PYTHON%
+    echo [LOI] Khong tim thay Python 3.12 virtual environment:
+    echo       %PYTHON%
+    pause
+    exit /b 1
+)
+if not exist "%LAUNCHER%" (
+    echo [LOI] Khong tim thay bo dieu phoi khoi dong:
+    echo       %LAUNCHER%
     pause
     exit /b 1
 )
 
-if not exist "%FRONTEND_DIR%\package.json" (
-    echo [ERROR] Khong tim thay frontend:
-    echo         %FRONTEND_DIR%
+if /i "%~1"=="stop" (
+    "%PYTHON%" "%LAUNCHER%" stop
+    echo.
+    pause
+    exit /b 0
+)
+
+echo ============================================================
+echo  Scopus-Ictu - khoi dong phan mem demo
+echo ============================================================
+"%PYTHON%" "%LAUNCHER%" start
+if errorlevel 1 (
+    echo.
+    echo [LOI] Khoi dong that bai. Doc thong bao [LOI] o tren.
+    echo       Nhat ky: %DOAN%\_quan_ly_do_an\logs\demo\
     pause
     exit /b 1
 )
 
-if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
-
-echo [%date% %time%] Starting Scopus-Ictu local servers>> "%LOG_DIR%\launcher.log"
-
-echo Applying database migrations...
-cd /d "%BACKEND_DIR%"
-"%PYTHON%" -m alembic upgrade head >> "%LOG_DIR%\migration.log" 2>&1
-if errorlevel 1 (
-    echo [ERROR] Database migration failed. See:
-    echo         %LOG_DIR%\migration.log
-    pause
-    exit /b 1
-)
-
-netstat -ano | findstr /R /C:":8000 .*LISTENING" > nul
-if errorlevel 1 (
-    start "" /b cmd /c "cd /d ""%BACKEND_DIR%"" && ""%PYTHON%"" -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload >> ""%LOG_DIR%\backend.log"" 2>&1"
-) else (
-    echo Backend port 8000 is already in use; keeping the existing server.
-)
-
-netstat -ano | findstr /R /C:":5173 .*LISTENING" > nul
-if errorlevel 1 (
-    start "" /b cmd /c "cd /d ""%FRONTEND_DIR%"" && npm run dev -- --host 127.0.0.1 >> ""%LOG_DIR%\frontend.log"" 2>&1"
-) else (
-    echo Frontend port 5173 is already in use; keeping the existing server.
-)
-
-echo Da mo 2 server:
-echo   Frontend: http://127.0.0.1:5173
-echo   Backend:  http://127.0.0.1:8000/docs
 echo.
-echo Log files:
-echo   %LOG_DIR%\backend.log
-echo   %LOG_DIR%\frontend.log
-echo.
-echo Backend va frontend dang chay trong cung cua so nay.
-echo Dong cua so nay de ket thuc phien chay.
+echo Phan mem dang chay nen. Dong cua so nay KHONG dung phan mem.
+choice /c SK /n /m "Nhan S de DUNG phan mem, K de giu phan mem chay va thoat: "
+if errorlevel 2 exit /b 0
+"%PYTHON%" "%LAUNCHER%" stop
 echo.
 pause
 exit /b 0

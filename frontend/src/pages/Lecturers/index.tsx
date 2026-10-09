@@ -11,6 +11,7 @@ import {
   updateLecturer,
 } from "../../api/lecturers";
 import { ApiError } from "../../api/client";
+import { getApiErrorMessage } from "../../api/errors";
 import {
   getUser,
   lockUser,
@@ -270,8 +271,8 @@ export default function LecturersPage() {
         );
         return;
       }
-      const msg = err?.response?.data?.detail || (locale === "vi" ? "Không thể thêm giảng viên. Vui lòng thử lại." : "Could not add lecturer.");
-      setAddError(typeof msg === "string" ? msg : JSON.stringify(msg));
+      // ApiError (fetch client): show the server's user-facing 4xx detail (e.g. "Email đã được sử dụng.").
+      setAddError(getApiErrorMessage(err, locale === "vi" ? "Không thể thêm giảng viên. Vui lòng thử lại." : "Could not add lecturer."));
     } finally {
       setIsSubmitting(false);
     }
@@ -515,12 +516,12 @@ export default function LecturersPage() {
         toast.error(
           locale === "vi" ? "Không thể xóa giảng viên" : "Cannot delete lecturer",
           locale === "vi"
-            ? "Hồ sơ này đang được liên kết với dữ liệu khác trong hệ thống."
+            ? (err.detail || "Hồ sơ này đang được liên kết với dữ liệu khác trong hệ thống.")
             : (err.message || "This record is currently in use in the system."),
         );
       } else {
-        const msg = err instanceof ApiError ? err.message : (err?.response?.data?.detail || (locale === "vi" ? "Không thể xóa giảng viên." : "Could not delete lecturer."));
-        toast.error(locale === "vi" ? "Không thể xóa giảng viên" : "Delete Error", typeof msg === "string" ? msg : JSON.stringify(msg));
+        const msg = getApiErrorMessage(err, locale === "vi" ? "Không thể xóa giảng viên." : "Could not delete lecturer.");
+        toast.error(locale === "vi" ? "Không thể xóa giảng viên" : "Delete Error", msg);
       }
     } finally {
       setIsSubmitting(false);

@@ -30,13 +30,27 @@ Các thư mục `Backend-Localhost-14-10/`, `Integration-*` chỉ là worktree t
 Database nghiệp vụ: `scopus_ictu_demo_teacher_20261014`.
 Các database `*_test_*` chỉ dùng để thử nghiệm/ghi dữ liệu (review, restore, migration), **không** dùng để trình diễn dữ liệu thật.
 
-## 2. Khởi động
+## 2. Khởi động (MỘT file BAT duy nhất)
 
-1. PostgreSQL demo: chạy `start_postgres.cmd` (dùng `pg_ctl ... -D <DOAN>/_postgres_demo_14_10/data`; luôn truyền `-D`, **không** đụng service `postgresql-x64-17` / cổng 5432).
-2. Backend: chạy `start_demo_backend.cmd` (Python 3.12, `uvicorn app.main:app` ở `127.0.0.1:8001`, mã lấy từ `Scopus-Ictu/backend`). Launcher in dòng `backend source: …/Scopus-Ictu/backend/app/__init__.py` và **từ chối chạy** nếu `app` được import từ thư mục khác.
-3. Đợi dòng `Application startup complete`.
-4. Frontend: chạy `start_demo_frontend.cmd` (Vite ở `http://127.0.0.1:5173`, proxy `/api` → backend 8001; biến `VITE_API_PROXY_TARGET`). Cần `Scopus-Ictu/frontend/node_modules` (đã cài sẵn).
-5. Mở `http://127.0.0.1:5173` và đăng nhập (mục 4).
+Người dùng trình diễn đồ án **chỉ cần một thao tác nhấp đúp chuột** vào file BAT gốc:
+
+* **Bước 1**: Nhấp đúp file BAT khởi động Scopus-Ictu: **`scopus-ictu-qhun22.bat`** (nằm tại thư mục gốc repository `Scopus-Ictu/scopus-ictu-qhun22.bat`).
+* **Bước 2**: Chờ hệ thống tự động kiểm tra và khởi động theo chu trình:
+  - Khởi động cluster PostgreSQL demo (`127.0.0.1:55432`) nếu chưa chạy (chỉ dùng data directory của demo, không chạm service 5432).
+  - Kiểm tra kết nối database `scopus_ictu_demo_teacher_20261014` và Alembic migration head.
+  - Khởi động Backend demo (Uvicorn `127.0.0.1:8001`, mã nguồn chuẩn từ `Scopus-Ictu/backend`).
+  - Khởi động Frontend demo (Vite `http://127.0.0.1:5173`, mã nguồn chuẩn từ `Scopus-Ictu/frontend`).
+  - Kiểm tra trạng thái `/health` và proxy `/api/v1/auth/me`.
+* **Bước 3**: Trình duyệt mặc định tự động mở địa chỉ: **`http://127.0.0.1:5173`**.
+* **Bước 4**: Đăng nhập tài khoản **ADMIN demo** (`admin@ictu.edu.vn`) và bắt đầu trình diễn.
+
+> **Lưu ý quan trọng:** Người dùng tuyệt đối không cần mở ba cửa sổ terminal hay chạy tay từng file CMD riêng biệt. Nếu chạy lại file BAT khi hệ thống đang chạy, launcher tự nhận diện tiến trình của demo và không khởi động trùng lặp.
+
+### Dành cho kỹ thuật viên / Xử lý sự cố (Technical Troubleshooting Only)
+Nếu cần gỡ lỗi từng thành phần riêng lẻ khi có sự cố, ba launcher nội bộ nằm tại `<DOAN>/_postgres_demo_14_10/`:
+1. `start_postgres.cmd`: Khởi động riêng PostgreSQL demo 55432 (`pg_ctl ... -D <DOAN>/_postgres_demo_14_10/data`).
+2. `start_demo_backend.cmd`: Khởi động riêng Backend uvicorn 8001 (kiểm tra nguồn import từ `Scopus-Ictu/backend`).
+3. `start_demo_frontend.cmd`: Khởi động riêng Frontend vite 5173 (chuyển tiếp proxy `/api` → 8001).
 
 ## 3. Xác nhận đang trỏ đúng database
 
@@ -126,7 +140,14 @@ Mọi affiliation có `scope = AUTHOR_ON_PUBLICATION_EXTERNAL_SOURCE`: là đơn
 
 ## 7. Dừng dịch vụ
 
-Chạy `stop_demo.cmd`: dừng đúng tiến trình lắng nghe `127.0.0.1:5173` (frontend) và `127.0.0.1:8001` (backend), rồi dừng cluster demo bằng `pg_ctl stop -D <DOAN>/_postgres_demo_14_10/data -m fast`.
+Có hai cách dừng an toàn, không làm gián đoạn các dịch vụ khác trên máy:
+
+* **Cách 1 (Từ cửa sổ BAT chính)**: Trong cửa sổ console của `scopus-ictu-qhun22.bat`, gõ phím **`S`** khi nhận được lời nhắc:
+  `Nhan S de DUNG phan mem, K de giu phan mem chay va thoat:`
+* **Cách 2 (Bằng lệnh)**: Chạy lệnh `scopus-ictu-qhun22.bat stop` từ thư mục gốc repository.
+* **Cách kỹ thuật viên**: Chạy `stop_demo.cmd` trong `<DOAN>/_postgres_demo_14_10/`.
+
+Quá trình dừng sẽ tắt Frontend, Backend và cluster PostgreSQL demo; **tuyệt đối không** đụng đến PostgreSQL service cổng 5432 hay các tiến trình không thuộc đồ án.
 
 ## 8. JSON nguồn/backup và PostgreSQL runtime
 
