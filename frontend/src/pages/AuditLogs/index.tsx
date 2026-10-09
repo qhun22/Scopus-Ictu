@@ -3,6 +3,7 @@ import { getAuditLogs } from "../../api/audits";
 import { getApiErrorMessage } from "../../api/errors";
 import { useI18n } from "../../i18n";
 import { AuditActorType, AuditListItem, AuditListResponse } from "../../types/audit";
+import { formatTimestamp } from "../../utils/dateTime";
 
 const PAGE_SIZES = [20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 50;
@@ -40,11 +41,6 @@ function datetimeLocalToIso(value: string): string | undefined {
   return d.toISOString();
 }
 
-function formatTimestamp(raw: string): string {
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return raw;
-  return d.toLocaleString();
-}
 
 function ActorCell({
   item,

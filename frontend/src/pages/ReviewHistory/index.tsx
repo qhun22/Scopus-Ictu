@@ -3,6 +3,7 @@ import { getReviewHistory } from "../../api/reviews";
 import { getApiErrorMessage } from "../../api/errors";
 import { useI18n } from "../../i18n";
 import { ReviewHistoryAction, ReviewHistoryItem, ReviewHistoryResponse } from "../../types/review";
+import { formatTimestamp } from "../../utils/dateTime";
 
 const PAGE_SIZES = [20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -34,11 +35,6 @@ function datetimeLocalToIso(value: string): string | undefined {
   return d.toISOString();
 }
 
-function formatTimestamp(raw: string): string {
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return raw;
-  return d.toLocaleString();
-}
 
 function ActionBadge({ action }: { action: ReviewHistoryAction }) {
   const colors: Record<ReviewHistoryAction, string> = {

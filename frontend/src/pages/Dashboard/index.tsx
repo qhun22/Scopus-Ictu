@@ -8,12 +8,8 @@ import {
   DashboardSummary,
 } from "../../types/dashboard";
 import { AuditListItem } from "../../types/audit";
+import { formatTimestamp } from "../../utils/dateTime";
 
-function formatTimestamp(raw: string): string {
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return raw;
-  return d.toLocaleString();
-}
 
 function ActorCell({
   item,
