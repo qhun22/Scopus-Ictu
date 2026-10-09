@@ -20,10 +20,67 @@ export interface PublicationListResponse {
   page_size: number;
 }
 
+/** Confidence of the link between the Scopus author and an external-source authorship. */
+export type AffiliationLinkStatus = "VERIFIED" | "CORROBORATED" | "UNRESOLVED" | "NOT_RECONCILED";
+
+export interface AffiliationOrganizationRead {
+  source_system: string;
+  source_org_id: string | null;
+  ror: string | null;
+  display_name: string;
+  country_code: string | null;
+}
+
+export interface AuthorAffiliationRead {
+  link_status: "VERIFIED" | "CORROBORATED";
+  source_system: string;
+  raw_affiliation_text: string | null;
+  organizations: AffiliationOrganizationRead[];
+  retrieved_at: string;
+  /** Always the author's affiliation on THIS paper per an external metadata source (not Scopus). */
+  scope: "AUTHOR_ON_PUBLICATION_EXTERNAL_SOURCE";
+  provenance: {
+    link_method: string;
+    source_work_id: string | null;
+    source_doi: string | null;
+    external_position: number | null;
+    external_author_name: string | null;
+    evidence: Record<string, unknown>;
+  };
+}
+
+export interface AffiliationResolutionRead {
+  source_system: string;
+  link_status: "VERIFIED" | "CORROBORATED" | "UNRESOLVED";
+  link_method: string | null;
+  unresolved_reason: string | null;
+  affiliation_presence: "PRESENT" | "ABSENT" | null;
+  retrieved_at: string | null;
+  source_work_id: string | null;
+}
+
 export interface PublicationAuthorRead {
   author_order: number;
   scopus_id: string;
   preferred_name: string;
+  affiliation_status?: AffiliationLinkStatus;
+  /** true: a trusted source lists a unit; false: it lists none; null: unknown. */
+  source_has_affiliation?: boolean | null;
+  affiliations?: AuthorAffiliationRead[];
+  affiliation_resolutions?: AffiliationResolutionRead[];
+}
+
+export interface AffiliationSummaryRead {
+  authors: number;
+  verified_with_affiliation: number;
+  verified_without_affiliation: number;
+  corroborated_with_affiliation: number;
+  corroborated_without_affiliation: number;
+  unresolved: number;
+  not_reconciled: number;
+  all_authors_verified_with_affiliation: boolean;
+  all_authors_verified_or_corroborated_with_affiliation: boolean;
+  note?: string;
 }
 
 export interface PublicationLecturerLinkRead {
@@ -60,6 +117,7 @@ export interface PublicationDetailResponse {
   publication_stage: string | null;
   open_access_status: string | null;
   authors: PublicationAuthorRead[];
+  affiliation_summary?: AffiliationSummaryRead | null;
   approved_lecturer_links: PublicationLecturerLinkRead[];
   provenance: PublicationProvenanceRead[];
 }

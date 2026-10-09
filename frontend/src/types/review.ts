@@ -28,6 +28,9 @@ export interface ReviewQueueItem {
   publication_support_count: number;
   candidate_count_for_lecturer: number;
   is_ambiguous: boolean;
+  /** Number of candidate roots proposing the SAME Scopus Author ID (any lecturer). */
+  candidate_count_for_scopus_author?: number;
+  is_shared_scopus_author?: boolean;
   created_at: string;
   updated_at: string;
   last_seen_at: string;
@@ -105,6 +108,8 @@ export interface ReviewCandidateDetail {
   ambiguity: {
     candidate_count_for_lecturer: number;
     is_ambiguous: boolean;
+    candidate_count_for_scopus_author?: number;
+    is_shared_scopus_author?: boolean;
     other_candidates: ReviewOtherCandidate[];
   };
 }

@@ -5,6 +5,7 @@ import { getApiErrorMessage } from "../../api/errors";
 import { getPublicationByEid } from "../../api/publications";
 import { PublicationDetailResponse } from "../../types/publication";
 import { useI18n } from "../../i18n";
+import { AffiliationSummaryBar, AuthorAffiliationCell } from "./AuthorAffiliations";
 
 const NULL_YEAR = "Chưa rõ";
 const NULL_CITATION = "Chưa có dữ liệu";
@@ -115,6 +116,7 @@ export default function PublicationDetailPage() {
   const retryLabel = locale === "vi" ? "Thử lại" : "Retry";
   const colAuthorOrder = locale === "vi" ? "STT" : "#";
   const colScopusId = "Scopus ID";
+  const colAffiliation = locale === "vi" ? "Đơn vị theo tác giả (nguồn ngoài) & độ tin cậy" : "Author affiliation (external source) & confidence";
   const colName = locale === "vi" ? "Tên ưu tiên" : "Preferred Name";
   const colStaffCode = locale === "vi" ? "Mã cán bộ" : "Staff Code";
   const colDepartment = locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept";
@@ -184,7 +186,7 @@ export default function PublicationDetailPage() {
     title, eid: pubEid, doi, year, source_title,
     volume, issue, art_no, page_start, page_end,
     cited_by_count, document_type, publication_stage, open_access_status,
-    authors, approved_lecturer_links, provenance,
+    authors, approved_lecturer_links, provenance, affiliation_summary,
   } = publication;
 
   const provenanceToShow = showAllProvenance ? provenance : provenance.slice(0, 3);
@@ -243,12 +245,17 @@ export default function PublicationDetailPage() {
           <p className="py-6 text-center text-xs text-slate-400">{emptyAuthorsLabel}</p>
         ) : (
           <div className="overflow-x-auto">
+            <p className="mb-2 text-xs text-slate-500" data-testid="author-count">
+              {locale === "vi" ? `${authors.length} tác giả, theo thứ tự trên bài báo.` : `${authors.length} authors, in publication order.`}
+            </p>
+            <AffiliationSummaryBar summary={affiliation_summary} locale={locale} />
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
                 <tr>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colAuthorOrder}</th>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colName}</th>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colScopusId}</th>
+                  <th className="px-3 py-2.5 font-semibold">{colAffiliation}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -257,6 +264,9 @@ export default function PublicationDetailPage() {
                     <td className="px-3 py-2.5 text-center text-slate-500">{a.author_order}</td>
                     <td className="px-3 py-2.5 font-medium text-slate-800">{a.preferred_name}</td>
                     <td className="px-3 py-2.5 font-mono text-slate-500">{a.scopus_id}</td>
+                    <td className="px-3 py-2.5 align-top">
+                      <AuthorAffiliationCell author={a} locale={locale} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

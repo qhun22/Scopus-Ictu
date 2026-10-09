@@ -73,6 +73,10 @@ function ambiguityText(count: number): string {
   return `Có ${count} ứng viên`;
 }
 
+function sharedAuthorText(count: number | undefined): string {
+  return `Cùng một Scopus Author ID đang được đề xuất cho ${count ?? "nhiều"} giảng viên`;
+}
+
 function displayValue(value: string | null | undefined): string {
   const normalized = value?.trim();
   return normalized ? normalized : "Chưa có dữ liệu";
@@ -338,9 +342,16 @@ export default function ApprovalQueuePage() {
         title: "Ngữ cảnh mơ hồ",
         key: "ambiguity",
         render: (_, item) => (
-          <Tag color={item.is_ambiguous ? "orange" : "default"}>
-            {ambiguityText(item.candidate_count_for_lecturer)}
-          </Tag>
+          <div className="flex flex-col items-start gap-1">
+            <Tag color={item.is_ambiguous ? "orange" : "default"}>
+              {ambiguityText(item.candidate_count_for_lecturer)}
+            </Tag>
+            {item.is_shared_scopus_author && (
+              <Tag color="red" data-testid="shared-author-tag" title={sharedAuthorText(item.candidate_count_for_scopus_author)}>
+                Tác giả Scopus dùng chung ({item.candidate_count_for_scopus_author ?? "?"} giảng viên)
+              </Tag>
+            )}
+          </div>
         ),
       },
       {
@@ -548,6 +559,15 @@ export default function ApprovalQueuePage() {
               message={ambiguityText(detail.ambiguity.candidate_count_for_lecturer)}
               description={detail.ambiguity.other_candidates.length > 0 ? "Các ứng viên khác của cùng giảng viên được liệt kê theo thứ tự API cung cấp." : "Không có ứng viên Scopus nào khác được ghi nhận cho giảng viên này."}
             />
+            {detail.ambiguity.is_shared_scopus_author && (
+              <Alert
+                className="mt-3"
+                showIcon
+                type="error"
+                message={sharedAuthorText(detail.ambiguity.candidate_count_for_scopus_author)}
+                description="Nhiều giảng viên cùng được đề xuất một tác giả Scopus. Chỉ bằng chứng tên là chưa đủ; hệ thống chặn xác nhận thứ hai cho cùng Scopus Author ID, và không có quyết định nào được tự động đưa ra."
+              />
+            )}
             {detail.ambiguity.other_candidates.length > 0 && (
               <div className="mt-3 space-y-2">
                 {detail.ambiguity.other_candidates.map((candidate) => (
