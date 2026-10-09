@@ -28,7 +28,7 @@ from app.core.database import get_session
 from app.core.security import password_hasher, token_service
 from app.main import app
 from app.models.base import Base
-from app.models.governance import User
+from app.models.governance import AuditEvent, User
 from app.models.master_lecturer import Lecturer
 
 
@@ -420,3 +420,78 @@ def test_staff_code_column_remains_optional() -> None:
     column = LecturerModel.__table__.c.staff_code
     assert column.nullable is True
     assert column.type.length == 50
+
+
+# ---------------------------------------------------------------------------
+# 10. Task 16 - creating a lecturer + login account is audited (no secrets)
+# ---------------------------------------------------------------------------
+
+
+def test_create_lecturer_writes_audit_event_without_password(
+    client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    response = client.post(
+        "/api/v1/lecturers",
+        headers=_auth(admin_user),
+        json={
+            "full_name": "Le Van Audit",
+            "email": "lva@ictu.edu.vn",
+            "password": "StrongPassword123!",
+            "role": "LECTURER",
+            "staff_code": "ICTU-AUDIT-1",
+        },
+    )
+    assert response.status_code == 201
+    db_session.expire_all()
+    lecturer = db_session.query(Lecturer).filter(Lecturer.email == "lva@ictu.edu.vn").one()
+    event = (
+        db_session.query(AuditEvent)
+        .filter(AuditEvent.entity_id == lecturer.id, AuditEvent.action == "LECTURER_CREATED")
+        .one()
+    )
+    assert event.actor_type == "USER"
+    assert event.actor_user_id == admin_user.id
+    assert event.after_state == {
+        "full_name": "Le Van Audit",
+        "email": "lva@ictu.edu.vn",
+        "staff_code": "ICTU-AUDIT-1",
+        "account_role": "LECTURER",
+    }
+    assert "StrongPassword123!" not in str(event.after_state)
+
+
+def test_update_lecturer_rejects_malformed_orcid_with_422(
+    client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """Task 16: a malformed ORCID must not be reported as a duplicate profile (409)."""
+    lecturer = Lecturer(full_name="Orcid Test", full_name_normalized="orcid test", email="orcid@ictu.edu.vn")
+    db_session.add(lecturer)
+    db_session.commit()
+    headers = _auth(admin_user)
+    bad = client.patch(
+        f"/api/v1/lecturers/{lecturer.id}", headers=headers, json={"version": lecturer.version, "orcid": "123"}
+    )
+    assert bad.status_code == 422
+    assert "ORCID" in bad.json()["detail"]
+    good = client.patch(
+        f"/api/v1/lecturers/{lecturer.id}",
+        headers=headers,
+        json={"version": lecturer.version, "orcid": "0000-0002-1825-009X"},
+    )
+    assert good.status_code == 200
+    db_session.expire_all()
+    assert db_session.query(Lecturer).filter(Lecturer.id == lecturer.id).one().orcid == "0000-0002-1825-009X"
+
+
+def test_bulk_cleanup_endpoint_is_retired_and_deletes_nothing(
+    client: TestClient, db_session: Session, admin_user: User
+) -> None:
+    """Task 16: the old route returned HTTP 500 (missing helper); it must now answer 410 and touch no data."""
+    db_session.add(Lecturer(full_name="Giu Nguyen", full_name_normalized="giu nguyen", email="keep@ictu.edu.vn"))
+    db_session.commit()
+    before = db_session.query(Lecturer).count()
+    response = client.delete("/api/v1/lecturers/unlinked/cleanup", headers=_auth(admin_user))
+    assert response.status_code == 410
+    assert response.json()["code"] == "LECTURER_BULK_CLEANUP_RETIRED"
+    db_session.expire_all()
+    assert db_session.query(Lecturer).count() == before

@@ -516,6 +516,22 @@ def create_lecturer(
             role=role,
             lecturer_id=lecturer.id,
         ))
+        from app.models.governance import AuditEvent
+
+        # Audit trail: who created which lecturer profile + login account (never the password).
+        db.add(AuditEvent(
+            entity_type="lecturer",
+            entity_id=lecturer.id,
+            action="LECTURER_CREATED",
+            actor_type="USER",
+            actor_user_id=current_user.id,
+            after_state={
+                "full_name": full_name,
+                "email": email,
+                "staff_code": staff_code,
+                "account_role": role,
+            },
+        ))
         db.commit()
         db.refresh(lecturer)
         return _lecturer_response(lecturer)
@@ -622,7 +638,13 @@ def update_lecturer(
         if payload.position is not None:
             lecturer.position = payload.position.strip() or None
         if payload.orcid is not None:
-            lecturer.orcid = payload.orcid.strip() or None
+            orcid_value = payload.orcid.strip() or None
+            if orcid_value is not None and not re.fullmatch(r"\d{4}-\d{4}-\d{4}-\d{3}[\dX]", orcid_value):
+                raise HTTPException(
+                    status_code=422,
+                    detail="ORCID không hợp lệ. Định dạng đúng: 0000-0000-0000-0000 (ký tự cuối có thể là X).",
+                )
+            lecturer.orcid = orcid_value
 
         # Check if granting account
         if payload.grant_account:
@@ -1124,11 +1146,16 @@ def cleanup_unlinked_lecturers(
     admin: Annotated[User, Depends(require_role("ADMIN"))],
     db: Annotated[Session, Depends(get_session)],
 ) -> dict[str, Any]:
-    """Admin-only cleanup of orphan imported lecturer records with no linked accounts."""
-    from scripts.clean_orphan_lecturers import clean_orphan_lecturers
+    """Retired endpoint: lecturers are master records, so no bulk cleanup is exposed over HTTP.
 
-    count = clean_orphan_lecturers(db)
-    return {
-        "message": f"Đã dọn dẹp thành công {count} hồ sơ giảng viên mồ côi chưa cấp tài khoản.",
-        "cleaned_count": count,
-    }
+    The helper this route used to call no longer exists (the route returned HTTP 500).  Disposable
+    test fixtures are removed with ``python -m scripts.clean_orphan_lecturers --lecturer-id ID``.
+    """
+    raise APIError(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "Chức năng dọn dẹp hàng loạt đã bị gỡ. Hồ sơ giảng viên là dữ liệu gốc; "
+            "chỉ xóa bản ghi thử nghiệm bằng script clean_orphan_lecturers."
+        ),
+        code="LECTURER_BULK_CLEANUP_RETIRED",
+    )
