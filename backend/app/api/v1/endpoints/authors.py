@@ -21,6 +21,7 @@ from app.api.dependencies import require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import User
+from app.services.text_folding import fold_text, folded
 from app.models.publication import (
     PublicationAuthor,
     ScopusAuthor,
@@ -179,7 +180,7 @@ def list_authors(
         base_q = base_q.filter(
             or_(
                 ScopusAuthor.scopus_id.ilike(f"%{q_stripped}%"),
-                ScopusAuthor.preferred_name.ilike(f"%{q_stripped}%"),
+                folded(ScopusAuthor.preferred_name).like(f"%{fold_text(q_stripped)}%"),
             )
         )
 

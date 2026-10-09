@@ -9,6 +9,7 @@ from datetime import datetime
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.services.text_folding import fold_text, folded
 from app.models.affiliation import (
     Organization,
     PublicationAuthorAffiliation,
@@ -70,10 +71,10 @@ def publication_filters(
         pattern = _escaped_substring(trimmed_q)
         conditions.append(
             or_(
-                Publication.title.ilike(pattern, escape="\\"),
+                folded(Publication.title).like(fold_text(pattern), escape="\\"),
                 Publication.eid.ilike(pattern, escape="\\"),
                 Publication.doi.ilike(pattern, escape="\\"),
-                Publication.source_title.ilike(pattern, escape="\\"),
+                folded(Publication.source_title).like(fold_text(pattern), escape="\\"),
             )
         )
 

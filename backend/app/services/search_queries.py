@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models.master_lecturer import Lecturer
 from app.models.publication import Publication, ScopusAuthor
+from app.services.text_folding import fold_text, folded
 from app.schemas.search_api import (
     LecturerSearchItem,
     PublicationSearchItem,
@@ -45,7 +46,7 @@ def _search_lecturers(
         .where(
             Lecturer.is_active.is_(True),
             or_(
-                Lecturer.full_name_normalized.ilike(pattern, escape="\\"),
+                folded(Lecturer.full_name_normalized).like(fold_text(pattern), escape="\\"),
                 Lecturer.staff_code.ilike(pattern, escape="\\"),
                 Lecturer.orcid.ilike(pattern, escape="\\"),
             ),
@@ -77,10 +78,10 @@ def _search_publications(
         select(Publication)
         .where(
             or_(
-                Publication.title.ilike(pattern, escape="\\"),
+                folded(Publication.title).like(fold_text(pattern), escape="\\"),
                 Publication.eid.ilike(pattern, escape="\\"),
                 Publication.doi.ilike(pattern, escape="\\"),
-                Publication.source_title.ilike(pattern, escape="\\"),
+                folded(Publication.source_title).like(fold_text(pattern), escape="\\"),
             )
         )
         .order_by(
@@ -110,7 +111,7 @@ def _search_scopus_authors(
         select(ScopusAuthor)
         .where(
             or_(
-                ScopusAuthor.preferred_name.ilike(pattern, escape="\\"),
+                folded(ScopusAuthor.preferred_name).like(fold_text(pattern), escape="\\"),
                 ScopusAuthor.scopus_id.ilike(pattern, escape="\\"),
             )
         )

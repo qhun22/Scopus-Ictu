@@ -20,6 +20,7 @@ from app.core.exceptions import APIError
 from app.core.security import password_hasher
 from app.models.governance import User
 from app.models.master_lecturer import Lecturer
+from app.services.text_folding import fold_text, folded
 from app.schemas.lecturer import (
     LecturerAccount,
     LecturerCreate,
@@ -258,12 +259,13 @@ def list_lecturers(
         stmt = select(Lecturer)
         if search:
             pattern = f"%{search.strip().lower()}%"
+            folded_pattern = f"%{fold_text(search.strip())}%"  # tìm không phân biệt dấu (Task 17)
             conditions = [
-                func.lower(Lecturer.full_name).like(pattern),
+                folded(Lecturer.full_name).like(folded_pattern),
                 func.lower(func.coalesce(Lecturer.staff_code, "")).like(pattern),
                 func.lower(func.coalesce(Lecturer.email, "")).like(pattern),
-                func.lower(func.coalesce(Lecturer.department, "")).like(pattern),
-                func.lower(func.coalesce(Lecturer.faculty, "")).like(pattern),
+                folded(func.coalesce(Lecturer.department, "")).like(folded_pattern),
+                folded(func.coalesce(Lecturer.faculty, "")).like(folded_pattern),
             ]
             try:
                 uuid_obj = uuid.UUID(search.strip())
