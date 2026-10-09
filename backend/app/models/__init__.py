@@ -27,6 +27,7 @@ from app.models.base import Base
 # registration side effect. Candidate persistence is an additive pre-identity
 # module alongside the frozen M1 tables.
 from app.models import (  # noqa: F401  (registration side effect)
+    affiliation,
     candidate,
     governance,
     identity,
