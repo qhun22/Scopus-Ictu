@@ -60,12 +60,58 @@ body {
   line-height: 1.2;
 }
 
-/* Common Page Container: Fluid with 1600px ceiling to prevent infinite stretch on ultra-wide monitors */
+/* Common Page Container: Fluid across all viewport sizes */
 .app-page-container {
   width: 100%;
-  max-width: 1600px;
+  max-width: 100%;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* Standardized Top-Right Page Action Group (aligned with header control width) */
+.page-action-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .page-action-group {
+    width: 320px;
+    flex-shrink: 0;
+  }
+}
+
+/* Page & Tab Entrance Transitions */
+.page-fade-in {
+  animation: pageFadeIn 190ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tab-fade-in {
+  animation: tabFadeIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes tabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .validation-message {
@@ -83,7 +129,16 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .page-fade-in,
+  .tab-fade-in {
+    animation: none !important;
+  }
   .validation-message {
-    transition: none;
+    transition: none !important;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

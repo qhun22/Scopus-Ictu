@@ -838,6 +838,10 @@ def to_import_response(
     #   TERMINAL   -> False when in_use else True
     # archive state does NOT block physical deletion; visibility is independent.
     can_delete = terminal and not in_use
+    perf_name = performed_by
+    if perf_name and ("Qu?n tr? vi?n" in perf_name or "?" in perf_name):
+        perf_name = "Quản trị viên"
+
     return ScopusImportResponse(
         id=item.id,
         type="SCOPUS",
@@ -859,7 +863,7 @@ def to_import_response(
         finished_at=item.updated_at if terminal else None,
         duration_seconds=max(0.0, (item.updated_at - item.created_at).total_seconds()),
         is_terminal=terminal,
-        performed_by=performed_by or "Không xác định",
+        performed_by=perf_name or "Không xác định",
         can_delete=can_delete,
         in_use=in_use,
         archived=archived,

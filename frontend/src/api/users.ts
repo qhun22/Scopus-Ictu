@@ -3,7 +3,21 @@ import { User } from "./auth";
 import type { LecturerUser } from "./lecturers";
 
 export async function getUsers(): Promise<User[]> {
-  return apiGet<User[]>("/api/v1/users");
+  const users = await apiGet<User[]>("/api/v1/users");
+  return users.map((u) => {
+    let name = u.display_name;
+    if (!name || name.includes("?") || name === "Qu?n tr? vi?n") {
+      if (u.role?.toUpperCase() === "ADMIN") {
+        name = "Quản trị viên";
+      } else {
+        name = name || "Người dùng";
+      }
+    }
+    return {
+      ...u,
+      display_name: name,
+    };
+  });
 }
 
 export function getUser(id: string): Promise<LecturerUser> {

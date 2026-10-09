@@ -113,11 +113,16 @@ export default function LecturersPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
+      const startTime = Date.now();
       const data = await getLecturers({
         page,
         page_size: pageSize,
         search: appliedSearch.trim() || undefined,
       });
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 2000) {
+        await new Promise((res) => setTimeout(res, 2000 - elapsed));
+      }
       setLecturers(data.items);
       setTotalRecords(data.total);
       setStats(data.stats);
@@ -564,34 +569,34 @@ export default function LecturersPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="page-action-group">
           {/* Export JSON Button */}
           <button
             type="button"
             disabled={isExporting}
             onClick={handleExportJson}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] transition-colors cursor-pointer disabled:opacity-50"
+            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
           >
             {isExporting ? (
-              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-[#3A5FC3]" />
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
             ) : (
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
             )}
-            <span>{isExporting ? (locale === "vi" ? "Đang xuất..." : "Exporting...") : (locale === "vi" ? "Xuất JSON" : "Export JSON")}</span>
+            <span className="truncate">{isExporting ? (locale === "vi" ? "Đang xuất..." : "Exporting...") : (locale === "vi" ? "Xuất JSON" : "Export JSON")}</span>
           </button>
 
           {/* Add Lecturer Button */}
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
+            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
             </svg>
-            <span>{locale === "vi" ? "Thêm giảng viên" : "Add Lecturer"}</span>
+            <span className="truncate">{locale === "vi" ? "Thêm giảng viên" : "Add Lecturer"}</span>
           </button>
         </div>
       </div>
@@ -710,12 +715,14 @@ export default function LecturersPage() {
               ) : lecturers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center gap-1">
-                      <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="font-semibold text-slate-600">{t.lecturers.noData}</span>
-                      <span className="text-[11px] text-slate-400">{t.lecturers.noDataSub}</span>
+                    <div className="flex flex-col items-center justify-center gap-1.5">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-bold text-slate-700">{t.lecturers.noData}</span>
+                      <span className="text-xs text-slate-400">{t.lecturers.noDataSub}</span>
                     </div>
                   </td>
                 </tr>
@@ -863,7 +870,7 @@ export default function LecturersPage() {
               type="button"
               onClick={() => setPage(page - 1)}
               disabled={isTableLoading || page <= 1}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
             >
               {t.lecturers.previousPage}
             </button>
@@ -874,7 +881,7 @@ export default function LecturersPage() {
               type="button"
               onClick={() => setPage(page + 1)}
               disabled={isTableLoading || page >= totalPages}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
             >
               {t.lecturers.nextPage}
             </button>
@@ -886,177 +893,213 @@ export default function LecturersPage() {
       {/* MODAL 1: THÊM GIẢNG VIÊN */}
       {/* ====================================================================== */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto">
-          <div className="relative w-full max-w-lg max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl bg-white p-5 sm:p-6 shadow-2xl animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 sm:text-lg">
-                {locale === "vi" ? "Thêm mới Giảng viên" : "Add New Lecturer"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleAddSubmit} className="mt-4 space-y-3.5 text-xs">
-              {addError && (
-                <div className="rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-rose-700 font-medium">
-                  {addError}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Họ và tên" : "Full Name"} <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={addForm.full_name}
-                    onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })}
-                    placeholder="VD: Nguyễn Văn A"
-                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Email giảng viên" : "Email"} <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={addForm.email}
-                    onChange={(e) => handleAddEmailChange(e.target.value)}
-                    placeholder="example@ictu.edu.vn"
-                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Mật khẩu tài khoản" : "Password"} <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    value={addForm.password}
-                    onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
-                    placeholder="••••••••"
-                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Mã cán bộ" : "Staff Code"}
-                    <span className="ml-1 text-[10px] font-normal text-slate-400">
-                      ({locale === "vi" ? "tùy chọn" : "optional"})
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addForm.staff_code ?? ""}
-                    onChange={(e) => handleAddStaffCodeChange(e.target.value)}
-                    placeholder={addForm.email.split("@")[0] || "VD: CB00123"}
-                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-                    aria-invalid={staffCodeFieldError ? "true" : "false"}
-                  />
-                  {staffCodeFieldError ? (
-                    <p className="mt-1 text-[11px] font-medium text-rose-600">{staffCodeFieldError}</p>
-                  ) : (
-                    <p className="mt-1 text-[10px] text-slate-500">
+        <ModalPortal>
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-lecturer-title"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
+                    <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 id="add-lecturer-title" className="text-base font-bold text-slate-900 sm:text-lg">
+                      {locale === "vi" ? "Thêm mới Giảng viên" : "Add New Lecturer"}
+                    </h3>
+                    <p className="text-xs text-slate-500">
                       {locale === "vi"
-                        ? "Gợi ý từ phần tên của email. Có thể chỉnh sửa hoặc để trống."
-                        : "Suggested from the email username. You may edit or leave it blank."}
+                        ? "Khởi tạo hồ sơ cán bộ và tài khoản truy cập hệ thống"
+                        : "Create lecturer profile and system account"}
                     </p>
-                  )}
+                  </div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Vai trò" : "Role"}
-                  </label>
-                  <select
-                    value={addForm.role}
-                    onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
-                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
-                  >
-                    <option value="LECTURER">Giảng viên</option>
-                    <option value="ADMIN">Quản trị viên</option>
-                    <option value="REVIEWER">Phê duyệt viên</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Học vị / Học hàm" : "Degree"}
-                  </label>
-                  <select
-                    value={addForm.academic_degree}
-                    onChange={(e) => setAddForm({ ...addForm, academic_degree: e.target.value })}
-                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
-                  >
-                    <option value="Cử nhân">Cử nhân / Kỹ sư</option>
-                    <option value="Thạc sĩ">Thạc sĩ</option>
-                    <option value="Tiến sĩ">Tiến sĩ</option>
-                    <option value="TS. GVC">TS. GVC</option>
-                    <option value="PGS.TS">PGS.TS</option>
-                    <option value="GS.TS">GS.TS</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {locale === "vi" ? "Khoa / Bộ môn" : "Department"}
-                  </label>
-                  <input
-                    type="text"
-                    value={addForm.department}
-                    onChange={(e) => setAddForm({ ...addForm, department: e.target.value })}
-                    placeholder="VD: Khoa CNTT"
-                    className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                >
-                  {t.common.cancel}
-                </button>
-                <button
-                  type="submit"
                   disabled={isSubmitting}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] disabled:opacity-50 cursor-pointer"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer disabled:opacity-50"
+                  aria-label={t.common.cancel}
                 >
-                  {isSubmitting ? (
-                    <>
-                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      <span>{locale === "vi" ? "Đang lưu..." : "Saving..."}</span>
-                    </>
-                  ) : (
-                    <span>{locale === "vi" ? "Tạo giảng viên" : "Create Lecturer"}</span>
-                  )}
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
-            </form>
+
+              {/* Form Body */}
+              <form onSubmit={handleAddSubmit} className="flex min-h-0 flex-1 flex-col text-xs">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
+                  {addError && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3 text-xs text-rose-700 font-medium">
+                      {addError}
+                    </div>
+                  )}
+
+                  {/* Row 1: Họ tên & Email */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Họ và tên" : "Full Name"} <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={addForm.full_name}
+                        onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })}
+                        placeholder="VD: Nguyễn Văn A"
+                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Email giảng viên" : "Email"} <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={addForm.email}
+                        onChange={(e) => handleAddEmailChange(e.target.value)}
+                        placeholder="example@ictu.edu.vn"
+                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Mật khẩu & Mã cán bộ */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Mật khẩu tài khoản" : "Password"} <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={addForm.password}
+                        onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
+                        placeholder="••••••••"
+                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {locale === "vi" ? "Tối thiểu 8 ký tự" : "Minimum 8 characters"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Mã cán bộ" : "Staff Code"}
+                        <span className="ml-1 text-[10px] font-normal text-slate-400">
+                          ({locale === "vi" ? "tùy chọn" : "optional"})
+                        </span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addForm.staff_code ?? ""}
+                        onChange={(e) => handleAddStaffCodeChange(e.target.value)}
+                        placeholder={addForm.email.split("@")[0] || "VD: CB00123"}
+                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                        aria-invalid={staffCodeFieldError ? "true" : "false"}
+                      />
+                      {staffCodeFieldError ? (
+                        <p className="mt-1 text-[11px] font-medium text-rose-600">{staffCodeFieldError}</p>
+                      ) : (
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          {locale === "vi"
+                            ? "Gợi ý từ email. Có thể chỉnh sửa hoặc để trống."
+                            : "Suggested from email username. May edit or leave blank."}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 3: Vai trò & Học vị */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Vai trò" : "Role"}
+                      </label>
+                      <select
+                        value={addForm.role}
+                        onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
+                      >
+                        <option value="LECTURER">{locale === "vi" ? "Giảng viên" : "Lecturer"}</option>
+                        <option value="ADMIN">{locale === "vi" ? "Quản trị viên" : "Administrator"}</option>
+                        <option value="REVIEWER">{locale === "vi" ? "Phê duyệt viên" : "Reviewer"}</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Học vị / Học hàm" : "Degree"}
+                      </label>
+                      <select
+                        value={addForm.academic_degree}
+                        onChange={(e) => setAddForm({ ...addForm, academic_degree: e.target.value })}
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
+                      >
+                        <option value="Cử nhân">Cử nhân / Kỹ sư</option>
+                        <option value="Thạc sĩ">Thạc sĩ</option>
+                        <option value="Tiến sĩ">Tiến sĩ</option>
+                        <option value="TS. GVC">TS. GVC</option>
+                        <option value="PGS.TS">PGS.TS</option>
+                        <option value="GS.TS">GS.TS</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Khoa / Bộ môn */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      {locale === "vi" ? "Khoa / Bộ môn" : "Department"}
+                    </label>
+                    <input
+                      type="text"
+                      value={addForm.department}
+                      onChange={(e) => setAddForm({ ...addForm, department: e.target.value })}
+                      placeholder="VD: Khoa Công nghệ Thông tin"
+                      className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/50 px-5 py-3.5 shrink-0">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="h-9 sm:h-10 rounded-lg border border-slate-200 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs"
+                  >
+                    {t.common.cancel}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex h-9 sm:h-10 min-w-32 items-center justify-center gap-2 rounded-lg bg-[#3A5FC3] px-5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                        <span>{locale === "vi" ? "Đang lưu..." : "Saving..."}</span>
+                      </>
+                    ) : (
+                      <span>{locale === "vi" ? "Tạo giảng viên" : "Create Lecturer"}</span>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* ====================================================================== */}

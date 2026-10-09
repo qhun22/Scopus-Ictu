@@ -25,11 +25,17 @@ from app.schemas.auth import LoginRequest, MessageResponse, UserResponse
 router = APIRouter()
 
 
+def _normalize_display_name(name: str | None, role: str) -> str | None:
+    if name and ("Qu?n tr? vi?n" in name or (role == "ADMIN" and "?" in name)):
+        return "Quản trị viên"
+    return name
+
+
 def _public_user(user: User) -> UserResponse:
     return UserResponse(
         id=user.id,
         email=user.email,
-        display_name=user.display_name,
+        display_name=_normalize_display_name(user.display_name, user.role),
         role=user.role,
         lecturer_id=user.lecturer_id,
     )

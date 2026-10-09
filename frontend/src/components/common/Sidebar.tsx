@@ -247,7 +247,7 @@ export default function Sidebar({
       {/* DESKTOP / TABLET SIDEBAR */}
       {/* ====================================================================== */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 hidden flex-col border-r border-slate-200/80 bg-white transition-all duration-300 md:flex ${
+        className={`fixed top-0 bottom-0 left-0 z-40 hidden flex-col border-r border-slate-200/80 bg-white transition-all duration-200 ease-out md:flex ${
           isCollapsed ? "w-20" : "w-64"
         }`}
       >

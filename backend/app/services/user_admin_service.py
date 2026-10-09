@@ -75,10 +75,14 @@ def ensure_expected_version(user: User, expected_version: int) -> None:
 
 
 def to_admin_response(user: User, lecturer: Lecturer | None) -> UserAdminResponse:
+    display_name = user.display_name
+    if display_name and ("Qu?n tr? vi?n" in display_name or (user.role == "ADMIN" and "?" in display_name)):
+        display_name = "Quản trị viên"
+
     return UserAdminResponse(
         id=user.id,
         email=user.email,
-        display_name=user.display_name,
+        display_name=display_name,
         role=user.role,
         lecturer_id=user.lecturer_id,
         staff_code=lecturer.staff_code if lecturer else None,

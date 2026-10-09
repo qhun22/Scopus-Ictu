@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/common/Header";
 import Sidebar from "../components/common/Sidebar";
 
 export default function AppLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
   return (
     <div className="min-h-screen bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">
@@ -18,7 +19,7 @@ export default function AppLayout() {
 
       {/* Main Content Area */}
       <div
-        className={`flex min-h-screen min-w-0 flex-1 flex-col transition-all duration-300 ${
+        className={`flex min-h-screen min-w-0 flex-1 flex-col transition-all duration-200 ease-out ${
           isSidebarCollapsed ? "md:pl-20" : "md:pl-64"
         }`}
       >
@@ -31,7 +32,9 @@ export default function AppLayout() {
 
         {/* Dynamic Page Content */}
         <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6">
-          <Outlet />
+          <div key={location.pathname} className="page-fade-in w-full">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
