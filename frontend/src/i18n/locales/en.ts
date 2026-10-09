@@ -330,6 +330,7 @@ export const en: TranslationSchema = {
       notNormalized: "Pending",
       normalizing: "Processing",
       completed: "Completed",
+      completedWithErrors: "Completed with errors",
       failed: "Failed",
       cancelled: "Cancelled",
     },

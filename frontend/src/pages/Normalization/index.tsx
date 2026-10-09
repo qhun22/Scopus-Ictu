@@ -105,17 +105,26 @@ export default function NormalizationPage() {
     );
   };
 
+  // Chuẩn hóa xong nhưng có dòng bị lỗi (vd. CSV không đúng định dạng Scopus) không được coi là thành công hoàn toàn.
+  const hasRowErrors = (item: ScopusImport): boolean => {
+    return (
+      item.normalization?.status === "COMPLETED" &&
+      (item.normalization.canonical_failed ?? 0) > 0
+    );
+  };
+
   const isCompleted = (item: ScopusImport): boolean => {
     return (
-      item.status === "APPLIED" ||
-      item.normalization?.status === "COMPLETED"
+      !hasRowErrors(item) &&
+      (item.status === "APPLIED" || item.normalization?.status === "COMPLETED")
     );
   };
 
   const isFailed = (item: ScopusImport): boolean => {
     return (
       item.status === "FAILED" ||
-      item.normalization?.status === "FAILED"
+      item.normalization?.status === "FAILED" ||
+      hasRowErrors(item)
     );
   };
 
@@ -596,7 +605,11 @@ export default function NormalizationPage() {
 
                             {/* Result */}
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                              {n && n.status === "COMPLETED" ? (
+                              {n && n.status === "COMPLETED" && hasRowErrors(item) ? (
+                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                                  {t.normalization.status.completedWithErrors}
+                                </span>
+                              ) : n && n.status === "COMPLETED" ? (
                                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
                                   {t.normalization.status.completed}
                                 </span>
@@ -801,7 +814,11 @@ export default function NormalizationPage() {
                           </h3>
                         </div>
                       </div>
-                      {detailModalItem.normalization && detailModalItem.normalization.status === "COMPLETED" ? (
+                      {detailModalItem.normalization && detailModalItem.normalization.status === "COMPLETED" && hasRowErrors(detailModalItem) ? (
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                          {t.normalization.status.completedWithErrors}
+                        </span>
+                      ) : detailModalItem.normalization && detailModalItem.normalization.status === "COMPLETED" ? (
                         <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
                           {t.normalization.status.completed}
                         </span>

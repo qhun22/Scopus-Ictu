@@ -322,6 +322,7 @@ export interface TranslationSchema {
       notNormalized: string;
       normalizing: string;
       completed: string;
+      completedWithErrors: string;
       failed: string;
       cancelled: string;
     };

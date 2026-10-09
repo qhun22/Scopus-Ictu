@@ -59,10 +59,12 @@ def test_utf8_bom_quoted_newline_and_blank_rows() -> None:
     ("content", "code"),
     [
         (b"", "EMPTY_IMPORT_FILE"),
-        (b"Authors,Title\n", "INVALID_CSV"),
+        (b"Authors,Title,EID\n", "INVALID_CSV"),
+        (b"Authors,Title\nA,T\n", "MISSING_EID_COLUMN"),
+        (b"cot1,cot2\nx,y\n", "MISSING_EID_COLUMN"),
         (b"Authors,,EID\nA,T,E\n", "INVALID_CSV_HEADER"),
         (b"Authors,Title,Authors\nA,T,B\n", "INVALID_CSV_HEADER"),
-        (b'Authors,Title\nA,"unterminated\n', "INVALID_CSV"),
+        (b'Authors,Title,EID\nA,"unterminated\n', "INVALID_CSV"),
         (b"\xff\xfe\x00", "INVALID_CSV"),
     ],
 )
@@ -83,7 +85,7 @@ def test_duplicate_eid_is_valid_raw_provenance() -> None:
 
 def test_bad_row_is_recoverable_and_does_not_drop_other_rows() -> None:
     parsed = ScopusCsvParser().parse_bytes(
-        b"Authors,Title\nA,Good\nB,Bad,extra\nC,Also good\n"
+        b"Authors,Title,EID\nA,Good,E1\nB,Bad,E2,extra\nC,Also good,E3\n"
     )
 
     assert parsed.total_records == 3

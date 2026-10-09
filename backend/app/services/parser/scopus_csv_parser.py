@@ -165,6 +165,12 @@ class ScopusCsvParser:
                 "INVALID_CSV_HEADER",
                 "Tệp CSV có tên cột bị trùng lặp.",
             )
+        if "eid" not in {header.strip().casefold() for header in headers}:
+            raise ScopusCsvError(
+                "MISSING_EID_COLUMN",
+                "Tệp CSV không phải bản xuất từ Scopus: thiếu cột EID "
+                "(mã định danh bài báo bắt buộc để chuẩn hóa).",
+            )
 
 
 __all__ = [

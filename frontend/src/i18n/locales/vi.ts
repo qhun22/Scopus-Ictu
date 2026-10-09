@@ -330,6 +330,7 @@ export const vi: TranslationSchema = {
       notNormalized: "Chờ xử lý",
       normalizing: "Đang xử lý",
       completed: "Hoàn thành",
+      completedWithErrors: "Hoàn thành có lỗi",
       failed: "Có lỗi",
       cancelled: "Đã hủy",
     },

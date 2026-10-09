@@ -1933,6 +1933,8 @@ export default function ImportsPage() {
                       </div>
 
                       {/* CARD 2: CHUẨN HÓA DỮ LIỆU */}
+                      {/* Đợt nhập thất bại: không hiển thị phần chuẩn hóa (tránh gợi ý "Đi tới chuẩn hóa") */}
+                      {detail.status !== "FAILED" && (
                       <div className="flex flex-col rounded-xl border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
                         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
                           <div className="flex items-center gap-2">
@@ -2012,6 +2014,7 @@ export default function ImportsPage() {
                           </div>
                         )}
                       </div>
+                      )}
                     </div>
 
                     {/* ROW 2: TÌNH TRẠNG SỬ DỤNG DỮ LIỆU SPANS FULL WIDTH */}
