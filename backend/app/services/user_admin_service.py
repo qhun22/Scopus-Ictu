@@ -268,6 +268,24 @@ def update_user(
                 code="LECTURER_PROFILE_REQUIRED",
             )
         if user.role != payload.role:
+            if user.id == actor.id:
+                raise APIError(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Không thể tự đổi vai trò của tài khoản đang đăng nhập.",
+                    code="CANNOT_CHANGE_OWN_ROLE",
+                )
+            if user.role == "ADMIN":
+                other_admins = (
+                    db.query(User)
+                    .filter(User.role == "ADMIN", User.is_active.is_(True), User.id != user.id)
+                    .count()
+                )
+                if other_admins == 0:
+                    raise APIError(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Không thể hạ vai trò của quản trị viên cuối cùng.",
+                        code="LAST_ADMIN_PROTECTED",
+                    )
             user.role = payload.role
             role_changed = True
 

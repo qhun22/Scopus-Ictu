@@ -586,3 +586,56 @@ def test_31_lock_unlock_supersedes_stale_lock_notification(mock_db: MagicMock) -
     unlock_notif = next((o for o in added_objects if isinstance(o, UserNotification) and o.notification_type == "ACCOUNT_UNLOCKED"), None)
     assert unlock_notif is not None
     assert unlock_notif.is_read is False
+
+
+# ===========================================================================
+# TASK 17 - self-demotion and last-admin protection
+# ===========================================================================
+
+def test_32_admin_cannot_change_own_role(mock_db: MagicMock) -> None:
+    from app.core.exceptions import APIError
+
+    admin = _create_user(role="ADMIN")
+    with pytest.raises(APIError) as caught:
+        update_user(
+            mock_db,
+            user=admin,
+            lecturer=None,
+            payload=UserAdminUpdate(version=admin.version, role="REVIEWER"),
+            actor=admin,
+        )
+    assert caught.value.code == "CANNOT_CHANGE_OWN_ROLE"
+    assert admin.role == "ADMIN"
+
+
+def test_33_last_active_admin_cannot_be_demoted(mock_db: MagicMock) -> None:
+    from app.core.exceptions import APIError
+
+    only_admin = _create_user(role="ADMIN", email="only@ictu.edu.vn")
+    other_actor = _create_user(role="ADMIN", email="actor@ictu.edu.vn")
+    mock_db.query.return_value.filter.return_value.count.return_value = 0  # no other active ADMIN
+    with pytest.raises(APIError) as caught:
+        update_user(
+            mock_db,
+            user=only_admin,
+            lecturer=None,
+            payload=UserAdminUpdate(version=only_admin.version, role="REVIEWER"),
+            actor=other_actor,
+        )
+    assert caught.value.code == "LAST_ADMIN_PROTECTED"
+    assert only_admin.role == "ADMIN"
+
+
+def test_34_admin_can_demote_another_admin_when_one_remains(mock_db: MagicMock) -> None:
+    target = _create_user(role="ADMIN", email="t@ictu.edu.vn")
+    actor = _create_user(role="ADMIN", email="a@ictu.edu.vn")
+    mock_db.query.return_value.filter.return_value.count.return_value = 1  # actor remains
+    changed = update_user(
+        mock_db,
+        user=target,
+        lecturer=None,
+        payload=UserAdminUpdate(version=target.version, role="REVIEWER"),
+        actor=actor,
+    )
+    assert changed is True
+    assert target.role == "REVIEWER"
