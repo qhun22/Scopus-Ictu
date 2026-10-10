@@ -44,7 +44,7 @@ import dataclasses
 import hashlib
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -124,6 +124,15 @@ def _name_department_key(full_name: str, department: str | None) -> tuple[str, s
     return (full_name.casefold().strip(), (department or "").casefold().strip())
 
 
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value).strip())
+    except (ValueError, TypeError):
+        return None
+
+
 def _ambiguous_name_candidate(
     candidates: list[tuple[uuid.UUID, str]],
     email: str | None,
@@ -154,6 +163,10 @@ def _canonical_fields(record: dict) -> dict:
         "faculty": record.get("faculty"),
         "department": record.get("department"),
         "orcid": record.get("orcid"),
+        "specialization": record.get("specialization"),
+        "gender": record.get("gender"),
+        "date_of_birth": record.get("date_of_birth"),
+        "phone": record.get("phone"),
         "profile_url": record.get("profile_url"),
         "is_active": record.get("is_active", True),
     }
@@ -170,6 +183,10 @@ def _current_fields(existing: Lecturer) -> dict:
         "faculty": existing.faculty,
         "department": existing.department,
         "orcid": existing.orcid,
+        "specialization": existing.specialization,
+        "gender": existing.gender,
+        "date_of_birth": existing.date_of_birth.isoformat() if existing.date_of_birth else None,
+        "phone": existing.phone,
         "profile_url": existing.repository_profile_url,
         "is_active": existing.is_active,
     }
@@ -533,6 +550,10 @@ class LecturerImportService:
                         position=canonical["position"],
                         faculty=canonical["faculty"],
                         department=canonical["department"],
+                        specialization=canonical.get("specialization"),
+                        gender=canonical.get("gender"),
+                        date_of_birth=_parse_date(canonical.get("date_of_birth")),
+                        phone=canonical.get("phone"),
                         repository_profile_url=canonical["profile_url"],
                         orcid=canonical["orcid"],
                         is_active=canonical["is_active"],
@@ -558,6 +579,10 @@ class LecturerImportService:
                     existing.position = canonical["position"]
                     existing.faculty = canonical["faculty"]
                     existing.department = canonical["department"]
+                    existing.specialization = canonical.get("specialization")
+                    existing.gender = canonical.get("gender")
+                    existing.date_of_birth = _parse_date(canonical.get("date_of_birth"))
+                    existing.phone = canonical.get("phone")
                     existing.repository_profile_url = canonical["profile_url"]
                     existing.orcid = canonical["orcid"]
                     existing.is_active = canonical["is_active"]

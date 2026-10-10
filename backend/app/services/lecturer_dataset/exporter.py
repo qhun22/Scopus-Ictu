@@ -38,7 +38,8 @@ EXPORTER_VERSION = "scopus_ictu_lecturer_export/1.0"
 SCHEMA_VERSION = "1.0"
 NOT_PRESERVED_FIELDS: tuple[str, ...] = ("tel", "google_scholar")
 RECOVERABILITY_NOTE = (
-    "Bản xuất chỉ khôi phục các trường canonical đang được PostgreSQL lưu. "
+    "Bản xuất khôi phục tất cả các trường canonical đang được PostgreSQL lưu, "
+    "bao gồm specialization, gender, date_of_birth và phone (thêm từ migration e1a2b3c4d5f6). "
     "Các trường tel và Google Scholar chưa được lưu nên không có trong bản xuất; "
     "JSON nguồn gốc (v1), Craw và sidecar vẫn là nguồn lưu trữ cho các trường này."
 )
@@ -161,6 +162,10 @@ def build_lecturer_export(
             "position": row.position,
             "faculty": row.faculty,
             "department": row.department,
+            "specialization": row.specialization,
+            "gender": row.gender,
+            "date_of_birth": row.date_of_birth.isoformat() if row.date_of_birth else None,
+            "phone": row.phone,
             "profile_url": row.repository_profile_url,
             "orcid": row.orcid,
             "is_active": row.is_active,
