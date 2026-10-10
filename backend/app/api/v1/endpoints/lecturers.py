@@ -882,6 +882,10 @@ def delete_lecturer(
             # The account exists solely to view this profile, so it is safe to
             # delete when the profile is deleted.
             if linked_user is not None and linked_user.role == "LECTURER":
+                from app.models.governance import UserNotification
+                db.query(UserNotification).filter(
+                    UserNotification.user_id == linked_user.id
+                ).delete(synchronize_session=False)
                 db.delete(linked_user)
                 db.flush()
 
