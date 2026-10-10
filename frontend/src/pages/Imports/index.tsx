@@ -155,15 +155,10 @@ export default function ImportsPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const startTime = Date.now();
       const [nextConfig, response] = await Promise.all([
         getImportConfig(),
         getImportHistory(archiveFilter !== "active"),
       ]);
-      const elapsed = Date.now() - startTime;
-      if (elapsed < 2000) {
-        await new Promise((res) => setTimeout(res, 2000 - elapsed));
-      }
       setConfig(nextConfig);
       setHistory(response.items);
     } catch (error: unknown) {
@@ -971,21 +966,13 @@ export default function ImportsPage() {
 
   const handlePageChange = (newPage: number) => {
     if (newPage === page || newPage < 1 || newPage > totalPages || isPageLoading) return;
-    setIsPageLoading(true);
-    setTimeout(() => {
-      setPage(newPage);
-      setIsPageLoading(false);
-    }, 2000);
+    setPage(newPage);
   };
 
   const handlePageSizeChange = (newSize: number) => {
     if (newSize === pageSize || isPageLoading) return;
-    setIsPageLoading(true);
-    setTimeout(() => {
-      setPageSize(newSize);
-      setPage(1);
-      setIsPageLoading(false);
-    }, 2000);
+    setPageSize(newSize);
+    setPage(1);
   };
 
   const maxSize = config ? formatBytes(config.max_bytes) : "20.0 MB";
@@ -1043,52 +1030,72 @@ export default function ImportsPage() {
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
+      {/* KPI Stats Grid — clickable để lọc nhanh */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => { setStatusFilter("ALL"); setPage(1); }}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "ALL" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+        >
           <span className="text-xs font-medium text-slate-500">
             {locale === "vi" ? "Tổng đợt nhập" : "Total Imports"}
           </span>
           <p className="mt-1 text-2xl font-black text-slate-800">
             {numberFormatter.format(countTotal)}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => { setStatusFilter("COMPLETED"); setPage(1); }}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "COMPLETED" ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200/80 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"}`}
+        >
           <span className="text-xs font-medium text-emerald-600">
             {locale === "vi" ? "Thành công" : "Completed"}
           </span>
           <p className="mt-1 text-2xl font-black text-emerald-600">
             {numberFormatter.format(countSuccess)}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => { setStatusFilter("WARNING"); setPage(1); }}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "WARNING" ? "border-amber-400 bg-amber-50 ring-2 ring-amber-200" : "border-slate-200/80 bg-white hover:border-amber-200 hover:bg-amber-50/50"}`}
+        >
           <span className="text-xs font-medium text-amber-600">
             {locale === "vi" ? "Cảnh báo" : "Warnings"}
           </span>
           <p className="mt-1 text-2xl font-black text-amber-600">
             {numberFormatter.format(countWarning)}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => { setStatusFilter("PROCESSING"); setPage(1); }}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "PROCESSING" ? "border-blue-400 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200/80 bg-white hover:border-blue-200 hover:bg-blue-50/50"}`}
+        >
           <span className="text-xs font-medium text-blue-600">
             {locale === "vi" ? "Đang xử lý" : "Processing"}
           </span>
           <p className="mt-1 text-2xl font-black text-[#3A5FC3]">
             {numberFormatter.format(countProcessing)}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs col-span-2 sm:col-span-1">
+        <button
+          type="button"
+          onClick={() => { setStatusFilter("FAILED"); setPage(1); }}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer col-span-2 sm:col-span-1 ${statusFilter === "FAILED" ? "border-rose-400 bg-rose-50 ring-2 ring-rose-200" : "border-slate-200/80 bg-white hover:border-rose-200 hover:bg-rose-50/50"}`}
+        >
           <span className="text-xs font-medium text-rose-600">
             {locale === "vi" ? "Lỗi / Đã hủy" : "Failed / Rolled back"}
           </span>
           <p className="mt-1 text-2xl font-black text-rose-600">
             {numberFormatter.format(countFailed)}
           </p>
-        </div>
+        </button>
       </div>
 
       {/* Import Boxes Grid: 1 row, 2 boxes (1:1 ratio) - Left: Scopus CSV, Right: Lecturer JSON */}
@@ -1530,7 +1537,7 @@ export default function ImportsPage() {
               setArchiveFilter("active");
               setPage(1);
             }}
-            disabled={!searchInput && !appliedSearch && statusFilter === "ALL" && archiveFilter === "active"}
+            disabled={!searchInput && !appliedSearch && statusFilter === "ALL"}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1539,39 +1546,6 @@ export default function ImportsPage() {
             <span>{locale === "vi" ? "Đặt lại" : "Reset"}</span>
           </button>
 
-          {/* Bộ lọc Hiển thị */}
-          <select
-            id="import-archive-filter"
-            aria-label={locale === "vi" ? "Hiển thị" : "Visibility"}
-            value={archiveFilter}
-            onChange={(e) => {
-              setArchiveFilter(e.target.value as "active" | "archived" | "all");
-              setPage(1);
-            }}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
-          >
-            <option value="active">{locale === "vi" ? "Đang hiển thị" : "Visible"}</option>
-            <option value="archived">{locale === "vi" ? "Đã ẩn" : "Hidden"}</option>
-            <option value="all">{locale === "vi" ? "Tất cả" : "All"}</option>
-          </select>
-
-          {/* Bộ lọc Trạng thái */}
-          <select
-            id="import-status-filter"
-            aria-label={t.common.status}
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
-          >
-            <option value="ALL">{t.imports.filterAll}</option>
-            <option value="COMPLETED">{t.imports.completed}</option>
-            <option value="WARNING">{locale === "vi" ? "Cảnh báo" : "Warnings"}</option>
-            <option value="PROCESSING">{t.imports.inProgress}</option>
-            <option value="FAILED">{t.imports.failed}</option>
-          </select>
         </div>
       </div>
 
