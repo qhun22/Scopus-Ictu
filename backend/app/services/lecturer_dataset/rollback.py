@@ -20,6 +20,12 @@ from typing import Any
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.models.candidate import (
+    LecturerScopusCandidate,
+    LecturerScopusCandidateEvidence,
+    LecturerScopusCandidateObservation,
+    LecturerScopusCandidateReview,
+)
 from app.models.governance import AuditEvent, User
 from app.models.identity import LecturerScopusIdentity
 from app.models.master_lecturer import (
@@ -257,8 +263,66 @@ class LecturerRollbackService:
                     LecturerSourceSnapshot.id.in_(batch_snapshot_ids)
                 ).delete(synchronize_session=False)
 
-            # D. Delete lecturers created only by this batch
+            # D. Delete lecturers created only by this batch.
+            # Must purge all FK dependents first (RESTRICT constraints):
+            #   lecturer_source_snapshots, lecturer_scopus_candidates (+ their
+            #   observations/evidence/reviews).
             if to_delete_lecturer_ids:
+                # D1. Extra snapshots outside this batch (same FK guard as B/C).
+                extra_snaps = (
+                    db.query(LecturerSourceSnapshot)
+                    .filter(
+                        LecturerSourceSnapshot.lecturer_id.in_(to_delete_lecturer_ids),
+                        LecturerSourceSnapshot.id.not_in(batch_snapshot_ids)
+                        if batch_snapshot_ids
+                        else True,
+                    )
+                    .all()
+                )
+                if extra_snaps:
+                    extra_snap_ids = {s.id for s in extra_snaps}
+                    db.query(LecturerKnownPublication).filter(
+                        LecturerKnownPublication.snapshot_id.in_(extra_snap_ids)
+                    ).delete(synchronize_session=False)
+                    db.query(LecturerSourceSnapshot).filter(
+                        LecturerSourceSnapshot.id.in_(extra_snap_ids)
+                    ).delete(synchronize_session=False)
+
+                # D2. Scopus candidate cascade:
+                #   reviews → evidence → observations → candidates
+                candidate_ids_rows = (
+                    db.query(LecturerScopusCandidate.id)
+                    .filter(
+                        LecturerScopusCandidate.lecturer_id.in_(to_delete_lecturer_ids)
+                    )
+                    .all()
+                )
+                if candidate_ids_rows:
+                    candidate_ids = {row.id for row in candidate_ids_rows}
+                    obs_ids_rows = (
+                        db.query(LecturerScopusCandidateObservation.id)
+                        .filter(
+                            LecturerScopusCandidateObservation.candidate_id.in_(
+                                candidate_ids
+                            )
+                        )
+                        .all()
+                    )
+                    if obs_ids_rows:
+                        obs_ids = {row.id for row in obs_ids_rows}
+                        db.query(LecturerScopusCandidateEvidence).filter(
+                            LecturerScopusCandidateEvidence.observation_id.in_(obs_ids)
+                        ).delete(synchronize_session=False)
+                    db.query(LecturerScopusCandidateReview).filter(
+                        LecturerScopusCandidateReview.candidate_id.in_(candidate_ids)
+                    ).delete(synchronize_session=False)
+                    db.query(LecturerScopusCandidateObservation).filter(
+                        LecturerScopusCandidateObservation.candidate_id.in_(candidate_ids)
+                    ).delete(synchronize_session=False)
+                    db.query(LecturerScopusCandidate).filter(
+                        LecturerScopusCandidate.id.in_(candidate_ids)
+                    ).delete(synchronize_session=False)
+
                 db.query(Lecturer).filter(
                     Lecturer.id.in_(to_delete_lecturer_ids)
                 ).delete(synchronize_session=False)
