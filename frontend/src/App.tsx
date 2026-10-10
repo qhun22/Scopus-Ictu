@@ -98,7 +98,13 @@ export default function App() {
                 <Route path="/audit-logs" element={<AuditLogsPage />} />
                 <Route
                   path="/tasks"
-                  element={<PlaceholderPage title="Tác vụ hệ thống" icon="tasks" />}
+                  element={
+                    <PlaceholderPage
+                      title="Tác vụ hệ thống"
+                      description="Chức năng đang phát triển. Trang này dành riêng cho quản lý tác vụ nền trong các phiên bản tương lai — chưa có bộ lập lịch hay công cụ thực thi nào được triển khai."
+                      icon="tasks"
+                    />
+                  }
                 />
               </Route>
             </Route>

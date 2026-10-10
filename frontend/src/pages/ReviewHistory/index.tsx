@@ -35,15 +35,14 @@ function datetimeLocalToIso(value: string): string | undefined {
   return d.toISOString();
 }
 
-
 function ActionBadge({ action }: { action: ReviewHistoryAction }) {
-  const colors: Record<ReviewHistoryAction, string> = {
-    ACCEPT: "bg-green-50 text-green-700",
-    REJECT: "bg-red-50 text-red-700",
-    REOPEN: "bg-yellow-50 text-yellow-700",
+  const styles: Record<ReviewHistoryAction, string> = {
+    ACCEPT: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
+    REJECT: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
+    REOPEN: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
   };
   return (
-    <span className={`rounded px-1.5 py-0.5 font-mono text-xs ${colors[action]}`}>
+    <span className={`inline-block rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold ${styles[action]}`}>
       {action}
     </span>
   );
@@ -51,7 +50,7 @@ function ActionBadge({ action }: { action: ReviewHistoryAction }) {
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">
+    <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 ring-1 ring-slate-200">
       {status}
     </span>
   );
@@ -63,34 +62,34 @@ interface RowCopy {
 
 function ReviewHistoryRow({ item, copy }: { item: ReviewHistoryItem; copy: RowCopy }) {
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+    <tr className="hover:bg-slate-50/50 transition-colors">
+      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">
         {formatTimestamp(item.created_at)}
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <ActionBadge action={item.action} />
       </td>
       <td className="whitespace-nowrap px-4 py-3">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <StatusBadge status={item.from_status} />
-          <span className="text-gray-400">→</span>
+          <span className="text-slate-400">→</span>
           <StatusBadge status={item.to_status} />
         </div>
       </td>
-      <td className="px-4 py-3 text-gray-700">
-        {item.lecturer_full_name}
+      <td className="px-4 py-3 text-xs text-slate-700">
+        <span className="font-medium">{item.lecturer_full_name}</span>
         {item.lecturer_staff_code && (
-          <span className="ml-1.5 text-xs text-gray-400">({item.lecturer_staff_code})</span>
+          <span className="ml-1.5 text-slate-400">({item.lecturer_staff_code})</span>
         )}
       </td>
-      <td className="px-4 py-3 text-gray-700">
-        {item.scopus_author_preferred_name}
-        <span className="ml-1.5 text-xs text-gray-400">{item.scopus_author_scopus_id}</span>
+      <td className="px-4 py-3 text-xs text-slate-700">
+        <div>{item.scopus_author_preferred_name}</div>
+        <div className="font-mono text-[11px] text-slate-400">{item.scopus_author_scopus_id}</div>
       </td>
-      <td className="px-4 py-3 text-gray-700">
+      <td className="px-4 py-3 text-xs text-slate-700">
         {item.reviewer_display_name}
       </td>
-      <td className="px-4 py-3 text-gray-600 max-w-xs truncate">
+      <td className="px-4 py-3 text-xs text-slate-600 max-w-xs truncate">
         {item.reason ?? copy.noReason}
       </td>
     </tr>
@@ -213,32 +212,35 @@ export default function ReviewHistoryPage() {
 
   return (
     <div className="app-page-container space-y-4 sm:space-y-5">
-      {/* Header */}
+      {/* ── Page Header ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">{copy.title}</h1>
-          <p className="mt-1 text-sm text-gray-500">{copy.subtitle}</p>
+          <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">{copy.title}</h1>
+          <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">{copy.subtitle}</p>
         </div>
         <button
           type="button"
           onClick={handleRefresh}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-xs transition-all hover:border-[#3A5FC3] hover:text-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 disabled:cursor-not-allowed disabled:opacity-60"
         >
+          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
           {copy.refresh}
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-gray-700">{copy.filtersTitle}</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">{copy.action}</label>
+      {/* ── Filter Bar ──────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          {/* Action filter */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">{copy.action}</label>
             <select
               value={form.action}
               onChange={(e) => handleFormChange("action", e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
             >
               <option value="">{copy.allActions}</option>
               <option value="ACCEPT">{copy.actionAccept}</option>
@@ -246,98 +248,114 @@ export default function ReviewHistoryPage() {
               <option value="REOPEN">{copy.actionReopen}</option>
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">{copy.dateFrom}</label>
+
+          {/* Date from */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">{copy.dateFrom}</label>
             <input
               type="datetime-local"
               value={form.date_from}
               onChange={(e) => handleFormChange("date_from", e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">{copy.dateTo}</label>
+
+          {/* Date to */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">{copy.dateTo}</label>
             <input
               type="datetime-local"
               value={form.date_to}
               onChange={(e) => handleFormChange("date_to", e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
+          </div>
+
+          {/* Buttons */}
+          <div className="ml-auto flex items-end gap-2">
+            <button
+              type="button"
+              onClick={handleApply}
+              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3]"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {copy.applyFilters}
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              disabled={!isFiltered && !form.action && !form.date_from && !form.date_to}
+              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-rose-300 hover:bg-rose-50/50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {copy.clearFilters}
+            </button>
           </div>
         </div>
 
         {formError && (
-          <p className="mt-2 text-sm text-red-600" role="alert">
+          <p className="text-xs font-medium text-rose-600" role="alert">
             {formError}
           </p>
         )}
-
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={handleApply}
-            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {copy.applyFilters}
-          </button>
-          <button
-            type="button"
-            onClick={handleClear}
-            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {copy.clearFilters}
-          </button>
-        </div>
       </div>
 
-      {/* Content */}
+      {/* ── Content ──────────────────────────────────────────────────────── */}
       {loading && !hasLoadedRef.current ? (
-        <div className="flex items-center justify-center rounded-lg border border-gray-200 bg-white py-20 shadow-sm">
-          <span className="text-sm text-gray-500">{t.common.loading}</span>
+        <div className="flex items-center justify-center rounded-xl border border-slate-200/80 bg-white py-20 shadow-xs">
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+            <span className="text-xs text-slate-400">{t.common.loading}</span>
+          </div>
         </div>
       ) : error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-2.5">
+          <svg className="h-5 w-5 shrink-0 text-rose-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="flex flex-col gap-1.5">
+            <span className="font-semibold">{error}</span>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="self-start rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+            >
+              {"Thử lại"}
+            </button>
+          </div>
         </div>
       ) : response && response.items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white py-20 shadow-sm">
-          <p className="text-base font-medium text-gray-700">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/80 bg-white py-20 shadow-xs">
+          <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
             {isFiltered ? copy.filteredEmptyTitle : copy.emptyTitle}
           </p>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-xs text-slate-400">
             {isFiltered ? copy.filteredEmptySubtitle : copy.emptySubtitle}
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+        <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+          <div className="relative overflow-x-auto">
+            <table className="w-full text-left text-xs" aria-busy={loading}>
+              <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                 <tr>
-                  <th className="whitespace-nowrap px-4 py-3 text-left font-medium text-gray-600">
-                    {copy.colTime}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-left font-medium text-gray-600">
-                    {copy.colAction}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-left font-medium text-gray-600">
-                    {copy.colTransition}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-left font-medium text-gray-600">
-                    {copy.colLecturer}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-left font-medium text-gray-600">
-                    {copy.colScopusAuthor}
-                  </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-left font-medium text-gray-600">
-                    {copy.colReviewer}
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-600">
-                    {copy.colReason}
-                  </th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold">{copy.colTime}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold">{copy.colAction}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold">{copy.colTransition}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold">{copy.colLecturer}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold">{copy.colScopusAuthor}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-semibold">{copy.colReviewer}</th>
+                  <th className="px-4 py-3 font-semibold">{copy.colReason}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {response?.items.map((item: ReviewHistoryItem) => (
                   <ReviewHistoryRow
                     key={item.id}
@@ -349,37 +367,34 @@ export default function ReviewHistoryPage() {
             </table>
           </div>
 
-          {/* Pagination footer */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+          {/* ── Footer: count + pagination ───────────────────────────────── */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+            <div className="flex items-center gap-3">
               <span>
-                {copy.page} {page} / {totalPages}
+                {copy.page} <strong className="text-slate-700">{page}</strong> / {totalPages}
+                <span className="mx-2 text-slate-300">·</span>
+                <strong className="text-slate-700">{total}</strong> {copy.records}
               </span>
-              <span className="text-gray-400">·</span>
-              <span>
-                {total} {copy.records}
-              </span>
-              <span className="text-gray-400">·</span>
-              <select
-                value={pageSize}
-                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                disabled={loading}
-                className="rounded border border-gray-300 px-2 py-0.5 text-xs"
-              >
-                {PAGE_SIZES.map((ps) => (
-                  <option key={ps} value={ps}>
-                    {ps}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <select
+                  value={pageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  disabled={loading}
+                  className="h-6 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                >
+                  {PAGE_SIZES.map((ps) => (
+                    <option key={ps} value={ps}>{ps}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div className="flex gap-2">
+            <nav className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => handlePage(page - 1)}
                 disabled={atFirstPage || loading}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {copy.previousPage}
               </button>
@@ -387,11 +402,11 @@ export default function ReviewHistoryPage() {
                 type="button"
                 onClick={() => handlePage(page + 1)}
                 disabled={atLastPage || loading}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {copy.nextPage}
               </button>
-            </div>
+            </nav>
           </div>
         </div>
       )}

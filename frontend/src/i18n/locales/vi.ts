@@ -140,7 +140,7 @@ export const vi: TranslationSchema = {
     actionIdentityDesc: "Định danh và đối soát Scopus Author ID",
   },
   lecturers: {
-    title: "Quản lý Giảng viên",
+    title: "",
     subtitle: "Danh mục cán bộ, giảng viên và người dùng nội bộ hệ thống ICTU",
     searchPlaceholder:
       "Tìm theo họ tên, email, mã cán bộ, bộ môn, khoa hoặc UUID...",
@@ -184,7 +184,7 @@ export const vi: TranslationSchema = {
     notLinked: "Không liên kết",
   },
   imports: {
-    title: "Nhập dữ liệu",
+    title: "",
     subtitle: "Nhập dữ liệu công bố từ tệp xuất của Scopus.",
     uploadTitle: "Tải tệp Scopus",
     dropPrompt: "Kéo thả tệp CSV vào đây",
@@ -295,7 +295,7 @@ export const vi: TranslationSchema = {
     conflicts: "Xung đột",
   },
   normalization: {
-    title: "Chuẩn hóa dữ liệu",
+    title: "",
     subtitle: "Kiểm tra và chuẩn hóa dữ liệu trước khi đưa vào hệ thống chính thức.",
     tabs: {
       publications: "Công bố",
@@ -480,7 +480,7 @@ export const vi: TranslationSchema = {
     userFallback: "Người dùng không xác định",
   },
   dashboard: {
-    title: "Bảng điều khiển",
+    title: "",
     subtitle: "Tổng hợp số liệu hệ thống Scopus ICTU",
     refresh: "Làm mới",
     totalPublications: "Tổng công bố",

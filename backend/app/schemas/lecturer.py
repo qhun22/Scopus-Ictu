@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,6 +40,10 @@ class LecturerUpdate(BaseModel):
     department: str | None = Field(default=None, max_length=150)
     faculty: str | None = Field(default=None, max_length=150)
     orcid: str | None = Field(default=None, max_length=19)
+    specialization: str | None = Field(default=None, max_length=200)
+    gender: str | None = Field(default=None, max_length=10)
+    date_of_birth: date | None = Field(default=None)
+    phone: str | None = Field(default=None, max_length=20)
     grant_account: bool = False
     password: str | None = Field(default=None, min_length=8, max_length=256)
 
@@ -151,6 +156,10 @@ class LecturerListItem(BaseModel):
     faculty: str | None = None
     department: str | None = None
     orcid: str | None = None
+    specialization: str | None = None
+    gender: str | None = None
+    date_of_birth: date | None = None
+    phone: str | None = None
     profile_url: str | None = None
     is_active: bool = True
     has_user_account: bool = False

@@ -1,6 +1,6 @@
 import { safeDisplayName } from "../../utils/displayName";
 import { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
@@ -20,7 +20,7 @@ export default function Header({
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const { locale, setLocale, t, getRoleLabel, isLanguageSwitching } = useI18n();
+  const { locale, setLocale, t, isLanguageSwitching } = useI18n();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -76,28 +76,7 @@ export default function Header({
     }
   };
 
-  const renderRoleBadge = (role?: string) => {
-    const r = role?.toUpperCase();
-    if (r === "ADMIN") {
-      return (
-        <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-bold text-[#3A5FC3]">
-          {getRoleLabel(role)}
-        </span>
-      );
-    }
-    if (r === "REVIEWER") {
-      return (
-        <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
-          {getRoleLabel(role)}
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-        {getRoleLabel(role)}
-      </span>
-    );
-  };
+
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -255,45 +234,25 @@ export default function Header({
 
           {/* Dropdown Menu */}
           {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-60 sm:w-64 max-w-[calc(100vw-2rem)] origin-top-right rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-black/5 focus:outline-none animate-in fade-in zoom-in-95 duration-100 z-50">
-              <div className="border-b border-slate-100 px-3 py-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">
-                    {safeName}
-                  </span>
-                  <div className="sm:hidden">{renderRoleBadge(user?.role)}</div>
+            <div className="absolute right-0 top-full mt-3 w-full min-w-[130px] md:min-w-0 md:inset-x-0 z-50 animate-in fade-in zoom-in-95 duration-100">
+              <button
+                type="button"
+                disabled={isLoggingOut}
+                onClick={handleLogout}
+                className="group flex h-10 w-full cursor-pointer items-center gap-1.5 sm:gap-2.5 rounded-lg border border-slate-200 bg-slate-50/95 hover:bg-rose-50/90 hover:border-rose-200 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left shadow-lg backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:opacity-50"
+              >
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm shrink-0 transition-transform group-hover:scale-105">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {user?.email}
-                </p>
-              </div>
 
-              <div className="py-1">
-                <Link
-                  to={user?.role?.toUpperCase() === "LECTURER" ? "/profile" : "/home"}
-                  onClick={() => setDropdownOpen(false)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                >
-                  <svg className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  <span>{t.header.accountInfo}</span>
-                </Link>
-              </div>
-
-              <div className="border-t border-slate-100 pt-1">
-                <button
-                  type="button"
-                  disabled={isLoggingOut}
-                  onClick={handleLogout}
-                  className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
-                >
-                  <svg className="h-4 w-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  <span>{isLoggingOut ? t.header.loggingOut : t.header.logout}</span>
-                </button>
-              </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold text-rose-600 leading-tight truncate">
+                    {isLoggingOut ? t.header.loggingOut : t.header.logout}
+                  </span>
+                </div>
+              </button>
             </div>
           )}
         </div>

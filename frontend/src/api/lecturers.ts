@@ -64,6 +64,10 @@ export interface LecturerUpdatePayload {
   faculty?: string;
   department?: string;
   orcid?: string;
+  specialization?: string;
+  gender?: string;
+  date_of_birth?: string;
+  phone?: string;
   grant_account?: boolean;
   password?: string;
 }
@@ -80,6 +84,10 @@ export interface LecturerMasterItem {
   faculty: string | null;
   department: string | null;
   orcid: string | null;
+  specialization: string | null;
+  gender: string | null;
+  date_of_birth: string | null;
+  phone: string | null;
   profile_url: string | null;
   is_active: boolean;
   has_user_account: boolean;

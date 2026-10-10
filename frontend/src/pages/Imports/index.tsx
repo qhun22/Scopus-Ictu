@@ -104,7 +104,8 @@ export default function ImportsPage() {
   }, [activeResultPanel, lecturerPreview]);
 
   // Search & Filter & Pagination states
-  const [search, setSearch] = useState<string>("");
+  const [searchInput, setSearchInput] = useState<string>("");
+  const [appliedSearch, setAppliedSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived" | "all">(
     "active",
@@ -930,9 +931,14 @@ export default function ImportsPage() {
     (item) => item.status === "FAILED" || item.status === "CANCELLED",
   ).length;
 
+  const handleApplySearch = () => {
+    setAppliedSearch(searchInput);
+    setPage(1);
+  };
+
   // Filter & Pagination calculations
   const filteredHistory = history.filter((item) => {
-    const q = search.trim().toLowerCase();
+    const q = appliedSearch.trim().toLowerCase();
     const matchesSearch =
       !q ||
       item.file_name.toLowerCase().includes(q) ||
@@ -1492,22 +1498,51 @@ export default function ImportsPage() {
           <input
             type="text"
             aria-label={t.common.search}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleApplySearch();
+              }
             }}
             placeholder={t.imports.searchPlaceholder}
             className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <label htmlFor="import-archive-filter" className="text-xs font-medium text-slate-500 whitespace-nowrap">
-            {locale === "vi" ? "Hiển thị" : "Visibility"}:
-          </label>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Nút Áp dụng */}
+          <button
+            type="button"
+            onClick={handleApplySearch}
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-[#3A5FC3] px-3.5 text-xs font-semibold text-white shadow-2xs transition-all duration-150 active:scale-[0.98] hover:bg-[#2f4ea6] cursor-pointer whitespace-nowrap"
+          >
+            {locale === "vi" ? "Áp dụng" : "Apply"}
+          </button>
+
+          {/* Nút Đặt lại */}
+          <button
+            type="button"
+            onClick={() => {
+              setSearchInput("");
+              setAppliedSearch("");
+              setStatusFilter("ALL");
+              setArchiveFilter("active");
+              setPage(1);
+            }}
+            disabled={!searchInput && !appliedSearch && statusFilter === "ALL" && archiveFilter === "active"}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>{locale === "vi" ? "Đặt lại" : "Reset"}</span>
+          </button>
+
+          {/* Bộ lọc Hiển thị */}
           <select
             id="import-archive-filter"
+            aria-label={locale === "vi" ? "Hiển thị" : "Visibility"}
             value={archiveFilter}
             onChange={(e) => {
               setArchiveFilter(e.target.value as "active" | "archived" | "all");
@@ -1520,11 +1555,10 @@ export default function ImportsPage() {
             <option value="all">{locale === "vi" ? "Tất cả" : "All"}</option>
           </select>
 
-          <label htmlFor="import-status-filter" className="text-xs font-medium text-slate-500 whitespace-nowrap">
-            {t.common.status}:
-          </label>
+          {/* Bộ lọc Trạng thái */}
           <select
             id="import-status-filter"
+            aria-label={t.common.status}
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
@@ -1538,24 +1572,6 @@ export default function ImportsPage() {
             <option value="PROCESSING">{t.imports.inProgress}</option>
             <option value="FAILED">{t.imports.failed}</option>
           </select>
-
-          {/* Reset Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setSearch("");
-              setStatusFilter("ALL");
-              setArchiveFilter("active");
-              setPage(1);
-            }}
-            disabled={!search && statusFilter === "ALL" && archiveFilter === "active"}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span>{locale === "vi" ? "Đặt lại" : "Reset"}</span>
-          </button>
         </div>
       </div>
 

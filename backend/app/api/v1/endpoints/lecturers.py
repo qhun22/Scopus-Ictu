@@ -387,6 +387,10 @@ def list_lecturers(
                     faculty=row.faculty,
                     department=row.department,
                     orcid=row.orcid,
+                    specialization=row.specialization,
+                    gender=row.gender,
+                    date_of_birth=row.date_of_birth,
+                    phone=row.phone,
                     profile_url=row.repository_profile_url,
                     is_active=row.is_active,
                     has_user_account=linked_user is not None,
@@ -639,6 +643,14 @@ def update_lecturer(
             lecturer.department = payload.department.strip() or None
         if payload.position is not None:
             lecturer.position = payload.position.strip() or None
+        if payload.specialization is not None:
+            lecturer.specialization = payload.specialization.strip() or None
+        if payload.gender is not None:
+            lecturer.gender = payload.gender.strip() or None
+        if payload.date_of_birth is not None:
+            lecturer.date_of_birth = payload.date_of_birth
+        if payload.phone is not None:
+            lecturer.phone = payload.phone.strip() or None
         if payload.orcid is not None:
             orcid_value = payload.orcid.strip() or None
             if orcid_value is not None and not re.fullmatch(r"\d{4}-\d{4}-\d{4}-\d{3}[\dX]", orcid_value):
@@ -747,6 +759,10 @@ def update_lecturer(
                 department=lecturer.department,
                 faculty=lecturer.faculty,
                 orcid=lecturer.orcid,
+                specialization=lecturer.specialization,
+                gender=lecturer.gender,
+                date_of_birth=lecturer.date_of_birth,
+                phone=lecturer.phone,
                 is_active=lecturer.is_active,
                 version=lecturer.version,
                 created_at=lecturer.created_at,

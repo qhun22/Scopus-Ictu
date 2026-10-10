@@ -24,7 +24,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
 
-const FILTER_DELAY_MS = 350;
+const LOAD_MIN_MS = 500;
 
 export default function LecturersPage() {
   const toast = useToast();
@@ -43,12 +43,14 @@ export default function LecturersPage() {
   const [search, setSearch] = useState<string>("");
   const [appliedSearch, setAppliedSearch] = useState<string>("");
   const [page, setPage] = useState<number>(1);
+  const [pageInputValue, setPageInputValue] = useState<string>("1");
   const [pageSize, setPageSize] = useState<number>(10);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [activeFilter, setActiveFilter] = useState<"all" | "linked" | "not_linked" | "locked" | "warning" | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
-  const isFiltering = search !== appliedSearch;
-  const isTableLoading = loading || isFiltering;
+  const hasUnappliedSearch = search !== appliedSearch;
+  const isTableLoading = loading;
 
   // Modal states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -84,16 +86,22 @@ export default function LecturersPage() {
     staff_code: string;
     academic_degree: string;
     academic_rank: string;
-    faculty: string;
-    department: string;
+    position: string;
+    specialization: string;
+    gender: string;
+    date_of_birth: string;
+    phone: string;
   }>({
     full_name: "",
     email: "",
     staff_code: "",
-    academic_degree: "Thạc sĩ",
+    academic_degree: "",
     academic_rank: "",
-    faculty: "",
-    department: "",
+    position: "",
+    specialization: "",
+    gender: "",
+    date_of_birth: "",
+    phone: "",
   });
   const [editError, setEditError] = useState<string>("");
   const [editStaffCodeFieldError, setEditStaffCodeFieldError] = useState<string>("");
@@ -115,16 +123,33 @@ export default function LecturersPage() {
     setLoading(true);
     try {
       const startTime = Date.now();
+      const isFilterMode = activeFilter && activeFilter !== "all";
       const data = await getLecturers({
-        page,
-        page_size: pageSize,
+        page: isFilterMode ? 1 : page,
+        page_size: isFilterMode ? 200 : pageSize,
         search: appliedSearch.trim() || undefined,
       });
-      const elapsed = Date.now() - startTime;
-      if (elapsed < 2000) {
-        await new Promise((res) => setTimeout(res, 2000 - elapsed));
+
+      let allItems = data.items;
+      if (isFilterMode && data.total > 200) {
+        const extraPages = Math.ceil((data.total - 200) / 200);
+        const extras = await Promise.all(
+          Array.from({ length: extraPages }, (_, i) =>
+            getLecturers({
+              page: i + 2,
+              page_size: 200,
+              search: appliedSearch.trim() || undefined,
+            })
+          )
+        );
+        allItems = [...data.items, ...extras.flatMap((r) => r.items)];
       }
-      setLecturers(data.items);
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed < LOAD_MIN_MS) {
+        await new Promise((res) => setTimeout(res, LOAD_MIN_MS - elapsed));
+      }
+      setLecturers(allItems);
       setTotalRecords(data.total);
       setStats(data.stats);
       setSelectedLecturer((current) => {
@@ -145,7 +170,11 @@ export default function LecturersPage() {
 
   useEffect(() => {
     fetchData();
-  }, [page, pageSize, appliedSearch]);
+  }, [page, pageSize, appliedSearch, activeFilter]);
+
+  useEffect(() => {
+    setPageInputValue(String(page));
+  }, [page]);
 
   useEffect(() => {
     if (!isDetailModalOpen) return;
@@ -160,16 +189,11 @@ export default function LecturersPage() {
     return () => window.removeEventListener("keydown", handleEscape);
   }, [confirmAction, isDetailBusy, isDetailModalOpen]);
 
-  useEffect(() => {
+  const handleApplySearch = () => {
     if (search === appliedSearch) return;
-
-    const timer = window.setTimeout(() => {
-      setAppliedSearch(search);
-      setPage(1);
-    }, FILTER_DELAY_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [search, appliedSearch]);
+    setAppliedSearch(search);
+    setPage(1);
+  };
 
   const getErrorCode = (error: unknown): string | undefined => {
     if (!(error instanceof ApiError) || typeof error.body !== "object" || error.body === null) {
@@ -285,10 +309,13 @@ export default function LecturersPage() {
       full_name: lec.full_name,
       email: lec.institutional_email || "",
       staff_code: lec.staff_code || "",
-      academic_degree: lec.academic_degree || "Thạc sĩ",
+      academic_degree: lec.academic_degree || "",
       academic_rank: lec.academic_rank || "",
-      faculty: lec.faculty || "",
-      department: lec.department || "",
+      position: lec.position || "",
+      specialization: lec.specialization || "",
+      gender: lec.gender || "",
+      date_of_birth: lec.date_of_birth || "",
+      phone: lec.phone || "",
     });
     setGrantAccount(false);
     setGrantEmail(lec.institutional_email || "");
@@ -341,8 +368,11 @@ export default function LecturersPage() {
         staff_code: trimmedStaffCode ? trimmedStaffCode : null,
         academic_degree: editForm.academic_degree.trim() || undefined,
         academic_rank: editForm.academic_rank.trim() || undefined,
-        faculty: editForm.faculty.trim() || undefined,
-        department: editForm.department.trim() || undefined,
+        position: editForm.position.trim() || undefined,
+        specialization: editForm.specialization.trim() || undefined,
+        gender: editForm.gender || undefined,
+        date_of_birth: editForm.date_of_birth || undefined,
+        phone: editForm.phone.trim() || undefined,
         grant_account: grantAccount,
         password: grantAccount ? grantPassword : undefined,
         role: selectedLecturer.account || grantAccount ? grantRole : undefined,
@@ -358,7 +388,7 @@ export default function LecturersPage() {
       } else {
         toast.success(
           locale === "vi" ? "Cập nhật thành công" : "Success",
-          locale === "vi" ? `Đã cập nhật thông tin giảng viên ${editForm.full_name}` : `Lecturer ${editForm.full_name} updated successfully.`,
+          locale === "vi" ? `Đã lưu hồ sơ giảng viên ${editForm.full_name}.` : `Lecturer ${editForm.full_name} updated successfully.`,
         );
       }
       setIsDetailModalOpen(false);
@@ -436,7 +466,7 @@ export default function LecturersPage() {
         setNewPassword("");
         toast.success(
           "Đã đặt lại mật khẩu",
-          "Mật khẩu mới đã được cập nhật cho tài khoản.",
+          `Mật khẩu của ${selectedLecturer.full_name} đã được cập nhật.`,
         );
       } else {
         const updated =
@@ -458,10 +488,10 @@ export default function LecturersPage() {
         if (action === "lock") {
           toast.success(
             "Đã khóa tài khoản",
-            "Tài khoản không thể đăng nhập cho đến khi được mở khóa.",
+            `Tài khoản của ${selectedLecturer.full_name} đã bị khóa.`,
           );
         } else {
-          toast.success("Đã mở khóa tài khoản", "Người dùng có thể đăng nhập lại.");
+          toast.success("Đã mở khóa tài khoản", `${selectedLecturer.full_name} có thể đăng nhập lại.`);
         }
       }
       setConfirmAction(null);
@@ -527,6 +557,37 @@ export default function LecturersPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleFilterCard = (filter: typeof activeFilter) => {
+    setActiveFilter((prev) => (prev === filter ? null : filter));
+    setPage(1);
+  };
+
+  const POSITION_ORDER: Record<string, number> = {
+    "hiệu trưởng": 1,
+    "phó hiệu trưởng": 2,
+    "trưởng khoa": 3,
+    "phó trưởng khoa": 4,
+    "trưởng bộ môn": 5,
+    "phó trưởng bộ môn": 6,
+    "trưởng phòng": 7,
+    "phó trưởng phòng": 8,
+  };
+  const positionRank = (pos: string | null): number => {
+    if (!pos) return 99;
+    return POSITION_ORDER[pos.trim().toLowerCase()] ?? 10;
+  };
+
+  const filteredLecturers = (activeFilter && activeFilter !== "all"
+    ? lecturers.filter((lec) => {
+        if (activeFilter === "linked") return lec.account !== null;
+        if (activeFilter === "not_linked") return lec.account === null;
+        if (activeFilter === "locked") return lec.account !== null && !lec.account.is_active;
+        if (activeFilter === "warning") return !!lec.has_warning;
+        return true;
+      })
+    : lecturers
+  ).slice().sort((a, b) => positionRank(a.position) - positionRank(b.position));
 
   // Export JSON Handler
   const handleExportJson = async () => {
@@ -602,52 +663,92 @@ export default function LecturersPage() {
         </div>
       </div>
 
-      {/* KPI Stats Grid - Lecturer-Centric 5 Cards */}
+      {/* KPI Stats Grid - Lecturer-Centric 5 Cards (clickable filters) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => handleFilterCard("all")}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+            activeFilter === "all"
+              ? "border-[#3A5FC3] bg-[#3A5FC3]/5 ring-2 ring-[#3A5FC3]/30"
+              : "border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm"
+          }`}
+        >
           <span className="text-xs font-medium text-slate-500">
             {locale === "vi" ? "Tổng giảng viên" : "Total Lecturers"}
           </span>
           <p className="mt-1 text-2xl font-black text-slate-800">
             {stats ? stats.total_lecturers : totalRecords}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => handleFilterCard("linked")}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+            activeFilter === "linked"
+              ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300/50"
+              : "border-slate-200/80 bg-white hover:border-emerald-200 hover:shadow-sm"
+          }`}
+        >
           <span className="text-xs font-medium text-emerald-600">
             {locale === "vi" ? "Đã cấp tài khoản" : "Account Linked"}
           </span>
           <p className="mt-1 text-2xl font-black text-emerald-600">
             {stats ? stats.account_linked : 0}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => handleFilterCard("not_linked")}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+            activeFilter === "not_linked"
+              ? "border-slate-400 bg-slate-50 ring-2 ring-slate-300/50"
+              : "border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm"
+          }`}
+        >
           <span className="text-xs font-medium text-slate-500">
             {locale === "vi" ? "Chưa cấp tài khoản" : "No Account"}
           </span>
           <p className="mt-1 text-2xl font-black text-slate-700">
             {stats ? stats.account_not_linked : 0}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={() => handleFilterCard("locked")}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+            activeFilter === "locked"
+              ? "border-rose-500 bg-rose-50 ring-2 ring-rose-300/50"
+              : "border-slate-200/80 bg-white hover:border-rose-200 hover:shadow-sm"
+          }`}
+        >
           <span className="text-xs font-medium text-rose-600">
             {locale === "vi" ? "Tài khoản bị khóa" : "Account Locked"}
           </span>
           <p className="mt-1 text-2xl font-black text-rose-600">
             {stats ? stats.account_locked : 0}
           </p>
-        </div>
+        </button>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs col-span-2 sm:col-span-1">
+        <button
+          type="button"
+          onClick={() => handleFilterCard("warning")}
+          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+            activeFilter === "warning"
+              ? "border-amber-500 bg-amber-50 ring-2 ring-amber-300/50"
+              : "border-slate-200/80 bg-white hover:border-amber-200 hover:shadow-sm"
+          }`}
+        >
           <span className="text-xs font-medium text-amber-600">
             {locale === "vi" ? "Cảnh báo" : "Warnings"}
           </span>
           <p className="mt-1 text-2xl font-black text-amber-600">
             {stats ? stats.warning_count : "—"}
           </p>
-        </div>
+        </button>
       </div>
 
       {/* Filter & Search Bar */}
@@ -663,21 +764,56 @@ export default function LecturersPage() {
             aria-label={t.common.search}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleApplySearch(); }}
             placeholder={t.lecturers.searchPlaceholder}
             className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
           />
         </div>
 
-        {/* Reset Button */}
-        <div className="flex items-center gap-2">
+        {/* Search apply + Active filter badge + Reset */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleApplySearch}
+            disabled={!hasUnappliedSearch || loading}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#3A5FC3] bg-[#3A5FC3] px-3 text-xs font-semibold text-white hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>{locale === "vi" ? "Áp dụng" : "Apply"}</span>
+          </button>
+
+          {activeFilter && activeFilter !== "all" && (
+            <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#3A5FC3]/40 bg-[#3A5FC3]/10 px-3 text-xs font-semibold text-[#3A5FC3]">
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+              </svg>
+              {activeFilter === "linked" && (locale === "vi" ? "Đã cấp tài khoản" : "Account Linked")}
+              {activeFilter === "not_linked" && (locale === "vi" ? "Chưa cấp tài khoản" : "No Account")}
+              {activeFilter === "locked" && (locale === "vi" ? "Tài khoản bị khóa" : "Locked")}
+              {activeFilter === "warning" && (locale === "vi" ? "Cảnh báo" : "Warnings")}
+              <button
+                type="button"
+                onClick={() => setActiveFilter(null)}
+                aria-label={locale === "vi" ? "Bỏ lọc" : "Clear filter"}
+                className="ml-0.5 rounded-full hover:text-[#2f4ea6] cursor-pointer"
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          )}
           <button
             type="button"
             onClick={() => {
               setSearch("");
               setAppliedSearch("");
+              setActiveFilter(null);
               setPage(1);
             }}
-            disabled={!search && !appliedSearch}
+            disabled={!search && !appliedSearch && !activeFilter && !hasUnappliedSearch}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -713,7 +849,7 @@ export default function LecturersPage() {
                     </div>
                   </td>
                 </tr>
-              ) : lecturers.length === 0 ? (
+              ) : filteredLecturers.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
@@ -728,7 +864,7 @@ export default function LecturersPage() {
                   </td>
                 </tr>
               ) : (
-                lecturers.map((lec) => {
+                filteredLecturers.map((lec) => {
                   const degreeRank = [lec.academic_rank, lec.academic_degree].filter(Boolean).join(" / ") || "—";
                   const facultyDept = [lec.faculty, lec.department].filter(Boolean).join(" / ") || "—";
                   return (
@@ -781,19 +917,19 @@ export default function LecturersPage() {
                         {lec.account && !lec.account.is_active ? (
                           <span
                             title={locale === "vi" ? "Tài khoản đang bị khóa" : "Account locked"}
-                            className="inline-flex w-20 items-center justify-center whitespace-nowrap rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700"
+                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700"
                           >
                             <span>{locale === "vi" ? "Đã khóa" : "Locked"}</span>
                           </span>
                         ) : lec.has_warning ? (
                           <span
                             title={lec.warning_reason || (locale === "vi" ? "Cần rà soát trùng tên" : "Review duplicate")}
-                            className="inline-flex w-20 items-center justify-center whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700"
+                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700"
                           >
                             <span>{locale === "vi" ? "Cảnh báo" : "Warning"}</span>
                           </span>
                         ) : (
-                          <span className="inline-flex w-20 items-center justify-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
                             <span>{locale === "vi" ? "Hoạt động" : "Active"}</span>
                           </span>
                         )}
@@ -830,63 +966,97 @@ export default function LecturersPage() {
               )}
             </tbody>
           </table>
-          {isFiltering && !loading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-[1px]">
-              <div role="status" className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-4 py-2.5 text-xs font-medium text-slate-600 shadow-sm">
-                <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3] motion-reduce:animate-none" />
-                {t.common.loading}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer info & Server-Side Pagination Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
           <div className="flex items-center gap-3">
             <span>
-              {t.lecturers.showing} <strong>{lecturers.length}</strong> {t.lecturers.of} {totalRecords} {locale === "vi" ? "giảng viên" : "lecturers"}
+              {activeFilter && activeFilter !== "all" ? (
+                <>
+                  {locale === "vi" ? "Kết quả lọc:" : "Filtered:"}{" "}
+                  <strong>{filteredLecturers.length}</strong>
+                  {" "}
+                  {locale === "vi" ? "giảng viên" : "lecturers"}
+                </>
+              ) : (
+                <>
+                  {t.lecturers.showing} <strong>{lecturers.length}</strong> {t.lecturers.of} {totalRecords} {locale === "vi" ? "giảng viên" : "lecturers"}
+                </>
+              )}
             </span>
 
-            {/* Page Size Selector */}
-            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-              <span className="text-slate-500">{locale === "vi" ? "Hiển thị:" : "Show:"}</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="h-6.5 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
-              >
-                <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
-                <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
-                <option value={50}>50 / {locale === "vi" ? "trang" : "page"}</option>
-                <option value={100}>100 / {locale === "vi" ? "trang" : "page"}</option>
-              </select>
-            </div>
+            {/* Page Size Selector — hidden in filter mode */}
+            {(!activeFilter || activeFilter === "all") && (
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <span className="text-slate-500">{locale === "vi" ? "Hiển thị:" : "Show:"}</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                >
+                  <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={50}>50 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={100}>100 / {locale === "vi" ? "trang" : "page"}</option>
+                </select>
+              </div>
+            )}
           </div>
 
-          <nav aria-label={t.lecturers.paginationLabel} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage(page - 1)}
-              disabled={isTableLoading || page <= 1}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-            >
-              {t.lecturers.previousPage}
-            </button>
-            <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
-              {t.lecturers.page} <strong>{page}</strong> / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage(page + 1)}
-              disabled={isTableLoading || page >= totalPages}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-            >
-              {t.lecturers.nextPage}
-            </button>
-          </nav>
+          {/* Pagination — hidden in filter mode */}
+          {(!activeFilter || activeFilter === "all") && (
+            <nav aria-label={t.lecturers.paginationLabel} className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPage(page - 1)}
+                disabled={isTableLoading || page <= 1}
+                className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                {t.lecturers.previousPage}
+              </button>
+              <span className="text-slate-400 px-0.5">{locale === "vi" ? "Trang" : "Page"}</span>
+              <input
+                type="number"
+                aria-label={locale === "vi" ? "Đến trang" : "Go to page"}
+                min={1}
+                max={totalPages}
+                value={pageInputValue}
+                disabled={isTableLoading}
+                onChange={(e) => setPageInputValue(e.target.value)}
+                onBlur={(e) => {
+                  const val = Math.max(1, Math.min(totalPages, parseInt(e.target.value, 10) || 1));
+                  setPage(val);
+                  setPageInputValue(String(val));
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const val = Math.max(1, Math.min(totalPages, parseInt(pageInputValue, 10) || 1));
+                    setPage(val);
+                    setPageInputValue(String(val));
+                    (e.target as HTMLInputElement).blur();
+                  }
+                  if (e.key === "Escape") {
+                    setPageInputValue(String(page));
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+                className="h-8 w-14 rounded-md border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="text-slate-400">/ <strong className="text-slate-600">{totalPages}</strong></span>
+              <button
+                type="button"
+                onClick={() => setPage(page + 1)}
+                disabled={isTableLoading || page >= totalPages}
+                className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                {t.lecturers.nextPage}
+              </button>
+            </nav>
+          )}
         </div>
       </div>
 
@@ -1210,7 +1380,7 @@ export default function LecturersPage() {
 
                       <div>
                         <label htmlFor="edit-degree" className="mb-1 block font-semibold text-slate-700">
-                          {locale === "vi" ? "Học vị / Học hàm" : "Degree / Rank"}
+                          {locale === "vi" ? "Học vị" : "Academic Degree"}
                         </label>
                         <input
                           id="edit-degree"
@@ -1218,37 +1388,99 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.academic_degree}
                           onChange={(e) => setEditForm({ ...editForm, academic_degree: e.target.value })}
-                          placeholder="VD: Thạc sĩ, Tiến sĩ, PGS.TS, TS. GVC, Cử nhân"
+                          placeholder="VD: Thạc sĩ, Tiến sĩ, Cử nhân"
                           className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="edit-faculty" className="mb-1 block font-semibold text-slate-700">
-                          {locale === "vi" ? "Khoa" : "Faculty"}
+                        <label htmlFor="edit-rank" className="mb-1 block font-semibold text-slate-700">
+                          {locale === "vi" ? "Học hàm" : "Academic Rank"}
                         </label>
                         <input
-                          id="edit-faculty"
+                          id="edit-rank"
                           type="text"
                           disabled={isDetailBusy}
-                          value={editForm.faculty}
-                          onChange={(e) => setEditForm({ ...editForm, faculty: e.target.value })}
-                          placeholder="VD: Khoa Công nghệ Thông tin"
+                          value={editForm.academic_rank}
+                          onChange={(e) => setEditForm({ ...editForm, academic_rank: e.target.value })}
+                          placeholder="VD: Giáo sư, Phó Giáo sư"
                           className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
                       <div>
-                        <label htmlFor="edit-department" className="mb-1 block font-semibold text-slate-700">
-                          {locale === "vi" ? "Bộ môn / Phòng ban" : "Department"}
+                        <label htmlFor="edit-position" className="mb-1 block font-semibold text-slate-700">
+                          {locale === "vi" ? "Chức vụ cán bộ" : "Position"}
                         </label>
                         <input
-                          id="edit-department"
+                          id="edit-position"
                           type="text"
                           disabled={isDetailBusy}
-                          value={editForm.department}
-                          onChange={(e) => setEditForm({ ...editForm, department: e.target.value })}
-                          placeholder="VD: Bộ môn Kỹ thuật phần mềm"
+                          value={editForm.position}
+                          onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
+                          placeholder="VD: Hiệu trưởng, Trưởng khoa, Trưởng bộ môn"
+                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-specialization" className="mb-1 block font-semibold text-slate-700">
+                          {locale === "vi" ? "Chuyên ngành" : "Specialization"}
+                        </label>
+                        <input
+                          id="edit-specialization"
+                          type="text"
+                          disabled={isDetailBusy}
+                          value={editForm.specialization}
+                          onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
+                          placeholder="VD: Khoa học máy tính, Kỹ thuật phần mềm"
+                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-gender" className="mb-1 block font-semibold text-slate-700">
+                          {locale === "vi" ? "Giới tính" : "Gender"}
+                        </label>
+                        <select
+                          id="edit-gender"
+                          disabled={isDetailBusy}
+                          value={editForm.gender}
+                          onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        >
+                          <option value="">{locale === "vi" ? "Chưa cập nhật" : "Not specified"}</option>
+                          <option value="Nam">Nam</option>
+                          <option value="Nữ">Nữ</option>
+                          <option value="Khác">Khác</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-dob" className="mb-1 block font-semibold text-slate-700">
+                          {locale === "vi" ? "Ngày sinh" : "Date of Birth"}
+                        </label>
+                        <input
+                          id="edit-dob"
+                          type="date"
+                          disabled={isDetailBusy}
+                          value={editForm.date_of_birth}
+                          onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-phone" className="mb-1 block font-semibold text-slate-700">
+                          {locale === "vi" ? "Số điện thoại" : "Phone"}
+                        </label>
+                        <input
+                          id="edit-phone"
+                          type="tel"
+                          disabled={isDetailBusy}
+                          value={editForm.phone}
+                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                          placeholder="VD: 0912345678"
                           className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>

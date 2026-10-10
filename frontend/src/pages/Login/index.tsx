@@ -46,6 +46,8 @@ export default function LoginPage() {
       newErrors.email = "Vui lòng nhập email.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       newErrors.email = "Email không đúng định dạng.";
+    } else if (!trimmedEmail.toLowerCase().endsWith("@ictu.edu.vn")) {
+      newErrors.email = "Chỉ tài khoản @ictu.edu.vn mới được phép đăng nhập vào hệ thống.";
     }
 
     if (!form.password) {

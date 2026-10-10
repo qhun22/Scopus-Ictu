@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -49,6 +49,10 @@ class UserAdminResponse(BaseModel):
     department: str | None = None
     faculty: str | None = None
     orcid: str | None = None
+    specialization: str | None = None
+    gender: str | None = None
+    date_of_birth: date | None = None
+    phone: str | None = None
     is_active: bool
     version: int
     created_at: datetime

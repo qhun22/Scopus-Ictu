@@ -47,6 +47,8 @@ LECTURER_FIELDS = (
     "department",
     "faculty",
     "orcid",
+    "specialization",
+    "gender",
 )
 
 
@@ -91,6 +93,10 @@ def to_admin_response(user: User, lecturer: Lecturer | None) -> UserAdminRespons
         department=lecturer.department if lecturer else None,
         faculty=lecturer.faculty if lecturer else None,
         orcid=lecturer.orcid if lecturer else None,
+        specialization=lecturer.specialization if lecturer else None,
+        gender=lecturer.gender if lecturer else None,
+        date_of_birth=lecturer.date_of_birth if lecturer else None,
+        phone=lecturer.phone if lecturer else None,
         is_active=user.is_active,
         version=user.version,
         created_at=user.created_at,

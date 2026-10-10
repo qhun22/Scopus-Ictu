@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Button,
@@ -8,14 +8,11 @@ import {
   Empty,
   Input,
   Modal,
-  Select,
   Space,
   Spin,
-  Table,
   Tag,
   Typography,
 } from "antd";
-import type { ColumnsType } from "antd/es/table";
 
 import {
   decideReviewCandidate,
@@ -35,7 +32,7 @@ import type {
   ReviewQueueItem,
 } from "../../types/review";
 
-const { Paragraph, Text, Title } = Typography;
+const { Paragraph, Text } = Typography;
 
 type EvidenceFilter = EvidenceCategory | "all";
 type AmbiguitySelection = AmbiguityFilter | "all";
@@ -53,6 +50,16 @@ const STATUS_COLORS: Record<CandidateStatus, string> = {
   REJECTED: "red",
   SUPERSEDED: "default",
 };
+
+const STATUS_BADGE_CLASS: Record<CandidateStatus, string> = {
+  PENDING: "border-amber-300 bg-amber-50 text-amber-700",
+  ACCEPTED: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  REJECTED: "border-rose-200 bg-rose-50 text-rose-700",
+  SUPERSEDED: "border-slate-200 bg-slate-100 text-slate-600",
+};
+
+const badgeClassName =
+  "inline-flex h-6 items-center justify-center rounded-full border px-2.5 text-[11px] font-bold whitespace-nowrap";
 
 const CONFLICT_MESSAGES: Readonly<Record<string, string>> = {
   STALE_CANDIDATE_VERSION:
@@ -297,168 +304,260 @@ export default function ApprovalQueuePage() {
     }
   };
 
-  const columns: ColumnsType<ReviewQueueItem> = useMemo(
-    () => [
-      {
-        title: "Giảng viên ICTU",
-        key: "lecturer",
-        render: (_, item) => <Text strong>{item.lecturer.full_name}</Text>,
-      },
-      {
-        title: "Tác giả Scopus",
-        key: "author",
-        render: (_, item) => (
-          <div>
-            <div className="font-medium text-slate-900">{item.scopus_author.preferred_name}</div>
-            <div className="mt-1 font-mono text-xs text-slate-500">{item.scopus_author.scopus_id}</div>
-          </div>
-        ),
-      },
-      {
-        title: "Trạng thái",
-        dataIndex: "candidate_status",
-        key: "status",
-        render: (value: CandidateStatus) => <Tag color={STATUS_COLORS[value]}>{STATUS_LABELS[value]}</Tag>,
-      },
-      {
-        title: "Bằng chứng",
-        key: "evidence",
-        render: (_, item) =>
-          item.publication_support_count > 0 ? (
-            <div>
-              <Tag color="cyan">Có công bố hỗ trợ</Tag>
-              <div className="mt-1 text-xs text-slate-500">
-                {item.publication_support_count} công bố · {item.name_evidence_count} bằng chứng tên
-              </div>
-            </div>
-          ) : (
-            <div>
-              <Tag>Chỉ bằng chứng tên</Tag>
-              <div className="mt-1 text-xs text-slate-500">{item.name_evidence_count} bằng chứng tên</div>
-            </div>
-          ),
-      },
-      {
-        title: "Ngữ cảnh mơ hồ",
-        key: "ambiguity",
-        render: (_, item) => (
-          <div className="flex flex-col items-start gap-1">
-            <Tag color={item.is_ambiguous ? "orange" : "default"}>
-              {ambiguityText(item.candidate_count_for_lecturer)}
-            </Tag>
-            {item.is_shared_scopus_author && (
-              <Tag color="red" data-testid="shared-author-tag" title={sharedAuthorText(item.candidate_count_for_scopus_author)}>
-                Tác giả Scopus dùng chung ({item.candidate_count_for_scopus_author ?? "?"} giảng viên)
-              </Tag>
-            )}
-          </div>
-        ),
-      },
-      {
-        title: "Thao tác",
-        key: "actions",
-        fixed: "right",
-        width: 110,
-        render: (_, item) => (
-          <Button type="link" onClick={() => openDetail(item.candidate_id)}>
-            Xem chi tiết
-          </Button>
-        ),
-      },
-    ],
-    [],
-  );
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="app-page-container space-y-4 sm:space-y-5">
-      <div>
-        <Title level={2} className="!mb-1 !text-slate-900">Duyệt đối sánh</Title>
-        <Paragraph className="!mb-0 !text-slate-500">
-          Kiểm tra bằng chứng trước khi xác nhận hoặc từ chối liên kết giữa giảng viên ICTU và tác giả Scopus.
-        </Paragraph>
+      {/* ── Page Header ──────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">Duyệt đối sánh</h1>
+          <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
+            Kiểm tra bằng chứng trước khi xác nhận hoặc từ chối liên kết giữa giảng viên ICTU và tác giả Scopus.
+          </p>
+        </div>
+        <div className="text-xs text-slate-500 mt-1">
+          Tổng số: <span className="font-semibold text-slate-800">{total}</span>
+        </div>
       </div>
 
-      <Card>
-        <div className="mb-5 flex flex-wrap items-end gap-3">
-          <label className="min-w-44">
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Trạng thái</span>
-            <Select<CandidateStatus>
-              className="w-full"
+      {/* ── Filter Bar ──────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs">
+        <div className="flex flex-wrap items-end gap-3">
+          {/* Trạng thái */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">Trạng thái</label>
+            <select
               value={status}
-              options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
-              onChange={(value) => { setStatus(value); setPage(1); }}
-            />
-          </label>
-          <label className="min-w-52">
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Loại bằng chứng</span>
-            <Select<EvidenceFilter>
-              className="w-full"
-              value={evidenceFilter}
-              options={[
-                { value: "all", label: "Tất cả" },
-                { value: "publication-supported", label: "Có công bố hỗ trợ" },
-                { value: "name-only", label: "Chỉ bằng chứng tên" },
-              ]}
-              onChange={(value) => { setEvidenceFilter(value); setPage(1); }}
-            />
-          </label>
-          <label className="min-w-48">
-            <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">Mức độ mơ hồ</span>
-            <Select<AmbiguitySelection>
-              className="w-full"
-              value={ambiguityFilter}
-              options={[
-                { value: "all", label: "Tất cả" },
-                { value: "ambiguous", label: "Có nhiều ứng viên" },
-                { value: "unique", label: "Không có ứng viên khác" },
-              ]}
-              onChange={(value) => { setAmbiguityFilter(value); setPage(1); }}
-            />
-          </label>
-          <Button onClick={() => void loadQueue()} loading={queueLoading}>Làm mới</Button>
-          <div className="ml-auto text-sm text-slate-500">
-            Tổng số: <span className="font-semibold text-slate-800">{total}</span>
+              onChange={(e) => { setStatus(e.target.value as CandidateStatus); setPage(1); }}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            >
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
           </div>
-        </div>
 
+          {/* Loại bằng chứng */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">Loại bằng chứng</label>
+            <select
+              value={evidenceFilter}
+              onChange={(e) => { setEvidenceFilter(e.target.value as EvidenceFilter); setPage(1); }}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            >
+              <option value="all">Tất cả</option>
+              <option value="publication-supported">Có công bố hỗ trợ</option>
+              <option value="name-only">Chỉ bằng chứng tên</option>
+            </select>
+          </div>
+
+          {/* Mức độ mơ hồ */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">Mức độ mơ hồ</label>
+            <select
+              value={ambiguityFilter}
+              onChange={(e) => { setAmbiguityFilter(e.target.value as AmbiguitySelection); setPage(1); }}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            >
+              <option value="all">Tất cả</option>
+              <option value="ambiguous">Có nhiều ứng viên</option>
+              <option value="unique">Không có ứng viên khác</option>
+            </select>
+          </div>
+
+          {/* Refresh button */}
+          <button
+            type="button"
+            onClick={() => void loadQueue()}
+            disabled={queueLoading}
+            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-60 ml-auto"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Làm mới
+          </button>
+        </div>
+      </div>
+
+      {/* ── Queue Table ─────────────────────────────────────────────────── */}
+      <section className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
         {queueError ? (
-          <Alert
-            showIcon
-            type="error"
-            message="Không thể tải hàng đợi"
-            description={
-              <Space direction="vertical">
-                <span>{queueError}</span>
-                <Button size="small" onClick={() => void loadQueue()}>Thử lại</Button>
-              </Space>
-            }
-          />
+          <div className="rounded-xl border border-rose-200 bg-rose-50 m-4 p-4 text-xs text-rose-800 flex items-start gap-2.5">
+            <svg className="h-5 w-5 shrink-0 text-rose-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div className="flex flex-col gap-1.5">
+              <span className="font-semibold">Không thể tải hàng đợi</span>
+              <span>{queueError}</span>
+              <button
+                type="button"
+                onClick={() => void loadQueue()}
+                className="self-start rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+              >
+                Thử lại
+              </button>
+            </div>
+          </div>
         ) : (
-          <Table<ReviewQueueItem>
-            rowKey="candidate_id"
-            columns={columns}
-            dataSource={items}
-            loading={queueLoading}
-            scroll={{ x: 980 }}
-            locale={{
-              emptyText: queueLoading ? <div className="py-10">Đang tải hàng đợi...</div> : <Empty description="Không có ứng viên phù hợp với bộ lọc." />,
-            }}
-            pagination={{
-              current: page,
-              pageSize,
-              total,
-              showSizeChanger: true,
-              pageSizeOptions: [10, 20, 50, 100],
-              showTotal: (value) => `${value} ứng viên`,
-              onChange: (nextPage, nextPageSize) => {
-                setPage(nextPageSize !== pageSize ? 1 : nextPage);
-                setPageSize(nextPageSize);
-              },
-            }}
-            onRow={(item) => ({ onDoubleClick: () => openDetail(item.candidate_id) })}
-          />
+          <div className="relative overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+                <tr>
+                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Giảng viên ICTU</th>
+                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Tác giả Scopus</th>
+                  <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Trạng thái</th>
+                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Bằng chứng</th>
+                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Ngữ cảnh mơ hồ</th>
+                  <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-28">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {queueLoading ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+                        <span>Đang tải hàng đợi...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : items.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">Không có ứng viên phù hợp</span>
+                        <span className="text-xs text-slate-400">Thay đổi bộ lọc để xem thêm kết quả.</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((item) => (
+                    <tr
+                      key={item.candidate_id}
+                      className="hover:bg-slate-50/50 transition-colors cursor-default"
+                      onDoubleClick={() => openDetail(item.candidate_id)}
+                    >
+                      <td className="px-4 py-3.5 align-middle whitespace-nowrap">
+                        <span className="font-bold text-slate-800">{item.lecturer.full_name}</span>
+                      </td>
+                      <td className="px-4 py-3.5 align-middle">
+                        <div className="font-medium text-slate-900">{item.scopus_author.preferred_name}</div>
+                        <div className="mt-0.5 font-mono text-[10px] text-slate-400">{item.scopus_author.scopus_id}</div>
+                      </td>
+                      <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
+                        <span className={`${badgeClassName} ${STATUS_BADGE_CLASS[item.candidate_status]}`}>
+                          {STATUS_LABELS[item.candidate_status]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 align-middle">
+                        {item.publication_support_count > 0 ? (
+                          <div>
+                            <span className="inline-flex h-5 items-center rounded-full border border-cyan-200 bg-cyan-50 px-2 text-[10px] font-bold text-cyan-700">
+                              Có công bố hỗ trợ
+                            </span>
+                            <div className="mt-1 text-[10px] text-slate-400">
+                              {item.publication_support_count} công bố · {item.name_evidence_count} bằng chứng tên
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-100 px-2 text-[10px] font-bold text-slate-600">
+                              Chỉ bằng chứng tên
+                            </span>
+                            <div className="mt-1 text-[10px] text-slate-400">{item.name_evidence_count} bằng chứng tên</div>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 align-middle">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-flex h-5 w-fit items-center rounded-full border px-2 text-[10px] font-bold ${item.is_ambiguous ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-100 text-slate-600"}`}>
+                            {ambiguityText(item.candidate_count_for_lecturer)}
+                          </span>
+                          {item.is_shared_scopus_author && (
+                            <span
+                              data-testid="shared-author-tag"
+                              title={sharedAuthorText(item.candidate_count_for_scopus_author)}
+                              className="inline-flex h-5 w-fit items-center rounded-full border border-rose-200 bg-rose-50 px-2 text-[10px] font-bold text-rose-700"
+                            >
+                              Dùng chung ({item.candidate_count_for_scopus_author ?? "?"} GV)
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => openDetail(item.candidate_id)}
+                          className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                        >
+                          <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          <span>Xem chi tiết</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
-      </Card>
+
+        {/* Footer: record count + page size + pagination */}
+        {!queueError && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+            <div className="flex items-center gap-3">
+              <span>
+                Hiển thị <strong>{items.length}</strong> trong {total} ứng viên
+              </span>
+              <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                <span className="text-slate-500">Hiển thị:</span>
+                <select
+                  value={pageSize}
+                  disabled={queueLoading}
+                  onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)); }}
+                  className="h-6 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
+                >
+                  <option value={10}>10 / trang</option>
+                  <option value={20}>20 / trang</option>
+                  <option value={50}>50 / trang</option>
+                  <option value={100}>100 / trang</option>
+                </select>
+              </div>
+            </div>
+            <nav aria-label="Phân trang" className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1 || queueLoading}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                Trước
+              </button>
+              <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
+                Trang <strong>{page}</strong> / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages || queueLoading}
+                className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              >
+                Sau
+              </button>
+            </nav>
+          </div>
+        )}
+      </section>
 
       <Modal
         open={selectedCandidateId !== null}

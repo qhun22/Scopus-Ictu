@@ -1,4 +1,4 @@
-"""Điều phối khởi động / dừng phần mềm demo Scopus-Ictu (gọi từ file BAT ở gốc repository).
+"""Điều phối khởi động / dừng phần mềm Scopus-Ictu (gọi từ file BAT ở gốc repository).
 
 Một lần nhấp đúp BAT => PostgreSQL demo sẵn sàng => Backend sẵn sàng => Frontend sẵn sàng => mở trình duyệt.
 
@@ -34,9 +34,9 @@ DOAN = REPO.parent
 RUNTIME = Path(os.environ.get("SCOPUS_DEMO_RUNTIME", DOAN / "_postgres_demo_14_10"))
 VENV_PYTHON = Path(os.environ.get("SCOPUS_DEMO_PYTHON", DOAN / "_venv_backend_demo_py312" / "Scripts" / "python.exe"))
 LOG_DIR = Path(os.environ.get("SCOPUS_DEMO_LOGS", DOAN / "_quan_ly_do_an" / "logs" / "demo"))
-ENV_FILE = RUNTIME / "secrets" / "backend_demo_teacher.env"
+ENV_FILE = RUNTIME / "secrets" / "backend_app.env"
 PG_BIN = Path(os.environ.get("SCOPUS_DEMO_PG_BIN", r"C:\Program Files\PostgreSQL\17\bin"))
-EXPECTED_DB = os.environ.get("SCOPUS_DEMO_DB", "scopus_ictu_demo_teacher_20261014")
+EXPECTED_DB = os.environ.get("SCOPUS_DEMO_DB", "scopus_ictu_app")
 PG_PORT, BACKEND_PORT, FRONTEND_PORT = 55432, 8001, 5173
 FORBIDDEN_PORTS = {5432}
 WEB_URL = f"http://127.0.0.1:{FRONTEND_PORT}"
@@ -244,7 +244,7 @@ def backend_env(values: dict[str, str]) -> dict[str, str]:
     env["PATH"] = r"C:\Windows\system32;C:\Windows"
     env["PYTHONUTF8"] = "1"
     env["PYTHONPATH"] = str(REPO / "backend")
-    raw, snap = RUNTIME / "api_data" / "teacher" / "raw_scopus", RUNTIME / "api_data" / "teacher" / "snapshots"
+    raw, snap = RUNTIME / "api_data" / "app" / "raw_scopus", RUNTIME / "api_data" / "app" / "snapshots"
     raw.mkdir(parents=True, exist_ok=True)
     snap.mkdir(parents=True, exist_ok=True)
     env["SCOPUS_RAW_DIR"], env["DSPACE_SNAPSHOT_PATH"] = str(raw) + os.sep, str(snap) + os.sep

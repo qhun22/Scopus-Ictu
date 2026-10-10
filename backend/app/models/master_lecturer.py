@@ -13,10 +13,11 @@ inferred fields, no invented indexes.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKeyConstraint,
     Index,
@@ -61,6 +62,10 @@ class Lecturer(Base):
     repository_profile_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     repository_profile_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     orcid: Mapped[str | None] = mapped_column(String(19), nullable=True)
+    specialization: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    date_of_birth: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_active: Mapped[bool] = mapped_column(
         nullable=False, server_default=text("TRUE")
     )
@@ -82,6 +87,10 @@ class Lecturer(Base):
         CheckConstraint(
             "orcid IS NULL OR orcid ~ '^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$'",
             name="orcid_format",
+        ),
+        CheckConstraint(
+            "gender IS NULL OR gender IN ('Nam', 'Nữ', 'Khác')",
+            name="ck_lecturers_gender",
         ),
         # Partial indexes — explicit names (not auto-template).
         Index(

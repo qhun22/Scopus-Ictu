@@ -15,6 +15,9 @@ import AuthorsTab from "./AuthorsTab";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
+const badgeClassName =
+  "inline-flex h-6 w-32 items-center justify-center rounded-full border px-2.5 text-xs font-bold whitespace-nowrap";
+
 function formatDate(isoString?: string | null): string {
   if (!isoString) return "—";
   try {
@@ -437,7 +440,7 @@ export default function NormalizationPage() {
 
                             {/* Status */}
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                              <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+                              <span className={`${badgeClassName} border-blue-200 bg-blue-50 text-[#3A5FC3]`}>
                                 {locale === "vi" ? "Chờ xử lý" : "Pending"}
                               </span>
                             </td>
@@ -606,24 +609,24 @@ export default function NormalizationPage() {
                             {/* Result */}
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
                               {n && n.status === "COMPLETED" && hasRowErrors(item) ? (
-                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                                <span className={`${badgeClassName} border-amber-200 bg-amber-50 text-amber-700`}>
                                   {t.normalization.status.completedWithErrors}
                                 </span>
                               ) : n && n.status === "COMPLETED" ? (
-                                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                                <span className={`${badgeClassName} border-emerald-200 bg-emerald-50 text-emerald-700`}>
                                   {t.normalization.status.completed}
                                 </span>
                               ) : n && n.status === "NORMALIZING" ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+                                <span className={`${badgeClassName} gap-1 border-blue-200 bg-blue-50 text-[#3A5FC3]`}>
                                   <span className="h-2 w-2 animate-spin rounded-full border-2 border-[#3A5FC3] border-t-transparent" />
                                   {t.normalization.status.normalizing} ({n.progress_percent}%)
                                 </span>
                               ) : isFailed(item) ? (
-                                <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700">
+                                <span className={`${badgeClassName} border-rose-200 bg-rose-50 text-rose-700`}>
                                   {t.normalization.status.failed}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                                <span className={`${badgeClassName} border-slate-200 bg-slate-100 text-slate-600`}>
                                   {item.status === "CANCELLED" ? t.normalization.status.cancelled : t.normalization.status.notNormalized}
                                 </span>
                               )}
@@ -815,15 +818,15 @@ export default function NormalizationPage() {
                         </div>
                       </div>
                       {detailModalItem.normalization && detailModalItem.normalization.status === "COMPLETED" && hasRowErrors(detailModalItem) ? (
-                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700">
+                        <span className={`${badgeClassName} border-amber-200 bg-amber-50 text-amber-700`}>
                           {t.normalization.status.completedWithErrors}
                         </span>
                       ) : detailModalItem.normalization && detailModalItem.normalization.status === "COMPLETED" ? (
-                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                        <span className={`${badgeClassName} border-emerald-200 bg-emerald-50 text-emerald-700`}>
                           {t.normalization.status.completed}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+                        <span className={`${badgeClassName} border-blue-200 bg-blue-50 text-[#3A5FC3]`}>
                           {t.normalization.summary.pending}
                         </span>
                       )}
