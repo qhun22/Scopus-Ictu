@@ -836,13 +836,20 @@ def delete_lecturer(
         )
 
     # 1. Dependency check: linked User account
-    if account is not None or (lecturer and db.query(User).filter(User.lecturer_id == lecturer.id).first()):
-        raise APIError(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Hồ sơ này đang được liên kết với tài khoản người dùng trong hệ thống.",
-            code="LECTURER_IN_USE",
-            data={"dependency": "USER_ACCOUNT"},
-        )
+    # LECTURER-role accounts are automatically removed with the profile (they
+    # have no independent identity beyond the linked record). ADMIN/APPROVER
+    # accounts are blocked — an admin must manually unlink them first.
+    linked_user = account or (
+        lecturer and db.query(User).filter(User.lecturer_id == lecturer.id).first()
+    )
+    if linked_user is not None:
+        if linked_user.role != "LECTURER":
+            raise APIError(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Hồ sơ này đang được liên kết với tài khoản người dùng trong hệ thống.",
+                code="LECTURER_IN_USE",
+                data={"dependency": "USER_ACCOUNT"},
+            )
 
     # 2. Dependency check: Scopus identities
     if lecturer:
@@ -871,6 +878,13 @@ def delete_lecturer(
 
     try:
         if lecturer:
+            # Remove LECTURER-role user account linked to this profile (if any).
+            # The account exists solely to view this profile, so it is safe to
+            # delete when the profile is deleted.
+            if linked_user is not None and linked_user.role == "LECTURER":
+                db.delete(linked_user)
+                db.flush()
+
             # Delete child source snapshots associated strictly with this lecturer
             db.query(LecturerSourceSnapshot).filter(
                 LecturerSourceSnapshot.lecturer_id == lecturer.id

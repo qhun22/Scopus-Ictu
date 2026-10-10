@@ -201,22 +201,22 @@ const LecturerDatasetImportCard = forwardRef<
       />
 
       {jsonFileLoading ? (
-        <div className="mt-4 flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border border-violet-200/80 bg-violet-50/40 p-5 text-center animate-in fade-in duration-200">
-          <div className="relative mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-600 shadow-xs">
-            <div className="absolute inset-0 rounded-2xl border-2 border-violet-400/30 border-t-violet-600 animate-spin" />
+        <div className="mt-4 flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border border-blue-200/80 bg-blue-50/40 p-5 text-center animate-in fade-in duration-200">
+          <div className="relative mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-[#3A5FC3] shadow-xs">
+            <div className="absolute inset-0 rounded-2xl border-2 border-[#3A5FC3]/30 border-t-[#3A5FC3] animate-spin" />
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0 0l3-3m-3 3l-3-3" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
           <p className="text-sm font-bold text-slate-800 truncate max-w-xs" title={jsonLoadingFileName}>
             {jsonLoadingFileName}
           </p>
-          <p className="mt-1 text-xs font-medium text-violet-700">
+          <p className="mt-1 text-xs font-medium text-[#3A5FC3]">
             {locale === "vi" ? "Đang đọc và kiểm tra cấu trúc tệp JSON..." : "Reading and validating JSON file structure..."}
           </p>
           <div className="mt-3 w-52 max-w-full h-1.5 overflow-hidden rounded-full bg-slate-200/80">
             <div
-              className="h-full bg-violet-600 transition-all duration-300 ease-out"
+              className="h-full bg-[#3A5FC3] transition-all duration-300 ease-out"
               style={{ width: `${jsonLoadingProgress}%` }}
             />
           </div>
@@ -269,7 +269,7 @@ const LecturerDatasetImportCard = forwardRef<
         <div className="mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3.5 min-w-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 text-violet-600 shrink-0">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
