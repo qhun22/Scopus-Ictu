@@ -159,7 +159,8 @@ class TestCompareMetadata:
         pub = self._mock_pub()
         payload = {
             "Title": "Original Title",
-            "Source": "Journal A",
+            "Source": "Scopus",  # data provider, NOT the publication source
+            "Source title": "Journal A",
             "Year": "2024",
             "Volume": "10",
             "Issue": "1",
@@ -204,6 +205,29 @@ class TestCompareMetadata:
         changed = compare_metadata(pub, {}, payload)
         assert "title" not in changed
 
+    # -- source_title: ``Source title`` is the publication source, ``Source`` is the provider --
+
+    def test_source_title_compares_against_source_title_column_not_source(self) -> None:
+        pub = self._mock_pub(source_title="Journal A")
+        payload = {"Source": "Scopus", "Source title": "Journal A"}
+        assert "source_title" not in compare_metadata(pub, {}, payload)
+
+    def test_provider_value_is_not_a_valid_source_title(self) -> None:
+        """A row stored with the provider name ("Scopus") is a mapping defect."""
+        pub = self._mock_pub(source_title="Scopus")
+        payload = {"Source": "Scopus", "Source title": "Journal A"}
+        assert "source_title" in compare_metadata(pub, {}, payload)
+
+    def test_source_title_whitespace_is_trimmed_in_comparison(self) -> None:
+        pub = self._mock_pub(source_title="Journal A")
+        payload = {"Source": "Scopus", "Source title": "  Journal A  "}
+        assert "source_title" not in compare_metadata(pub, {}, payload)
+
+    def test_missing_source_title_is_not_filled_from_source(self) -> None:
+        pub = self._mock_pub(source_title=None)
+        payload = {"Source": "Scopus"}
+        assert "source_title" not in compare_metadata(pub, {}, payload)
+
 
 # ---------------------------------------------------------------------------
 # Helper equality functions
@@ -246,7 +270,8 @@ class TestCreatePublicationFromRaw:
             raw_payload={
                 "Title": "Test Paper",
                 "DOI": "10.1000/test",
-                "Source": "Test Journal",
+                "Source": "Scopus",  # data provider, NOT the publication source
+                "Source title": "Test Journal",
                 "Year": "2025",
                 "Volume": "1",
                 "Issue": "2",
@@ -286,6 +311,38 @@ class TestCreatePublicationFromRaw:
         assert pub.doi is None
         assert pub.year is None
 
+    def test_source_title_comes_from_source_title_column_not_source(self) -> None:
+        raw = self._mock_raw()
+        raw.raw_payload["Source"] = "Scopus"
+        raw.raw_payload["Source title"] = "Lecture Notes in Networks and Systems"
+        pub = create_publication_from_raw(raw)
+        assert pub.source_title == "Lecture Notes in Networks and Systems"
+        assert pub.source_title != "Scopus"
+
+    def test_source_title_whitespace_is_trimmed(self) -> None:
+        raw = self._mock_raw()
+        raw.raw_payload["Source title"] = "  Journal of Tests \n"
+        assert create_publication_from_raw(raw).source_title == "Journal of Tests"
+
+    def test_missing_source_title_stays_none_and_is_not_filled_from_source(self) -> None:
+        raw = self._mock_raw()
+        raw.raw_payload["Source"] = "Scopus"
+        del raw.raw_payload["Source title"]
+        assert create_publication_from_raw(raw).source_title is None
+
+    @pytest.mark.parametrize("blank", ["", "   ", "\t\n", None])
+    def test_blank_source_title_stays_none(self, blank) -> None:
+        raw = self._mock_raw()
+        raw.raw_payload["Source"] = "Scopus"
+        raw.raw_payload["Source title"] = blank
+        assert create_publication_from_raw(raw).source_title is None
+
+    def test_creation_and_comparison_agree_so_reruns_are_idempotent(self) -> None:
+        raw = self._mock_raw()
+        raw.raw_payload["Source title"] = "  Journal A  "
+        pub = create_publication_from_raw(raw)
+        assert compare_metadata(pub, {}, raw.raw_payload) == []
+
     def test_bounded_canonical_fields_keep_reruns_idempotent(self) -> None:
         raw = self._mock_raw()
         raw.raw_payload["Open Access"] = (
@@ -295,6 +352,67 @@ class TestCreatePublicationFromRaw:
 
         assert len(pub.open_access_status) == 50
         assert compare_metadata(pub, {}, raw.raw_payload) == []
+
+
+# ---------------------------------------------------------------------------
+# Re-running normalization on an EID that already exists
+# ---------------------------------------------------------------------------
+
+class TestRerunOnExistingEid:
+    """An existing canonical row is compared, never overwritten (invariant 3)."""
+
+    def _existing(self, source_title: str | None) -> MagicMock:
+        pub = MagicMock()
+        pub.id = uuid.uuid4()
+        pub.eid = "2-s2.0-555"
+        for key, value in dict(
+            title="Paper", title_normalized="paper", doi=None, source_title=source_title,
+            year=2025, volume=None, issue=None, art_no=None, page_start=None,
+            page_end=None, cited_by_count=0, document_type=None,
+            publication_stage=None, open_access_status=None,
+        ).items():
+            setattr(pub, key, value)
+        return pub
+
+    def _raw(self, payload: dict) -> MagicMock:
+        raw = MagicMock()
+        raw.id = uuid.uuid4()
+        raw.eid_raw = "2-s2.0-555"
+        raw.validation_status = "VALID"
+        raw.raw_payload = {"Title": "Paper", "Year": "2025", "Cited by": "0", **payload}
+        return raw
+
+    def _run(self, pub: MagicMock, raw: MagicMock):
+        link = MagicMock()
+        link.publication_id = pub.id
+        db = MagicMock()
+        result = normalize_single_raw(db, raw, {"2-s2.0-555": pub}, {raw.id: link})
+        return result, db
+
+    def test_wrong_stored_source_title_is_reported_but_not_overwritten(self) -> None:
+        pub = self._existing("Scopus")
+        raw = self._raw({"Source": "Scopus", "Source title": "Journal A"})
+        result, db = self._run(pub, raw)
+        assert result.outcome == "EXISTING_METADATA_CHANGED"
+        assert result.changed_fields == ["source_title"]
+        assert pub.source_title == "Scopus"  # untouched: correction is a separate, audited step
+        db.add.assert_not_called()
+
+    def test_correct_stored_source_title_is_unchanged(self) -> None:
+        pub = self._existing("Journal A")
+        raw = self._raw({"Source": "Scopus", "Source title": " Journal A "})
+        result, db = self._run(pub, raw)
+        assert result.outcome == "EXISTING_UNCHANGED"
+        assert result.changed_fields == []
+        assert pub.source_title == "Journal A"
+        db.add.assert_not_called()
+
+    def test_missing_source_title_does_not_change_an_empty_value(self) -> None:
+        pub = self._existing(None)
+        raw = self._raw({"Source": "Scopus"})
+        result, _ = self._run(pub, raw)
+        assert result.outcome == "EXISTING_UNCHANGED"
+        assert pub.source_title is None
 
 
 # ---------------------------------------------------------------------------

@@ -202,7 +202,7 @@ def compare_metadata(
         changed.append("doi")
 
     # source_title
-    raw_source = _raw_field(candidate, raw_payload, "Source", "source_title")
+    raw_source = _raw_source_title(raw_payload)
     if not _nullable_str_equal(existing.source_title, raw_source):
         changed.append("source_title")
 
@@ -272,6 +272,18 @@ def _raw_field(
         if val and str(val).strip():
             return str(val).strip()
     return None
+
+
+def _raw_source_title(raw_payload: dict) -> str | None:
+    """Publication source (journal / proceedings / book series) of a Scopus row.
+
+    Read from the CSV column ``Source title``.  The separate CSV column
+    ``Source`` names the data provider (always "Scopus") and is NOT the
+    publication source, so it must never be used here.  Surrounding whitespace
+    is trimmed; a missing or blank ``Source title`` stays ``None`` (the system's
+    missing-data policy) and is never replaced by the provider name.
+    """
+    return _raw_field({}, raw_payload, "Source title", "source_title")
 
 
 def _bounded_raw_field(raw_payload: dict, header: str, max_length: int) -> str | None:
@@ -356,7 +368,7 @@ def create_publication_from_raw(
         doi=doi,
         title=title,
         title_normalized=title_norm,
-        source_title=_raw_field({}, payload, "Source", "source_title"),
+        source_title=_raw_source_title(payload),
         year=_raw_int({}, payload, "Year", "year"),
         volume=_raw_field({}, payload, "Volume", "volume"),
         issue=_raw_field({}, payload, "Issue", "issue"),
