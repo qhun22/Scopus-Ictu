@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3330 980" width="3330" height="980" font-family="Segoe UI, Arial, sans-serif">
+<defs><marker id="ar" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L10,5 L0,10 z" fill="#2C3E50"/></marker></defs>
+<rect width="3330" height="980" fill="#FFFFFF"/>
+<text x="1665" y="30" text-anchor="middle" font-size="17" font-weight="bold" fill="#17202A">BPMN-1 — Quy trình nghiệp vụ thực tế của Scopus–ICTU (nhập → kiểm tra → dữ liệu thô → chuẩn hóa → bằng chứng → đề xuất → người duyệt → truy vết)</text>
+<rect x="20" y="50" width="3300" height="910" fill="none" stroke="#2C3E50" stroke-width="1.6"/>
+<rect x="20" y="50" width="3300" height="170" fill="#FEF5E7" fill-opacity="0.55" stroke="#2C3E50" stroke-width="1"/>
+<rect x="20" y="50" width="34" height="170" fill="#FEF5E7" stroke="#2C3E50" stroke-width="1"/>
+<text transform="translate(37,135) rotate(-90)" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#17202A"><tspan x="0" dy="0">ADMIN</tspan><tspan x="0" dy="15">(Quản trị viên)</tspan></text>
+<rect x="20" y="220" width="3300" height="250" fill="#EBF5FB" fill-opacity="0.55" stroke="#2C3E50" stroke-width="1"/>
+<rect x="20" y="220" width="34" height="250" fill="#EBF5FB" stroke="#2C3E50" stroke-width="1"/>
+<text transform="translate(37,345) rotate(-90)" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#17202A"><tspan x="0" dy="0">Hệ thống</tspan><tspan x="0" dy="15">(API/dịch vụ — tự động)</tspan></text>
+<rect x="20" y="470" width="3300" height="130" fill="#EAFAF1" fill-opacity="0.55" stroke="#2C3E50" stroke-width="1"/>
+<rect x="20" y="470" width="34" height="130" fill="#EAFAF1" stroke="#2C3E50" stroke-width="1"/>
+<text transform="translate(37,535) rotate(-90)" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#17202A"><tspan x="0" dy="0">Kỹ thuật viên</tspan><tspan x="0" dy="15">(script CLI)</tspan></text>
+<rect x="20" y="600" width="3300" height="230" fill="#F5EEF8" fill-opacity="0.55" stroke="#2C3E50" stroke-width="1"/>
+<rect x="20" y="600" width="34" height="230" fill="#F5EEF8" stroke="#2C3E50" stroke-width="1"/>
+<text transform="translate(37,715) rotate(-90)" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#17202A"><tspan x="0" dy="0">REVIEWER / ADMIN</tspan><tspan x="0" dy="15">(người duyệt)</tspan></text>
+<rect x="20" y="830" width="3300" height="130" fill="#FDEDEC" fill-opacity="0.55" stroke="#2C3E50" stroke-width="1"/>
+<rect x="20" y="830" width="34" height="130" fill="#FDEDEC" stroke="#2C3E50" stroke-width="1"/>
+<text transform="translate(37,895) rotate(-90)" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#17202A"><tspan x="0" dy="0">LECTURER</tspan><tspan x="0" dy="15">(Giảng viên)</tspan></text>
+<polyline points="167,135 248,135" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="412,135 510,135 510,307" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="592,345 667,345" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="690,322 690,173" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="690,97 690,73 330,73 330,97" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="713,345 788,345" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="952,345 1027,345" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="1050,322 1050,135 1148,135" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="1073,345 1213,345" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="1312,135 1410,135 1410,307" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="1492,345 1590,345 1590,497" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="1672,535 1688,535" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="1852,535 1950,535 1950,632" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2032,670 2107,670" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2130,647 2130,290 2228,290" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2153,670 2310,670 2310,443" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2130,693 2130,763" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2392,290 2467,290" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2513,290 2588,290" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2490,313 2490,763" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2752,290 2827,290" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2850,313 2850,632" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2873,290 3030,290 3030,857" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2392,405 2430,405 2430,670 2768,670" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="2932,670 3193,670" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<polyline points="3112,895 3193,895" fill="none" stroke="#2C3E50" stroke-width="1.6" marker-end="url(#ar)"/>
+<text x="696" y="314" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">Không</text>
+<text x="696" y="89" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">Làm lại</text>
+<text x="719" y="339" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">Có</text>
+<text x="1056" y="314" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">CSV</text>
+<text x="1079" y="339" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">JSON</text>
+<text x="2136" y="639" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">ACCEPT</text>
+<text x="2159" y="664" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">REJECT (lý do bắt buộc)</text>
+<text x="2136" y="709" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">Giữ PENDING</text>
+<text x="2519" y="284" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">Có</text>
+<text x="2496" y="329" font-size="11" font-weight="bold" fill="#7B241C" text-anchor="start">Không</text>
+<circle cx="150" cy="135" r="17.0" fill="#E9F7EF" stroke="#1E8449" stroke-width="2"/>
+<text x="150" y="171.35" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="150" dy="0">Có dữ liệu nguồn</tspan><tspan x="150" dy="13">(CSV Scopus / JSON GV)</tspan></text>
+<rect x="248" y="97" width="164" height="76" rx="9" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="255" y="112" font-size="11" fill="#1F3A5F">👤</text>
+<text x="330" y="135.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="330" dy="0">Tải tệp lên</tspan><tspan x="330" dy="14">(UC-08 JSON / UC-10 CSV)</tspan></text>
+<rect x="428" y="307" width="164" height="76" rx="9" fill="#D6EAF8" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="435" y="322" font-size="11" fill="#1F3A5F">⚙</text>
+<text x="510" y="338.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="510" dy="0">Kiểm tra tệp: định dạng,</tspan><tspan x="510" dy="14">cột EID, SHA-256 trùng,</tspan><tspan x="510" dy="14">lỗi từng dòng; JSON: xem trước</tspan></text>
+<polygon points="690,322 713,345 690,368 667,345" fill="#FEF9E7" stroke="#7D6608" stroke-width="1.8"/>
+<path d="M681,336 L699,354 M699,336 L681,354" stroke="#7D6608" stroke-width="2.4"/>
+<text x="690" y="382.35" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="690" dy="0">Hợp lệ</tspan><tspan x="690" dy="13">và không trùng?</tspan></text>
+<rect x="608" y="97" width="164" height="76" rx="9" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="615" y="112" font-size="11" fill="#1F3A5F">👤</text>
+<text x="690" y="128.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="690" dy="0">Đọc lỗi theo dòng:</tspan><tspan x="690" dy="14">sửa tệp hoặc xác nhận</tspan><tspan x="690" dy="14">nhập trùng</tspan></text>
+<rect x="788" y="307" width="164" height="76" rx="9" fill="#D6EAF8" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="795" y="322" font-size="11" fill="#1F3A5F">⚙</text>
+<text x="870" y="331.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="870" dy="0">Lưu dữ liệu THÔ: JSON →</tspan><tspan x="870" dy="14">lecturers + snapshot;</tspan><tspan x="870" dy="14">CSV → scopus_imports,</tspan><tspan x="870" dy="14">raw_scopus_records; audit</tspan></text>
+<polygon points="1050,322 1073,345 1050,368 1027,345" fill="#FEF9E7" stroke="#7D6608" stroke-width="1.8"/>
+<path d="M1041,336 L1059,354 M1059,336 L1041,354" stroke="#7D6608" stroke-width="2.4"/>
+<text x="1050" y="382.35" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="1050" dy="0">Là CSV</tspan><tspan x="1050" dy="13">Scopus?</tspan></text>
+<circle cx="1230" cy="345" r="17.0" fill="#FDEDEC" stroke="#922B21" stroke-width="3.6"/>
+<text x="1230" y="379.35" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="1230" dy="0">Hồ sơ giảng viên</tspan><tspan x="1230" dy="13">đã lưu</tspan></text>
+<rect x="1148" y="97" width="164" height="76" rx="9" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="1155" y="112" font-size="11" fill="#1F3A5F">👤</text>
+<text x="1230" y="128.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="1230" dy="0">Chạy chuẩn hóa công bố</tspan><tspan x="1230" dy="14">và bóc tách tác giả</tspan><tspan x="1230" dy="14">(UC-11, UC-12)</tspan></text>
+<rect x="1328" y="307" width="164" height="76" rx="9" fill="#D6EAF8" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="1335" y="322" font-size="11" fill="#1F3A5F">⚙</text>
+<text x="1410" y="338.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="1410" dy="0">Chuẩn hóa: EID chống trùng</tspan><tspan x="1410" dy="14">→ công bố + nguồn gốc;</tspan><tspan x="1410" dy="14">tác giả + vị trí tác giả</tspan></text>
+<rect x="1508" y="497" width="164" height="76" rx="9" fill="#E8DAEF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="1515" y="512" font-size="11" fill="#1F3A5F">▤</text>
+<text x="1590" y="528.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="1590" dy="0">Nạp bằng chứng ngoài:</tspan><tspan x="1590" dy="14">công bố đã biết (Craw),</tspan><tspan x="1590" dy="14">đơn vị (OpenAlex/Crossref)</tspan></text>
+<rect x="1688" y="497" width="164" height="76" rx="9" fill="#E8DAEF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="1695" y="512" font-size="11" fill="#1F3A5F">▤</text>
+<text x="1770" y="528.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="1770" dy="0">Sinh ứng viên: 4 luật tên</tspan><tspan x="1770" dy="14">+ bằng chứng công bố;</tspan><tspan x="1770" dy="14">lưu PENDING, idempotent</tspan></text>
+<rect x="1868" y="632" width="164" height="76" rx="9" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="1875" y="647" font-size="11" fill="#1F3A5F">👤</text>
+<text x="1950" y="663.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="1950" dy="0">Xem hàng đợi và</tspan><tspan x="1950" dy="14">bằng chứng ứng viên</tspan><tspan x="1950" dy="14">(UC-17)</tspan></text>
+<polygon points="2130,647 2153,670 2130,693 2107,670" fill="#FEF9E7" stroke="#7D6608" stroke-width="1.8"/>
+<path d="M2121,661 L2139,679 M2139,661 L2121,679" stroke="#7D6608" stroke-width="2.4"/>
+<text x="2100" y="704.35" text-anchor="end" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2100" dy="0">Quyết định</tspan><tspan x="2100" dy="13">của người duyệt?</tspan></text>
+<circle cx="2130" cy="780" r="17.0" fill="#FDEDEC" stroke="#922B21" stroke-width="3.6"/>
+<text x="2130" y="814.35" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2130" dy="0">Giữ PENDING</tspan><tspan x="2130" dy="13">(không ghi gì)</tspan></text>
+<rect x="2228" y="252" width="164" height="76" rx="9" fill="#D6EAF8" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="2235" y="267" font-size="11" fill="#1F3A5F">⚙</text>
+<text x="2310" y="283.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2310" dy="0">Kiểm tra: ứng viên PENDING,</tspan><tspan x="2310" dy="14">phiên bản hiện hành,</tspan><tspan x="2310" dy="14">Scopus ID chưa APPROVED</tspan></text>
+<rect x="2228" y="367" width="164" height="76" rx="9" fill="#D6EAF8" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="2235" y="382" font-size="11" fill="#1F3A5F">⚙</text>
+<text x="2310" y="398.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2310" dy="0">Kiểm tra lý do bắt buộc;</tspan><tspan x="2310" dy="14">ghi review REJECT</tspan><tspan x="2310" dy="14">+ audit</tspan></text>
+<polygon points="2490,267 2513,290 2490,313 2467,290" fill="#FEF9E7" stroke="#7D6608" stroke-width="1.8"/>
+<path d="M2481,281 L2499,299 M2499,281 L2481,299" stroke="#7D6608" stroke-width="2.4"/>
+<text x="2490" y="248.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2490" dy="0">Hợp lệ?</tspan></text>
+<circle cx="2490" cy="780" r="17.0" fill="#FDEDEC" stroke="#922B21" stroke-width="3.6"/>
+<path d="M2483,787 L2487,773 L2493,782 L2497,772" fill="none" stroke="#922B21" stroke-width="2"/>
+<text x="2490" y="814.35" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2490" dy="0">Dừng: HTTP 409</tspan><tspan x="2490" dy="13">(xung đột/dữ liệu cũ)</tspan></text>
+<rect x="2588" y="252" width="164" height="76" rx="9" fill="#D6EAF8" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="2595" y="267" font-size="11" fill="#1F3A5F">⚙</text>
+<text x="2670" y="283.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2670" dy="0">Ghi review ACCEPT,</tspan><tspan x="2670" dy="14">danh tính APPROVED,</tspan><tspan x="2670" dy="14">bằng chứng danh tính, audit</tspan></text>
+<polygon points="2850,267 2873,290 2850,313 2827,290" fill="#FEF9E7" stroke="#7D6608" stroke-width="1.8"/>
+<path d="M2839,290 L2861,290 M2850,279 L2850,301" stroke="#7D6608" stroke-width="2.4"/>
+<rect x="2768" y="632" width="164" height="76" rx="9" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="2775" y="647" font-size="11" fill="#1F3A5F">👤</text>
+<text x="2850" y="663.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="2850" dy="0">Truy vết: xem lịch sử</tspan><tspan x="2850" dy="14">review, nhật ký</tspan><tspan x="2850" dy="14">(UC-19, UC-07)</tspan></text>
+<rect x="2948" y="857" width="164" height="76" rx="9" fill="#FFFFFF" stroke="#1F3A5F" stroke-width="1.8"/>
+<text x="2955" y="872" font-size="11" fill="#1F3A5F">👤</text>
+<text x="3030" y="888.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="3030" dy="0">Xem liên kết Scopus</tspan><tspan x="3030" dy="14">và công bố của tôi</tspan><tspan x="3030" dy="14">(UC-21, UC-22)</tspan></text>
+<circle cx="3210" cy="670" r="17.0" fill="#FDEDEC" stroke="#922B21" stroke-width="3.6"/>
+<text x="3210" y="710.85" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="3210" dy="0">Đã truy vết</tspan></text>
+<circle cx="3210" cy="895" r="17.0" fill="#FDEDEC" stroke="#922B21" stroke-width="3.6"/>
+<text x="3210" y="929.35" text-anchor="middle" font-size="11" font-weight="normal" fill="#1B2631"><tspan x="3210" dy="0">Giảng viên</tspan><tspan x="3210" dy="13">khai thác kết quả</tspan></text>
+<path d="M812,408 L800,408 L800,460 L812,460" fill="none" stroke="#566573" stroke-width="1.4"/>
+<line x1="870" y1="383" x2="965" y2="408" stroke="#566573" stroke-dasharray="4 3"/>
+<text x="810" y="424.85" text-anchor="start" font-size="11" font-weight="normal" fill="#2E4053"><tspan x="810" dy="0">Dữ liệu thô bất biến: raw_scopus_records.raw_payload</tspan><tspan x="810" dy="13">và lecturer_source_snapshots không bị sửa khi chuẩn</tspan><tspan x="810" dy="13">hóa.</tspan></text>
+<path d="M1512,624 L1500,624 L1500,694 L1512,694" fill="none" stroke="#566573" stroke-width="1.4"/>
+<line x1="1770" y1="573" x2="1700" y2="624" stroke="#566573" stroke-dasharray="4 3"/>
+<text x="1510" y="649.85" text-anchor="start" font-size="11" font-weight="normal" fill="#2E4053"><tspan x="1510" dy="0">KHÔNG có bước tự động phê duyệt: hệ thống chỉ ĐỀ XUẤT ứng viên;</tspan><tspan x="1510" dy="13">danh tính APPROVED chỉ được tạo sau ACCEPT của người (ADR-004,</tspan><tspan x="1510" dy="13">test_no_mapping_review_written).</tspan></text>
+<text x="28" y="968" font-size="11" fill="#566573">Chú giải: 👤 nhiệm vụ của người · ⚙ nhiệm vụ dịch vụ tự động · ▤ script CLI · ◇✕ cổng loại trừ · ◇+ cổng song song · vòng đậm = sự kiện kết thúc · nguồn: gen_bpmn.py (mô hình trong tệp)</text>
+</svg>

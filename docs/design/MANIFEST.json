@@ -1,0 +1,780 @@
+{
+ "name": "Bộ tài sản phân tích–thiết kế Scopus–ICTU (Task 19)",
+ "version": "1.0",
+ "generated_at": "2026-10-09T16:20:27+00:00",
+ "repository_head": "530bf0f",
+ "working_tree_note": "Tệp trong docs/design và docs/planning là tệp mới/chưa commit tại thời điểm sinh manifest",
+ "schema_source": {
+  "database": "scopus_ictu_demo_teacher_20261014",
+  "postgres": "17.10",
+  "alembic_version": [
+   "a9c2e4f71b30"
+  ],
+  "extracted_at": "2026-10-09T15:10:58+00:00",
+  "mode": "READ ONLY (set_session readonly=True)"
+ },
+ "counts": {
+  "files": 121,
+  "by_category": {
+   "nguồn sơ đồ PlantUML": 25,
+   "render (SVG/PNG xuất từ nguồn)": 52,
+   "tài liệu": 21,
+   "bảng dữ liệu": 3,
+   "nguồn ERD DBML": 1,
+   "dữ liệu/nguồn máy đọc": 5,
+   "nguồn BPMN 2.0": 1,
+   "tool": 13
+  },
+  "plantuml_sources": 25,
+  "tables": 24,
+  "foreign_keys": 30
+ },
+ "tools": {
+  "plantuml": {
+   "version": "1.2026.8",
+   "sha256": "5e1ecfa8ecd32c90b03bbf3b1eb6f020943f98ab0fcf4032be31a0002ee2c462",
+   "source": "https://github.com/plantuml/plantuml/releases/tag/v1.2026.8 (SHA-256 khớp digest do GitHub công bố)"
+  },
+  "graphviz": {
+   "version": "16.1.0",
+   "sha256": "733e49626c492242eb8dca30ea627b6ead20710e207998c7933b4909d92d6abc",
+   "source": "https://gitlab.com/graphviz/graphviz/-/releases (SHA-256 khớp tệp .sha256 do dự án công bố)"
+  },
+  "bpmn_js": {
+   "version": "17.11.1",
+   "use": "kiểm tra nhập .bpmn (unpkg) — 0 cảnh báo, 82 phần tử"
+  },
+  "dbml_core": {
+   "use": "kiểm cú pháp .dbml — 24 bảng, 30 quan hệ"
+  },
+  "browser": "Microsoft Edge headless (xuất PNG từ SVG tự dựng)"
+ },
+ "files": [
+  {
+   "path": "architecture/ARC-1_kien_truc_tong_the.puml",
+   "bytes": 3803,
+   "sha256": "737c372cd76f13e2ca032a8d7b51e899be4d3a3f88c093b6d3cd37146d33c991",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "architecture/DFD-1_luong_du_lieu.puml",
+   "bytes": 3479,
+   "sha256": "91ad8218418f0cf7b97b1575fa642fa17d6ba304cea559d72e9e2ea3a7b3fe22",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "architecture/render/ARC-1_kien_truc_tong_the.png",
+   "bytes": 365616,
+   "sha256": "a84fd906b9db4dc353103829b7d36404b30fae208b8156cec69778fd2b18b22a",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "architecture/render/ARC-1_kien_truc_tong_the.svg",
+   "bytes": 35731,
+   "sha256": "12b686cd92b8361ca8512e85158b31fcd630e007fc20f54a9ac216dc6b3cd906",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "architecture/render/DFD-1_luong_du_lieu.png",
+   "bytes": 460537,
+   "sha256": "a11f0e00d019a56af3b8df3014dbecf2ad885648fbb3cbbac28365f3b8a602d3",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "architecture/render/DFD-1_luong_du_lieu.svg",
+   "bytes": 40847,
+   "sha256": "0adf8a9832cc7bae4adebbc37e95c9f41bed7ff3d489c3e1ddae149dd8270b52",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/CLS-0_tong_the_cot_khoa.puml",
+   "bytes": 7572,
+   "sha256": "3155569110b818eccdbe30ca36de725bff7fe65a625a9bccb7872c36ddf983da",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/class/CLS-A_nguoi_dung_kiem_toan.puml",
+   "bytes": 2850,
+   "sha256": "7805145cc4d61a1c54cb55ffbd0feb12e42a9bfef092ca711522be376a0f47da",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/class/CLS-B_ho_so_giang_vien.puml",
+   "bytes": 3143,
+   "sha256": "f96792ec749709806296c51d5d9ebfee3be65b553e6c79ac96a202be07e35c1e",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/class/CLS-C_nhap_tho_scopus.puml",
+   "bytes": 2314,
+   "sha256": "76a7680d463ab0172f6c9febf120d8f36b66ed154c236d4c2876c99295924f58",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/class/CLS-D_cong_bo_tac_gia.puml",
+   "bytes": 3800,
+   "sha256": "4ae50739f0b39e7f6a91ca5efa069ceeeab7a4368bd28274d0004caa43ec4323",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/class/CLS-E_don_vi_cong_tac.puml",
+   "bytes": 2804,
+   "sha256": "cf8ef83dfbcadf74b0868250a129e40f41766d7497b81ce056620a54bd437dce",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/class/CLS-F_doi_soat_danh_tinh.puml",
+   "bytes": 5591,
+   "sha256": "bb1fb2ca7fc2ee89ec50ffd4c25e626d1ffb77cae6b76dad0efadf4ed911077b",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/class/render/CLS-0_tong_the_cot_khoa.png",
+   "bytes": 546133,
+   "sha256": "8a4191dd3dcf4e174385c8abcd46380f0c22602e37d5dc86d234f2890f95f219",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-0_tong_the_cot_khoa.svg",
+   "bytes": 64158,
+   "sha256": "75d79cb256ebaad5299b8f01044f82ecc3804c8bc1db6d78770ec7cb32a35b6c",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-A_nguoi_dung_kiem_toan.png",
+   "bytes": 110666,
+   "sha256": "12ba86a0d932e4f17de7f80fbcff38b0c08c353e7e44b3ad38e40603535964e8",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-A_nguoi_dung_kiem_toan.svg",
+   "bytes": 22178,
+   "sha256": "ef7dc3d96ea5ab45954481330c5bf78dc8179fce34cfc0d3d7c461756d34f699",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-B_ho_so_giang_vien.png",
+   "bytes": 204852,
+   "sha256": "1c7574c89d2661bf8ac42365a18d1ae503d73e8ede3817a28e0152414dfa630f",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-B_ho_so_giang_vien.svg",
+   "bytes": 23122,
+   "sha256": "16f63d86344506b61462985c24bdb15d3514bd0c3fc5f97b5db87c6baefe1743",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-C_nhap_tho_scopus.png",
+   "bytes": 79696,
+   "sha256": "c5d056c84913c001d44fe6779f72dfa59f82af0bfd72920954b8f4c4f6fec7b0",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-C_nhap_tho_scopus.svg",
+   "bytes": 15089,
+   "sha256": "44382607ceaa29c6c10da166cd90ab82b8d13efdbb44f6b0c7c5f5050d51ca3d",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-D_cong_bo_tac_gia.png",
+   "bytes": 146907,
+   "sha256": "0e87f3d054eaa0c71b3b3091bf08d1152a7138d2c1cb4d3a5c11d4aee69dea54",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-D_cong_bo_tac_gia.svg",
+   "bytes": 29596,
+   "sha256": "3221ecbda791587783633f1a6bd1b1adfafe987b42ed5fdfe52cec8170b4c890",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-E_don_vi_cong_tac.png",
+   "bytes": 103774,
+   "sha256": "02db19d128aa5a71f8a6f938bd123dbab955af09148849f098f40a4e2260b819",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-E_don_vi_cong_tac.svg",
+   "bytes": 18686,
+   "sha256": "09d1d8e1c9d2c7398c1d407b789f0c4e2b4d768edec878c8333e3808d86e86fb",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-F_doi_soat_danh_tinh.png",
+   "bytes": 406190,
+   "sha256": "4cc10ab1a4acad45ddf134677e185d17a5e5c57c585825c197bc180b022a00b6",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/class/render/CLS-F_doi_soat_danh_tinh.svg",
+   "bytes": 46634,
+   "sha256": "4ca22b89feaf3bc2213a055b37e932d5e8ad390493c11e5a2cd0bf09d8674ff8",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/CONSTRAINTS_BUSINESS_RULES.md",
+   "bytes": 13433,
+   "sha256": "59f0c1211f53b2ec3dcc9f6c1a8e001a1156ffedb6d38d4b66913bdfaaa21308",
+   "category": "tài liệu"
+  },
+  {
+   "path": "database/CONSTRAINTS_CATALOG.md",
+   "bytes": 19927,
+   "sha256": "958e800ad9c64dc9e325191ad223ab942f6e282e0a48fee44ea8216ec9acd71b",
+   "category": "tài liệu"
+  },
+  {
+   "path": "database/DATA_DICTIONARY.csv",
+   "bytes": 30921,
+   "sha256": "940b2e400f291c274355be94149850e963261e1689d72f95aa2b0247a82aa148",
+   "category": "bảng dữ liệu"
+  },
+  {
+   "path": "database/DATA_DICTIONARY.md",
+   "bytes": 55684,
+   "sha256": "11b4382010870ecec25daccba3fa1ff1b30775c8692c8928883344ef2159a0c5",
+   "category": "tài liệu"
+  },
+  {
+   "path": "database/DOI_CHIEU_SO_DO_CU.md",
+   "bytes": 8499,
+   "sha256": "ba6d6844f21185a50988b2952965794e8a2b4a0f6b6b64ae5da589e14e641d04",
+   "category": "tài liệu"
+  },
+  {
+   "path": "database/erd/ERD-0_tong_the.puml",
+   "bytes": 6018,
+   "sha256": "ae9078cb7570d0f39f823f758d88164bf95070bc2cf6cfdf3c908790377b62f8",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/erd/ERD-A_nguoi_dung_kiem_toan.puml",
+   "bytes": 2770,
+   "sha256": "0439e62cb660bdc0e1a2b4c242831eb8fd350ce607fdfe740310e95827618c87",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/erd/ERD-B_ho_so_giang_vien.puml",
+   "bytes": 3028,
+   "sha256": "841cf79770adb750933effd2d10fa187db7c7d93258ad1451e06810406d3af5d",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/erd/ERD-C_nhap_tho_scopus.puml",
+   "bytes": 2228,
+   "sha256": "ff5517431970c218cd0c1d3df8c01bf774653dcab6b3f676d511c9c51e76c54a",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/erd/ERD-D_cong_bo_tac_gia.puml",
+   "bytes": 3704,
+   "sha256": "ee672b42984d894c9557cc5df722d6482aff0f5f7a033c22bf79b996248359eb",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/erd/ERD-E_don_vi_cong_tac.puml",
+   "bytes": 2662,
+   "sha256": "4e49b5135872449cbc10a8d109944b33f7ef4afea49a12f3a8130e0facc11d5b",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/erd/ERD-F_doi_soat_danh_tinh.puml",
+   "bytes": 5400,
+   "sha256": "223b886b338f1c0d120d47ab79604c6989c3d7fad3761aa1c12ccf3e0a40113d",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "database/erd/render/ERD-0_tong_the.png",
+   "bytes": 405686,
+   "sha256": "a7701b56c3beb3a049fce2922c9e1a5e5034dd23b083cf8fb6dff735fce9260e",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-0_tong_the.svg",
+   "bytes": 67560,
+   "sha256": "360e4d05de307c213e7bbb54a9feb32377e0428bd2181e4bb174ea144d29c3c1",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-A_nguoi_dung_kiem_toan.png",
+   "bytes": 114441,
+   "sha256": "b7b55614ab76ec6bf8a7208102d41a19051d926fb15403d5fd07fc2a88e58f1d",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-A_nguoi_dung_kiem_toan.svg",
+   "bytes": 22429,
+   "sha256": "e4d6b99ef26a4ca167639b4464fbca7920952464ab06c61339ca12fd22135c6b",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-B_ho_so_giang_vien.png",
+   "bytes": 124433,
+   "sha256": "7a00233273152796c011f2bcdacde98a1b114e96fb60b8ecae6eaa9429eb1a43",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-B_ho_so_giang_vien.svg",
+   "bytes": 22562,
+   "sha256": "f69487eabfbdce5c14c0982a5a7e806e3c5e4be69757fc1073e8badbbef38624",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-C_nhap_tho_scopus.png",
+   "bytes": 82343,
+   "sha256": "6271274bdfab0bd57092dd118dab9d6ed9aad5d40f859851988a61465ff3b52c",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-C_nhap_tho_scopus.svg",
+   "bytes": 15398,
+   "sha256": "7be50e21fc7bb3d5f6626d67b32aa7b875b4ec32439bbb950cb2fad56f9ae81a",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-D_cong_bo_tac_gia.png",
+   "bytes": 150225,
+   "sha256": "446a16acc65ea7b4508a362fa10736def5cfbe5c806861d252bdd1804f35c846",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-D_cong_bo_tac_gia.svg",
+   "bytes": 31334,
+   "sha256": "e56cf74efdfa76f2a036ec1c0ff25f2eb939a541a7f0d714b0818de4f7b7dc4d",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-E_don_vi_cong_tac.png",
+   "bytes": 104791,
+   "sha256": "021452b70f2f3b379a149823dccf363606c666afc824d9a1e0a6453cf0fd136f",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-E_don_vi_cong_tac.svg",
+   "bytes": 16818,
+   "sha256": "383b8edfee49dd062d7ed73b6616d6cc5239a21d23e257810e17db8e019beb7b",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-F_doi_soat_danh_tinh.png",
+   "bytes": 238201,
+   "sha256": "80fc69a66ac0149a083fa2af90adb85991f127dd0ec5fc291c01921a128573c3",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/render/ERD-F_doi_soat_danh_tinh.svg",
+   "bytes": 51420,
+   "sha256": "3b820ce41f057843436f8bcce58edb3e18a79227da4a8114ab867e75d3027d53",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "database/erd/scopus_ictu.dbml",
+   "bytes": 32573,
+   "sha256": "97799c1513799e4a84ea618c2d1192ddca620929d07fbcf3c8316062d6159caa",
+   "category": "nguồn ERD DBML"
+  },
+  {
+   "path": "database/KEYS_RELATIONS.md",
+   "bytes": 17290,
+   "sha256": "0c1479c1958e3ad1df8669ac13dc6de8a3e2426bc1f2978b2061d3c654229829",
+   "category": "tài liệu"
+  },
+  {
+   "path": "database/NGUYEN_TAC_THIET_KE_DU_LIEU.md",
+   "bytes": 10896,
+   "sha256": "bc8babc3ba97d40e732da80484f1de0d9457f21f9efb026befe696ad24d4b166",
+   "category": "tài liệu"
+  },
+  {
+   "path": "database/ORM_MIGRATION_DB_PARITY.md",
+   "bytes": 3988,
+   "sha256": "6820478a322bec8fcebe0cdfc07931d06c828b33cbaa29e50095f277404ebd77",
+   "category": "tài liệu"
+  },
+  {
+   "path": "database/source/descriptions_vi.json",
+   "bytes": 25209,
+   "sha256": "d629c9d58ccb6c608bac1c7bcef61a5c7b83f6189246904e9a5354355d7e4026",
+   "category": "dữ liệu/nguồn máy đọc"
+  },
+  {
+   "path": "database/source/schema_snapshot.json",
+   "bytes": 99867,
+   "sha256": "7fe7b676abd535809a5a878c562ce310f9eee17a2eaf12c515fe369d443f1447",
+   "category": "dữ liệu/nguồn máy đọc"
+  },
+  {
+   "path": "figma_handoff/FIGMA_HANDOFF_TASK20.md",
+   "bytes": 8173,
+   "sha256": "3df182df29dccf5c32ec590893f98d07b601e3c3eb420f19d66d4ae5ba9aaf33",
+   "category": "tài liệu"
+  },
+  {
+   "path": "figma_handoff/screens.json",
+   "bytes": 10668,
+   "sha256": "ae6a86499a1b91573839ee072e4b8ec5e006c58f2f9067dabf060f5591267532",
+   "category": "dữ liệu/nguồn máy đọc"
+  },
+  {
+   "path": "gap/GAP_DE_CUONG_VS_CODE.md",
+   "bytes": 23137,
+   "sha256": "c9bffab3ef36a73842b8a612eafb59339eb7427366095756ed6ca2932c227105",
+   "category": "tài liệu"
+  },
+  {
+   "path": "process/BPMN-1_bang_buoc.md",
+   "bytes": 10990,
+   "sha256": "ddc3f1de73b5b0ef37f7cf8e856eb01d3d32c652af02f4397ca495454df6b1ce",
+   "category": "tài liệu"
+  },
+  {
+   "path": "process/BPMN-1_quy_trinh_thuc_te.bpmn",
+   "bytes": 22171,
+   "sha256": "4f333f720afa7850748b8742228a3630a36f4ba7fb215023397b423cb3b5016e",
+   "category": "nguồn BPMN 2.0"
+  },
+  {
+   "path": "process/render/BPMN-1_quy_trinh_thuc_te.png",
+   "bytes": 396913,
+   "sha256": "0dd83079c17d1e7de56d9066de03ee202e61ce32c0d7c37a592b62a0c451c7e7",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "process/render/BPMN-1_quy_trinh_thuc_te.svg",
+   "bytes": 18157,
+   "sha256": "2532a0e8fc3430181336b85d5680cd476215d5f58c4be92b0100788f024f582d",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "README.md",
+   "bytes": 12526,
+   "sha256": "4d381fd801c5a787257257d884c642229ea33d26e8d6680fa11ed51915249c2d",
+   "category": "tài liệu"
+  },
+  {
+   "path": "requirements/00_MA_TRAN_YEU_CAU_GVHD.md",
+   "bytes": 12300,
+   "sha256": "8bc9d38bc9f37e1f0f0a1c6a1787c0740bf3c1cf2212451c13d5366309720435",
+   "category": "tài liệu"
+  },
+  {
+   "path": "requirements/01_FR_NFR.csv",
+   "bytes": 34835,
+   "sha256": "c19c7c807e6b6d8d524666977a5b5e3479c61e7e6485cfdd70e6257a971e3f0b",
+   "category": "bảng dữ liệu"
+  },
+  {
+   "path": "requirements/01_FR_NFR.md",
+   "bytes": 39948,
+   "sha256": "d30f567a156e7b4f1ce580fc012e10849954633a1e7d79e4b2901f2733849605",
+   "category": "tài liệu"
+  },
+  {
+   "path": "tools/check_consistency.py",
+   "bytes": 13224,
+   "sha256": "65c12cdf6c3fb9f05c0a8406f39354c3d7133fb1b9cd0ab2f6393c89d53b533a",
+   "category": "tool"
+  },
+  {
+   "path": "tools/check_dbml.js",
+   "bytes": 615,
+   "sha256": "002e54d8df4f53760b89ef414f17b4a67af8150d9c10cf30ef68c0919ed4e052",
+   "category": "tool"
+  },
+  {
+   "path": "tools/extract_schema.py",
+   "bytes": 6661,
+   "sha256": "12b1622dd74e48d8f44f8035fcfb0fdc806f2e926964af5dc1c92f8126203814",
+   "category": "tool"
+  },
+  {
+   "path": "tools/fr_nfr_data.py",
+   "bytes": 42379,
+   "sha256": "44ba66ea08e05b89be7b33ae006d5ef8418c157b0120eef53a07cbadb2c1e9c9",
+   "category": "tool"
+  },
+  {
+   "path": "tools/gen_bpmn.py",
+   "bytes": 20135,
+   "sha256": "060af7131a2bf9569591c1e6ad8e0a091549bfbb05170bf37cafaf213f90a495",
+   "category": "tool"
+  },
+  {
+   "path": "tools/gen_database_assets.py",
+   "bytes": 27965,
+   "sha256": "f94a49ddeca9b0150050f560c457da52063173de0e243942a5889b9a4caa51dd",
+   "category": "tool"
+  },
+  {
+   "path": "tools/gen_manifest.py",
+   "bytes": 3488,
+   "sha256": "16d942050dd50888836c416648d5d057eb331213e6d9a7eb963d48d837a815ea",
+   "category": "tool"
+  },
+  {
+   "path": "tools/gen_requirements.py",
+   "bytes": 5569,
+   "sha256": "45fe5dee71417a03562467c5ea12240ee31857ceb990af0d654e50e7d498f8bb",
+   "category": "tool"
+  },
+  {
+   "path": "tools/gen_usecase_assets.py",
+   "bytes": 11720,
+   "sha256": "24e041561ff71562757610fddd7af64a940fe94aac0f7f638e56fe9ef8d4125f",
+   "category": "tool"
+  },
+  {
+   "path": "tools/orm_parity.py",
+   "bytes": 9569,
+   "sha256": "12c9383c14dd7e1fe32fb59a3b8b6fde1f592a3c4df200e9bf543f193423ca67",
+   "category": "tool"
+  },
+  {
+   "path": "tools/rbac_matrix.py",
+   "bytes": 3267,
+   "sha256": "6a963e8f16318341ddfbb1b87af8638e7b5c1937c64d8e05af6c54e601309ded",
+   "category": "tool"
+  },
+  {
+   "path": "tools/render.py",
+   "bytes": 2611,
+   "sha256": "ba1b8c2f911ffc6d7d13dcbfb5d7542abfa2fdd8762aed153c64d76b5c63af2d",
+   "category": "tool"
+  },
+  {
+   "path": "tools/render_svg_png.py",
+   "bytes": 1603,
+   "sha256": "c290c3d33e577b5b26b0fc7df069cbc1964a645570d1dcd952d45d2060ffff2b",
+   "category": "tool"
+  },
+  {
+   "path": "usecase/ACTOR_UC_MATRIX.md",
+   "bytes": 3256,
+   "sha256": "aceadf61dcef0bf71e8277f1af3593dce6415d1b47388c114d78d9d0eb45f73d",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-0A_tong_the_admin.png",
+   "bytes": 494350,
+   "sha256": "80f80269b9816c33c0ed5e5f5fc5ab5b9d2454df6aee92f3277793ab7d05f3cf",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-0A_tong_the_admin.svg",
+   "bytes": 35820,
+   "sha256": "15463bcabf49413cb91c3e92db93fdd84c5e67989e1650f1e0d99e6707d3f649",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-0B_tong_the_reviewer.png",
+   "bytes": 183846,
+   "sha256": "98b705e39cb8b14204a29dffe7c5fcb7a630cc3a9d4c955a5d11fa76bdf92215",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-0B_tong_the_reviewer.svg",
+   "bytes": 15841,
+   "sha256": "0908a0690826051ee1c7c62559de48df5ab8673d226bbf5b40d513caf1e8a693",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-0C_tong_the_lecturer.png",
+   "bytes": 132492,
+   "sha256": "5f1cf2e714f4d5bb56d1e7554a2f7ad075a2e4871df59d1e68137a204970c816",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-0C_tong_the_lecturer.svg",
+   "bytes": 11738,
+   "sha256": "5339bee63314435ba6a8142286cfc400177101f85242712ffb468c7812f52bbb",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-1_nhap_du_lieu.png",
+   "bytes": 139759,
+   "sha256": "a03e4a6432772153d8be1ecb290ab4b266bad8dc52abb82a94c5400dcd86ca57",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-1_nhap_du_lieu.svg",
+   "bytes": 12702,
+   "sha256": "28ca2a7072213aad8dc75def9eba6fd5f7355ef80970d6daf27e3d174b26e444",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-2_quan_ly_ho_so.png",
+   "bytes": 133949,
+   "sha256": "57b73dd0317c7c49bfce1cff636b2d274cc922461d445b3f7df1718abe5c3ecb",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-2_quan_ly_ho_so.svg",
+   "bytes": 11784,
+   "sha256": "d867cbc0b2f1be5bfd22367a7069ffd513898bdf677de8ea919ee31865e2cfe1",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-3_quan_ly_cong_bo.png",
+   "bytes": 87150,
+   "sha256": "993d1e4fc2fa591e46d484b5e2d7b5be7b4df101040eb9b85637792d5ba8b53e",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-3_quan_ly_cong_bo.svg",
+   "bytes": 8200,
+   "sha256": "3560bb69250ddd0be3a0db1c4e69ab1d4eafd08b171aa50349fd656aec2b980a",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-4_chuan_hoa_doi_soat_phe_duyet.png",
+   "bytes": 174251,
+   "sha256": "4d526ae21ee7ffe39688e28483200cf4bb6ab4aab355529cf4c1325d0cde97f4",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-4_chuan_hoa_doi_soat_phe_duyet.svg",
+   "bytes": 15586,
+   "sha256": "37b3571b372ff389ef5c0c08edb18263f9776e0ad324c84d8f2e37b68e2b1859",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-5_tim_kiem_thong_ke_xuat.png",
+   "bytes": 106962,
+   "sha256": "c1b653ffdc8600417af91314e01b2eaa2a9559d8679c7f120f8e2e9a1038465f",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-5_tim_kiem_thong_ke_xuat.svg",
+   "bytes": 9917,
+   "sha256": "790ab91c62a8c83dbb5b6ea2262540ffc9d3f0ee9281253df92c9d33406dbac1",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-6_xac_thuc_giam_sat.png",
+   "bytes": 131164,
+   "sha256": "558735ad6602994766f9d7540e7747da5ab996d385f9694afe128ffcbd6b6fc4",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/render/UCD-6_xac_thuc_giam_sat.svg",
+   "bytes": 15081,
+   "sha256": "2bc1d2643850dc7446ffa3b19a12b089fffcc8f6aac7129e82293f4f0e3dd1ea",
+   "category": "render (SVG/PNG xuất từ nguồn)"
+  },
+  {
+   "path": "usecase/diagrams/UCD-0A_tong_the_admin.puml",
+   "bytes": 3601,
+   "sha256": "11f43e5cbb0bffdd82a53f96a462d227cae49347d1adaff0e1ab2c9df041bd2c",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-0B_tong_the_reviewer.puml",
+   "bytes": 2120,
+   "sha256": "b007a70ea6f3fca812ebbc108435a4a5f9a84323934d86534b5776682508c276",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-0C_tong_the_lecturer.puml",
+   "bytes": 1758,
+   "sha256": "f16acf00e0c6e2f0815453828e6d2a7d7f96835f9c22c3d1a0b83eebc5beeadc",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-1_nhap_du_lieu.puml",
+   "bytes": 1871,
+   "sha256": "2771af7e6f1182c8f2b41f9c59675040c26146fdcb8ee980fb8dd52315347895",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-2_quan_ly_ho_so.puml",
+   "bytes": 1762,
+   "sha256": "775199e4eab89dbe5e858e7f775100b3cff02363241ea0600585f917adc44f18",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-3_quan_ly_cong_bo.puml",
+   "bytes": 1452,
+   "sha256": "4b829a901af12b93d389435cea014eb6acff78fe68353b5e777dc59faaede577",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-4_chuan_hoa_doi_soat_phe_duyet.puml",
+   "bytes": 2147,
+   "sha256": "fc2e412c3882ddf5ea03ef6c9c2cff331e70fe55d55facb3c7dd5ad085831989",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-5_tim_kiem_thong_ke_xuat.puml",
+   "bytes": 1591,
+   "sha256": "f5aebabd65a37a327e7eaafe63dcb40da6514848abe3f87018b869ca8ce3355a",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/diagrams/UCD-6_xac_thuc_giam_sat.puml",
+   "bytes": 1817,
+   "sha256": "3a09d758a26147df37df5088937a5c3fc12b6e0c0b9753bf5f7b91d3ee70845d",
+   "category": "nguồn sơ đồ PlantUML"
+  },
+  {
+   "path": "usecase/RBAC_API_MATRIX.csv",
+   "bytes": 4801,
+   "sha256": "0f28a5fe0bd2a5ac9eda44708bd7848d8810d17317a433a614c90460a4f5fd90",
+   "category": "bảng dữ liệu"
+  },
+  {
+   "path": "usecase/RBAC_API_MATRIX.json",
+   "bytes": 11579,
+   "sha256": "9d40ca9c3b16162dfca54419b67a4f7c306aa4a27555a0f5045a98106443ea30",
+   "category": "dữ liệu/nguồn máy đọc"
+  },
+  {
+   "path": "usecase/specs/UCS-G1_nhap_du_lieu.md",
+   "bytes": 17667,
+   "sha256": "e503aba9aff0ab2f3d84ab7f4514f97f508ca44a0f641bf5eeccd932ef6ebbe5",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/specs/UCS-G2_quan_ly_ho_so.md",
+   "bytes": 12669,
+   "sha256": "58719a7a5440f60e3c1c45cfddf6ac876e78c5507e5f6d1c7b833109afc2fe7b",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/specs/UCS-G3_quan_ly_cong_bo.md",
+   "bytes": 5214,
+   "sha256": "f551bc23e160b6dca552545de1a7932255d2a1a6aecf1101c003022fb04effc9",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/specs/UCS-G4_chuan_hoa_doi_soat_phe_duyet.md",
+   "bytes": 19654,
+   "sha256": "9acbc0c2e9e7aeaee15d8ae7e6e3b1ca6faf286202e0596b2e2aee4d03b2c9de",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/specs/UCS-G5_tim_kiem_thong_ke_xuat.md",
+   "bytes": 7449,
+   "sha256": "fb337ea6af2691ab159646e263538101316d7d1b110732f80eb7d2a77466fa68",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/specs/UCS-XT_xac_thuc_giam_sat.md",
+   "bytes": 9364,
+   "sha256": "66b0ce3789fec0c6bf82b9817f9216aad7534effee84cfddc09d225a5ef943d0",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/UC_INVENTORY.md",
+   "bytes": 9079,
+   "sha256": "605b8d879f5750945094e00edc9f278b271ff6c0e76ec47e3aecfea812da2c16",
+   "category": "tài liệu"
+  },
+  {
+   "path": "usecase/usecase_map.json",
+   "bytes": 9425,
+   "sha256": "a6a174cb708f0d3d6cb9d357e87ebd5988c559df96e2e5ba6da224a6e7c80cbf",
+   "category": "dữ liệu/nguồn máy đọc"
+  }
+ ]
+}

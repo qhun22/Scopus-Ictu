@@ -1,0 +1,379 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sinh bởi docs/design/tools/gen_bpmn.py. Mở bằng https://demo.bpmn.io hoặc Camunda Modeler để chỉnh sửa. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_ScopusIctu" targetNamespace="http://scopus-ictu/bpmn">
+  <bpmn:collaboration id="Collab_1">
+    <bpmn:participant id="Pool_1" name="Hệ thống Scopus–ICTU" processRef="Process_1" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_1" name="Quy trình nghiệp vụ thực tế" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="lane_adm" name="ADMIN&#10;(Quản trị viên)">
+        <bpmn:flowNodeRef>S0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>AE</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>A3</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_sys" name="Hệ thống&#10;(API/dịch vụ — tự động)">
+        <bpmn:flowNodeRef>S1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>S2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>S3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>S4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>S6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>S5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GP</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_cli" name="Kỹ thuật viên&#10;(script CLI)">
+        <bpmn:flowNodeRef>C1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>C2</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_rev" name="REVIEWER / ADMIN&#10;(người duyệt)">
+        <bpmn:flowNodeRef>R1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>G3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EP</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>ER</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>R2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E2</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="lane_lec" name="LECTURER&#10;(Giảng viên)">
+        <bpmn:flowNodeRef>L1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E3</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="S0" name="Có dữ liệu nguồn&#10;(CSV Scopus / JSON GV)">
+      <bpmn:outgoing>f1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="A1" name="Tải tệp lên&#10;(UC-08 JSON / UC-10 CSV)">
+      <bpmn:incoming>f1</bpmn:incoming>
+      <bpmn:incoming>f5</bpmn:incoming>
+      <bpmn:outgoing>f2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="S1" name="Kiểm tra tệp: định dạng,&#10;cột EID, SHA-256 trùng,&#10;lỗi từng dòng; JSON: xem trước">
+      <bpmn:incoming>f2</bpmn:incoming>
+      <bpmn:outgoing>f3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G1" name="Hợp lệ&#10;và không trùng?">
+      <bpmn:incoming>f3</bpmn:incoming>
+      <bpmn:outgoing>f4</bpmn:outgoing>
+      <bpmn:outgoing>f6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="AE" name="Đọc lỗi theo dòng:&#10;sửa tệp hoặc xác nhận&#10;nhập trùng">
+      <bpmn:incoming>f4</bpmn:incoming>
+      <bpmn:outgoing>f5</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="S2" name="Lưu dữ liệu THÔ: JSON →&#10;lecturers + snapshot;&#10;CSV → scopus_imports,&#10;raw_scopus_records; audit">
+      <bpmn:incoming>f6</bpmn:incoming>
+      <bpmn:outgoing>f7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G2" name="Là CSV&#10;Scopus?">
+      <bpmn:incoming>f7</bpmn:incoming>
+      <bpmn:outgoing>f8</bpmn:outgoing>
+      <bpmn:outgoing>f9</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="E1" name="Hồ sơ giảng viên&#10;đã lưu">
+      <bpmn:incoming>f9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="A3" name="Chạy chuẩn hóa công bố&#10;và bóc tách tác giả&#10;(UC-11, UC-12)">
+      <bpmn:incoming>f8</bpmn:incoming>
+      <bpmn:outgoing>f10</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="S3" name="Chuẩn hóa: EID chống trùng&#10;→ công bố + nguồn gốc;&#10;tác giả + vị trí tác giả">
+      <bpmn:incoming>f10</bpmn:incoming>
+      <bpmn:outgoing>f11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:scriptTask id="C1" name="Nạp bằng chứng ngoài:&#10;công bố đã biết (Craw),&#10;đơn vị (OpenAlex/Crossref)">
+      <bpmn:incoming>f11</bpmn:incoming>
+      <bpmn:outgoing>f12</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="C2" name="Sinh ứng viên: 4 luật tên&#10;+ bằng chứng công bố;&#10;lưu PENDING, idempotent">
+      <bpmn:incoming>f12</bpmn:incoming>
+      <bpmn:outgoing>f13</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:userTask id="R1" name="Xem hàng đợi và&#10;bằng chứng ứng viên&#10;(UC-17)">
+      <bpmn:incoming>f13</bpmn:incoming>
+      <bpmn:outgoing>f14</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="G3" name="Quyết định&#10;của người duyệt?">
+      <bpmn:incoming>f14</bpmn:incoming>
+      <bpmn:outgoing>f15</bpmn:outgoing>
+      <bpmn:outgoing>f16</bpmn:outgoing>
+      <bpmn:outgoing>f17</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EP" name="Giữ PENDING&#10;(không ghi gì)">
+      <bpmn:incoming>f17</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="S4" name="Kiểm tra: ứng viên PENDING,&#10;phiên bản hiện hành,&#10;Scopus ID chưa APPROVED">
+      <bpmn:incoming>f15</bpmn:incoming>
+      <bpmn:outgoing>f18</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="S6" name="Kiểm tra lý do bắt buộc;&#10;ghi review REJECT&#10;+ audit">
+      <bpmn:incoming>f16</bpmn:incoming>
+      <bpmn:outgoing>f24</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="G4" name="Hợp lệ?">
+      <bpmn:incoming>f18</bpmn:incoming>
+      <bpmn:outgoing>f19</bpmn:outgoing>
+      <bpmn:outgoing>f20</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="ER" name="Dừng: HTTP 409&#10;(xung đột/dữ liệu cũ)">
+      <bpmn:incoming>f20</bpmn:incoming>
+      <bpmn:errorEventDefinition id="ErrDef_1" />
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="S5" name="Ghi review ACCEPT,&#10;danh tính APPROVED,&#10;bằng chứng danh tính, audit">
+      <bpmn:incoming>f19</bpmn:incoming>
+      <bpmn:outgoing>f21</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:parallelGateway id="GP" name="">
+      <bpmn:incoming>f21</bpmn:incoming>
+      <bpmn:outgoing>f22</bpmn:outgoing>
+      <bpmn:outgoing>f23</bpmn:outgoing>
+    </bpmn:parallelGateway>
+    <bpmn:userTask id="R2" name="Truy vết: xem lịch sử&#10;review, nhật ký&#10;(UC-19, UC-07)">
+      <bpmn:incoming>f22</bpmn:incoming>
+      <bpmn:incoming>f24</bpmn:incoming>
+      <bpmn:outgoing>f25</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="L1" name="Xem liên kết Scopus&#10;và công bố của tôi&#10;(UC-21, UC-22)">
+      <bpmn:incoming>f23</bpmn:incoming>
+      <bpmn:outgoing>f26</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="E2" name="Đã truy vết">
+      <bpmn:incoming>f25</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="E3" name="Giảng viên&#10;khai thác kết quả">
+      <bpmn:incoming>f26</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="f1" sourceRef="S0" targetRef="A1" />
+    <bpmn:sequenceFlow id="f2" sourceRef="A1" targetRef="S1" />
+    <bpmn:sequenceFlow id="f3" sourceRef="S1" targetRef="G1" />
+    <bpmn:sequenceFlow id="f4" name="Không" sourceRef="G1" targetRef="AE" />
+    <bpmn:sequenceFlow id="f5" name="Làm lại" sourceRef="AE" targetRef="A1" />
+    <bpmn:sequenceFlow id="f6" name="Có" sourceRef="G1" targetRef="S2" />
+    <bpmn:sequenceFlow id="f7" sourceRef="S2" targetRef="G2" />
+    <bpmn:sequenceFlow id="f8" name="CSV" sourceRef="G2" targetRef="A3" />
+    <bpmn:sequenceFlow id="f9" name="JSON" sourceRef="G2" targetRef="E1" />
+    <bpmn:sequenceFlow id="f10" sourceRef="A3" targetRef="S3" />
+    <bpmn:sequenceFlow id="f11" sourceRef="S3" targetRef="C1" />
+    <bpmn:sequenceFlow id="f12" sourceRef="C1" targetRef="C2" />
+    <bpmn:sequenceFlow id="f13" sourceRef="C2" targetRef="R1" />
+    <bpmn:sequenceFlow id="f14" sourceRef="R1" targetRef="G3" />
+    <bpmn:sequenceFlow id="f15" name="ACCEPT" sourceRef="G3" targetRef="S4" />
+    <bpmn:sequenceFlow id="f16" name="REJECT (lý do bắt buộc)" sourceRef="G3" targetRef="S6" />
+    <bpmn:sequenceFlow id="f17" name="Giữ PENDING" sourceRef="G3" targetRef="EP" />
+    <bpmn:sequenceFlow id="f18" sourceRef="S4" targetRef="G4" />
+    <bpmn:sequenceFlow id="f19" name="Có" sourceRef="G4" targetRef="S5" />
+    <bpmn:sequenceFlow id="f20" name="Không" sourceRef="G4" targetRef="ER" />
+    <bpmn:sequenceFlow id="f21" sourceRef="S5" targetRef="GP" />
+    <bpmn:sequenceFlow id="f22" sourceRef="GP" targetRef="R2" />
+    <bpmn:sequenceFlow id="f23" sourceRef="GP" targetRef="L1" />
+    <bpmn:sequenceFlow id="f24" sourceRef="S6" targetRef="R2" />
+    <bpmn:sequenceFlow id="f25" sourceRef="R2" targetRef="E2" />
+    <bpmn:sequenceFlow id="f26" sourceRef="L1" targetRef="E3" />
+    <bpmn:textAnnotation id="T1"><bpmn:text>Dữ liệu thô bất biến: raw_scopus_records.raw_payload và lecturer_source_snapshots không bị sửa khi chuẩn hóa.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="As_T1" sourceRef="S2" targetRef="T1" />
+    <bpmn:textAnnotation id="T2"><bpmn:text>KHÔNG có bước tự động phê duyệt: hệ thống chỉ ĐỀ XUẤT ứng viên; danh tính APPROVED chỉ được tạo sau ACCEPT của người (ADR-004, test_no_mapping_review_written).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:association id="As_T2" sourceRef="C2" targetRef="T2" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Collab_1">
+      <bpmndi:BPMNShape id="Pool_1_di" bpmnElement="Pool_1" isHorizontal="true"><dc:Bounds x="20" y="50" width="3300" height="910" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_adm_di" bpmnElement="lane_adm" isHorizontal="true"><dc:Bounds x="50" y="50" width="3270" height="170" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_sys_di" bpmnElement="lane_sys" isHorizontal="true"><dc:Bounds x="50" y="220" width="3270" height="250" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_cli_di" bpmnElement="lane_cli" isHorizontal="true"><dc:Bounds x="50" y="470" width="3270" height="130" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_rev_di" bpmnElement="lane_rev" isHorizontal="true"><dc:Bounds x="50" y="600" width="3270" height="230" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="lane_lec_di" bpmnElement="lane_lec" isHorizontal="true"><dc:Bounds x="50" y="830" width="3270" height="130" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S0_di" bpmnElement="S0"><dc:Bounds x="133" y="118" width="34" height="34" />
+        <bpmndi:BPMNLabel><dc:Bounds x="90" y="156" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="A1_di" bpmnElement="A1"><dc:Bounds x="248" y="97" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S1_di" bpmnElement="S1"><dc:Bounds x="428" y="307" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G1_di" bpmnElement="G1" isMarkerVisible="true"><dc:Bounds x="667" y="322" width="46" height="46" />
+        <bpmndi:BPMNLabel><dc:Bounds x="630" y="372" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="AE_di" bpmnElement="AE"><dc:Bounds x="608" y="97" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S2_di" bpmnElement="S2"><dc:Bounds x="788" y="307" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G2_di" bpmnElement="G2" isMarkerVisible="true"><dc:Bounds x="1027" y="322" width="46" height="46" />
+        <bpmndi:BPMNLabel><dc:Bounds x="990" y="372" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="E1_di" bpmnElement="E1"><dc:Bounds x="1213" y="328" width="34" height="34" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1170" y="366" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="A3_di" bpmnElement="A3"><dc:Bounds x="1148" y="97" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S3_di" bpmnElement="S3"><dc:Bounds x="1328" y="307" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C1_di" bpmnElement="C1"><dc:Bounds x="1508" y="497" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="C2_di" bpmnElement="C2"><dc:Bounds x="1688" y="497" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="R1_di" bpmnElement="R1"><dc:Bounds x="1868" y="632" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G3_di" bpmnElement="G3" isMarkerVisible="true"><dc:Bounds x="2107" y="647" width="46" height="46" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1980" y="694" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EP_di" bpmnElement="EP"><dc:Bounds x="2113" y="763" width="34" height="34" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2070" y="801" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S4_di" bpmnElement="S4"><dc:Bounds x="2228" y="252" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S6_di" bpmnElement="S6"><dc:Bounds x="2228" y="367" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="G4_di" bpmnElement="G4" isMarkerVisible="true"><dc:Bounds x="2467" y="267" width="46" height="46" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2430" y="232" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="ER_di" bpmnElement="ER"><dc:Bounds x="2473" y="763" width="34" height="34" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2430" y="801" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S5_di" bpmnElement="S5"><dc:Bounds x="2588" y="252" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GP_di" bpmnElement="GP"><dc:Bounds x="2827" y="267" width="46" height="46" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="R2_di" bpmnElement="R2"><dc:Bounds x="2768" y="632" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="L1_di" bpmnElement="L1"><dc:Bounds x="2948" y="857" width="164" height="76" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="E2_di" bpmnElement="E2"><dc:Bounds x="3193" y="653" width="34" height="34" />
+        <bpmndi:BPMNLabel><dc:Bounds x="3150" y="691" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="E3_di" bpmnElement="E3"><dc:Bounds x="3193" y="878" width="34" height="34" />
+        <bpmndi:BPMNLabel><dc:Bounds x="3150" y="916" width="120" height="30" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="T1_di" bpmnElement="T1"><dc:Bounds x="800" y="408" width="330" height="52" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="T2_di" bpmnElement="T2"><dc:Bounds x="1500" y="624" width="400" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="f1_di" bpmnElement="f1">
+        <di:waypoint x="167" y="135" />
+        <di:waypoint x="248" y="135" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f2_di" bpmnElement="f2">
+        <di:waypoint x="412" y="135" />
+        <di:waypoint x="510" y="135" />
+        <di:waypoint x="510" y="307" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f3_di" bpmnElement="f3">
+        <di:waypoint x="592" y="345" />
+        <di:waypoint x="667" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f4_di" bpmnElement="f4">
+        <di:waypoint x="690" y="322" />
+        <di:waypoint x="690" y="173" />
+        <bpmndi:BPMNLabel><dc:Bounds x="694" y="304" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f5_di" bpmnElement="f5">
+        <di:waypoint x="690" y="97" />
+        <di:waypoint x="690" y="73" />
+        <di:waypoint x="330" y="73" />
+        <di:waypoint x="330" y="97" />
+        <bpmndi:BPMNLabel><dc:Bounds x="694" y="79" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f6_di" bpmnElement="f6">
+        <di:waypoint x="713" y="345" />
+        <di:waypoint x="788" y="345" />
+        <bpmndi:BPMNLabel><dc:Bounds x="717" y="327" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f7_di" bpmnElement="f7">
+        <di:waypoint x="952" y="345" />
+        <di:waypoint x="1027" y="345" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f8_di" bpmnElement="f8">
+        <di:waypoint x="1050" y="322" />
+        <di:waypoint x="1050" y="135" />
+        <di:waypoint x="1148" y="135" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1054" y="304" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f9_di" bpmnElement="f9">
+        <di:waypoint x="1073" y="345" />
+        <di:waypoint x="1213" y="345" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1077" y="327" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f10_di" bpmnElement="f10">
+        <di:waypoint x="1312" y="135" />
+        <di:waypoint x="1410" y="135" />
+        <di:waypoint x="1410" y="307" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f11_di" bpmnElement="f11">
+        <di:waypoint x="1492" y="345" />
+        <di:waypoint x="1590" y="345" />
+        <di:waypoint x="1590" y="497" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f12_di" bpmnElement="f12">
+        <di:waypoint x="1672" y="535" />
+        <di:waypoint x="1688" y="535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f13_di" bpmnElement="f13">
+        <di:waypoint x="1852" y="535" />
+        <di:waypoint x="1950" y="535" />
+        <di:waypoint x="1950" y="632" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f14_di" bpmnElement="f14">
+        <di:waypoint x="2032" y="670" />
+        <di:waypoint x="2107" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f15_di" bpmnElement="f15">
+        <di:waypoint x="2130" y="647" />
+        <di:waypoint x="2130" y="290" />
+        <di:waypoint x="2228" y="290" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2134" y="629" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f16_di" bpmnElement="f16">
+        <di:waypoint x="2153" y="670" />
+        <di:waypoint x="2310" y="670" />
+        <di:waypoint x="2310" y="443" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2157" y="652" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f17_di" bpmnElement="f17">
+        <di:waypoint x="2130" y="693" />
+        <di:waypoint x="2130" y="763" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2134" y="675" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f18_di" bpmnElement="f18">
+        <di:waypoint x="2392" y="290" />
+        <di:waypoint x="2467" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f19_di" bpmnElement="f19">
+        <di:waypoint x="2513" y="290" />
+        <di:waypoint x="2588" y="290" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2517" y="272" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f20_di" bpmnElement="f20">
+        <di:waypoint x="2490" y="313" />
+        <di:waypoint x="2490" y="763" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2494" y="295" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f21_di" bpmnElement="f21">
+        <di:waypoint x="2752" y="290" />
+        <di:waypoint x="2827" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f22_di" bpmnElement="f22">
+        <di:waypoint x="2850" y="313" />
+        <di:waypoint x="2850" y="632" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f23_di" bpmnElement="f23">
+        <di:waypoint x="2873" y="290" />
+        <di:waypoint x="3030" y="290" />
+        <di:waypoint x="3030" y="857" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f24_di" bpmnElement="f24">
+        <di:waypoint x="2392" y="405" />
+        <di:waypoint x="2430" y="405" />
+        <di:waypoint x="2430" y="670" />
+        <di:waypoint x="2768" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f25_di" bpmnElement="f25">
+        <di:waypoint x="2932" y="670" />
+        <di:waypoint x="3193" y="670" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="f26_di" bpmnElement="f26">
+        <di:waypoint x="3112" y="895" />
+        <di:waypoint x="3193" y="895" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="As_T1_di" bpmnElement="As_T1"><di:waypoint x="870" y="383" /><di:waypoint x="965" y="408" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="As_T2_di" bpmnElement="As_T2"><di:waypoint x="1770" y="573" /><di:waypoint x="1700" y="624" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

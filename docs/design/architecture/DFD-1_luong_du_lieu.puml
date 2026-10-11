@@ -1,0 +1,81 @@
+@startuml DFD-1_luong_du_lieu
+' Nguồn: docs/design/usecase/usecase_map.json, schema thật (24 bảng), docs/demo/HUONG_DAN_SU_DUNG_SCOPUS_ICTU.md ch.5, mã services/*.
+' DFD mức 1 — dòng dữ liệu đúng cách cài đặt hiện tại. Không có luồng tự động phê duyệt.
+left to right direction
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+}
+skinparam database {
+  BackgroundColor #FEF9E7
+  BorderColor #7D6608
+}
+title DFD-1 — Luồng dữ liệu: nguồn ngoài → dữ liệu thô → dữ liệu chuẩn → bằng chứng → ứng viên → duyệt → danh tính → khai thác
+
+rectangle "Thực thể ngoài" {
+  rectangle "ICTU Repository\n(JSON hồ sơ GV)" as X1 #FDEDEC
+  rectangle "Scopus\n(CSV xuất)" as X2 #FDEDEC
+  rectangle "Craw ICTU +\nOpenAlex/Crossref (tệp)" as X3 #FDEDEC
+  actor "ADMIN" as ADM
+  actor "REVIEWER" as REV
+  actor "LECTURER" as LEC
+  actor "Kỹ thuật viên (CLI)" as TECH
+}
+
+usecase "P1\nNhập hồ sơ GV\n(UC-08)" as P1
+usecase "P2\nNhập CSV Scopus\n(UC-10)" as P2
+usecase "P3\nChuẩn hóa công bố,\nbóc tách tác giả\n(UC-11, UC-12)" as P3
+usecase "P4\nNạp bằng chứng ngoài\n(UC-25)" as P4
+usecase "P5\nSinh ứng viên\n(UC-24)" as P5
+usecase "P6\nDuyệt ứng viên\nACCEPT / REJECT\n(UC-17, UC-18)" as P6
+usecase "P7\nKhai thác kết quả\n(UC-13…15, 19–22)" as P7
+
+database "D1 lecturers\nlecturer_source_snapshots" as D1
+database "D2 scopus_imports\nraw_scopus_records\n(DỮ LIỆU THÔ)" as D2
+database "D3 publications\npublication_raw_sources\nscopus_authors\nname_variants\npublication_authors" as D3
+database "D4 lecturer_known_publications\norganizations\naffiliation_resolutions\npublication_author_affiliations\n(BẰNG CHỨNG NGOÀI)" as D4
+database "D5 candidate_generation_runs\nlecturer_scopus_candidates\n…_observations, …_evidence\n(ĐỀ XUẤT — PENDING)" as D5
+database "D6 …_candidate_reviews\nlecturer_scopus_identities\nidentity_evidence\n(QUYẾT ĐỊNH CỦA NGƯỜI)" as D6
+database "D7 audit_events\n(chỉ INSERT)" as D7
+
+X1 --> P1 : JSON
+ADM --> P1 : xác nhận nhập
+P1 --> D1 : hồ sơ + snapshot
+X2 --> P2 : CSV
+ADM --> P2 : tải lên
+P2 --> D2 : dòng thô + SHA-256
+D2 --> P3 : dòng thô hợp lệ
+ADM --> P3 : kích hoạt
+P3 --> D3 : công bố chuẩn,\ntác giả, vị trí
+X3 --> P4
+TECH --> P4
+P4 --> D4 : công bố đã biết,\nđơn vị theo tác giả
+D1 --> P5 : tên giảng viên
+D3 --> P5 : tên tác giả + biến thể
+D4 --> P5 : công bố đã biết
+TECH --> P5
+P5 --> D5 : ứng viên + bằng chứng
+D5 --> P6 : hàng đợi + bằng chứng
+D3 --> P6 : công bố hỗ trợ
+REV --> P6 : quyết định\n(+ lý do)
+ADM --> P6
+P6 --> D6 : review, danh tính APPROVED
+D6 --> P7 : danh tính đã duyệt
+D3 --> P7
+D4 --> P7
+P7 --> LEC : liên kết + công bố của tôi
+P7 --> ADM : công bố, thống kê,\nxuất JSON, nhật ký
+P7 --> REV : công bố, lịch sử review
+P6 --> D7 : ghi audit
+D7 --> P7 : nhật ký
+note bottom of D7
+  audit_events được ghi bởi MỌI tiến trình có thao tác ghi (P1, P2, P3, P6, quản lý GV/tài khoản, xuất JSON…);
+  chỉ vẽ P6 để hình gọn. Chỉ INSERT theo ADR-003 (quy ước tầng ứng dụng, không có trigger DB).
+end note
+@enduml

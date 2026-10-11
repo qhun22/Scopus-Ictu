@@ -1,0 +1,85 @@
+@startuml ARC-1_kien_truc_tong_the
+' Nguồn: frontend/src/App.tsx, frontend/package.json, backend/app/main.py, backend/app/api/v1/router.py, backend/app/api/dependencies.py,
+' backend/app/core/security.py, backend/alembic, backend/scripts/*.py, docs/adr/ADR-002. Chỉ vẽ thành phần CÓ THẬT.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 11
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+}
+title ARC-1 — Kiến trúc tổng thể Scopus–ICTU (giao diện web — Web API — tầng dữ liệu) và các tiến trình ngoài giao diện
+
+actor "ADMIN" as UA
+actor "REVIEWER" as UR
+actor "LECTURER" as UL
+actor "Kỹ thuật viên\n(chạy script)" as UT
+
+rectangle "TẦNG GIAO DIỆN — Trình duyệt" as TIER1 #EAF2F8 {
+  component "Single-Page App\nReact 18 + Vite + TypeScript\nTailwind CSS (AntD chỉ ở trang Duyệt đối sánh)" as SPA
+  component "AuthContext / ProtectedRoute / RoleRoute\n(ẩn menu theo vai trò — chỉ để tiện dùng)" as GUARD
+  component "Lớp gọi API (src/api/*.ts)\nfetch + cookie phiên" as APIC
+}
+
+rectangle "TẦNG DỊCH VỤ — Web API (FastAPI, Python)" as TIER2 #EAFAF1 {
+  component "Endpoints /api/v1\n(13 module: auth, users, lecturers, imports, authors,\npublications, search, reviews, audits, dashboard,\nnotifications, lecturer_scopus, matching-ping)" as EP
+  component "Xác thực & phân quyền\nget_current_user · require_role (RBAC)\nJWT cookie httponly + Argon2id" as SEC
+  component "Dịch vụ nghiệp vụ (services/)\nnhập JSON/CSV · chuẩn hóa công bố & tác giả ·\nđối soát affiliation · duyệt ứng viên ·\ntra cứu · dashboard · xuất JSON" as SVC
+  component "Repositories + Mô hình SQLAlchemy 2.x\n(24 bảng ORM)" as REPO
+  component "Nhật ký kiểm toán\n(ghi bởi tầng dịch vụ — chỉ INSERT)" as AUD
+}
+
+rectangle "TẦNG DỮ LIỆU" as TIER3 #FEF9E7 {
+  database "PostgreSQL 17\n24 bảng · 30 FK · 99 CHECK\n(không trigger/hàm)" as PG
+  component "Alembic\n7 migration tuyến tính\n(head a9c2e4f71b30)" as ALEM
+}
+
+rectangle "TIẾN TRÌNH NGOÀI GIAO DIỆN (CLI — backend/scripts)" as CLI #F5EEF8 {
+  component "generate_matching_candidates.py\n(sinh ứng viên — 4 luật tên + bằng chứng công bố)" as C1
+  component "ingest_craw_known_publications.py\nimport_author_affiliations.py" as C2
+  component "bootstrap_demo_admin.py · seed_demo_users.py\nbuild_ictu_lecturer_dataset.py · crawl_dspace_snapshot.py" as C3
+}
+
+rectangle "NGUỒN DỮ LIỆU NGOÀI (TỆP — ngoại tuyến, KHÔNG gọi API trực tuyến)" as SRC #FDEDEC {
+  artifact "CSV xuất từ Scopus" as S1
+  artifact "JSON hồ sơ giảng viên\n(ICTU Repository / DSpace)" as S2
+  artifact "Craw snapshot\n(công bố đã biết)" as S3
+  artifact "JSONL OpenAlex / Crossref\n(đã tải sẵn)" as S4
+}
+
+UA --> SPA
+UR --> SPA
+UL --> SPA
+SPA --> GUARD
+SPA --> APIC
+APIC --> EP : "HTTP/JSON\n+ cookie JWT"
+EP --> SEC
+EP --> SVC
+SVC --> REPO
+SVC --> AUD
+REPO --> PG : "psycopg2"
+AUD --> PG
+ALEM ..> PG : "tạo/nâng cấp\nlược đồ"
+UT --> C1
+UT --> C2
+UT --> C3
+C1 --> PG
+C2 --> PG
+C3 --> PG
+S1 ..> EP : "ADMIN tải lên\n(UC-10)"
+S2 ..> EP : "ADMIN tải lên\n(UC-08)"
+S3 ..> C2
+S4 ..> C2
+S2 ..> C3
+
+note bottom of TIER2
+  Không có Redis, Kafka, Celery hay hàng đợi tác vụ nền riêng:
+  nhập CSV và chuẩn hóa chạy trong tiến trình API (có theo dõi tiến độ/hủy qua bảng scopus_imports).
+  Quyền được kiểm ở BACKEND (require_role); menu giao diện ẩn mục chỉ để tiện dùng.
+  Hệ thống KHÔNG gọi Scopus API.
+end note
+@enduml
