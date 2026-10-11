@@ -601,7 +601,8 @@ def test_export_lecturers_json_admin_success(
     assert "attachment; filename=" in response.headers["content-disposition"]
 
     data = response.json()
-    assert data["dataset"]["schema_version"] == "1.0"
+    # 1.1 = 1.0 + the optional per-record ``account`` block (parser still accepts any 1.x).
+    assert data["dataset"]["schema_version"] == "1.1"
     assert data["dataset"]["record_count"] == 0
     assert data["lecturers"] == []
     assert data["dataset"]["export"]["not_preserved_fields"] == ["tel", "google_scholar"]
@@ -632,7 +633,10 @@ def test_delete_lecturer_blocked_when_linked_to_user_account(
     app.dependency_overrides[get_current_user] = lambda: admin
 
     lec = _create_lecturer(full_name="Nguyễn Văn A")
-    user = _create_user(role="LECTURER", lecturer_id=lec.id)
+    # A non-LECTURER account (e.g. a REVIEWER) linked to the profile always blocks the delete.
+    # delete_lecturer removes LECTURER-role accounts together with the profile (commit f1df12d),
+    # so that role is deliberately not used here.
+    user = _create_user(role="REVIEWER", lecturer_id=lec.id)
 
     def mock_query(model: Any) -> MagicMock:
         chain = MagicMock()
@@ -648,3 +652,7 @@ def test_delete_lecturer_blocked_when_linked_to_user_account(
     assert response.status_code == 409
     assert response.json()["code"] == "LECTURER_IN_USE"
     assert "tài khoản người dùng" in response.json()["detail"]
+    assert response.json()["dependency"] == "USER_ACCOUNT"
+    # Blocked: nothing was deleted or committed.
+    assert not mock_db.delete.called
+    assert not mock_db.commit.called

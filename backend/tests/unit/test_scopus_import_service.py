@@ -104,8 +104,29 @@ def test_cancel_is_terminal_audited_and_does_not_delete_raw_data() -> None:
     assert not any(isinstance(value, RawScopusRecord) for value in db.added)
 
 
-def test_cancel_completed_import_is_rejected() -> None:
+def test_cancel_staged_import_awaiting_confirmation_is_allowed() -> None:
     item = make_import("STAGED")
+    db = FakeSession(item)
+    actor = SimpleNamespace(id=uuid.uuid4(), display_name="Admin")
+
+    result = cancel_import(db, item.id, actor)  # type: ignore[arg-type]
+
+    assert result is not None and result.status == "CANCELLED"
+
+
+@pytest.mark.parametrize("status", ["APPLIED", "FAILED"])
+def test_cancel_completed_import_is_rejected(status: str) -> None:
+    item = make_import(status)
+    db = FakeSession(item)
+    actor = SimpleNamespace(id=uuid.uuid4(), display_name="Admin")
+
+    with pytest.raises(ImportAlreadyFinished):
+        cancel_import(db, item.id, actor)  # type: ignore[arg-type]
+
+
+def test_cancel_staged_import_with_normalization_is_rejected() -> None:
+    item = make_import("STAGED")
+    item.normalization_summary = {"status": "COMPLETED"}
     db = FakeSession(item)
     actor = SimpleNamespace(id=uuid.uuid4(), display_name="Admin")
 
@@ -125,3 +146,39 @@ def test_active_duplicate_exception_exposes_existing_id() -> None:
     identifier = uuid.uuid4()
     error = ImportAlreadyProcessing(identifier)
     assert error.existing_import_id == identifier
+
+
+def test_record_cancelled_lecturer_import_writes_only_an_audit_event() -> None:
+    from app.services.scopus_import_service import (
+        LECTURER_IMPORT_CANCELLED_ACTION,
+        _cancelled_lecturer_response,
+        record_cancelled_lecturer_import,
+    )
+
+    db = FakeSession(None)
+    actor = SimpleNamespace(id=uuid.uuid4(), display_name="Admin")
+
+    record_cancelled_lecturer_import(
+        db,  # type: ignore[arg-type]
+        filename="ictu_lecturers.json",
+        summary={"total": 410, "conflicts": 2},
+        dataset_name="ICTU",
+        actor=actor,  # type: ignore[arg-type]
+    )
+
+    assert db.commits == 1
+    assert len(db.added) == 1
+    audit = db.added[0]
+    assert isinstance(audit, AuditEvent)
+    assert audit.action == LECTURER_IMPORT_CANCELLED_ACTION
+    assert audit.entity_type == "lecturer_dataset"
+
+    audit.created_at = datetime.now(UTC)
+    audit.id = uuid.uuid4()
+    response = _cancelled_lecturer_response(audit, "Admin")
+    assert response.type == "LECTURERS"
+    assert response.status == "CANCELLED"
+    assert response.total_records == 410
+    assert response.imported_records == 0
+    assert response.can_delete is True
+    assert response.lecturer_summary["cancelled_before_import"] is True

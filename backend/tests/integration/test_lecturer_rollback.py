@@ -160,6 +160,12 @@ def _make_mock_db_for_rollback(
             LecturerSourceSnapshot,
         )
 
+        if not isinstance(model, type):
+            # rollback.py also issues column queries (e.g. db.query(LecturerScopusCandidate.id)).
+            # ``column == Class`` raises ArgumentError in SQLAlchemy, so such arguments must be
+            # routed before the class comparisons below; an empty result means "no dependents".
+            return _build_query_mock()
+
         if model == AuditEvent:
             # Build AuditEvent mock DIRECTLY without _build_query_mock.
             # _build_query_mock creates a fresh _SequentialFirst which would
@@ -638,7 +644,10 @@ def test_user_linkage_blocks_rollback_with_409(mock_db: MagicMock) -> None:
         email="linked@ictu.edu.vn",
         staff_code="LNK01",
     )
-    linked_user = _create_user(role="LECTURER", lecturer_id=import_lec.id)
+    # A non-LECTURER account (e.g. a REVIEWER) linked to the profile always blocks the rollback.
+    # NOTE: rollback.py now removes LECTURER-role accounts together with the profile; that rule
+    # is deliberately not asserted here (see the open business decision in the task report).
+    linked_user = _create_user(role="REVIEWER", lecturer_id=import_lec.id)
 
     snap_id = uuid.uuid4()
     snap = LecturerSourceSnapshot(
@@ -688,6 +697,8 @@ def test_user_linkage_blocks_rollback_with_409(mock_db: MagicMock) -> None:
     assert err.status_code == 409
     assert err.data["linked_accounts"] == 1
     assert not mock_db.commit.called
+    # Blocked: neither the linked account nor anything else may be deleted.
+    assert not mock_db.delete.called
 
 
 def test_scopus_identity_dependency_blocks_rollback(mock_db: MagicMock) -> None:
@@ -832,7 +843,8 @@ def test_rollback_linked_user_endpoint_returns_mapped_409(
         full_name="Thầy Test API",
         email="testapi@ictu.edu.vn",
     )
-    linked_user = _create_user(role="LECTURER", lecturer_id=import_lec.id)
+    # Non-LECTURER account: always blocks (LECTURER-role accounts are removed with the profile).
+    linked_user = _create_user(role="REVIEWER", lecturer_id=import_lec.id)
     snap_id = uuid.uuid4()
     snap = LecturerSourceSnapshot(
         id=snap_id,
@@ -874,6 +886,8 @@ def test_rollback_linked_user_endpoint_returns_mapped_409(
     data = response.json()
     assert data["code"] == "LECTURER_IMPORT_IN_USE"
     assert data["linked_accounts"] == 1
+    assert not mock_db.delete.called
+    assert not mock_db.commit.called
 
 
 def test_multi_source_lecturer_survives_rollback(mock_db: MagicMock) -> None:

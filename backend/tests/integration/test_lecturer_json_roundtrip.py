@@ -448,3 +448,153 @@ def test_export_requires_admin(client: TestClient, db_session: Session) -> None:
 def test_export_of_empty_database_is_valid_but_not_importable(client: TestClient) -> None:
     v = export(client)
     assert v["dataset"]["record_count"] == 0 and v["lecturers"] == []
+
+
+# ---------------------------------------------------------------------------
+# Login accounts travel with the lecturer (export -> import, schema 1.1)
+# ---------------------------------------------------------------------------
+
+PASSWORD = "MatKhau@12345"
+
+
+def _add_account(db: Session, lecturer_id: uuid.UUID, email: str, role: str, *, hasher=None) -> User:
+    from app.core.security import PasswordHasher
+
+    user = User(
+        id=uuid.uuid4(), email=email, password_hash=(hasher or PasswordHasher()).hash(PASSWORD),
+        display_name=f"Tài khoản {email}", role=role, lecturer_id=lecturer_id, is_active=True,
+    )
+    db.add(user)
+    db.commit()
+    return user
+
+
+def _record_of(payload: dict, institutional_email: str) -> dict:
+    return next(r for r in payload["lecturers"] if r["institutional_email"] == institutional_email)
+
+
+def test_accounts_are_exported_and_restored_usable_after_reimport(
+    client: TestClient, db_session: Session
+) -> None:
+    from app.core.security import PasswordHasher
+
+    import_v1(client, 4)
+    ids = lecturer_ids(db_session)
+    wanted = {
+        "gv0@example.test": ("acc0@example.test", "LECTURER"),
+        "gv1@example.test": ("acc1@example.test", "REVIEWER"),
+        "gv2@example.test": ("acc2@example.test", "ADMIN"),
+    }
+    originals = {
+        lec_email: _add_account(db_session, ids[lec_email], acc_email, role)
+        for lec_email, (acc_email, role) in wanted.items()
+    }
+
+    v2 = export(client)
+    # Only lecturers that own an account carry the block; every role is kept.
+    assert sum("account" in r for r in v2["lecturers"]) == 3
+    assert "account" not in _record_of(v2, "gv3@example.test")
+    for lec_email, (acc_email, role) in wanted.items():
+        block = _record_of(v2, lec_email)["account"]
+        assert block["email"] == acc_email and block["role"] == role and block["is_active"] is True
+        assert block["password_hash"] == originals[lec_email].password_hash
+        assert block["password_hash"].startswith("$argon2") and PASSWORD not in json.dumps(block)
+    assert v2["dataset"]["export"]["includes_accounts"] is True
+    assert v2["dataset"]["schema_version"] == "1.1"
+
+    export_audit = db_session.execute(
+        select(AuditEvent).where(AuditEvent.action == "LECTURER_DATASET_EXPORTED")
+    ).scalars().all()[-1]
+    assert export_audit.event_metadata["accounts_exported"] == 3
+    assert "argon2" not in json.dumps(export_audit.event_metadata)
+
+    # The accounts disappear (fresh system); re-importing the file brings them back, usable.
+    for user in originals.values():
+        db_session.delete(user)
+    db_session.commit()
+    assert count(db_session, User) == 1  # only the admin of the fixture
+
+    resp = post(client, "import", v2)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["conflicts"] == []
+    db_session.expire_all()
+    for lec_email, (acc_email, role) in wanted.items():
+        restored = db_session.scalar(select(User).where(User.email == acc_email))
+        assert restored is not None and restored.role == role
+        assert restored.lecturer_id == ids[lec_email] and restored.is_active is True
+        assert restored.password_hash == originals[lec_email].password_hash
+        assert PasswordHasher().verify(PASSWORD, restored.password_hash) is True  # same password logs in
+
+    imported = db_session.execute(
+        select(AuditEvent).where(AuditEvent.action == "LECTURER_DATASET_IMPORTED")
+    ).scalars().all()[-1]
+    assert imported.event_metadata["accounts_created"] == 3
+    assert len(imported.event_metadata["created_user_ids"]) == 3
+    assert "argon2" not in json.dumps([imported.event_metadata, imported.after_state])
+
+    # Idempotent: importing again changes nothing and raises no warning.
+    again = post(client, "import", v2)
+    assert again.status_code == 201, again.text
+    assert again.json()["conflicts"] == []
+    assert count(db_session, User) == 4
+
+
+def test_existing_account_email_only_warns_and_is_never_overwritten(
+    client: TestClient, db_session: Session
+) -> None:
+    ds = import_v1(client, 3)
+    ids = lecturer_ids(db_session)
+    owner = _add_account(db_session, ids["gv0@example.test"], "shared@example.test", "LECTURER")
+    original_hash, original_role = owner.password_hash, owner.role
+
+    other_hash = _add_account(db_session, ids["gv2@example.test"], "tmp@example.test", "LECTURER").password_hash
+    db_session.delete(db_session.scalar(select(User).where(User.email == "tmp@example.test")))
+    db_session.commit()
+    ds["lecturers"][1]["account"] = {
+        "email": "Shared@Example.test", "role": "ADMIN", "password_hash": other_hash,
+        "display_name": "Cố ghi đè", "is_active": True,
+    }
+    preview = post(client, "import/preview", ds)
+    assert preview.status_code == 200, preview.text
+    warnings = [c for c in preview.json()["conflicts"] if c["matched_by"] == "account_email"]
+    assert len(warnings) == 1 and warnings[0]["blocking"] is False
+    assert "đã được dùng" in warnings[0]["reason"]
+    assert preview.json()["summary"]["blocking_conflicts"] == 0
+
+    resp = post(client, "import", ds)
+    assert resp.status_code == 201, resp.text  # a warning never blocks the import
+    db_session.expire_all()
+    kept = db_session.scalar(select(User).where(User.email == "shared@example.test"))
+    assert kept.id == owner.id and kept.password_hash == original_hash and kept.role == original_role
+    assert kept.lecturer_id == ids["gv0@example.test"]
+    assert db_session.scalar(select(User).where(User.lecturer_id == ids["gv1@example.test"])) is None
+
+
+def test_lecturer_that_already_has_another_account_is_not_given_a_second_one(
+    client: TestClient, db_session: Session
+) -> None:
+    ds = import_v1(client, 2)
+    ids = lecturer_ids(db_session)
+    existing = _add_account(db_session, ids["gv0@example.test"], "first@example.test", "LECTURER")
+    ds["lecturers"][0]["account"] = {
+        "email": "second@example.test", "role": "REVIEWER",
+        "password_hash": existing.password_hash, "display_name": "Thứ hai", "is_active": True,
+    }
+    resp = post(client, "import", ds)
+    assert resp.status_code == 201, resp.text
+    assert [c["matched_by"] for c in resp.json()["conflicts"]] == ["account_email"]
+    db_session.expire_all()
+    assert db_session.scalar(select(User).where(User.email == "second@example.test")) is None
+    assert db_session.scalar(select(User).where(User.lecturer_id == ids["gv0@example.test"])).email == "first@example.test"
+
+
+def test_account_block_with_plaintext_password_is_rejected_without_echo(client: TestClient) -> None:
+    ds = make_dataset(2)
+    ds["lecturers"][0]["account"] = {
+        "email": "plain@example.test", "role": "LECTURER", "password_hash": "MatKhauChuThuong1",
+        "display_name": "X", "is_active": True,
+    }
+    resp = post(client, "import/preview", ds)
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["code"] == "INVALID_LECTURER_DATASET"
+    assert "MatKhauChuThuong1" not in resp.text

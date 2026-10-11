@@ -13,7 +13,13 @@ profile are not persisted, so they are omitted and listed in
 ``dataset.export.not_preserved_fields``.
 
 The output is accepted by :func:`parse_and_validate` and by the import
-service (round trip). Users/accounts/credentials are never read here.
+service (round trip).
+
+A lecturer that has a login account is exported together with it (``account``:
+email, role, display name, active flag and the Argon2id ``password_hash``).
+Passwords are never stored in plaintext, so the hash is the only credential
+that can travel; importing it restores a login that works with the same
+password. The file therefore must be handled as confidential.
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.governance import User
 from app.models.master_lecturer import (
     Lecturer,
     LecturerKnownPublication,
@@ -35,13 +42,15 @@ from app.services.lecturer_dataset.parser import UUID_RE
 
 ICTU_SOURCE_SYSTEM = "ictu_dspace_archive"
 EXPORTER_VERSION = "scopus_ictu_lecturer_export/1.0"
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 NOT_PRESERVED_FIELDS: tuple[str, ...] = ("tel", "google_scholar")
 RECOVERABILITY_NOTE = (
     "Bản xuất khôi phục tất cả các trường canonical đang được PostgreSQL lưu, "
     "bao gồm specialization, gender, date_of_birth và phone (thêm từ migration e1a2b3c4d5f6). "
     "Các trường tel và Google Scholar chưa được lưu nên không có trong bản xuất; "
-    "JSON nguồn gốc (v1), Craw và sidecar vẫn là nguồn lưu trữ cho các trường này."
+    "JSON nguồn gốc (v1), Craw và sidecar vẫn là nguồn lưu trữ cho các trường này. "
+    "Giảng viên có tài khoản đăng nhập được xuất kèm khối account (email, vai trò, chuỗi băm "
+    "mật khẩu Argon2); hệ thống không lưu mật khẩu gốc nên chỉ chuỗi băm được xuất."
 )
 
 
@@ -51,6 +60,7 @@ class LecturerExport:
     record_count: int
     excluded_without_source_id: int
     known_publication_count: int
+    account_count: int = 0
 
 
 def _source_id_of(payload: dict) -> str | None:
@@ -140,6 +150,16 @@ def build_lecturer_export(
                 "published_year": pub.published_year,
             })
 
+    # At most one account per lecturer (unique index uq_users_lecturer).
+    accounts: dict[uuid.UUID, User] = {}
+    if origin:
+        for user in db.execute(
+            select(User)
+            .where(User.lecturer_id.in_(list(origin)))
+            .order_by(User.created_at.asc(), User.id.asc())
+        ).scalars():
+            accounts.setdefault(user.lecturer_id, user)
+
     exported_at = now.isoformat()
     records: list[dict] = []
     derived_from: dict | None = None
@@ -152,7 +172,8 @@ def build_lecturer_export(
         provenance["export"] = {"exported_at": exported_at, "exporter": EXPORTER_VERSION}
         if derived_from is None and isinstance(payload.get("dataset"), dict):
             derived_from = payload["dataset"]
-        records.append({
+        account = accounts.get(lecturer_id)
+        record = {
             "source_id": sid,
             "staff_code": row.staff_code,
             "full_name": row.full_name,
@@ -172,7 +193,16 @@ def build_lecturer_export(
             "provenance": provenance,
             "known_publications": publications.get(lecturer_id, []),
             "full_name_normalized": row.full_name_normalized,
-        })
+        }
+        if account is not None:
+            record["account"] = {
+                "email": account.email,
+                "display_name": account.display_name,
+                "role": account.role,
+                "is_active": account.is_active,
+                "password_hash": account.password_hash,
+            }
+        records.append(record)
     records.sort(key=lambda r: r["source_id"])
     derived_from = derived_from or {}
 
@@ -194,6 +224,10 @@ def build_lecturer_export(
             "not_preserved_fields": list(NOT_PRESERVED_FIELDS),
             "recoverability_note": RECOVERABILITY_NOTE,
             "excluded_without_source_id": excluded,
+            "includes_accounts": True,
+            "accounts_note": (
+                "Tệp chứa chuỗi băm mật khẩu và vai trò tài khoản; chỉ lưu và chia sẻ cho người có thẩm quyền."
+            ),
         },
     }
     return LecturerExport(
@@ -201,4 +235,5 @@ def build_lecturer_export(
         record_count=len(records),
         excluded_without_source_id=excluded,
         known_publication_count=sum(len(v) for v in publications.values()),
+        account_count=sum(1 for r in records if "account" in r),
     )

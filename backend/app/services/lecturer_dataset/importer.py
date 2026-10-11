@@ -4,7 +4,9 @@ This module is the single authoritative writer for the lecturer dataset
 import pipeline. It follows the same pattern as
 ``app.services.scopus_import_service`` but writes to the lecturer
 master-data tables (``lecturers``, ``lecturer_source_snapshots``,
-``lecturer_known_publications``) and **never** touches ``users``.
+``lecturer_known_publications``). The only ``users`` rows it ever writes are the
+login accounts carried by the dataset's optional ``account`` block, and only
+when the e-mail is unused (existing accounts are never overwritten).
 
 Identity resolution
 -------------------
@@ -210,6 +212,8 @@ class _Index:
     by_source_id: dict[str, set[uuid.UUID]]
     source_ids_of: dict[uuid.UUID, set[str]]
     snapshot_bound: set[uuid.UUID]
+    users_by_email: dict[str, User] = dataclasses.field(default_factory=dict)
+    users_by_lecturer: dict[uuid.UUID, User] = dataclasses.field(default_factory=dict)
 
 
 def _build_index(db: Session, source_systems: set[str]) -> _Index:
@@ -229,6 +233,11 @@ def _build_index(db: Session, source_systems: set[str]) -> _Index:
             index.source_ids_of.setdefault(row.id, set()).add(row.repository_profile_url)
         key = (row.full_name.casefold().strip(), (row.department or "").casefold().strip())
         index.by_name_dept.setdefault(key, []).append((row.id, _email_key(row.email)))
+
+    for user in db.query(User).all():
+        index.users_by_email[user.email.lower()] = user
+        if user.lecturer_id is not None:
+            index.users_by_lecturer[user.lecturer_id] = user
 
     if source_systems:
         stmt = (
@@ -260,6 +269,7 @@ class _Decision:
     action: str  # create | update | unchanged | conflict
     blocking: list[dict]
     warnings: list[dict]
+    account_action: str | None = None  # create | exists | skip (None: no account in file)
 
 
 def _conflict(
@@ -367,6 +377,45 @@ def _resolve(index: _Index, record: dict, canonical: dict) -> tuple[Lecturer | N
     return target, blocking
 
 
+def _account_warning(record: dict, holder: User, reason: str) -> dict:
+    return {
+        "record_full_name": record["full_name"],
+        "matched_by": "account_email",
+        "existing_id": str(holder.lecturer_id or holder.id),
+        "existing_full_name": holder.display_name,
+        "existing_email": holder.email,
+        "blocking": False,
+        "reason": reason,
+        "source_id": record.get("source_id"),
+    }
+
+
+def _plan_account(
+    index: _Index, record: dict, existing: Lecturer | None
+) -> tuple[str | None, list[dict]]:
+    """Decide what to do with the record's optional login account (never overwrites)."""
+    account = record.get("account")
+    if not account:
+        return None, []
+    holder = index.users_by_email.get(account["email"])
+    if holder is not None:
+        if existing is not None and holder.lecturer_id == existing.id:
+            return "exists", []
+        return "skip", [_account_warning(
+            record, holder,
+            f"Email tài khoản {account['email']} đã được dùng bởi tài khoản khác — "
+            "không ghi đè; chỉnh sửa tài khoản trong trang Giảng viên.",
+        )]
+    if existing is not None:
+        current = index.users_by_lecturer.get(existing.id)
+        if current is not None:
+            return "skip", [_account_warning(
+                record, current,
+                "Hồ sơ này đã có tài khoản khác — không tạo thêm tài khoản từ tệp.",
+            )]
+    return "create", []
+
+
 def _plan(index: _Index, envelope: dict) -> list[_Decision]:
     """Decide create/update/unchanged/conflict for each record without writing."""
     decisions: list[_Decision] = []
@@ -413,7 +462,13 @@ def _plan(index: _Index, envelope: dict) -> list[_Decision]:
             )
         else:
             action = "unchanged" if canonical == _current_fields(existing) else "update"
-        decisions.append(_Decision(record, canonical, existing, action, blocking, warnings))
+        account_action = None
+        if not blocking:
+            account_action, account_warnings = _plan_account(index, record, existing)
+            warnings.extend(account_warnings)
+        decisions.append(
+            _Decision(record, canonical, existing, action, blocking, warnings, account_action)
+        )
     return decisions
 
 
@@ -528,6 +583,7 @@ class LecturerImportService:
         created = updated = unchanged = 0
         created_snapshot_ids: list[str] = []
         created_lecturer_ids: list[str] = []
+        created_user_ids: list[str] = []
         dataset_provenance = _dataset_provenance(envelope["dataset"])
 
         try:
@@ -618,6 +674,25 @@ class LecturerImportService:
                 db.flush()
                 created_snapshot_ids.append(str(snapshot.id))
 
+                if decision.account_action == "create":
+                    account = record["account"]
+                    user = User(
+                        id=uuid.uuid4(),
+                        email=account["email"],
+                        password_hash=account["password_hash"],
+                        display_name=account["display_name"],
+                        role=account["role"],
+                        lecturer_id=lecturer_id,
+                        is_active=account["is_active"],
+                        version=1,
+                        auth_version=1,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    db.add(user)
+                    db.flush()
+                    created_user_ids.append(str(user.id))
+
                 pubs = record.get("known_publications") or []
                 if pubs:
                     known = _known_publication_keys(db, lecturer_id)
@@ -645,6 +720,7 @@ class LecturerImportService:
                 "dataset_name": envelope["dataset"].get("name"),
                 "dataset_schema_version": envelope["dataset"].get("schema_version"),
                 "filename": filename,
+                "file_sha256": hashlib.sha256(content).hexdigest(),
                 "record_count": len(envelope["lecturers"]),
                 "created": created,
                 "updated": updated,
@@ -654,6 +730,8 @@ class LecturerImportService:
                 "absent_from_file": summary["absent_from_file"],
                 "snapshot_ids": created_snapshot_ids,
                 "created_lecturer_ids": created_lecturer_ids,
+                "accounts_created": len(created_user_ids),
+                "created_user_ids": created_user_ids,
                 "parser_version": envelope["dataset"].get("parser_version") or "unknown",
             }
             audit_entity_id = uuid.uuid4()  # batch aggregate id

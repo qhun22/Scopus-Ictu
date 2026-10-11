@@ -38,6 +38,11 @@ PROVENANCE_PASSTHROUGH_KEYS: tuple[str, ...] = ("parser_version", "known_special
 
 ACADEMIC_DEGREE_VALUES: tuple[str, ...] = ("TS", "ThS", "KS", "CN", "PGS", "GS")
 
+# Optional per-record login account (dataset schema 1.1, backward compatible).
+ACCOUNT_ROLES: tuple[str, ...] = ("LECTURER", "REVIEWER", "ADMIN")
+# The system only stores Argon2id hashes; plaintext passwords are never accepted.
+ARGON2_HASH_PREFIX = "$argon2"
+
 
 class DatasetValidationError(ValueError):
     """Raised when the uploaded payload fails project invariants.
@@ -67,6 +72,56 @@ def hash_payload(payload: dict | list | bytes) -> str:
     else:
         body = payload
     return hashlib.sha256(body).hexdigest()
+
+
+def _parse_account(
+    raw: object,
+    full_name: str,
+    location: str,
+    idx: int,
+    seen_emails: dict[str, int],
+) -> dict | None:
+    """Validate the optional ``account`` block of one record.
+
+    Error messages never echo the password hash.
+    """
+    if raw is None:
+        return None
+    loc = f"{location}.account"
+    _require(isinstance(raw, dict), "INVALID_LECTURER_DATASET",
+             f"{loc} phải là một đối tượng.", location=loc)
+    email = str(raw.get("email") or "").strip().lower()
+    _require(bool(email) and EMAIL_RE.match(email) is not None and len(email) <= 255,
+             "INVALID_LECTURER_DATASET",
+             f"{loc}.email không hợp lệ.", location=f"{loc}.email")
+    if email in seen_emails:
+        raise DatasetValidationError(
+            "DUPLICATE_LECTURER_IDENTITY",
+            f"Email tài khoản {email!r} bị trùng giữa các bản ghi.",
+            location=location,
+        )
+    seen_emails[email] = idx
+    role = str(raw.get("role") or "").strip().upper()
+    _require(role in ACCOUNT_ROLES, "INVALID_LECTURER_DATASET",
+             f"{loc}.role phải là một trong {', '.join(ACCOUNT_ROLES)}.", location=f"{loc}.role")
+    password_hash = raw.get("password_hash")
+    _require(
+        isinstance(password_hash, str) and password_hash.startswith(ARGON2_HASH_PREFIX),
+        "INVALID_LECTURER_DATASET",
+        f"{loc}.password_hash phải là chuỗi băm Argon2 do hệ thống xuất ra "
+        "(không nhận mật khẩu dạng chữ thường).",
+        location=f"{loc}.password_hash",
+    )
+    display_name = normalise_full_name(str(raw.get("display_name") or "")) or full_name
+    _require(len(display_name) <= 255, "INVALID_LECTURER_DATASET",
+             f"{loc}.display_name quá dài.", location=f"{loc}.display_name")
+    return {
+        "email": email,
+        "password_hash": password_hash,
+        "role": role,
+        "display_name": display_name,
+        "is_active": bool(raw.get("is_active", True)),
+    }
 
 
 def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict:
@@ -130,6 +185,7 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
     seen_staff_codes: dict[str, int] = {}
     seen_orcids: dict[str, int] = {}
     seen_source_ids: dict[str, int] = {}
+    seen_account_emails: dict[str, int] = {}
     for idx, rec in enumerate(raw_lecturers):
         location = f"lecturers[{idx}]"
         _require(isinstance(rec, dict), "INVALID_LECTURER_DATASET",
@@ -201,6 +257,10 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
                         location=location,
                     )
                 seen_orcids[orcid] = idx
+
+        account = _parse_account(
+            rec.get("account"), full_name, location, idx, seen_account_emails
+        )
 
         known_pubs = rec.get("known_publications") or []
         _require(isinstance(known_pubs, list), "INVALID_LECTURER_DATASET",
@@ -296,6 +356,7 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
             "is_active": bool(rec.get("is_active", True)),
             "provenance": source_provenance,
             "known_publications": normalised_pubs,
+            "account": account,
         })
 
     return {

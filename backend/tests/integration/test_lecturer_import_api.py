@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, Generator
 from unittest.mock import MagicMock
@@ -291,6 +291,12 @@ def test_list_master_returns_pagination_envelope(client: TestClient, mock_db: Ma
             faculty="Faculty of Information Technology",
             department="Department of Computer Science",
             orcid=None,
+            # Personal fields added by migration e1a2b3c4d5f6: the list endpoint copies them
+            # into LecturerListItem, so a MagicMock must not stand in for them.
+            specialization="Khoa học dữ liệu",
+            gender="Nam",
+            date_of_birth=date(1985, 1, 1),
+            phone="0912345678",
             is_active=True,
             version=1,
             created_at=datetime.now(UTC),
@@ -306,3 +312,9 @@ def test_list_master_returns_pagination_envelope(client: TestClient, mock_db: Ma
     assert "items" in body and "total" in body
     assert body["page"] == 1
     assert body["page_size"] == 10
+    # The four personal fields travel through the list contract unchanged.
+    first = body["items"][0]
+    assert first["specialization"] == "Khoa học dữ liệu"
+    assert first["gender"] == "Nam"
+    assert first["date_of_birth"] == "1985-01-01"
+    assert first["phone"] == "0912345678"

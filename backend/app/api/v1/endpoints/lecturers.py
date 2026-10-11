@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 import uuid
 from typing import Annotated
@@ -45,6 +46,10 @@ from app.services.lecturer_dataset.exporter import ICTU_SOURCE_SYSTEM, build_lec
 from app.services.lecturer_dataset.parser import (
     DatasetValidationError,
     MAX_FILE_BYTES as LECTURER_IMPORT_MAX_BYTES,
+)
+from app.services.scopus_import_service import (
+    find_duplicate_lecturer_import,
+    record_cancelled_lecturer_import,
 )
 from app.services.user_admin_service import to_admin_response, update_user
 
@@ -423,9 +428,10 @@ def export_lecturers(
 
     Only lecturers whose import snapshots recorded a source identity
     (``source_id``) for ``source_system`` are exported; synthetic/manual
-    records and every user/account/security field are excluded. ``tel`` and
-    Google Scholar are not stored in PostgreSQL and are therefore not
-    exported (see ``dataset.export.not_preserved_fields``).
+    records are excluded. A lecturer that has a login account is exported with
+    it (email, role and Argon2 password hash), so the file is confidential.
+    ``tel`` and Google Scholar are not stored in PostgreSQL and are therefore
+    not exported (see ``dataset.export.not_preserved_fields``).
     """
     from datetime import UTC, datetime
     import json
@@ -443,6 +449,7 @@ def export_lecturers(
         actor_user_id=admin.id,
         event_metadata={
             "record_count": exported.record_count,
+            "accounts_exported": exported.account_count,
             "excluded_without_source_id": exported.excluded_without_source_id,
             "source_system": source_system,
             "format": "JSON",
@@ -1001,6 +1008,7 @@ async def preview_lecturer_dataset(
     admin: Annotated[User, Depends(require_role("ADMIN"))],
     db: Annotated[Session, Depends(get_session)],
     file: Annotated[UploadFile | None, File()] = None,
+    allow_duplicate: Annotated[bool, Query()] = False,
 ) -> LecturerPreviewResponse:
     """M2.5A §27–§28: read-only diff against current lecturer master data."""
     if file is None:
@@ -1014,6 +1022,23 @@ async def preview_lecturer_dataset(
         content = await _read_upload_bounded(file, LECTURER_IMPORT_MAX_BYTES)
     finally:
         await file.close()
+    if not allow_duplicate:
+        previous = find_duplicate_lecturer_import(db, hashlib.sha256(content).hexdigest())
+        if previous is not None:
+            previous_meta = previous.event_metadata or {}
+            raise APIError(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Nội dung tệp này đã được nhập trước đó. "
+                    "Hãy xác nhận nếu vẫn muốn nhập lại."
+                ),
+                code="DUPLICATE_IMPORT_CONFIRMATION_REQUIRED",
+                data={
+                    "duplicate_of_import_id": str(previous.id),
+                    "duplicate_imported_at": previous.created_at.isoformat(),
+                    "duplicate_filename": previous_meta.get("filename", "ictu_lecturers.json"),
+                },
+            )
     try:
         summary = LecturerPreviewService().preview(
             db, filename=filename, content=content
@@ -1103,6 +1128,47 @@ async def import_lecturer_dataset(
         filename=result.filename,
         parser_version=result.parser_version,
     )
+
+
+@router.post(
+    "/import/cancel",
+    status_code=status.HTTP_201_CREATED,
+    summary="Record that an ICTU lecturer dataset was cancelled before importing",
+)
+async def cancel_lecturer_dataset_import(
+    admin: Annotated[User, Depends(require_role("ADMIN"))],
+    db: Annotated[Session, Depends(get_session)],
+    file: Annotated[UploadFile | None, File()] = None,
+) -> dict:
+    """Keep a CANCELLED history entry; no lecturer master data is touched."""
+    if file is None:
+        raise APIError(
+            status_code=422,
+            detail="Vui lòng chọn tệp JSON cần hủy.",
+            code="INVALID_IMPORT_FILE",
+        )
+    filename = _validate_upload_filename(file.filename)
+    try:
+        content = await _read_upload_bounded(file, LECTURER_IMPORT_MAX_BYTES)
+    finally:
+        await file.close()
+    try:
+        service = LecturerPreviewService()
+        summary = service.preview(db, filename=filename, content=content)
+    except DatasetValidationError as exc:
+        raise APIError(
+            status_code=422,
+            detail=exc.message,
+            code=exc.code or "INVALID_LECTURER_DATASET",
+        ) from exc
+    history_id = record_cancelled_lecturer_import(
+        db,
+        filename=summary.filename,
+        summary={"total": summary.total, "conflicts": summary.conflicts},
+        dataset_name=(summary.dataset or {}).get("name"),
+        actor=admin,
+    )
+    return {"id": str(history_id), "status": "CANCELLED"}
 
 
 @router.get(

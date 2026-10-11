@@ -201,7 +201,8 @@ def cancel_import(db: Session, import_id: uuid.UUID, actor: User) -> ScopusImpor
             isinstance(item.normalization_summary, dict)
             and item.normalization_summary.get("status") == "NORMALIZING"
         )
-        if item.status in TERMINAL_STATUSES and not normalization_is_running:
+        awaiting_confirmation = item.status == "STAGED" and not item.normalization_summary
+        if item.status in TERMINAL_STATUSES and not normalization_is_running and not awaiting_confirmation:
             raise ImportAlreadyFinished(item.status)
         before = {"status": item.status}
         item.status = "CANCELLED"
@@ -290,6 +291,135 @@ def _ensure_dt(val: Any) -> datetime:
             return val.replace(tzinfo=UTC)
         return val
     return datetime.now(UTC)
+
+
+LECTURER_IMPORT_CANCELLED_ACTION = "LECTURER_DATASET_IMPORT_CANCELLED"
+
+
+def find_duplicate_lecturer_import(db: Session, digest: str) -> AuditEvent | None:
+    """Latest still-applied lecturer import whose file had the same SHA-256.
+
+    Rolled-back or history-deleted imports no longer count, mirroring how a
+    cancelled Scopus import is not treated as a duplicate. Imports made before
+    the hash was recorded cannot be matched.
+    """
+    audits = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.entity_type == "lecturer_dataset",
+            AuditEvent.action == "LECTURER_DATASET_IMPORTED",
+        )
+        .order_by(AuditEvent.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    matching = [a for a in audits if _safe_dict(a.event_metadata).get("file_sha256") == digest]
+    if not matching:
+        return None
+    markers = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.entity_type == "lecturer_dataset",
+            AuditEvent.action.in_(
+                ["LECTURER_DATASET_ROLLED_BACK", "LECTURER_DATASET_HISTORY_DELETED"]
+            ),
+        )
+        .all()
+    )
+    ended: set[uuid.UUID] = set()
+    for marker in markers:
+        if marker.entity_id is not None:
+            ended.add(marker.entity_id)
+        ended.add(marker.id)
+        raw_id = _safe_dict(marker.event_metadata).get("import_id")
+        if raw_id:
+            try:
+                ended.add(uuid.UUID(str(raw_id)))
+            except (ValueError, TypeError):
+                pass
+    for audit in matching:
+        if audit.id in ended or audit.entity_id in ended:
+            continue
+        return audit
+    return None
+
+
+def record_cancelled_lecturer_import(
+    db: Session,
+    *,
+    filename: str,
+    summary: dict[str, int],
+    dataset_name: str | None,
+    actor: User,
+) -> uuid.UUID:
+    """Keep a history entry for a lecturer dataset the admin cancelled before importing.
+
+    Nothing is written to lecturer master data; only an append-only audit event.
+    """
+    audit = AuditEvent(
+        entity_type="lecturer_dataset",
+        entity_id=uuid.uuid4(),
+        action=LECTURER_IMPORT_CANCELLED_ACTION,
+        actor_type="USER",
+        actor_user_id=actor.id,
+        before_state=None,
+        after_state={"status": "CANCELLED", "record_count": summary["total"]},
+        event_metadata={
+            "filename": filename,
+            "dataset_name": dataset_name,
+            "total": summary["total"],
+            "created": 0,
+            "updated": 0,
+            "unchanged": 0,
+            "conflicts": summary["conflicts"],
+            "warnings": summary["conflicts"],
+            "cancelled_by": actor.display_name,
+        },
+    )
+    db.add(audit)
+    db.commit()
+    return audit.id
+
+
+def _cancelled_lecturer_response(
+    audit: AuditEvent, actor_name: str | None
+) -> ScopusImportResponse:
+    meta = _safe_dict(audit.event_metadata)
+    total = int(meta.get("total") or 0)
+    warnings = int(meta.get("warnings") or meta.get("conflicts") or 0)
+    dt = _ensure_dt(audit.created_at)
+    return ScopusImportResponse(
+        id=audit.id,
+        type="LECTURERS",
+        file_name=meta.get("filename", "ictu_lecturers.json"),
+        status="CANCELLED",
+        total_records=total,
+        imported_records=0,
+        failed_records=0,
+        processed_records=0,
+        progress_percent=100,
+        duplicate_candidates=warnings,
+        row_errors=[],
+        error_summary=None,
+        version=1,
+        created_at=dt,
+        updated_at=dt,
+        started_at=dt,
+        finished_at=dt,
+        duration_seconds=0.0,
+        is_terminal=True,
+        performed_by=actor_name or "Không xác định",
+        can_delete=True,
+        lecturer_summary={
+            "created": 0,
+            "updated": 0,
+            "unchanged": 0,
+            "conflicts": warnings,
+            "warnings": warnings,
+            "dataset_name": meta.get("dataset_name"),
+            "cancelled_before_import": True,
+        },
+    )
 
 
 def list_imports(
@@ -425,6 +555,32 @@ def list_imports(
             )
         )
 
+    cancelled_audits = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.entity_type == "lecturer_dataset",
+            AuditEvent.action == LECTURER_IMPORT_CANCELLED_ACTION,
+        )
+        .order_by(AuditEvent.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    cancelled_actor_ids = {a.actor_user_id for a in cancelled_audits if a.actor_user_id is not None}
+    cancelled_actors: dict[uuid.UUID, str] = {}
+    if cancelled_actor_ids:
+        cancelled_actors = {
+            u.id: u.display_name
+            for u in db.query(User).filter(User.id.in_(cancelled_actor_ids)).all()
+        }
+    for audit in cancelled_audits:
+        if audit.id in hidden_history_ids or audit.entity_id in hidden_history_ids:
+            continue
+        lecturer_responses.append(
+            _cancelled_lecturer_response(
+                audit, cancelled_actors.get(audit.actor_user_id) if audit.actor_user_id else None
+            )
+        )
+
     all_imports = sorted(
         [*scopus_responses, *lecturer_responses],
         key=lambda x: _ensure_dt(x.created_at),
@@ -545,6 +701,34 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
             },
             normalization_summary=None,
         )
+
+    cancelled = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.entity_type == "lecturer_dataset",
+            AuditEvent.action == LECTURER_IMPORT_CANCELLED_ACTION,
+            (AuditEvent.id == import_id) | (AuditEvent.entity_id == import_id),
+        )
+        .first()
+    )
+    if cancelled is not None:
+        hidden = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.entity_type == "lecturer_dataset",
+                AuditEvent.action == "LECTURER_DATASET_HISTORY_DELETED",
+                (AuditEvent.entity_id == cancelled.entity_id)
+                | (AuditEvent.entity_id == cancelled.id),
+            )
+            .first()
+        )
+        if hidden is not None:
+            return None
+        actor_name = None
+        if cancelled.actor_user_id:
+            u = db.query(User).filter(User.id == cancelled.actor_user_id).first()
+            actor_name = u.display_name if u else None
+        return _cancelled_lecturer_response(cancelled, actor_name)
     return None
 
 
@@ -658,8 +842,20 @@ def delete_lecturer_import_history(
         )
         .first()
     )
+    is_cancelled_entry = False
     if import_audit is None:
-        return False
+        import_audit = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.entity_type == "lecturer_dataset",
+                AuditEvent.action == LECTURER_IMPORT_CANCELLED_ACTION,
+                (AuditEvent.id == import_id) | (AuditEvent.entity_id == import_id),
+            )
+            .first()
+        )
+        if import_audit is None:
+            return False
+        is_cancelled_entry = True
 
     history_entity_id = import_audit.entity_id or import_audit.id
     rolled_back = (
@@ -672,7 +868,7 @@ def delete_lecturer_import_history(
         )
         .first()
     )
-    if rolled_back is None:
+    if rolled_back is None and not is_cancelled_entry:
         raise APIError(
             status_code=409,
             detail="Bạn chưa hoàn tác đợt nhập giảng viên này.",
@@ -703,7 +899,7 @@ def delete_lecturer_import_history(
             actor_type="USER",
             actor_user_id=actor.id,
             actor_service=None,
-            before_state={"status": "ROLLED_BACK"},
+            before_state={"status": "CANCELLED" if is_cancelled_entry else "ROLLED_BACK"},
             after_state={"status": "HISTORY_DELETED"},
             event_metadata={
                 "import_id": str(import_audit.id),

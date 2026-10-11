@@ -26,7 +26,7 @@ from app.models.candidate import (
     LecturerScopusCandidateObservation,
     LecturerScopusCandidateReview,
 )
-from app.models.governance import AuditEvent, User
+from app.models.governance import AuditEvent, User, UserNotification
 from app.models.identity import LecturerScopusIdentity
 from app.models.master_lecturer import (
     Lecturer,
@@ -198,20 +198,26 @@ class LecturerRollbackService:
 
         # 5. Enforce Blockers BEFORE Mutating Database
         # Check User account linkage blocker
+        # LECTURER-role accounts are auto-removed with the profile.
+        # Non-LECTURER accounts (ADMIN, etc.) block rollback — they were
+        # granted intentionally and must be handled manually.
+        lecturer_role_users_to_delete: list[User] = []
         if to_delete_lecturer_ids:
             linked_users = (
                 db.query(User)
                 .filter(User.lecturer_id.in_(to_delete_lecturer_ids))
                 .all()
             )
-            if linked_users:
+            non_lecturer_users = [u for u in linked_users if u.role != "LECTURER"]
+            if non_lecturer_users:
                 raise LecturerRollbackError(
                     "LECTURER_IMPORT_IN_USE",
-                    f"Có {len(linked_users)} hồ sơ trong đợt nhập đang được liên kết "
-                    "với tài khoản hệ thống. Vui lòng xử lý các liên kết trước.",
+                    f"Có {len(non_lecturer_users)} hồ sơ trong đợt nhập đang được liên kết "
+                    "với tài khoản hệ thống (không phải LECTURER). Vui lòng xử lý các liên kết trước.",
                     status_code=409,
-                    data={"linked_accounts": len(linked_users)},
+                    data={"linked_accounts": len(non_lecturer_users)},
                 )
+            lecturer_role_users_to_delete = [u for u in linked_users if u.role == "LECTURER"]
 
             # Check downstream Scopus identities blocker
             linked_identities = (
@@ -268,6 +274,16 @@ class LecturerRollbackService:
             #   lecturer_source_snapshots, lecturer_scopus_candidates (+ their
             #   observations/evidence/reviews).
             if to_delete_lecturer_ids:
+                # D0. Auto-remove LECTURER-role user accounts linked to deleted profiles.
+                if lecturer_role_users_to_delete:
+                    user_ids = [u.id for u in lecturer_role_users_to_delete]
+                    db.query(UserNotification).filter(
+                        UserNotification.user_id.in_(user_ids)
+                    ).delete(synchronize_session=False)
+                    for user in lecturer_role_users_to_delete:
+                        db.delete(user)
+                    db.flush()
+
                 # D1. Extra snapshots outside this batch (same FK guard as B/C).
                 extra_snaps = (
                     db.query(LecturerSourceSnapshot)

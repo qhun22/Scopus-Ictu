@@ -153,3 +153,73 @@ def test_two_identical_records_yield_same_canonical_payload() -> None:
     assert a["lecturers"][0]["full_name"] == b["lecturers"][0]["full_name"]
     assert a["lecturers"][0]["staff_code"] == b["lecturers"][0]["staff_code"]
     assert a["lecturers"][0]["institutional_email"] == b["lecturers"][0]["institutional_email"]
+
+
+# ---------------------------------------------------------------------------
+# Optional per-record login account (schema 1.1)
+# ---------------------------------------------------------------------------
+
+_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$aGFzaGhhc2hoYXNoaGFzaA"
+
+
+def _with_account(**overrides: Any) -> bytes:
+    payload = _fixture_envelope()
+    payload["lecturers"][0]["account"] = {
+        "email": "Tai.Khoan@ICTU.edu.vn", "role": "reviewer", "password_hash": _HASH,
+        "display_name": "  Tài   khoản  ", "is_active": False, **overrides,
+    }
+    return json.dumps(payload).encode("utf-8")
+
+
+def test_old_files_without_account_still_parse() -> None:
+    envelope = parse_and_validate(_load_fixture_bytes())
+    assert all(record["account"] is None for record in envelope["lecturers"])
+
+
+def test_account_block_is_normalised() -> None:
+    record = parse_and_validate(_with_account())["lecturers"][0]
+    assert record["account"] == {
+        "email": "tai.khoan@ictu.edu.vn", "role": "REVIEWER", "password_hash": _HASH,
+        "display_name": "Tài khoản", "is_active": False,
+    }
+
+
+@pytest.mark.parametrize("role", ["LECTURER", "REVIEWER", "ADMIN"])
+def test_all_three_roles_are_accepted(role: str) -> None:
+    assert parse_and_validate(_with_account(role=role))["lecturers"][0]["account"]["role"] == role
+
+
+@pytest.mark.parametrize("overrides", [
+    {"role": "SUPERUSER"},
+    {"role": ""},
+    {"email": "không-phải-email"},
+    {"email": ""},
+    {"password_hash": "MatKhauChuThuong1"},
+    {"password_hash": "$2b$12$bcrypthashnotargon2"},
+    {"password_hash": None},
+])
+def test_invalid_account_is_rejected_without_echoing_the_hash(overrides: dict) -> None:
+    with pytest.raises(DatasetValidationError) as exc_info:
+        parse_and_validate(_with_account(**overrides))
+    assert exc_info.value.code == "INVALID_LECTURER_DATASET"
+    assert "account" in exc_info.value.location
+    for secret in (_HASH, "MatKhauChuThuong1"):
+        assert secret not in exc_info.value.message
+
+
+def test_account_must_be_an_object() -> None:
+    payload = _fixture_envelope()
+    payload["lecturers"][0]["account"] = "admin:123456"
+    with pytest.raises(DatasetValidationError) as exc_info:
+        parse_and_validate(json.dumps(payload).encode("utf-8"))
+    assert exc_info.value.code == "INVALID_LECTURER_DATASET"
+    assert "admin:123456" not in exc_info.value.message
+
+
+def test_duplicate_account_email_between_records_is_rejected() -> None:
+    payload = _fixture_envelope()
+    for record in payload["lecturers"][:2]:
+        record["account"] = {"email": "same@ictu.edu.vn", "role": "LECTURER", "password_hash": _HASH}
+    with pytest.raises(DatasetValidationError) as exc_info:
+        parse_and_validate(json.dumps(payload).encode("utf-8"))
+    assert exc_info.value.code == "DUPLICATE_LECTURER_IDENTITY"
