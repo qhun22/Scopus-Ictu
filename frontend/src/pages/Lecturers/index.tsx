@@ -20,6 +20,7 @@ import {
 } from "../../api/users";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import ModalPortal from "../../components/common/ModalPortal";
+import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
@@ -46,7 +47,7 @@ export default function LecturersPage() {
   const [pageInputValue, setPageInputValue] = useState<string>("1");
   const [pageSize, setPageSize] = useState<number>(10);
   const [isExporting, setIsExporting] = useState<boolean>(false);
-  const [activeFilter, setActiveFilter] = useState<"all" | "linked" | "not_linked" | "locked" | "warning" | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"all" | "linked" | "not_linked" | "locked" | "warning" | null>("all");
 
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
   const hasUnappliedSearch = search !== appliedSearch;
@@ -559,7 +560,7 @@ export default function LecturersPage() {
   };
 
   const handleFilterCard = (filter: typeof activeFilter) => {
-    setActiveFilter((prev) => (prev === filter ? null : filter));
+    setActiveFilter((prev) => (prev === filter && filter !== "all" ? "all" : filter));
     setPage(1);
   };
 
@@ -605,8 +606,8 @@ export default function LecturersPage() {
       toast.success(
         locale === "vi" ? "Xuất dữ liệu thành công" : "Export successful",
         locale === "vi"
-          ? `Đã xuất ${recordCount} hồ sơ giảng viên.`
-          : `Exported ${recordCount} lecturer records.`,
+          ? `Đã xuất ${recordCount} hồ sơ giảng viên, kèm tài khoản đăng nhập (nếu có). Tệp chứa chuỗi băm mật khẩu, hãy bảo quản cẩn thận.`
+          : `Exported ${recordCount} lecturer records, with their login accounts (if any). The file contains password hashes; keep it safe.`,
       );
     } catch (err: any) {
       toast.error(
@@ -668,10 +669,10 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("all")}
-          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "all"
-              ? "border-[#3A5FC3] bg-[#3A5FC3]/5 ring-2 ring-[#3A5FC3]/30"
-              : "border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm"
+              ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300"
+              : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"
           }`}
         >
           <span className="text-xs font-medium text-slate-500">
@@ -685,7 +686,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("linked")}
-          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "linked"
               ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300/50"
               : "border-slate-200/80 bg-white hover:border-emerald-200 hover:shadow-sm"
@@ -702,10 +703,10 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("not_linked")}
-          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "not_linked"
               ? "border-slate-400 bg-slate-50 ring-2 ring-slate-300/50"
-              : "border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm"
+              : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"
           }`}
         >
           <span className="text-xs font-medium text-slate-500">
@@ -719,7 +720,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("locked")}
-          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer ${
+          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "locked"
               ? "border-rose-500 bg-rose-50 ring-2 ring-rose-300/50"
               : "border-slate-200/80 bg-white hover:border-rose-200 hover:shadow-sm"
@@ -736,7 +737,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("warning")}
-          className={`rounded-xl border p-4 shadow-xs text-left transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+          className={`rounded-lg border p-4 shadow-xs text-left transition-all cursor-pointer col-span-2 sm:col-span-1 ${
             activeFilter === "warning"
               ? "border-amber-500 bg-amber-50 ring-2 ring-amber-300/50"
               : "border-slate-200/80 bg-white hover:border-amber-200 hover:shadow-sm"
@@ -752,7 +753,7 @@ export default function LecturersPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -825,7 +826,7 @@ export default function LecturersPage() {
       </div>
 
       {/* Lecturers Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+      <div className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
           <table aria-busy={isTableLoading} className="w-full text-left text-xs">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
@@ -866,7 +867,7 @@ export default function LecturersPage() {
               ) : (
                 filteredLecturers.map((lec) => {
                   const degreeRank = [lec.academic_rank, lec.academic_degree].filter(Boolean).join(" / ") || "—";
-                  const facultyDept = [lec.faculty, lec.department].filter(Boolean).join(" / ") || "—";
+                  const facultyDept = [lec.faculty, lec.department].filter(Boolean).join(" / ") || lec.specialization || "—";
                   return (
                     <tr key={lec.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-3">
@@ -936,14 +937,14 @@ export default function LecturersPage() {
                       </td>
 
                       {/* Actions Column: [Chi tiết] [Xóa] */}
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                        <div className="mx-auto grid w-52 grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleOpenDetailModal(lec)}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                           >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                             </svg>
                             <span>{locale === "vi" ? "Chi tiết" : "Detail"}</span>
@@ -951,9 +952,9 @@ export default function LecturersPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenDeleteModal(lec)}
-                            className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50/50 px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-100/70 transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap"
                           >
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
                             <span>{locale === "vi" ? "Xóa" : "Delete"}</span>
@@ -1298,7 +1299,7 @@ export default function LecturersPage() {
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-6">
                   {/* Warning Notice Banner */}
                   {selectedLecturer.has_warning && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
                       <svg className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
@@ -1537,26 +1538,24 @@ export default function LecturersPage() {
                               onChange={(event) => setGrantRole(event.target.value)}
                               className="mt-1 h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:cursor-not-allowed disabled:bg-slate-100"
                             >
-                              <option value="LECTURER">{locale === "vi" ? "Giảng viên (LECTURER)" : "Lecturer (LECTURER)"}</option>
-                              <option value="ADMIN">{locale === "vi" ? "Quản trị viên (ADMIN)" : "Administrator (ADMIN)"}</option>
-                              <option value="REVIEWER">{locale === "vi" ? "Phê duyệt viên (REVIEWER)" : "Reviewer (REVIEWER)"}</option>
+                              <option value="LECTURER">{locale === "vi" ? "Giảng viên" : "Lecturer"}</option>
+                              <option value="ADMIN">{locale === "vi" ? "Quản trị viên" : "Administrator"}</option>
+                              <option value="REVIEWER">{locale === "vi" ? "Phê duyệt viên" : "Reviewer"}</option>
                             </select>
                           </div>
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2.5">
                           <span className="font-semibold text-slate-600">Trạng thái tài khoản</span>
+                          {/* Same status label as the "Trạng thái" column of the list. */}
                           <span
-                            className={`inline-flex items-center gap-1.5 font-bold ${
-                              selectedLecturer.account.is_active ? "text-emerald-700" : "text-rose-700"
+                            className={`inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-bold ${
+                              selectedLecturer.account.is_active
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-rose-200 bg-rose-50 text-rose-700"
                             }`}
                           >
-                            <span
-                              className={`h-2 w-2 rounded-full ${
-                                selectedLecturer.account.is_active ? "bg-emerald-500" : "bg-rose-500"
-                              }`}
-                            />
-                            {selectedLecturer.account.is_active ? "Đang hoạt động" : "Đã khóa"}
+                            {selectedLecturer.account.is_active ? "Hoạt động" : "Đã khóa"}
                           </span>
                         </div>
 
@@ -1618,7 +1617,7 @@ export default function LecturersPage() {
                             type="button"
                             disabled={isDetailBusy || isCurrentAccount}
                             onClick={requestPasswordReset}
-                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[#3A5FC3]/30 bg-blue-50 px-3 py-2 font-bold text-[#3A5FC3] hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                            className={BUTTON_SECONDARY}
                           >
                             Đặt lại mật khẩu
                           </button>
@@ -1628,11 +1627,7 @@ export default function LecturersPage() {
                             onClick={() =>
                               setConfirmAction(selectedLecturer.account?.is_active ? "lock" : "unlock")
                             }
-                            className={`inline-flex min-h-9 items-center justify-center rounded-lg border px-3 py-2 font-bold disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer ${
-                              selectedLecturer.account.is_active
-                                ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                                : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                            }`}
+                            className={selectedLecturer.account.is_active ? BUTTON_DANGER : BUTTON_PRIMARY}
                           >
                             {selectedLecturer.account.is_active ? "Khóa tài khoản" : "Mở khóa tài khoản"}
                           </button>
@@ -1640,7 +1635,7 @@ export default function LecturersPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="rounded-xl border border-violet-200/80 bg-violet-50/40 p-4">
+                        <div className="rounded-lg border border-violet-200/80 bg-violet-50/40 p-4">
                           <label className="flex items-center gap-2 cursor-pointer font-bold text-violet-900">
                             <input
                               type="checkbox"
@@ -1691,9 +1686,9 @@ export default function LecturersPage() {
                                   onChange={(e) => setGrantRole(e.target.value)}
                                   className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
                                 >
-                                  <option value="LECTURER">Giảng viên (LECTURER)</option>
-                                  <option value="ADMIN">Quản trị viên (ADMIN)</option>
-                                  <option value="REVIEWER">Phê duyệt viên (REVIEWER)</option>
+                                  <option value="LECTURER">Giảng viên</option>
+                                  <option value="ADMIN">Quản trị viên</option>
+                                  <option value="REVIEWER">Phê duyệt viên</option>
                                 </select>
                               </div>
                             </div>

@@ -30,6 +30,7 @@ export interface LecturerImportSummaryData {
   warnings?: number;
   dataset_name?: string;
   schema_version?: string;
+  cancelled_before_import?: boolean;
 }
 
 export interface AuthorNormalizationSummary {

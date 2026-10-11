@@ -73,9 +73,11 @@ async function postForm<T>(
 
 export function previewLecturerDataset(
   file: File,
+  allowDuplicate = false,
 ): Promise<LecturerPreviewResponse> {
+  const suffix = allowDuplicate ? "?allow_duplicate=true" : "";
   return postForm<LecturerPreviewResponse>(
-    "/api/v1/lecturers/import/preview",
+    `/api/v1/lecturers/import/preview${suffix}`,
     file,
   );
 }
@@ -85,6 +87,15 @@ export function importLecturerDataset(
 ): Promise<LecturerImportResponse> {
   return postForm<LecturerImportResponse>(
     "/api/v1/lecturers/import",
+    file,
+  );
+}
+
+export function cancelLecturerDatasetImport(
+  file: File,
+): Promise<{ id: string; status: "CANCELLED" }> {
+  return postForm<{ id: string; status: "CANCELLED" }>(
+    "/api/v1/lecturers/import/cancel",
     file,
   );
 }

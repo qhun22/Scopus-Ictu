@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
+import DuplicateImportDialog from "../common/DuplicateImportDialog";
 import { previewLecturerDataset } from "../../api/lecturerImport";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
@@ -56,14 +57,36 @@ export interface LecturerDatasetImportCardProps {
   onPreviewGenerated?: (preview: PreviewResponse, file: File) => void;
   onFileCleared?: () => void;
   onFileSelected?: (file: File) => void;
+  onViewPrevious?: (importId: string) => void;
+  /** Hide the duplicate dialog while another modal (import detail) is on top. */
+  dialogSuspended?: boolean;
   isImporting?: boolean;
+}
+
+interface DuplicateWarning {
+  importId: string;
+  filename: string;
+  importedAt: string;
+}
+
+function errorField(error: ApiError, field: string): string | undefined {
+  if (typeof error.body !== "object" || error.body === null) return undefined;
+  const value = (error.body as Record<string, unknown>)[field];
+  return typeof value === "string" ? value : undefined;
 }
 
 const LecturerDatasetImportCard = forwardRef<
   LecturerDatasetImportCardHandle,
   LecturerDatasetImportCardProps
 >(function LecturerDatasetImportCard(
-  { onPreviewGenerated, onFileCleared, onFileSelected, isImporting = false },
+  {
+    onPreviewGenerated,
+    onFileCleared,
+    onFileSelected,
+    onViewPrevious,
+    dialogSuspended = false,
+    isImporting = false,
+  },
   ref,
 ) {
   const { t, locale } = useI18n();
@@ -74,18 +97,21 @@ const LecturerDatasetImportCard = forwardRef<
   const [selectionError, setSelectionError] = useState("");
   const [dragging, setDragging] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-
-  // JSON File Picking Loader
-  const [jsonFileLoading, setJsonFileLoading] = useState(false);
-  const [jsonLoadingFileName, setJsonLoadingFileName] = useState("");
-  const [jsonLoadingProgress, setJsonLoadingProgress] = useState(0);
+  const [isFileExiting, setIsFileExiting] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
 
   const clearFile = () => {
     setSelectedFile(null);
-    setJsonFileLoading(false);
+    setDuplicateWarning(null);
     setSelectionError("");
+    setIsFileExiting(false);
     if (inputRef.current) inputRef.current.value = "";
     onFileCleared?.();
+  };
+
+  const exitFile = () => {
+    setIsFileExiting(true);
+    setTimeout(clearFile, 180);
   };
 
   useImperativeHandle(ref, () => ({
@@ -98,7 +124,7 @@ const LecturerDatasetImportCard = forwardRef<
   }));
 
   const selectFile = (file: File | undefined) => {
-    if (!file || isImporting || previewing || jsonFileLoading) return;
+    if (!file || isImporting || previewing) return;
     const lowerName = file.name.toLowerCase();
     if (!lowerName.endsWith(".json")) {
       setSelectedFile(null);
@@ -120,31 +146,20 @@ const LecturerDatasetImportCard = forwardRef<
     }
 
     setSelectionError("");
-    setJsonLoadingFileName(file.name);
-    setJsonFileLoading(true);
-    setJsonLoadingProgress(15);
-
-    setTimeout(() => setJsonLoadingProgress(45), 700);
-    setTimeout(() => setJsonLoadingProgress(85), 1800);
-    setTimeout(() => {
-      setJsonLoadingProgress(100);
-      setTimeout(() => {
-        setSelectedFile(file);
-        setJsonFileLoading(false);
-        setJsonLoadingProgress(0);
-        onFileSelected?.(file);
-      }, 350);
-    }, 2600);
+    setDuplicateWarning(null);
+    setSelectedFile(file);
+    onFileSelected?.(file);
   };
 
-  const handlePreview = async () => {
+  const handlePreview = async (allowDuplicate = false) => {
     if (!selectedFile || previewing || isImporting) return;
     setPreviewing(true);
     try {
       const [response] = await Promise.all([
-        previewLecturerDataset(selectedFile),
+        previewLecturerDataset(selectedFile, allowDuplicate),
         new Promise((resolve) => setTimeout(resolve, 350)),
       ]);
+      setDuplicateWarning(null);
       if (response.conflicts && response.conflicts.length > 0) {
         toast.warning(
           locale === "vi" ? "Cảnh báo trùng tên" : "Duplicate Name Warnings",
@@ -154,7 +169,18 @@ const LecturerDatasetImportCard = forwardRef<
         );
       }
       onPreviewGenerated?.(response, selectedFile);
+      setSelectedFile(null);
+      if (inputRef.current) inputRef.current.value = "";
     } catch (error) {
+      if (error instanceof ApiError && error.code === "DUPLICATE_IMPORT_CONFIRMATION_REQUIRED") {
+        const importId = errorField(error, "duplicate_of_import_id");
+        const importedAt = errorField(error, "duplicate_imported_at");
+        const filename = errorField(error, "duplicate_filename");
+        if (importId && importedAt && filename) {
+          setDuplicateWarning({ importId, importedAt, filename });
+          return;
+        }
+      }
       const code = error instanceof ApiError ? error.code : "PREVIEW_FAILED";
       const detail =
         error instanceof ApiError
@@ -200,28 +226,7 @@ const LecturerDatasetImportCard = forwardRef<
         onChange={(event) => selectFile(event.target.files?.[0])}
       />
 
-      {jsonFileLoading ? (
-        <div className="mt-4 flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border border-blue-200/80 bg-blue-50/40 p-5 text-center animate-in fade-in duration-200">
-          <div className="relative mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-[#3A5FC3] shadow-xs">
-            <div className="absolute inset-0 rounded-2xl border-2 border-[#3A5FC3]/30 border-t-[#3A5FC3] animate-spin" />
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <p className="text-sm font-bold text-slate-800 truncate max-w-xs" title={jsonLoadingFileName}>
-            {jsonLoadingFileName}
-          </p>
-          <p className="mt-1 text-xs font-medium text-[#3A5FC3]">
-            {locale === "vi" ? "Đang đọc và kiểm tra cấu trúc tệp JSON..." : "Reading and validating JSON file structure..."}
-          </p>
-          <div className="mt-3 w-52 max-w-full h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-            <div
-              className="h-full bg-[#3A5FC3] transition-all duration-300 ease-out"
-              style={{ width: `${jsonLoadingProgress}%` }}
-            />
-          </div>
-        </div>
-      ) : !selectedFile ? (
+      {!selectedFile ? (
         <div
           onClick={() => !isImporting && !previewing && inputRef.current?.click()}
           onDragEnter={(event) => {
@@ -266,7 +271,7 @@ const LecturerDatasetImportCard = forwardRef<
           </p>
         </div>
       ) : (
-        <div className="mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5">
+        <div className={`mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all duration-300 ease-out ${isFileExiting ? "opacity-0 scale-[0.97] -translate-y-1" : "opacity-100 scale-100 translate-y-0 animate-in fade-in slide-in-from-top-2 duration-300"}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3.5 min-w-0">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
@@ -300,7 +305,7 @@ const LecturerDatasetImportCard = forwardRef<
               <button
                 type="button"
                 disabled={previewing || isImporting}
-                onClick={clearFile}
+                onClick={exitFile}
                 className="h-9 sm:h-10 rounded-lg border border-slate-200 bg-white px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs"
               >
                 {t.imports.cancelFile}
@@ -334,6 +339,19 @@ const LecturerDatasetImportCard = forwardRef<
           </div>
         </div>
       )}
+
+      <DuplicateImportDialog
+        open={Boolean(duplicateWarning && selectedFile) && !dialogSuspended}
+        fileName={selectedFile?.name ?? ""}
+        previousFileName={duplicateWarning?.filename}
+        previousImportedAt={duplicateWarning?.importedAt}
+        loading={previewing}
+        onCancel={() => setDuplicateWarning(null)}
+        onViewPrevious={() => {
+          if (duplicateWarning) onViewPrevious?.(duplicateWarning.importId);
+        }}
+        onConfirm={() => handlePreview(true)}
+      />
 
       {selectionError && (
         <div

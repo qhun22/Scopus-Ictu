@@ -236,6 +236,11 @@ export interface TranslationSchema {
     duplicateMessage: string;
     viewPrevious: string;
     importAnyway: string;
+    duplicateDialogTitle: string;
+    duplicateDialogDescription: string;
+    duplicateDialogFileLabel: string;
+    duplicateDialogPreviousLabel: string;
+    duplicateDialogQuestion: string;
     duplicateRows: string;
     rowErrors: string;
     errorDetail: string;
@@ -537,5 +542,7 @@ export interface TranslationSchema {
     systemFallback: string;
     userFallback: string;
     loadError: string;
+    entityLabels: Record<string, string>;
+    actionLabels: Record<string, string>;
   };
 }
