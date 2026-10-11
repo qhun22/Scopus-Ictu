@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { getDashboardSummary } from "../../api/dashboard";
 import { getApiErrorMessage } from "../../api/errors";
+import { resetSystem } from "../../api/system";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
+import TextConfirmModal from "../../components/common/TextConfirmModal";
 import { useI18n } from "../../i18n";
 import {
   DashboardIdentityStatus,
@@ -52,11 +56,31 @@ const IDENTITY_LABEL_KEYS: Record<DashboardIdentityStatus, "identityCandidate" |
 export default function DashboardPage() {
   const { t } = useI18n();
   const copy = t.dashboard;
+  const toast = useToast();
+  const { user: currentUser } = useAuth();
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+
+  // Reset modal state
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleReset = async () => {
+    setIsResetting(true);
+    try {
+      await resetSystem("ICTU");
+      toast.success("Đã reset hệ thống", "Toàn bộ dữ liệu đã được xóa. Chỉ giữ lại tài khoản ADMIN.");
+      setShowResetModal(false);
+      fetchSummary();
+    } catch (err) {
+      toast.error("Reset thất bại", getApiErrorMessage(err, "Không thể reset hệ thống."));
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const fetchSummary = useCallback(() => {
     if (controllerRef.current) {
@@ -89,22 +113,55 @@ export default function DashboardPage() {
 
   return (
     <div className="app-page-container space-y-6">
+      {/* Reset Confirmation Modal */}
+      <TextConfirmModal
+        open={showResetModal}
+        title="Reset toàn hệ thống"
+        subtitle="Thao tác này không thể hoàn tác"
+        description="Toàn bộ dữ liệu sẽ bị xóa sạch — giảng viên, lịch sử nhập, chuẩn hóa, danh tính Scopus, bài báo, audit logs… Chỉ giữ lại tài khoản ADMIN."
+        confirmWord="ICTU"
+        confirmLabel="Xóa toàn bộ"
+        cancelLabel="Hủy"
+        loading={isResetting}
+        onConfirm={handleReset}
+        onCancel={() => setShowResetModal(false)}
+      />
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">{copy.title}</h1>
           <p className="mt-1 text-sm text-gray-500">{copy.subtitle}</p>
         </div>
-        <button
-          onClick={fetchSummary}
-          disabled={loading}
-          className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-50"
-        >
-          {loading ? (
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-          ) : null}
-          {copy.refresh}
-        </button>
+        <div className="page-action-group">
+          <button
+            onClick={fetchSummary}
+            disabled={loading}
+            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-slate-50 disabled:opacity-50"
+          >
+            {loading ? (
+              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+            ) : (
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            )}
+            <span className="truncate">{copy.refresh}</span>
+          </button>
+          {currentUser?.role === "ADMIN" ? (
+            <button
+              onClick={() => setShowResetModal(true)}
+              className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-red-100"
+            >
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span className="truncate">Reset hệ thống</span>
+            </button>
+          ) : (
+            <div />
+          )}
+        </div>
       </div>
 
       {/* Error state */}
@@ -284,9 +341,11 @@ export default function DashboardPage() {
                         <td className="py-2 pr-4 whitespace-nowrap text-gray-500">
                           {formatTimestamp(item.created_at)}
                         </td>
-                        <td className="py-2 pr-4 text-gray-700">{item.entity_type}</td>
-                        <td className="py-2 pr-4 font-mono text-xs text-gray-700">
-                          {item.action}
+                        <td className="py-2 pr-4 text-gray-700">
+                          {copy.entityLabels[item.entity_type] ?? item.entity_type}
+                        </td>
+                        <td className="py-2 pr-4 text-gray-700">
+                          {copy.actionLabels[item.action] ?? item.action}
                         </td>
                         <td className="py-2 pr-4">
                           <ActorCell
@@ -361,11 +420,22 @@ const IMPORT_STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-gray-100 text-gray-600",
 };
 
+const IMPORT_STATUS_VI: Record<string, string> = {
+  RECEIVED: "Đã tiếp nhận",
+  PARSING: "Đang phân tích",
+  VALIDATED: "Đã kiểm tra",
+  STAGED: "Chờ áp dụng",
+  APPLIED: "Đã áp dụng",
+  FAILED: "Thất bại",
+  CANCELLED: "Đã hủy",
+};
+
 function ImportStatusBadge({ status }: { status: string }) {
   const color = IMPORT_STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600";
+  const label = IMPORT_STATUS_VI[status] ?? status;
   return (
     <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${color}`}>
-      {status}
+      {label}
     </span>
   );
 }
