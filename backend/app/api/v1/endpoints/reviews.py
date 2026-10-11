@@ -34,6 +34,7 @@ from app.schemas.review_api import (
     ReviewAuthorDetail,
     ReviewAuthorSummary,
     ReviewCandidateDetailResponse,
+    ReviewContextResponse,
     ReviewDecisionRequest,
     ReviewDecisionResponse,
     ReviewLecturerDetail,
@@ -243,6 +244,60 @@ def _source_ref_ids(source_refs: list[Any]) -> dict[str, uuid.UUID]:
         if ref_id is not None and isinstance(kind, str):
             result.setdefault(kind, ref_id)
     return result
+
+
+@router.get(
+    "/context",
+    response_model=ReviewContextResponse,
+    summary="Explain which precondition of the review queue is missing",
+)
+def review_context(_reviewer: ReviewerUser, db: DatabaseSession) -> ReviewContextResponse:
+    """Counters that let the UI tell apart the four reasons the queue can be empty."""
+
+    try:
+        lecturers = int(db.scalar(select(func.count()).select_from(Lecturer)) or 0)
+        publications = int(db.scalar(select(func.count()).select_from(Publication)) or 0)
+        authors = int(db.scalar(select(func.count()).select_from(ScopusAuthor)) or 0)
+        runs = int(
+            db.scalar(
+                select(func.count())
+                .select_from(CandidateGenerationRun)
+                .where(CandidateGenerationRun.status == "COMPLETED")
+            )
+            or 0
+        )
+        by_status = {
+            status_name: int(count)
+            for status_name, count in db.execute(
+                select(LecturerScopusCandidate.status, func.count()).group_by(
+                    LecturerScopusCandidate.status
+                )
+            ).all()
+        }
+    except SQLAlchemyError as exc:
+        raise APIError(
+            status_code=503,
+            detail="Không thể truy vấn ngữ cảnh hàng đợi duyệt.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
+    for key in ("PENDING", "ACCEPTED", "REJECTED", "SUPERSEDED"):
+        by_status.setdefault(key, 0)
+    if lecturers == 0:
+        state = "NO_LECTURERS"
+    elif runs == 0:
+        state = "NO_CANDIDATE_RUN"
+    elif sum(by_status.values()) == 0:
+        state = "RUN_WITHOUT_CANDIDATES"
+    else:
+        state = "HAS_CANDIDATES"
+    return ReviewContextResponse(
+        state=state,
+        lecturers_total=lecturers,
+        publications_total=publications,
+        scopus_authors_total=authors,
+        completed_generation_runs=runs,
+        candidates_by_status=by_status,
+    )
 
 
 @router.get(

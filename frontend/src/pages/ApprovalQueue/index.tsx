@@ -18,12 +18,14 @@ import {
   decideReviewCandidate,
   getReviewCandidate,
   getReviewCandidates,
+  getReviewContext,
 } from "../../api/reviews";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { useToast } from "../../contexts/ToastContext";
 import type {
   AmbiguityFilter,
+  ReviewContext,
   CandidateStatus,
   EvidenceCategory,
   ReviewAction,
@@ -147,6 +149,50 @@ function NameEvidenceCard({ evidence }: { evidence: ReviewNameEvidence }) {
   );
 }
 
+function emptyQueueCopy(context: ReviewContext | null): { title: string; text: string } {
+  if (!context) {
+    return { title: "Hàng đợi đang trống", text: "Chưa xác định được nguyên nhân. Thử tải lại trang." };
+  }
+  const n = (v: number) => v.toLocaleString("vi-VN");
+  const purpose =
+    "Màn hình này duyệt việc đối sánh giảng viên ICTU với tác giả Scopus; đây không phải màn hình phê duyệt chuẩn hóa công bố. ";
+  switch (context.state) {
+    case "NO_LECTURERS":
+      return {
+        title: "Chưa có dữ liệu giảng viên ICTU để đối sánh",
+        text:
+          purpose +
+          `Hệ thống đang có ${n(context.publications_total)} công bố và ${n(context.scopus_authors_total)} tác giả Scopus nhưng 0 giảng viên, nên chưa có gì để đối sánh. ` +
+          "Công bố và tác giả vẫn tra cứu bình thường ở mục Công bố. Khi đã nhập danh sách giảng viên (JSON) ở trang Nhập dữ liệu, quản trị viên chạy bước sinh ứng viên (hiện là công cụ dòng lệnh) để hàng đợi này có dữ liệu.",
+      };
+    case "NO_CANDIDATE_RUN":
+      return {
+        title: "Đã có giảng viên nhưng chưa sinh ứng viên đối sánh",
+        text:
+          purpose +
+          `Hệ thống có ${n(context.lecturers_total)} giảng viên và ${n(context.scopus_authors_total)} tác giả Scopus, nhưng chưa có lượt sinh ứng viên nào hoàn tất. Quản trị viên cần chạy bước sinh ứng viên (công cụ dòng lệnh); giao diện chưa có nút chạy.`,
+      };
+    case "RUN_WITHOUT_CANDIDATES":
+      return {
+        title: "Đã sinh ứng viên nhưng không tìm thấy cặp phù hợp",
+        text:
+          purpose +
+          `Đã có ${n(context.completed_generation_runs)} lượt sinh ứng viên hoàn tất nhưng không có cặp giảng viên – tác giả nào đủ bằng chứng tên hoặc công bố.`,
+      };
+    default: {
+      const by = context.candidates_by_status;
+      const others = Object.entries(by)
+        .filter(([, count]) => count > 0)
+        .map(([name, count]) => `${name}: ${n(count)}`)
+        .join(" · ");
+      return {
+        title: "Bộ lọc hiện tại không có kết quả",
+        text: `Hệ thống có ứng viên ở các trạng thái khác (${others}). Hãy đổi trạng thái hoặc đặt lại bộ lọc.`,
+      };
+    }
+  }
+}
+
 export default function ApprovalQueuePage() {
   const toast = useToast();
   const [status, setStatus] = useState<CandidateStatus>("PENDING");
@@ -158,6 +204,7 @@ export default function ApprovalQueuePage() {
   const [total, setTotal] = useState(0);
   const [queueLoading, setQueueLoading] = useState(true);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [context, setContext] = useState<ReviewContext | null>(null);
 
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ReviewCandidateDetail | null>(null);
@@ -209,6 +256,21 @@ export default function ApprovalQueuePage() {
   useEffect(() => {
     void loadQueue();
   }, [loadQueue]);
+
+  // Which precondition of the queue is missing (decides the empty-state text).
+  useEffect(() => {
+    let cancelled = false;
+    getReviewContext()
+      .then((value) => {
+        if (!cancelled) setContext(value);
+      })
+      .catch(() => {
+        if (!cancelled) setContext(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [items.length, total]);
 
   useEffect(() => {
     if (!selectedCandidateId) return;
@@ -432,8 +494,10 @@ export default function ApprovalQueuePage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                         </div>
-                        <span className="text-sm font-bold text-slate-700">Không có ứng viên phù hợp</span>
-                        <span className="text-xs text-slate-400">Thay đổi bộ lọc để xem thêm kết quả.</span>
+                        <span className="text-sm font-bold text-slate-700">{emptyQueueCopy(context).title}</span>
+                        <span className="max-w-xl text-xs leading-relaxed text-slate-500" data-testid="review-empty-detail">
+                          {emptyQueueCopy(context).text}
+                        </span>
                       </div>
                     </td>
                   </tr>

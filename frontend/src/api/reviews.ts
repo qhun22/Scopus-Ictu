@@ -5,6 +5,7 @@ import {
   CandidateStatus,
   EvidenceCategory,
   ReviewCandidateDetail,
+  ReviewContext,
   ReviewDecisionRequest,
   ReviewDecisionResponse,
   ReviewHistoryQueryParams,
@@ -66,4 +67,8 @@ export function decideReviewCandidate(
     `/api/v1/reviews/candidates/${encodeURIComponent(candidateId)}/reviews`,
     request,
   );
+}
+
+export function getReviewContext(options: ApiRequestOptions = {}): Promise<ReviewContext> {
+  return apiGet<ReviewContext>("/api/v1/reviews/context", options);
 }

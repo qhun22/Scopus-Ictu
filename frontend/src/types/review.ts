@@ -36,6 +36,22 @@ export interface ReviewQueueItem {
   last_seen_at: string;
 }
 
+export type ReviewQueueState =
+  | "NO_LECTURERS"
+  | "NO_CANDIDATE_RUN"
+  | "RUN_WITHOUT_CANDIDATES"
+  | "HAS_CANDIDATES";
+
+/** Why the queue is (or is not) empty; read-only counters, no candidate data. */
+export interface ReviewContext {
+  state: ReviewQueueState;
+  lecturers_total: number;
+  publications_total: number;
+  scopus_authors_total: number;
+  completed_generation_runs: number;
+  candidates_by_status: Record<string, number>;
+}
+
 export interface ReviewQueueResponse {
   items: ReviewQueueItem[];
   total: number;

@@ -56,6 +56,25 @@ class ReviewQueueItem(BaseModel):
     last_seen_at: datetime
 
 
+ReviewQueueState = Literal[
+    "NO_LECTURERS",
+    "NO_CANDIDATE_RUN",
+    "RUN_WITHOUT_CANDIDATES",
+    "HAS_CANDIDATES",
+]
+
+
+class ReviewContextResponse(BaseModel):
+    """Why the queue is (or is not) empty - read-only, no candidate data."""
+
+    state: ReviewQueueState
+    lecturers_total: int
+    publications_total: int
+    scopus_authors_total: int
+    completed_generation_runs: int
+    candidates_by_status: dict[str, int]
+
+
 class ReviewQueueResponse(BaseModel):
     items: list[ReviewQueueItem]
     total: int
