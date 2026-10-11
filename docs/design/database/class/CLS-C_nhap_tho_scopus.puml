@@ -1,0 +1,70 @@
+@startuml CLS-C_nhap_tho_scopus
+' Nguồn: docs/design/database/source/schema_snapshot.json (sinh bởi tools/gen_database_assets.py) — KHÔNG sửa tay phần sinh tự động.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+  FontSize 12
+  AttributeFontSize 11
+  HeaderBackgroundColor #ECF0F1
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam packageStyle rectangle
+hide circle
+hide empty methods
+title CLS-C — Sơ đồ lớp cụm C: Nhập dữ liệu thô Scopus
+
+class "scopus_imports" as scopus_imports <<Table>> #D5F5E3 {
+  + id : uuid {PK}
+  + file_name : varchar(255)
+  + file_sha256 : varchar(64)
+  + total_records : integer
+  + valid_records : integer
+  + invalid_records : integer
+  + status : varchar(20)
+  + error_summary? : jsonb
+  + version : integer
+  + created_at : timestamptz
+  + updated_at : timestamptz
+  + normalization_summary? : jsonb
+}
+
+class "raw_scopus_records" as raw_scopus_records <<Table>> #D5F5E3 {
+  + id : uuid {PK}
+  + import_id : uuid {FK}
+  + row_number : integer
+  + row_hash : varchar(64)
+  + eid_raw? : text
+  + doi_raw? : text
+  + raw_payload : jsonb
+  + validation_status : varchar(20)
+  + validation_errors? : jsonb
+  + created_at : timestamptz
+}
+
+class "publication_raw_sources" as publication_raw_sources <<Table>> #EEEEEE {
+  + id : uuid {PK}
+}
+
+class "scopus_author_name_variants" as scopus_author_name_variants <<Table>> #EEEEEE {
+  + id : uuid {PK}
+}
+
+raw_scopus_records "1" -- "0..1" publication_raw_sources : raw_record_id
+scopus_imports "1" -- "0..*" raw_scopus_records : import_id
+raw_scopus_records "1" -- "0..*" scopus_author_name_variants : first_seen_raw_record_id
+legend bottom right
+  <b>Chú giải UML</b>
+  Mỗi lớp «Table» = một bảng PostgreSQL; thuộc tính = cột; <i>?</i> = cho phép NULL
+  Kim cương đặc (composition) = khóa ngoại ON DELETE CASCADE; đường thường = ON DELETE RESTRICT
+  Bội số: phía bảng cha suy từ NOT NULL của cột FK; phía bảng con suy từ tính duy nhất của cột FK
+endlegend
+
+@enduml

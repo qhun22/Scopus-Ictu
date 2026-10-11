@@ -1,0 +1,145 @@
+@startuml ERD-0_tong_the
+' Nguồn: docs/design/database/source/schema_snapshot.json (sinh bởi tools/gen_database_assets.py) — KHÔNG sửa tay phần sinh tự động.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+  FontSize 12
+  AttributeFontSize 11
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam packageStyle rectangle
+hide circle
+title ERD-0 — Toàn bộ CSDL Scopus–ICTU (24 bảng, 30 khóa ngoại)
+
+left to right direction
+package "Cụm A – Người dùng và kiểm toán" #E8DAEF {
+  entity "users" as users #E8DAEF {
+    *id : uuid <<PK>>
+  }
+  entity "user_notifications" as user_notifications #E8DAEF {
+    *id : uuid <<PK>>
+  }
+  entity "audit_events" as audit_events #E8DAEF {
+    *id : uuid <<PK>>
+  }
+}
+package "Cụm B – Hồ sơ giảng viên (dữ liệu chủ)" #FCF3CF {
+  entity "lecturers" as lecturers #FCF3CF {
+    *id : uuid <<PK>>
+  }
+  entity "lecturer_source_snapshots" as lecturer_source_snapshots #FCF3CF {
+    *id : uuid <<PK>>
+  }
+  entity "lecturer_known_publications" as lecturer_known_publications #FCF3CF {
+    *id : uuid <<PK>>
+  }
+}
+package "Cụm C – Nhập dữ liệu thô Scopus" #D5F5E3 {
+  entity "scopus_imports" as scopus_imports #D5F5E3 {
+    *id : uuid <<PK>>
+  }
+  entity "raw_scopus_records" as raw_scopus_records #D5F5E3 {
+    *id : uuid <<PK>>
+  }
+}
+package "Cụm D – Công bố và tác giả chuẩn hóa" #D6EAF8 {
+  entity "publications" as publications #D6EAF8 {
+    *id : uuid <<PK>>
+  }
+  entity "publication_raw_sources" as publication_raw_sources #D6EAF8 {
+    *id : uuid <<PK>>
+  }
+  entity "scopus_authors" as scopus_authors #D6EAF8 {
+    *id : uuid <<PK>>
+  }
+  entity "scopus_author_name_variants" as scopus_author_name_variants #D6EAF8 {
+    *id : uuid <<PK>>
+  }
+  entity "publication_authors" as publication_authors #D6EAF8 {
+    *id : uuid <<PK>>
+  }
+}
+package "Cụm E – Đơn vị công tác theo tác giả (affiliation)" #FADBD8 {
+  entity "organizations" as organizations #FADBD8 {
+    *id : uuid <<PK>>
+  }
+  entity "publication_author_affiliation_resolutions" as publication_author_affiliation_resolutions #FADBD8 {
+    *id : uuid <<PK>>
+  }
+  entity "publication_author_affiliations" as publication_author_affiliations #FADBD8 {
+    *id : uuid <<PK>>
+  }
+}
+package "Cụm F – Đối sánh, duyệt và danh tính" #FDEBD0 {
+  entity "candidate_generation_runs" as candidate_generation_runs #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+  entity "lecturer_scopus_candidates" as lecturer_scopus_candidates #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+  entity "lecturer_scopus_candidate_observations" as lecturer_scopus_candidate_observations #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+  entity "lecturer_scopus_candidate_evidence" as lecturer_scopus_candidate_evidence #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+  entity "lecturer_scopus_candidate_reviews" as lecturer_scopus_candidate_reviews #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+  entity "lecturer_scopus_identities" as lecturer_scopus_identities #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+  entity "identity_evidence" as identity_evidence #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+  entity "mapping_reviews" as mapping_reviews #FDEBD0 {
+    *id : uuid <<PK>>
+  }
+}
+users |o--o{ audit_events : actor_user_id
+lecturer_scopus_identities ||--o{ identity_evidence : identity_id
+lecturer_source_snapshots ||--o{ lecturer_known_publications : snapshot_id, lecturer_id
+lecturer_scopus_candidate_observations ||--o{ lecturer_scopus_candidate_evidence : observation_id
+lecturer_scopus_candidates ||--o{ lecturer_scopus_candidate_observations : candidate_id
+candidate_generation_runs ||--o{ lecturer_scopus_candidate_observations : generation_run_id
+lecturer_scopus_candidates ||--o{ lecturer_scopus_candidate_reviews : candidate_id
+lecturer_scopus_candidate_observations ||--o{ lecturer_scopus_candidate_reviews : observation_id
+lecturer_scopus_identities |o--o{ lecturer_scopus_candidate_reviews : resulting_identity_id
+users ||--o{ lecturer_scopus_candidate_reviews : reviewer_user_id
+lecturers ||--o{ lecturer_scopus_candidates : lecturer_id
+scopus_authors ||--o{ lecturer_scopus_candidates : scopus_author_id
+lecturers ||--o{ lecturer_scopus_identities : lecturer_id
+scopus_authors ||--o| lecturer_scopus_identities : scopus_author_id
+lecturers |o--o{ lecturer_source_snapshots : lecturer_id
+mapping_reviews |o--o{ mapping_reviews : compensates_review_id
+lecturer_scopus_identities ||--o{ mapping_reviews : identity_id
+users ||--o{ mapping_reviews : reviewer_user_id
+publication_authors ||--o{ publication_author_affiliation_resolutions : publication_author_id
+organizations |o--o{ publication_author_affiliations : organization_id
+publication_author_affiliation_resolutions ||--o{ publication_author_affiliations : resolution_id, link_status
+publications ||--o{ publication_authors : publication_id
+scopus_authors ||--o{ publication_authors : scopus_author_id
+publications ||--o{ publication_raw_sources : publication_id
+raw_scopus_records ||--o| publication_raw_sources : raw_record_id
+scopus_imports ||--o{ raw_scopus_records : import_id
+raw_scopus_records ||--o{ scopus_author_name_variants : first_seen_raw_record_id
+scopus_authors ||--o{ scopus_author_name_variants : scopus_author_id
+users ||--o{ user_notifications : user_id
+lecturers |o--o| users : lecturer_id
+legend bottom right
+  <b>Chú giải</b>
+  * = NOT NULL · <<PK>> khóa chính · <<FK>> khóa ngoại · <<UQ>> duy nhất
+  Đầu nối (crow's foot): hai gạch = đúng 1 · vòng tròn + gạch = 0..1 · vòng tròn + chân chim = 0..*
+  Nhãn trên đường nối = cột khóa ngoại ở bảng con
+  Nguồn: PostgreSQL thật (alembic a9c2e4f71b30)
+endlegend
+
+@enduml

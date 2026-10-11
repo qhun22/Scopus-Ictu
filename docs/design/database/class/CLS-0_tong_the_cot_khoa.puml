@@ -1,0 +1,203 @@
+@startuml CLS-0_tong_the_cot_khoa
+' Nguồn: docs/design/database/source/schema_snapshot.json (sinh bởi tools/gen_database_assets.py) — KHÔNG sửa tay phần sinh tự động.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+  FontSize 12
+  AttributeFontSize 11
+  HeaderBackgroundColor #ECF0F1
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam packageStyle rectangle
+hide circle
+hide empty methods
+title CLS-0 — Sơ đồ lớp tổng thể (cột khóa) của 24 bảng
+
+left to right direction
+package "Cụm A – Người dùng và kiểm toán" #E8DAEF {
+class "users" as users <<Table>> #E8DAEF {
+  + id : uuid {PK}
+  + lecturer_id? : uuid {FK}
+}
+
+class "user_notifications" as user_notifications <<Table>> #E8DAEF {
+  + id : uuid {PK}
+  + user_id : uuid {FK}
+}
+
+class "audit_events" as audit_events <<Table>> #E8DAEF {
+  + id : uuid {PK}
+  + actor_user_id? : uuid {FK}
+}
+
+}
+package "Cụm B – Hồ sơ giảng viên (dữ liệu chủ)" #FCF3CF {
+class "lecturers" as lecturers <<Table>> #FCF3CF {
+  + id : uuid {PK}
+}
+
+class "lecturer_source_snapshots" as lecturer_source_snapshots <<Table>> #FCF3CF {
+  + id : uuid {PK}
+  + lecturer_id? : uuid {FK}
+}
+
+class "lecturer_known_publications" as lecturer_known_publications <<Table>> #FCF3CF {
+  + id : uuid {PK}
+  + lecturer_id : uuid {FK}
+  + snapshot_id : uuid {FK}
+}
+
+}
+package "Cụm C – Nhập dữ liệu thô Scopus" #D5F5E3 {
+class "scopus_imports" as scopus_imports <<Table>> #D5F5E3 {
+  + id : uuid {PK}
+}
+
+class "raw_scopus_records" as raw_scopus_records <<Table>> #D5F5E3 {
+  + id : uuid {PK}
+  + import_id : uuid {FK}
+}
+
+}
+package "Cụm D – Công bố và tác giả chuẩn hóa" #D6EAF8 {
+class "publications" as publications <<Table>> #D6EAF8 {
+  + id : uuid {PK}
+}
+
+class "publication_raw_sources" as publication_raw_sources <<Table>> #D6EAF8 {
+  + id : uuid {PK}
+  + publication_id : uuid {FK}
+  + raw_record_id : uuid {FK, UQ}
+}
+
+class "scopus_authors" as scopus_authors <<Table>> #D6EAF8 {
+  + id : uuid {PK}
+}
+
+class "scopus_author_name_variants" as scopus_author_name_variants <<Table>> #D6EAF8 {
+  + id : uuid {PK}
+  + scopus_author_id : uuid {FK}
+  + first_seen_raw_record_id : uuid {FK}
+}
+
+class "publication_authors" as publication_authors <<Table>> #D6EAF8 {
+  + id : uuid {PK}
+  + publication_id : uuid {FK}
+  + scopus_author_id : uuid {FK}
+}
+
+}
+package "Cụm E – Đơn vị công tác theo tác giả (affiliation)" #FADBD8 {
+class "organizations" as organizations <<Table>> #FADBD8 {
+  + id : uuid {PK}
+}
+
+class "publication_author_affiliation_resolutions" as publication_author_affiliation_resolutions <<Table>> #FADBD8 {
+  + id : uuid {PK}
+  + publication_author_id : uuid {FK}
+}
+
+class "publication_author_affiliations" as publication_author_affiliations <<Table>> #FADBD8 {
+  + id : uuid {PK}
+  + resolution_id : uuid {FK}
+  + link_status : varchar(20) {FK}
+  + organization_id? : uuid {FK}
+}
+
+}
+package "Cụm F – Đối sánh, duyệt và danh tính" #FDEBD0 {
+class "candidate_generation_runs" as candidate_generation_runs <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+}
+
+class "lecturer_scopus_candidates" as lecturer_scopus_candidates <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+  + lecturer_id : uuid {FK}
+  + scopus_author_id : uuid {FK}
+}
+
+class "lecturer_scopus_candidate_observations" as lecturer_scopus_candidate_observations <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+  + candidate_id : uuid {FK}
+  + generation_run_id : uuid {FK}
+}
+
+class "lecturer_scopus_candidate_evidence" as lecturer_scopus_candidate_evidence <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+  + observation_id : uuid {FK}
+}
+
+class "lecturer_scopus_candidate_reviews" as lecturer_scopus_candidate_reviews <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+  + candidate_id : uuid {FK}
+  + observation_id : uuid {FK}
+  + reviewer_user_id : uuid {FK}
+  + resulting_identity_id? : uuid {FK}
+}
+
+class "lecturer_scopus_identities" as lecturer_scopus_identities <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+  + lecturer_id : uuid {FK}
+  + scopus_author_id : uuid {FK}
+}
+
+class "identity_evidence" as identity_evidence <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+  + identity_id : uuid {FK}
+}
+
+class "mapping_reviews" as mapping_reviews <<Table>> #FDEBD0 {
+  + id : uuid {PK}
+  + identity_id : uuid {FK}
+  + reviewer_user_id : uuid {FK}
+  + compensates_review_id? : uuid {FK}
+}
+
+}
+users "0..1" -- "0..*" audit_events : actor_user_id
+lecturer_scopus_identities "1" -- "0..*" identity_evidence : identity_id
+lecturer_source_snapshots "1" -- "0..*" lecturer_known_publications : snapshot_id, lecturer_id
+lecturer_scopus_candidate_observations "1" -- "0..*" lecturer_scopus_candidate_evidence : observation_id
+lecturer_scopus_candidates "1" -- "0..*" lecturer_scopus_candidate_observations : candidate_id
+candidate_generation_runs "1" -- "0..*" lecturer_scopus_candidate_observations : generation_run_id
+lecturer_scopus_candidates "1" -- "0..*" lecturer_scopus_candidate_reviews : candidate_id
+lecturer_scopus_candidate_observations "1" -- "0..*" lecturer_scopus_candidate_reviews : observation_id
+lecturer_scopus_identities "0..1" -- "0..*" lecturer_scopus_candidate_reviews : resulting_identity_id
+users "1" -- "0..*" lecturer_scopus_candidate_reviews : reviewer_user_id
+lecturers "1" -- "0..*" lecturer_scopus_candidates : lecturer_id
+scopus_authors "1" -- "0..*" lecturer_scopus_candidates : scopus_author_id
+lecturers "1" -- "0..*" lecturer_scopus_identities : lecturer_id
+scopus_authors "1" -- "0..1" lecturer_scopus_identities : scopus_author_id
+lecturers "0..1" -- "0..*" lecturer_source_snapshots : lecturer_id
+mapping_reviews "0..1" -- "0..*" mapping_reviews : compensates_review_id
+lecturer_scopus_identities "1" -- "0..*" mapping_reviews : identity_id
+users "1" -- "0..*" mapping_reviews : reviewer_user_id
+publication_authors "1" *-- "0..*" publication_author_affiliation_resolutions : publication_author_id
+organizations "0..1" -- "0..*" publication_author_affiliations : organization_id
+publication_author_affiliation_resolutions "1" *-- "0..*" publication_author_affiliations : resolution_id, link_status
+publications "1" *-- "0..*" publication_authors : publication_id
+scopus_authors "1" -- "0..*" publication_authors : scopus_author_id
+publications "1" -- "0..*" publication_raw_sources : publication_id
+raw_scopus_records "1" -- "0..1" publication_raw_sources : raw_record_id
+scopus_imports "1" -- "0..*" raw_scopus_records : import_id
+raw_scopus_records "1" -- "0..*" scopus_author_name_variants : first_seen_raw_record_id
+scopus_authors "1" -- "0..*" scopus_author_name_variants : scopus_author_id
+users "1" -- "0..*" user_notifications : user_id
+lecturers "0..1" -- "0..1" users : lecturer_id
+legend bottom right
+  <b>Chú giải UML</b>
+  Mỗi lớp «Table» = một bảng PostgreSQL; thuộc tính = cột; <i>?</i> = cho phép NULL
+  Kim cương đặc (composition) = khóa ngoại ON DELETE CASCADE; đường thường = ON DELETE RESTRICT
+  Bội số: phía bảng cha suy từ NOT NULL của cột FK; phía bảng con suy từ tính duy nhất của cột FK
+  <b>Hình rút gọn: chỉ hiển thị cột khóa (PK/FK); đầy đủ cột xem hình theo cụm</b>
+endlegend
+
+@enduml

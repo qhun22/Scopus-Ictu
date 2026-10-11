@@ -1,0 +1,246 @@
+﻿cum,bang,stt,cot,kieu,null,mac_dinh,khoa_rang_buoc,check_lien_quan,mo_ta
+A,users,1,id,uuid,NO,gen_random_uuid(),PK; UQ một phần,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+A,users,2,email,varchar(255),NO,,UQ một phần,email_not_empty,Email đăng nhập; duy nhất không phân biệt hoa/thường (chỉ mục unique trên lower(email)).
+A,users,3,password_hash,text,NO,,,,Mật khẩu đã băm (Argon2id). Không bao giờ lưu mật khẩu thô.
+A,users,4,display_name,varchar(255),NO,,,display_name_not_empty,Tên hiển thị.
+A,users,5,role,varchar(20),NO,,,lecturer_account_required; role,"Vai trò: ADMIN, REVIEWER hoặc LECTURER."
+A,users,6,lecturer_id,uuid,YES,,FK→`lecturers.id`; UQ một phần,lecturer_account_required,Hồ sơ giảng viên được liên kết (NULL với ADMIN/REVIEWER; bắt buộc với LECTURER; mỗi hồ sơ tối đa 1 tài khoản).
+A,users,7,is_active,boolean,NO,true,,,FALSE = tài khoản bị khóa (đăng nhập bị từ chối).
+A,users,8,version,integer,NO,1,,version,Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.
+A,users,9,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+A,users,10,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+A,users,11,auth_version,integer,NO,1,,auth_version,Tăng khi đổi mật khẩu/vai trò/khóa để thu hồi các phiên (token) cũ.
+A,user_notifications,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+A,user_notifications,2,user_id,uuid,NO,,FK→`users.id`,,Người nhận.
+A,user_notifications,3,notification_type,varchar(40),NO,,,notification_type,"PROFILE_UPDATED, ROLE_CHANGED, ACCOUNT_LOCKED, ACCOUNT_UNLOCKED, PASSWORD_RESET."
+A,user_notifications,4,title,varchar(255),NO,,,,Tiêu đề thông báo.
+A,user_notifications,5,message,text,NO,,,,Nội dung thông báo.
+A,user_notifications,6,metadata,jsonb,NO,'{}'::jsonb,,metadata_object,Dữ liệu kèm theo (JSON object).
+A,user_notifications,7,is_read,boolean,NO,false,,read_consistency,Đã đọc chưa.
+A,user_notifications,8,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+A,user_notifications,9,read_at,timestamptz,YES,,,read_consistency,Thời điểm đọc (NULL khi chưa đọc; nhất quán với is_read).
+A,audit_events,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+A,audit_events,2,entity_type,varchar(100),NO,,,entity_type_format,"Loại thực thể bị tác động (snake_case, ví dụ lecturer, publication_export)."
+A,audit_events,3,entity_id,uuid,NO,,,,UUID thực thể bị tác động — KHÔNG có khóa ngoại (đa hình theo entity_type).
+A,audit_events,4,action,varchar(64),NO,,,action_format,"Mã hành động IN HOA (ví dụ LECTURER_CREATED, PUBLICATION_DATASET_EXPORTED)."
+A,audit_events,5,actor_type,varchar(20),NO,,,actor_invariant; actor_type,USER (người dùng) hoặc SYSTEM (tiến trình hệ thống).
+A,audit_events,6,actor_user_id,uuid,YES,,FK→`users.id`,actor_invariant,Người thực hiện khi actor_type = USER (FK → users).
+A,audit_events,7,actor_service,varchar(100),YES,,,actor_invariant,Tên dịch vụ/tiến trình khi actor_type = SYSTEM.
+A,audit_events,8,before_state,jsonb,YES,,,before_state_object,"Trạng thái trước (JSON object, tùy chọn)."
+A,audit_events,9,after_state,jsonb,YES,,,after_state_object,"Trạng thái sau (JSON object, tùy chọn)."
+A,audit_events,10,reason,text,YES,,,,Lý do/ghi chú.
+A,audit_events,11,request_id,varchar(128),YES,,,,Mã yêu cầu HTTP.
+A,audit_events,12,correlation_id,varchar(128),YES,,,,Mã tương quan giữa nhiều sự kiện.
+A,audit_events,13,ip_address,inet,YES,,,,Địa chỉ IP nguồn.
+A,audit_events,14,user_agent,text,YES,,,,User-Agent của trình duyệt/máy khách.
+A,audit_events,15,metadata,jsonb,YES,,,metadata_object,"Thông tin bổ sung (JSON object), ví dụ record_count/format của lần xuất."
+A,audit_events,16,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+B,lecturers,1,id,uuid,NO,gen_random_uuid(),PK; UQ một phần,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+B,lecturers,2,staff_code,varchar(50),YES,,UQ một phần,,Mã cán bộ (có thể NULL; duy nhất khi có giá trị).
+B,lecturers,3,full_name,varchar(255),NO,,,,"Họ tên đầy đủ như nguồn (có thể kèm tiền tố học hàm/học vị như TS., ThS.)."
+B,lecturers,4,full_name_normalized,varchar(255),NO,,,,Họ tên đã chuẩn hóa để tra cứu.
+B,lecturers,5,email,varchar(255),YES,,,,Email đơn vị (cho phép trùng giữa các hồ sơ; có chỉ mục lower(email)).
+B,lecturers,6,academic_rank,varchar(50),YES,,,,Học hàm.
+B,lecturers,7,academic_degree,varchar(50),YES,,,,Học vị.
+B,lecturers,8,position,varchar(100),YES,,,,Chức vụ.
+B,lecturers,9,department,varchar(150),YES,,,,Bộ môn/phòng ban (phần lớn dữ liệu nguồn còn trống).
+B,lecturers,10,faculty,varchar(150),YES,,,,Khoa (phần lớn dữ liệu nguồn còn trống).
+B,lecturers,11,repository_profile_url,text,YES,,,,Đường dẫn hồ sơ trên ICTU Repository (khóa nguồn).
+B,lecturers,12,repository_profile_id,varchar(100),YES,,,,Mã hồ sơ trên ICTU Repository.
+B,lecturers,13,orcid,varchar(19),YES,,UQ một phần,orcid_format,ORCID (định dạng 0000-0000-0000-000X); duy nhất khi có giá trị.
+B,lecturers,14,is_active,boolean,NO,true,,,Hồ sơ còn hiệu lực.
+B,lecturers,15,version,integer,NO,1,,version,Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.
+B,lecturers,16,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+B,lecturers,17,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+B,lecturer_source_snapshots,1,id,uuid,NO,gen_random_uuid(),"PK; UQ(id,lecturer_id)",,Khóa chính (UUID sinh bởi gen_random_uuid()).
+B,lecturer_source_snapshots,2,lecturer_id,uuid,YES,,"FK→`lecturers.id`; UQ(id,lecturer_id)",,Giảng viên được bản chụp mô tả (có thể NULL khi chưa gán).
+B,lecturer_source_snapshots,3,source_system,varchar(50),NO,,,,Hệ nguồn (ví dụ ICTU Repository).
+B,lecturer_source_snapshots,4,source_url,text,NO,,,,Địa chỉ nguồn.
+B,lecturer_source_snapshots,5,snapshot_hash,varchar(64),NO,,,snapshot_hash,SHA-256 của bản chụp (64 ký tự hex).
+B,lecturer_source_snapshots,6,raw_payload,jsonb,NO,,,raw_payload_object,Payload gốc (JSON object).
+B,lecturer_source_snapshots,7,parser_version,varchar(100),NO,,,,Phiên bản bộ phân tích đã xử lý.
+B,lecturer_source_snapshots,8,validation_status,varchar(20),NO,,,validation_status,VALID hoặc INVALID.
+B,lecturer_source_snapshots,9,validation_errors,jsonb,YES,,,validation_errors_array,Danh sách lỗi (JSON array) khi INVALID.
+B,lecturer_source_snapshots,10,fetched_at,timestamptz,NO,,,,Thời điểm lấy dữ liệu nguồn.
+B,lecturer_source_snapshots,11,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+B,lecturer_known_publications,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+B,lecturer_known_publications,2,lecturer_id,uuid,NO,,FK→`lecturer_source_snapshots.lecturer_id`,,Giảng viên sở hữu công bố.
+B,lecturer_known_publications,3,snapshot_id,uuid,NO,,FK→`lecturer_source_snapshots.id`,,Bản chụp nguồn chứa công bố (FK ghép cùng lecturer_id).
+B,lecturer_known_publications,4,title_raw,text,NO,,,,Tiêu đề nguyên văn.
+B,lecturer_known_publications,5,title_normalized,text,NO,,,,Tiêu đề đã chuẩn hóa để so khớp.
+B,lecturer_known_publications,6,doi_raw,varchar(255),YES,,,,DOI nguyên văn.
+B,lecturer_known_publications,7,doi_normalized,varchar(255),YES,,,,"DOI đã chuẩn hóa (chữ thường, bỏ tiền tố URL) để so khớp."
+B,lecturer_known_publications,8,source_title_raw,text,YES,,,,"Tên nguồn xuất bản nguyên văn (chuỗi, không chuẩn hóa)."
+B,lecturer_known_publications,9,published_year,integer,YES,,,published_year,Năm xuất bản (1000–9999).
+B,lecturer_known_publications,10,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+C,scopus_imports,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+C,scopus_imports,2,file_name,varchar(255),NO,,,,Tên tệp tải lên.
+C,scopus_imports,3,file_sha256,varchar(64),NO,,,file_sha256,SHA-256 nội dung tệp (chống nhập trùng nội dung).
+C,scopus_imports,4,total_records,integer,NO,0,,record_counts,Tổng số dòng dữ liệu.
+C,scopus_imports,5,valid_records,integer,NO,0,,record_counts,Số dòng hợp lệ.
+C,scopus_imports,6,invalid_records,integer,NO,0,,record_counts,Số dòng không hợp lệ.
+C,scopus_imports,7,status,varchar(20),NO,'RECEIVED'::character varying,,status,"RECEIVED, PARSING, VALIDATED, STAGED, APPLIED, FAILED hoặc CANCELLED."
+C,scopus_imports,8,error_summary,jsonb,YES,,,error_summary_object,Tóm tắt lỗi nhập (JSON object).
+C,scopus_imports,9,version,integer,NO,1,,version,Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.
+C,scopus_imports,10,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+C,scopus_imports,11,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+C,scopus_imports,12,normalization_summary,jsonb,YES,,,normalization_summa_5872,Bộ đếm kết quả chuẩn hóa công bố/tác giả (JSON object).
+C,raw_scopus_records,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+C,raw_scopus_records,2,import_id,uuid,NO,,"FK→`scopus_imports.id`; UQ(import_id,row_number)",,Đợt nhập chứa dòng.
+C,raw_scopus_records,3,row_number,integer,NO,,"UQ(import_id,row_number)",row_number,Số thứ tự dòng trong tệp (>= 1); duy nhất trong một đợt.
+C,raw_scopus_records,4,row_hash,varchar(64),NO,,,row_hash,SHA-256 của dòng.
+C,raw_scopus_records,5,eid_raw,text,YES,,,,EID nguyên văn (có thể trống/sai).
+C,raw_scopus_records,6,doi_raw,text,YES,,,,DOI nguyên văn.
+C,raw_scopus_records,7,raw_payload,jsonb,NO,,,raw_payload_object,Toàn bộ giá trị các cột của dòng (JSON object).
+C,raw_scopus_records,8,validation_status,varchar(20),NO,,,validation_status,VALID hoặc INVALID.
+C,raw_scopus_records,9,validation_errors,jsonb,YES,,,validation_errors_array,Lỗi theo dòng (JSON array) khi INVALID.
+C,raw_scopus_records,10,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+D,publications,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+D,publications,2,eid,text,NO,,UQ,eid_not_empty,Scopus EID chuẩn tắc (duy nhất).
+D,publications,3,doi,varchar(255),YES,,,,DOI theo văn bản nguồn (chưa chuẩn hóa).
+D,publications,4,title,text,NO,,,,Tiêu đề công bố.
+D,publications,5,title_normalized,text,NO,,,,"Tiêu đề chuẩn hóa (Unicode NFKC, chữ thường)."
+D,publications,6,source_title,text,YES,,,,Tên nguồn xuất bản (tạp chí/hội nghị) dạng chuỗi.
+D,publications,7,year,integer,YES,,,year_range,Năm xuất bản (1000–9999).
+D,publications,8,volume,text,YES,,,,Tập.
+D,publications,9,issue,text,YES,,,,Số.
+D,publications,10,art_no,text,YES,,,,Mã bài báo.
+D,publications,11,page_start,text,YES,,,,Trang bắt đầu.
+D,publications,12,page_end,text,YES,,,,Trang kết thúc.
+D,publications,13,cited_by_count,integer,YES,,,cited_by_count,Số lần được trích dẫn (>= 0).
+D,publications,14,document_type,varchar(50),YES,,,,"Loại tài liệu (Article, Conference Paper…)."
+D,publications,15,publication_stage,varchar(50),YES,,,,Giai đoạn xuất bản.
+D,publications,16,open_access_status,varchar(50),YES,,,,Tình trạng truy cập mở.
+D,publications,17,version,integer,NO,1,,version,Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.
+D,publications,18,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+D,publications,19,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+D,publication_raw_sources,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+D,publication_raw_sources,2,publication_id,uuid,NO,,FK→`publications.id`,,Công bố chuẩn hóa.
+D,publication_raw_sources,3,raw_record_id,uuid,NO,,FK→`raw_scopus_records.id`; UQ,,Dòng thô nguồn (duy nhất).
+D,publication_raw_sources,4,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+D,scopus_authors,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+D,scopus_authors,2,scopus_id,text,NO,,UQ,scopus_id_not_empty,Scopus Author ID (duy nhất).
+D,scopus_authors,3,preferred_name,varchar(255),NO,,,,Tên ưu tiên khi tạo tác giả (ưu tiên dạng tên đầy đủ hơn dạng hiển thị — `scopus_author_normalizer.py`).
+D,scopus_authors,4,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+D,scopus_authors,5,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+D,scopus_author_name_variants,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+D,scopus_author_name_variants,2,scopus_author_id,uuid,NO,,"FK→`scopus_authors.id`; UQ(scopus_author_id,variant_type,variant_name)",,Tác giả.
+D,scopus_author_name_variants,3,variant_type,varchar(30),NO,,"UQ(scopus_author_id,variant_type,variant_name)",variant_type,AUTHOR_DISPLAY hoặc AUTHOR_FULL_NAME.
+D,scopus_author_name_variants,4,variant_name,varchar(255),NO,,"UQ(scopus_author_id,variant_type,variant_name)",,Tên nguyên văn.
+D,scopus_author_name_variants,5,variant_name_normalized,varchar(255),NO,,,,Tên chuẩn hóa.
+D,scopus_author_name_variants,6,first_seen_raw_record_id,uuid,NO,,FK→`raw_scopus_records.id`,,Dòng thô nơi dạng tên này xuất hiện lần đầu (provenance).
+D,scopus_author_name_variants,7,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+D,publication_authors,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+D,publication_authors,2,publication_id,uuid,NO,,"FK→`publications.id`; UQ(publication_id,scopus_author_id); UQ(publication_id,author_order)",,Công bố (xóa công bố sẽ xóa dây chuyền vị trí tác giả).
+D,publication_authors,3,scopus_author_id,uuid,NO,,"FK→`scopus_authors.id`; UQ(publication_id,scopus_author_id)",,Tác giả.
+D,publication_authors,4,author_order,integer,NO,,"UQ(publication_id,author_order)",author_order,Thứ tự tác giả trong bài (>= 1).
+D,publication_authors,5,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+E,organizations,1,id,uuid,NO,gen_random_uuid(),PK; UQ một phần,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+E,organizations,2,source_system,varchar(50),NO,,UQ một phần; UQ một phần,source_system,"Hệ nguồn ngoài (script nạp hỗ trợ `openalex`, `crossref`)."
+E,organizations,3,source_org_id,text,YES,,UQ một phần,source_org_id,Mã tổ chức theo nguồn (có thể NULL).
+E,organizations,4,ror,text,YES,,,,Mã ROR (nếu có).
+E,organizations,5,display_name,text,NO,,UQ một phần,display_name,Tên hiển thị.
+E,organizations,6,country_code,varchar(2),YES,,,country_code,Mã quốc gia ISO-2 (chữ in hoa).
+E,organizations,7,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+E,publication_author_affiliation_resolutions,1,id,uuid,NO,gen_random_uuid(),"PK; UQ(id,link_status)",,Khóa chính (UUID sinh bởi gen_random_uuid()).
+E,publication_author_affiliation_resolutions,2,publication_author_id,uuid,NO,,"FK→`publication_authors.id`; UQ(publication_author_id,source_system,source_payload_sha256)",,Vị trí tác giả được đối chiếu.
+E,publication_author_affiliation_resolutions,3,source_system,varchar(50),NO,,"UQ(publication_author_id,source_system,source_payload_sha256)",source_system,Nguồn ngoài (`openalex` hoặc `crossref` theo script nạp).
+E,publication_author_affiliation_resolutions,4,source_payload_sha256,varchar(64),NO,,"UQ(publication_author_id,source_system,source_payload_sha256)",payload_hash,SHA-256 payload nguồn (chống nạp trùng).
+E,publication_author_affiliation_resolutions,5,link_status,varchar(20),NO,,"UQ(id,link_status)",link_method; link_status; presence; reason; retrieved_at; trusted_position; verified_orcid,"VERIFIED, CORROBORATED hoặc UNRESOLVED."
+E,publication_author_affiliation_resolutions,6,link_method,varchar(40),YES,,,link_method,ORCID_SCOPUS_ID_BRIDGE (VERIFIED) hoặc POSITION_COUNT_NAME (CORROBORATED); NULL khi UNRESOLVED.
+E,publication_author_affiliation_resolutions,7,unresolved_reason,varchar(80),YES,,,reason,Lý do khi UNRESOLVED (bắt buộc khi và chỉ khi UNRESOLVED).
+E,publication_author_affiliation_resolutions,8,affiliation_presence,varchar(10),YES,,,presence,PRESENT/ABSENT: nguồn có/không liệt kê đơn vị (NULL khi UNRESOLVED).
+E,publication_author_affiliation_resolutions,9,evidence,jsonb,NO,'{}'::jsonb,,evidence_object,Bằng chứng đối chiếu (JSON object).
+E,publication_author_affiliation_resolutions,10,source_doi,text,YES,,,,DOI theo nguồn ngoài.
+E,publication_author_affiliation_resolutions,11,source_work_id,text,YES,,,,Mã công trình trong nguồn ngoài.
+E,publication_author_affiliation_resolutions,12,external_position,integer,YES,,,ext_position; trusted_position,Vị trí tác giả trong nguồn ngoài (>= 1; bắt buộc khi không UNRESOLVED).
+E,publication_author_affiliation_resolutions,13,external_author_name,text,YES,,,,Tên tác giả theo nguồn ngoài.
+E,publication_author_affiliation_resolutions,14,external_author_orcid,varchar(19),YES,,,orcid_format; verified_orcid,ORCID tác giả theo nguồn ngoài (bắt buộc khi VERIFIED).
+E,publication_author_affiliation_resolutions,15,retrieved_at,timestamptz,YES,,,retrieved_at,Thời điểm lấy dữ liệu nguồn ngoài (bắt buộc khi không UNRESOLVED).
+E,publication_author_affiliation_resolutions,16,importer_version,varchar(40),NO,,,,Phiên bản trình nạp.
+E,publication_author_affiliation_resolutions,17,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+E,publication_author_affiliations,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+E,publication_author_affiliations,2,resolution_id,uuid,NO,,"FK→`publication_author_affiliation_resolutions.id`; UQ(resolution_id,ord)",,Resolution cha (xóa resolution sẽ xóa dây chuyền).
+E,publication_author_affiliations,3,link_status,varchar(20),NO,,FK→`publication_author_affiliation_resolutions.link_status`,link_status,"Bản sao link_status của resolution (VERIFIED/CORROBORATED), ép nhất quán bằng FK ghép."
+E,publication_author_affiliations,4,ord,integer,NO,,"UQ(resolution_id,ord)",ord,Thứ tự đơn vị (>= 1).
+E,publication_author_affiliations,5,raw_index,integer,YES,,,raw_text,Chỉ số chuỗi đơn vị gốc trong nguồn (>= 1; NULL khi không có chuỗi gốc).
+E,publication_author_affiliations,6,raw_affiliation_text,text,YES,,,content; raw_text,Chuỗi đơn vị nguyên văn của nhà xuất bản.
+E,publication_author_affiliations,7,organization_id,uuid,YES,,FK→`organizations.id`,content,Tổ chức chuẩn hóa (tùy chọn; phải có chuỗi gốc hoặc tổ chức).
+E,publication_author_affiliations,8,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,candidate_generation_runs,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,candidate_generation_runs,2,rule_set_id,text,NO,,,rule_set_id_not_empty,Mã bộ luật.
+F,candidate_generation_runs,3,rule_set_version,text,NO,,,rule_set_version_not_empty,Phiên bản bộ luật.
+F,candidate_generation_runs,4,source_state,jsonb,NO,,,source_state_object,Ảnh chụp trạng thái dữ liệu đầu vào (JSON object).
+F,candidate_generation_runs,5,status,varchar(20),NO,'RUNNING'::character varying,,completion_consistency; status,"RUNNING, COMPLETED hoặc FAILED."
+F,candidate_generation_runs,6,started_at,timestamptz,NO,now(),,,Thời điểm bắt đầu.
+F,candidate_generation_runs,7,completed_at,timestamptz,YES,,,completion_consistency,Thời điểm kết thúc (bắt buộc khi không còn RUNNING).
+F,candidate_generation_runs,8,version,integer,NO,1,,version,Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.
+F,candidate_generation_runs,9,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,candidate_generation_runs,10,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+F,lecturer_scopus_candidates,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,lecturer_scopus_candidates,2,lecturer_id,uuid,NO,,"FK→`lecturers.id`; UQ(lecturer_id,scopus_author_id)",,Giảng viên.
+F,lecturer_scopus_candidates,3,scopus_author_id,uuid,NO,,"FK→`scopus_authors.id`; UQ(lecturer_id,scopus_author_id)",,Tác giả Scopus.
+F,lecturer_scopus_candidates,4,status,varchar(20),NO,'PENDING'::character varying,,status,"PENDING, ACCEPTED, REJECTED hoặc SUPERSEDED."
+F,lecturer_scopus_candidates,5,first_seen_at,timestamptz,NO,now(),,,Lần đầu bộ sinh thấy cặp này.
+F,lecturer_scopus_candidates,6,last_seen_at,timestamptz,NO,now(),,,Lần gần nhất bộ sinh thấy cặp này.
+F,lecturer_scopus_candidates,7,version,integer,NO,1,,version,Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.
+F,lecturer_scopus_candidates,8,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,lecturer_scopus_candidates,9,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+F,lecturer_scopus_candidate_observations,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,lecturer_scopus_candidate_observations,2,candidate_id,uuid,NO,,"FK→`lecturer_scopus_candidates.id`; UQ(candidate_id,generation_run_id)",,Ứng viên.
+F,lecturer_scopus_candidate_observations,3,generation_run_id,uuid,NO,,"FK→`candidate_generation_runs.id`; UQ(candidate_id,generation_run_id)",,Lần chạy sinh ứng viên.
+F,lecturer_scopus_candidate_observations,4,observed_at,timestamptz,NO,,,,Thời điểm quan sát.
+F,lecturer_scopus_candidate_observations,5,candidate_snapshot,jsonb,NO,,,candidate_sna_25cc,Ảnh chụp ứng viên (JSON object).
+F,lecturer_scopus_candidate_observations,6,observation_hash,varchar(64),NO,,,observation_hash,SHA-256 của quan sát.
+F,lecturer_scopus_candidate_observations,7,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,lecturer_scopus_candidate_evidence,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,lecturer_scopus_candidate_evidence,2,observation_id,uuid,NO,,"FK→`lecturer_scopus_candidate_observations.id`; UQ(observation_id,rule_id,rule_version,evidence_fingerprint)",,Quan sát chứa bằng chứng.
+F,lecturer_scopus_candidate_evidence,3,evidence_kind,varchar(30),NO,,,evidence_kind,NAME hoặc PUBLICATION.
+F,lecturer_scopus_candidate_evidence,4,rule_id,text,NO,,"UQ(observation_id,rule_id,rule_version,evidence_fingerprint)",rule_id_not_empty,Mã luật sinh bằng chứng.
+F,lecturer_scopus_candidate_evidence,5,rule_version,text,NO,,"UQ(observation_id,rule_id,rule_version,evidence_fingerprint)",rule_version_not_empty,Phiên bản luật.
+F,lecturer_scopus_candidate_evidence,6,payload,jsonb,NO,,,payload_object,Chi tiết bằng chứng (JSON object).
+F,lecturer_scopus_candidate_evidence,7,source_refs,jsonb,NO,,,source_refs_array,Tham chiếu nguồn (JSON array).
+F,lecturer_scopus_candidate_evidence,8,evidence_fingerprint,varchar(64),NO,,"UQ(observation_id,rule_id,rule_version,evidence_fingerprint)",evidence_fingerprint,Dấu vân tay SHA-256 (chống trùng).
+F,lecturer_scopus_candidate_evidence,9,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,lecturer_scopus_candidate_reviews,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,lecturer_scopus_candidate_reviews,2,candidate_id,uuid,NO,,FK→`lecturer_scopus_candidates.id`,,Ứng viên được duyệt.
+F,lecturer_scopus_candidate_reviews,3,observation_id,uuid,NO,,FK→`lecturer_scopus_candidate_observations.id`,,Quan sát hiện hành tại thời điểm duyệt.
+F,lecturer_scopus_candidate_reviews,4,reviewer_user_id,uuid,NO,,FK→`users.id`,,Người duyệt (FK → users).
+F,lecturer_scopus_candidate_reviews,5,action,varchar(20),NO,,,action; reason_required; transitions,"ACCEPT, REJECT hoặc REOPEN."
+F,lecturer_scopus_candidate_reviews,6,from_status,varchar(20),NO,,,from_status; transitions,Trạng thái ứng viên trước khi duyệt.
+F,lecturer_scopus_candidate_reviews,7,to_status,varchar(20),NO,,,to_status; transitions,Trạng thái ứng viên sau khi duyệt.
+F,lecturer_scopus_candidate_reviews,8,candidate_version,integer,NO,,,candidate_version,Phiên bản ứng viên lúc duyệt (phát hiện duyệt trên dữ liệu cũ).
+F,lecturer_scopus_candidate_reviews,9,reason,text,YES,,,reason_required,Lý do (bắt buộc khi không phải ACCEPT).
+F,lecturer_scopus_candidate_reviews,10,evidence_snapshot,jsonb,NO,,,evidence_snapshot_object,Ảnh chụp bằng chứng người duyệt đã xem (JSON object).
+F,lecturer_scopus_candidate_reviews,11,resulting_identity_id,uuid,YES,,FK→`lecturer_scopus_identities.id`,,Danh tính APPROVED được tạo khi ACCEPT (NULL nếu REJECT).
+F,lecturer_scopus_candidate_reviews,12,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,lecturer_scopus_identities,1,id,uuid,NO,gen_random_uuid(),PK; UQ một phần,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,lecturer_scopus_identities,2,lecturer_id,uuid,NO,,"FK→`lecturers.id`; UQ(lecturer_id,scopus_author_id)",,Giảng viên.
+F,lecturer_scopus_identities,3,scopus_author_id,uuid,NO,,"FK→`scopus_authors.id`; UQ(lecturer_id,scopus_author_id); UQ một phần",,Tác giả Scopus.
+F,lecturer_scopus_identities,4,status,varchar(20),NO,'CANDIDATE'::character varying,,status,"CANDIDATE, APPROVED, REJECTED hoặc REVOKED."
+F,lecturer_scopus_identities,5,recommendation,varchar(30),YES,,,recommendation; recommendation_consistency,MATCH/NO_MATCH/MANUAL_VERIFY (chưa có mã ghi cột này).
+F,lecturer_scopus_identities,6,recommendation_algorithm_version,varchar(100),YES,,,recommendation_consistency,Phiên bản thuật toán khuyến nghị (đi cùng recommendation).
+F,lecturer_scopus_identities,7,recommended_at,timestamptz,YES,,,recommendation_consistency,Thời điểm khuyến nghị (đi cùng recommendation).
+F,lecturer_scopus_identities,8,version,integer,NO,1,,version,Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.
+F,lecturer_scopus_identities,9,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,lecturer_scopus_identities,10,updated_at,timestamptz,NO,now(),,,"Thời điểm cập nhật gần nhất (timestamptz, mặc định now())."
+F,identity_evidence,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,identity_evidence,2,identity_id,uuid,NO,,"FK→`lecturer_scopus_identities.id`; UQ(identity_id,evidence_type,algorithm_version,evidence_fingerprint)",,Danh tính.
+F,identity_evidence,3,evidence_type,varchar(40),NO,,"UQ(identity_id,evidence_type,algorithm_version,evidence_fingerprint)",evidence_type,"APPROVED_ID, ORCID_EXACT, DOI_EXACT, PUBLICATION_OVERLAP, COAUTHOR_CONFIRMED, NAME_SIMILARITY, AFFILIATION_MATCH."
+F,identity_evidence,4,direction,varchar(20),NO,,,direction,SUPPORTS hoặc CONTRADICTS.
+F,identity_evidence,5,confidence_score,"numeric(5,4)",YES,,,confidence_score,Điểm tin cậy 0–1; luôn NULL hiện nay (không có điểm do máy tính).
+F,identity_evidence,6,algorithm_version,varchar(100),NO,,"UQ(identity_id,evidence_type,algorithm_version,evidence_fingerprint)",,Phiên bản thuật toán/luật.
+F,identity_evidence,7,features,jsonb,NO,,,features_object,Đặc trưng bằng chứng (JSON object).
+F,identity_evidence,8,source_refs,jsonb,NO,,,source_refs_array,Tham chiếu nguồn (JSON array).
+F,identity_evidence,9,evidence_fingerprint,varchar(64),NO,,"UQ(identity_id,evidence_type,algorithm_version,evidence_fingerprint)",fingerprint,Dấu vân tay SHA-256 (chống trùng).
+F,identity_evidence,10,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."
+F,mapping_reviews,1,id,uuid,NO,gen_random_uuid(),PK,,Khóa chính (UUID sinh bởi gen_random_uuid()).
+F,mapping_reviews,2,identity_id,uuid,NO,,FK→`lecturer_scopus_identities.id`,,Danh tính.
+F,mapping_reviews,3,reviewer_user_id,uuid,NO,,FK→`users.id`,,Người duyệt.
+F,mapping_reviews,4,action,varchar(20),NO,,,action; compensates; reason_required; transitions,"APPROVE, REJECT, REVOKE hoặc REOPEN."
+F,mapping_reviews,5,from_status,varchar(20),NO,,,transitions,Trạng thái trước.
+F,mapping_reviews,6,to_status,varchar(20),NO,,,transitions,Trạng thái sau.
+F,mapping_reviews,7,reason,text,YES,,,reason_required,Lý do (bắt buộc khi không phải APPROVE).
+F,mapping_reviews,8,evidence_snapshot,jsonb,NO,,,evidence_snapshot_object,Ảnh chụp bằng chứng (JSON object).
+F,mapping_reviews,9,compensates_review_id,uuid,YES,,FK→`mapping_reviews.id`,compensates,"Quyết định được bù trừ (bắt buộc với REVOKE/REOPEN, cấm với APPROVE/REJECT)."
+F,mapping_reviews,10,created_at,timestamptz,NO,now(),,,"Thời điểm tạo bản ghi (timestamptz, mặc định now())."

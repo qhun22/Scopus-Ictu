@@ -1,0 +1,95 @@
+@startuml CLS-B_ho_so_giang_vien
+' Nguồn: docs/design/database/source/schema_snapshot.json (sinh bởi tools/gen_database_assets.py) — KHÔNG sửa tay phần sinh tự động.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+  FontSize 12
+  AttributeFontSize 11
+  HeaderBackgroundColor #ECF0F1
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam packageStyle rectangle
+hide circle
+hide empty methods
+title CLS-B — Sơ đồ lớp cụm B: Hồ sơ giảng viên (dữ liệu chủ)
+
+class "lecturers" as lecturers <<Table>> #FCF3CF {
+  + id : uuid {PK}
+  + staff_code? : varchar(50)
+  + full_name : varchar(255)
+  + full_name_normalized : varchar(255)
+  + email? : varchar(255)
+  + academic_rank? : varchar(50)
+  + academic_degree? : varchar(50)
+  + position? : varchar(100)
+  + department? : varchar(150)
+  + faculty? : varchar(150)
+  + repository_profile_url? : text
+  + repository_profile_id? : varchar(100)
+  + orcid? : varchar(19)
+  + is_active : boolean
+  + version : integer
+  + created_at : timestamptz
+  + updated_at : timestamptz
+}
+
+class "lecturer_source_snapshots" as lecturer_source_snapshots <<Table>> #FCF3CF {
+  + id : uuid {PK}
+  + lecturer_id? : uuid {FK}
+  + source_system : varchar(50)
+  + source_url : text
+  + snapshot_hash : varchar(64)
+  + raw_payload : jsonb
+  + parser_version : varchar(100)
+  + validation_status : varchar(20)
+  + validation_errors? : jsonb
+  + fetched_at : timestamptz
+  + created_at : timestamptz
+}
+
+class "lecturer_known_publications" as lecturer_known_publications <<Table>> #FCF3CF {
+  + id : uuid {PK}
+  + lecturer_id : uuid {FK}
+  + snapshot_id : uuid {FK}
+  + title_raw : text
+  + title_normalized : text
+  + doi_raw? : varchar(255)
+  + doi_normalized? : varchar(255)
+  + source_title_raw? : text
+  + published_year? : integer
+  + created_at : timestamptz
+}
+
+class "lecturer_scopus_candidates" as lecturer_scopus_candidates <<Table>> #EEEEEE {
+  + id : uuid {PK}
+}
+
+class "lecturer_scopus_identities" as lecturer_scopus_identities <<Table>> #EEEEEE {
+  + id : uuid {PK}
+}
+
+class "users" as users <<Table>> #EEEEEE {
+  + id : uuid {PK}
+}
+
+lecturer_source_snapshots "1" -- "0..*" lecturer_known_publications : snapshot_id, lecturer_id
+lecturers "1" -- "0..*" lecturer_scopus_candidates : lecturer_id
+lecturers "1" -- "0..*" lecturer_scopus_identities : lecturer_id
+lecturers "0..1" -- "0..*" lecturer_source_snapshots : lecturer_id
+lecturers "0..1" -- "0..1" users : lecturer_id
+legend bottom right
+  <b>Chú giải UML</b>
+  Mỗi lớp «Table» = một bảng PostgreSQL; thuộc tính = cột; <i>?</i> = cho phép NULL
+  Kim cương đặc (composition) = khóa ngoại ON DELETE CASCADE; đường thường = ON DELETE RESTRICT
+  Bội số: phía bảng cha suy từ NOT NULL của cột FK; phía bảng con suy từ tính duy nhất của cột FK
+endlegend
+
+@enduml

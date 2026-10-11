@@ -1,0 +1,3827 @@
+{
+ "meta": {
+  "alembic_version": [
+   "a9c2e4f71b30"
+  ],
+  "database": "scopus_ictu_demo_teacher_20261014",
+  "extensions": [
+   "plpgsql"
+  ],
+  "extracted_at": "2026-10-09T15:10:58+00:00",
+  "functions": 0,
+  "mode": "READ ONLY (set_session readonly=True)",
+  "postgres_version": "17.10",
+  "triggers": 0
+ },
+ "tables": {
+  "audit_events": {
+   "checks": [
+    {
+     "expr": "CHECK (((action)::text ~ '^[A-Z][A-Z0-9_]*$'::text))",
+     "name": "ck_audit_events_action_format"
+    },
+    {
+     "expr": "CHECK (((((actor_type)::text = 'USER'::text) AND (actor_user_id IS NOT NULL) AND (actor_service IS NULL)) OR (((actor_type)::text = 'SYSTEM'::text) AND (actor_user_id IS NULL) AND (actor_service IS NOT NULL) AND (btrim((actor_service)::text) <> ''::text))))",
+     "name": "ck_audit_events_actor_invariant"
+    },
+    {
+     "expr": "CHECK (((actor_type)::text = ANY ((ARRAY['USER'::character varying, 'SYSTEM'::character varying])::text[])))",
+     "name": "ck_audit_events_actor_type"
+    },
+    {
+     "expr": "CHECK (((after_state IS NULL) OR (jsonb_typeof(after_state) = 'object'::text)))",
+     "name": "ck_audit_events_after_state_object"
+    },
+    {
+     "expr": "CHECK (((before_state IS NULL) OR (jsonb_typeof(before_state) = 'object'::text)))",
+     "name": "ck_audit_events_before_state_object"
+    },
+    {
+     "expr": "CHECK (((entity_type)::text ~ '^[a-z][a-z0-9_]*$'::text))",
+     "name": "ck_audit_events_entity_type_format"
+    },
+    {
+     "expr": "CHECK (((metadata IS NULL) OR (jsonb_typeof(metadata) = 'object'::text)))",
+     "name": "ck_audit_events_metadata_object"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "entity_type",
+     "nullable": false,
+     "pos": 2,
+     "type": "character varying(100)"
+    },
+    {
+     "default": null,
+     "name": "entity_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "action",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(64)"
+    },
+    {
+     "default": null,
+     "name": "actor_type",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "actor_user_id",
+     "nullable": true,
+     "pos": 6,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "actor_service",
+     "nullable": true,
+     "pos": 7,
+     "type": "character varying(100)"
+    },
+    {
+     "default": null,
+     "name": "before_state",
+     "nullable": true,
+     "pos": 8,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "after_state",
+     "nullable": true,
+     "pos": 9,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "reason",
+     "nullable": true,
+     "pos": 10,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "request_id",
+     "nullable": true,
+     "pos": 11,
+     "type": "character varying(128)"
+    },
+    {
+     "default": null,
+     "name": "correlation_id",
+     "nullable": true,
+     "pos": 12,
+     "type": "character varying(128)"
+    },
+    {
+     "default": null,
+     "name": "ip_address",
+     "nullable": true,
+     "pos": 13,
+     "type": "inet"
+    },
+    {
+     "default": null,
+     "name": "user_agent",
+     "nullable": true,
+     "pos": 14,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "metadata",
+     "nullable": true,
+     "pos": 15,
+     "type": "jsonb"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 16,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "actor_user_id"
+     ],
+     "name": "fk_audit_events_actor_user_id_users",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "users"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_audit_events_actor ON public.audit_events USING btree (actor_user_id, created_at)",
+     "method": "btree",
+     "name": "ix_audit_events_actor",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_audit_events_correlation ON public.audit_events USING btree (correlation_id) WHERE (correlation_id IS NOT NULL)",
+     "method": "btree",
+     "name": "ix_audit_events_correlation",
+     "predicate": "(correlation_id IS NOT NULL)",
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_audit_events_created ON public.audit_events USING btree (created_at)",
+     "method": "btree",
+     "name": "ix_audit_events_created",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_audit_events_entity ON public.audit_events USING btree (entity_type, entity_id, created_at)",
+     "method": "btree",
+     "name": "ix_audit_events_entity",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_audit_events ON public.audit_events USING btree (id)",
+     "method": "btree",
+     "name": "pk_audit_events",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 16,
+   "uniques": []
+  },
+  "candidate_generation_runs": {
+   "checks": [
+    {
+     "expr": "CHECK (((((status)::text = 'RUNNING'::text) AND (completed_at IS NULL)) OR (((status)::text = ANY ((ARRAY['COMPLETED'::character varying, 'FAILED'::character varying])::text[])) AND (completed_at IS NOT NULL))))",
+     "name": "ck_candidate_generation_runs_completion_consistency"
+    },
+    {
+     "expr": "CHECK ((btrim(rule_set_id) <> ''::text))",
+     "name": "ck_candidate_generation_runs_rule_set_id_not_empty"
+    },
+    {
+     "expr": "CHECK ((btrim(rule_set_version) <> ''::text))",
+     "name": "ck_candidate_generation_runs_rule_set_version_not_empty"
+    },
+    {
+     "expr": "CHECK ((jsonb_typeof(source_state) = 'object'::text))",
+     "name": "ck_candidate_generation_runs_source_state_object"
+    },
+    {
+     "expr": "CHECK (((status)::text = ANY ((ARRAY['RUNNING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying])::text[])))",
+     "name": "ck_candidate_generation_runs_status"
+    },
+    {
+     "expr": "CHECK ((version >= 1))",
+     "name": "ck_candidate_generation_runs_version"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "rule_set_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "rule_set_version",
+     "nullable": false,
+     "pos": 3,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "source_state",
+     "nullable": false,
+     "pos": 4,
+     "type": "jsonb"
+    },
+    {
+     "default": "'RUNNING'::character varying",
+     "name": "status",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(20)"
+    },
+    {
+     "default": "now()",
+     "name": "started_at",
+     "nullable": false,
+     "pos": 6,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": null,
+     "name": "completed_at",
+     "nullable": true,
+     "pos": 7,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "1",
+     "name": "version",
+     "nullable": false,
+     "pos": 8,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 9,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_candidate_generation_runs_status_created ON public.candidate_generation_runs USING btree (status, created_at)",
+     "method": "btree",
+     "name": "ix_candidate_generation_runs_status_created",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_candidate_generation_runs ON public.candidate_generation_runs USING btree (id)",
+     "method": "btree",
+     "name": "pk_candidate_generation_runs",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 2,
+   "uniques": []
+  },
+  "identity_evidence": {
+   "checks": [
+    {
+     "expr": "CHECK (((confidence_score >= 0.0) AND (confidence_score <= 1.0)))",
+     "name": "ck_identity_evidence_confidence_score"
+    },
+    {
+     "expr": "CHECK (((direction)::text = ANY ((ARRAY['SUPPORTS'::character varying, 'CONTRADICTS'::character varying])::text[])))",
+     "name": "ck_identity_evidence_direction"
+    },
+    {
+     "expr": "CHECK (((evidence_type)::text = ANY ((ARRAY['APPROVED_ID'::character varying, 'ORCID_EXACT'::character varying, 'DOI_EXACT'::character varying, 'PUBLICATION_OVERLAP'::character varying, 'COAUTHOR_CONFIRMED'::character varying, 'NAME_SIMILARITY'::character varying, 'AFFILIATION_MATCH'::character varying])::text[])))",
+     "name": "ck_identity_evidence_evidence_type"
+    },
+    {
+     "expr": "CHECK ((jsonb_typeof(features) = 'object'::text))",
+     "name": "ck_identity_evidence_features_object"
+    },
+    {
+     "expr": "CHECK (((evidence_fingerprint)::text ~ '^[0-9a-f]{64}$'::text))",
+     "name": "ck_identity_evidence_fingerprint"
+    },
+    {
+     "expr": "CHECK ((jsonb_typeof(source_refs) = 'array'::text))",
+     "name": "ck_identity_evidence_source_refs_array"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "identity_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "evidence_type",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(40)"
+    },
+    {
+     "default": null,
+     "name": "direction",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "confidence_score",
+     "nullable": true,
+     "pos": 5,
+     "type": "numeric(5,4)"
+    },
+    {
+     "default": null,
+     "name": "algorithm_version",
+     "nullable": false,
+     "pos": 6,
+     "type": "character varying(100)"
+    },
+    {
+     "default": null,
+     "name": "features",
+     "nullable": false,
+     "pos": 7,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "source_refs",
+     "nullable": false,
+     "pos": 8,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "evidence_fingerprint",
+     "nullable": false,
+     "pos": 9,
+     "type": "character varying(64)"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "identity_id"
+     ],
+     "name": "fk_identity_evidence_identity_id_lecturer_scopus_identities",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturer_scopus_identities"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_identity_evidence_created_at ON public.identity_evidence USING btree (created_at)",
+     "method": "btree",
+     "name": "ix_identity_evidence_created_at",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_identity_evidence ON public.identity_evidence USING btree (id)",
+     "method": "btree",
+     "name": "pk_identity_evidence",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_identity_evidence_dedup ON public.identity_evidence USING btree (identity_id, evidence_type, algorithm_version, evidence_fingerprint)",
+     "method": "btree",
+     "name": "uq_identity_evidence_dedup",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 0,
+   "uniques": [
+    {
+     "cols": [
+      "identity_id",
+      "evidence_type",
+      "algorithm_version",
+      "evidence_fingerprint"
+     ],
+     "name": "uq_identity_evidence_dedup"
+    }
+   ]
+  },
+  "lecturer_known_publications": {
+   "checks": [
+    {
+     "expr": "CHECK (((published_year IS NULL) OR ((published_year >= 1000) AND (published_year <= 9999))))",
+     "name": "ck_lecturer_known_publications_published_year"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "lecturer_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "snapshot_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "title_raw",
+     "nullable": false,
+     "pos": 4,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "title_normalized",
+     "nullable": false,
+     "pos": 5,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "doi_raw",
+     "nullable": true,
+     "pos": 6,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "doi_normalized",
+     "nullable": true,
+     "pos": 7,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "source_title_raw",
+     "nullable": true,
+     "pos": 8,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "published_year",
+     "nullable": true,
+     "pos": 9,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "snapshot_id",
+      "lecturer_id"
+     ],
+     "name": "fk_lecturer_known_publications_snapshot_lecturer",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id",
+      "lecturer_id"
+     ],
+     "ref_table": "lecturer_source_snapshots"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_known_pubs_lecturer_year ON public.lecturer_known_publications USING btree (lecturer_id, published_year)",
+     "method": "btree",
+     "name": "ix_known_pubs_lecturer_year",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturer_known_publications_doi ON public.lecturer_known_publications USING btree (doi_normalized) WHERE (doi_normalized IS NOT NULL)",
+     "method": "btree",
+     "name": "ix_lecturer_known_publications_doi",
+     "predicate": "(doi_normalized IS NOT NULL)",
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturer_known_publications_lecturer_id ON public.lecturer_known_publications USING btree (lecturer_id)",
+     "method": "btree",
+     "name": "ix_lecturer_known_publications_lecturer_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturer_known_publications_snapshot_id ON public.lecturer_known_publications USING btree (snapshot_id)",
+     "method": "btree",
+     "name": "ix_lecturer_known_publications_snapshot_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturer_known_publications ON public.lecturer_known_publications USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturer_known_publications",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 327,
+   "uniques": []
+  },
+  "lecturer_scopus_candidate_evidence": {
+   "checks": [
+    {
+     "expr": "CHECK (((evidence_fingerprint)::text ~ '^[0-9a-f]{64}$'::text))",
+     "name": "ck_lecturer_scopus_candidate_evidence_evidence_fingerprint"
+    },
+    {
+     "expr": "CHECK (((evidence_kind)::text = ANY ((ARRAY['NAME'::character varying, 'PUBLICATION'::character varying])::text[])))",
+     "name": "ck_lecturer_scopus_candidate_evidence_evidence_kind"
+    },
+    {
+     "expr": "CHECK ((jsonb_typeof(payload) = 'object'::text))",
+     "name": "ck_lecturer_scopus_candidate_evidence_payload_object"
+    },
+    {
+     "expr": "CHECK ((btrim(rule_id) <> ''::text))",
+     "name": "ck_lecturer_scopus_candidate_evidence_rule_id_not_empty"
+    },
+    {
+     "expr": "CHECK ((btrim(rule_version) <> ''::text))",
+     "name": "ck_lecturer_scopus_candidate_evidence_rule_version_not_empty"
+    },
+    {
+     "expr": "CHECK ((jsonb_typeof(source_refs) = 'array'::text))",
+     "name": "ck_lecturer_scopus_candidate_evidence_source_refs_array"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "observation_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "evidence_kind",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(30)"
+    },
+    {
+     "default": null,
+     "name": "rule_id",
+     "nullable": false,
+     "pos": 4,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "rule_version",
+     "nullable": false,
+     "pos": 5,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "payload",
+     "nullable": false,
+     "pos": 6,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "source_refs",
+     "nullable": false,
+     "pos": 7,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "evidence_fingerprint",
+     "nullable": false,
+     "pos": 8,
+     "type": "character varying(64)"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 9,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "observation_id"
+     ],
+     "name": "fk_lecturer_scopus_candidate_evidence_observation_id_le_d76b",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturer_scopus_candidate_observations"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_candidate_evidence_observation ON public.lecturer_scopus_candidate_evidence USING btree (observation_id, created_at)",
+     "method": "btree",
+     "name": "ix_candidate_evidence_observation",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturer_scopus_candidate_evidence ON public.lecturer_scopus_candidate_evidence USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturer_scopus_candidate_evidence",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_candidate_evidence_descriptor ON public.lecturer_scopus_candidate_evidence USING btree (observation_id, rule_id, rule_version, evidence_fingerprint)",
+     "method": "btree",
+     "name": "uq_candidate_evidence_descriptor",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 203,
+   "uniques": [
+    {
+     "cols": [
+      "observation_id",
+      "rule_id",
+      "rule_version",
+      "evidence_fingerprint"
+     ],
+     "name": "uq_candidate_evidence_descriptor"
+    }
+   ]
+  },
+  "lecturer_scopus_candidate_observations": {
+   "checks": [
+    {
+     "expr": "CHECK ((jsonb_typeof(candidate_snapshot) = 'object'::text))",
+     "name": "ck_lecturer_scopus_candidate_observations_candidate_sna_25cc"
+    },
+    {
+     "expr": "CHECK (((observation_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+     "name": "ck_lecturer_scopus_candidate_observations_observation_hash"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "candidate_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "generation_run_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "observed_at",
+     "nullable": false,
+     "pos": 4,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": null,
+     "name": "candidate_snapshot",
+     "nullable": false,
+     "pos": 5,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "observation_hash",
+     "nullable": false,
+     "pos": 6,
+     "type": "character varying(64)"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 7,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "candidate_id"
+     ],
+     "name": "fk_lecturer_scopus_candidate_observations_candidate_id__26b4",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturer_scopus_candidates"
+    },
+    {
+     "cols": [
+      "generation_run_id"
+     ],
+     "name": "fk_lecturer_scopus_candidate_observations_generation_ru_f0a3",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "candidate_generation_runs"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_candidate_observations_candidate ON public.lecturer_scopus_candidate_observations USING btree (candidate_id, created_at)",
+     "method": "btree",
+     "name": "ix_candidate_observations_candidate",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_candidate_observations_run ON public.lecturer_scopus_candidate_observations USING btree (generation_run_id)",
+     "method": "btree",
+     "name": "ix_candidate_observations_run",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturer_scopus_candidate_observations ON public.lecturer_scopus_candidate_observations USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturer_scopus_candidate_observations",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_candidate_observations_candidate_run ON public.lecturer_scopus_candidate_observations USING btree (candidate_id, generation_run_id)",
+     "method": "btree",
+     "name": "uq_candidate_observations_candidate_run",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 80,
+   "uniques": [
+    {
+     "cols": [
+      "candidate_id",
+      "generation_run_id"
+     ],
+     "name": "uq_candidate_observations_candidate_run"
+    }
+   ]
+  },
+  "lecturer_scopus_candidate_reviews": {
+   "checks": [
+    {
+     "expr": "CHECK (((action)::text = ANY ((ARRAY['ACCEPT'::character varying, 'REJECT'::character varying, 'REOPEN'::character varying])::text[])))",
+     "name": "ck_lecturer_scopus_candidate_reviews_action"
+    },
+    {
+     "expr": "CHECK ((candidate_version >= 1))",
+     "name": "ck_lecturer_scopus_candidate_reviews_candidate_version"
+    },
+    {
+     "expr": "CHECK ((jsonb_typeof(evidence_snapshot) = 'object'::text))",
+     "name": "ck_lecturer_scopus_candidate_reviews_evidence_snapshot_object"
+    },
+    {
+     "expr": "CHECK (((from_status)::text = ANY ((ARRAY['PENDING'::character varying, 'ACCEPTED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying])::text[])))",
+     "name": "ck_lecturer_scopus_candidate_reviews_from_status"
+    },
+    {
+     "expr": "CHECK ((((action)::text = 'ACCEPT'::text) OR ((reason IS NOT NULL) AND (btrim(reason) <> ''::text))))",
+     "name": "ck_lecturer_scopus_candidate_reviews_reason_required"
+    },
+    {
+     "expr": "CHECK (((to_status)::text = ANY ((ARRAY['PENDING'::character varying, 'ACCEPTED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying])::text[])))",
+     "name": "ck_lecturer_scopus_candidate_reviews_to_status"
+    },
+    {
+     "expr": "CHECK (((((action)::text = 'ACCEPT'::text) AND ((from_status)::text = 'PENDING'::text) AND ((to_status)::text = 'ACCEPTED'::text)) OR (((action)::text = 'REJECT'::text) AND ((from_status)::text = 'PENDING'::text) AND ((to_status)::text = 'REJECTED'::text)) OR (((action)::text = 'REOPEN'::text) AND ((from_status)::text = ANY ((ARRAY['ACCEPTED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying])::text[])) AND ((to_status)::text = 'PENDING'::text))))",
+     "name": "ck_lecturer_scopus_candidate_reviews_transitions"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "candidate_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "observation_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "reviewer_user_id",
+     "nullable": false,
+     "pos": 4,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "action",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "from_status",
+     "nullable": false,
+     "pos": 6,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "to_status",
+     "nullable": false,
+     "pos": 7,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "candidate_version",
+     "nullable": false,
+     "pos": 8,
+     "type": "integer"
+    },
+    {
+     "default": null,
+     "name": "reason",
+     "nullable": true,
+     "pos": 9,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "evidence_snapshot",
+     "nullable": false,
+     "pos": 10,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "resulting_identity_id",
+     "nullable": true,
+     "pos": 11,
+     "type": "uuid"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 12,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "candidate_id"
+     ],
+     "name": "fk_lecturer_scopus_candidate_reviews_candidate_id_lectu_d610",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturer_scopus_candidates"
+    },
+    {
+     "cols": [
+      "observation_id"
+     ],
+     "name": "fk_lecturer_scopus_candidate_reviews_observation_id_lec_05f7",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturer_scopus_candidate_observations"
+    },
+    {
+     "cols": [
+      "resulting_identity_id"
+     ],
+     "name": "fk_lecturer_scopus_candidate_reviews_resulting_identity_a592",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturer_scopus_identities"
+    },
+    {
+     "cols": [
+      "reviewer_user_id"
+     ],
+     "name": "fk_lecturer_scopus_candidate_reviews_reviewer_user_id_users",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "users"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_candidate_reviews_candidate_created ON public.lecturer_scopus_candidate_reviews USING btree (candidate_id, created_at)",
+     "method": "btree",
+     "name": "ix_candidate_reviews_candidate_created",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_candidate_reviews_observation ON public.lecturer_scopus_candidate_reviews USING btree (observation_id)",
+     "method": "btree",
+     "name": "ix_candidate_reviews_observation",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_candidate_reviews_reviewer ON public.lecturer_scopus_candidate_reviews USING btree (reviewer_user_id)",
+     "method": "btree",
+     "name": "ix_candidate_reviews_reviewer",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturer_scopus_candidate_reviews ON public.lecturer_scopus_candidate_reviews USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturer_scopus_candidate_reviews",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 0,
+   "uniques": []
+  },
+  "lecturer_scopus_candidates": {
+   "checks": [
+    {
+     "expr": "CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'ACCEPTED'::character varying, 'REJECTED'::character varying, 'SUPERSEDED'::character varying])::text[])))",
+     "name": "ck_lecturer_scopus_candidates_status"
+    },
+    {
+     "expr": "CHECK ((version >= 1))",
+     "name": "ck_lecturer_scopus_candidates_version"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "lecturer_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "scopus_author_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": "'PENDING'::character varying",
+     "name": "status",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(20)"
+    },
+    {
+     "default": "now()",
+     "name": "first_seen_at",
+     "nullable": false,
+     "pos": 5,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "last_seen_at",
+     "nullable": false,
+     "pos": 6,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "1",
+     "name": "version",
+     "nullable": false,
+     "pos": 7,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 8,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 9,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "lecturer_id"
+     ],
+     "name": "fk_lecturer_scopus_candidates_lecturer_id_lecturers",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturers"
+    },
+    {
+     "cols": [
+      "scopus_author_id"
+     ],
+     "name": "fk_lecturer_scopus_candidates_scopus_author_id_scopus_authors",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "scopus_authors"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturer_scopus_candidates_lecturer ON public.lecturer_scopus_candidates USING btree (lecturer_id)",
+     "method": "btree",
+     "name": "ix_lecturer_scopus_candidates_lecturer",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturer_scopus_candidates_scopus_author ON public.lecturer_scopus_candidates USING btree (scopus_author_id)",
+     "method": "btree",
+     "name": "ix_lecturer_scopus_candidates_scopus_author",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturer_scopus_candidates_status_updated ON public.lecturer_scopus_candidates USING btree (status, updated_at)",
+     "method": "btree",
+     "name": "ix_lecturer_scopus_candidates_status_updated",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturer_scopus_candidates ON public.lecturer_scopus_candidates USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturer_scopus_candidates",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_lecturer_scopus_candidates_pair ON public.lecturer_scopus_candidates USING btree (lecturer_id, scopus_author_id)",
+     "method": "btree",
+     "name": "uq_lecturer_scopus_candidates_pair",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 40,
+   "uniques": [
+    {
+     "cols": [
+      "lecturer_id",
+      "scopus_author_id"
+     ],
+     "name": "uq_lecturer_scopus_candidates_pair"
+    }
+   ]
+  },
+  "lecturer_scopus_identities": {
+   "checks": [
+    {
+     "expr": "CHECK (((recommendation IS NULL) OR ((recommendation)::text = ANY ((ARRAY['MATCH'::character varying, 'NO_MATCH'::character varying, 'MANUAL_VERIFY'::character varying])::text[]))))",
+     "name": "ck_lecturer_scopus_identities_recommendation"
+    },
+    {
+     "expr": "CHECK ((((recommendation IS NULL) AND (recommendation_algorithm_version IS NULL) AND (recommended_at IS NULL)) OR ((recommendation IS NOT NULL) AND (recommendation_algorithm_version IS NOT NULL) AND (recommended_at IS NOT NULL))))",
+     "name": "ck_lecturer_scopus_identities_recommendation_consistency"
+    },
+    {
+     "expr": "CHECK (((status)::text = ANY ((ARRAY['CANDIDATE'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying, 'REVOKED'::character varying])::text[])))",
+     "name": "ck_lecturer_scopus_identities_status"
+    },
+    {
+     "expr": "CHECK ((version >= 1))",
+     "name": "ck_lecturer_scopus_identities_version"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "lecturer_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "scopus_author_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": "'CANDIDATE'::character varying",
+     "name": "status",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "recommendation",
+     "nullable": true,
+     "pos": 5,
+     "type": "character varying(30)"
+    },
+    {
+     "default": null,
+     "name": "recommendation_algorithm_version",
+     "nullable": true,
+     "pos": 6,
+     "type": "character varying(100)"
+    },
+    {
+     "default": null,
+     "name": "recommended_at",
+     "nullable": true,
+     "pos": 7,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "1",
+     "name": "version",
+     "nullable": false,
+     "pos": 8,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 9,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "lecturer_id"
+     ],
+     "name": "fk_lecturer_scopus_identities_lecturer_id_lecturers",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturers"
+    },
+    {
+     "cols": [
+      "scopus_author_id"
+     ],
+     "name": "fk_lecturer_scopus_identities_scopus_author_id_scopus_authors",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "scopus_authors"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_identities_scopus_author_id ON public.lecturer_scopus_identities USING btree (scopus_author_id)",
+     "method": "btree",
+     "name": "ix_identities_scopus_author_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_identities_status_updated ON public.lecturer_scopus_identities USING btree (status, updated_at)",
+     "method": "btree",
+     "name": "ix_identities_status_updated",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturer_scopus_identities ON public.lecturer_scopus_identities USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturer_scopus_identities",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE UNIQUE INDEX uq_identities_scopus_author_approved ON public.lecturer_scopus_identities USING btree (scopus_author_id) WHERE ((status)::text = 'APPROVED'::text)",
+     "method": "btree",
+     "name": "uq_identities_scopus_author_approved",
+     "predicate": "((status)::text = 'APPROVED'::text)",
+     "primary": false,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_lecturer_scopus_identities_pair ON public.lecturer_scopus_identities USING btree (lecturer_id, scopus_author_id)",
+     "method": "btree",
+     "name": "uq_lecturer_scopus_identities_pair",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 0,
+   "uniques": [
+    {
+     "cols": [
+      "lecturer_id",
+      "scopus_author_id"
+     ],
+     "name": "uq_lecturer_scopus_identities_pair"
+    }
+   ]
+  },
+  "lecturer_source_snapshots": {
+   "checks": [
+    {
+     "expr": "CHECK ((jsonb_typeof(raw_payload) = 'object'::text))",
+     "name": "ck_lecturer_source_snapshots_raw_payload_object"
+    },
+    {
+     "expr": "CHECK (((snapshot_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+     "name": "ck_lecturer_source_snapshots_snapshot_hash"
+    },
+    {
+     "expr": "CHECK (((validation_errors IS NULL) OR (jsonb_typeof(validation_errors) = 'array'::text)))",
+     "name": "ck_lecturer_source_snapshots_validation_errors_array"
+    },
+    {
+     "expr": "CHECK (((validation_status)::text = ANY ((ARRAY['VALID'::character varying, 'INVALID'::character varying])::text[])))",
+     "name": "ck_lecturer_source_snapshots_validation_status"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "lecturer_id",
+     "nullable": true,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "source_system",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "source_url",
+     "nullable": false,
+     "pos": 4,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "snapshot_hash",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(64)"
+    },
+    {
+     "default": null,
+     "name": "raw_payload",
+     "nullable": false,
+     "pos": 6,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "parser_version",
+     "nullable": false,
+     "pos": 7,
+     "type": "character varying(100)"
+    },
+    {
+     "default": null,
+     "name": "validation_status",
+     "nullable": false,
+     "pos": 8,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "validation_errors",
+     "nullable": true,
+     "pos": 9,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "fetched_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 11,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "lecturer_id"
+     ],
+     "name": "fk_lecturer_source_snapshots_lecturer_id_lecturers",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturers"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturer_source_snapshots_lecturer_id ON public.lecturer_source_snapshots USING btree (lecturer_id)",
+     "method": "btree",
+     "name": "ix_lecturer_source_snapshots_lecturer_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_snapshots_source_lookup ON public.lecturer_source_snapshots USING btree (source_system, source_url, fetched_at)",
+     "method": "btree",
+     "name": "ix_snapshots_source_lookup",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturer_source_snapshots ON public.lecturer_source_snapshots USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturer_source_snapshots",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_lecturer_source_snapshots_id_lecturer ON public.lecturer_source_snapshots USING btree (id, lecturer_id)",
+     "method": "btree",
+     "name": "uq_lecturer_source_snapshots_id_lecturer",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 1687,
+   "uniques": [
+    {
+     "cols": [
+      "id",
+      "lecturer_id"
+     ],
+     "name": "uq_lecturer_source_snapshots_id_lecturer"
+    }
+   ]
+  },
+  "lecturers": {
+   "checks": [
+    {
+     "expr": "CHECK (((orcid IS NULL) OR ((orcid)::text ~ '^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$'::text)))",
+     "name": "ck_lecturers_orcid_format"
+    },
+    {
+     "expr": "CHECK ((version >= 1))",
+     "name": "ck_lecturers_version"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "staff_code",
+     "nullable": true,
+     "pos": 2,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "full_name",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "full_name_normalized",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "email",
+     "nullable": true,
+     "pos": 5,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "academic_rank",
+     "nullable": true,
+     "pos": 6,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "academic_degree",
+     "nullable": true,
+     "pos": 7,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "position",
+     "nullable": true,
+     "pos": 8,
+     "type": "character varying(100)"
+    },
+    {
+     "default": null,
+     "name": "department",
+     "nullable": true,
+     "pos": 9,
+     "type": "character varying(150)"
+    },
+    {
+     "default": null,
+     "name": "faculty",
+     "nullable": true,
+     "pos": 10,
+     "type": "character varying(150)"
+    },
+    {
+     "default": null,
+     "name": "repository_profile_url",
+     "nullable": true,
+     "pos": 11,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "repository_profile_id",
+     "nullable": true,
+     "pos": 12,
+     "type": "character varying(100)"
+    },
+    {
+     "default": null,
+     "name": "orcid",
+     "nullable": true,
+     "pos": 13,
+     "type": "character varying(19)"
+    },
+    {
+     "default": "true",
+     "name": "is_active",
+     "nullable": false,
+     "pos": 14,
+     "type": "boolean"
+    },
+    {
+     "default": "1",
+     "name": "version",
+     "nullable": false,
+     "pos": 15,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 16,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 17,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturers_email_ci ON public.lecturers USING btree (lower((email)::text)) WHERE (email IS NOT NULL)",
+     "method": "btree",
+     "name": "ix_lecturers_email_ci",
+     "predicate": "(email IS NOT NULL)",
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_lecturers_full_name_normalized ON public.lecturers USING btree (full_name_normalized)",
+     "method": "btree",
+     "name": "ix_lecturers_full_name_normalized",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_lecturers ON public.lecturers USING btree (id)",
+     "method": "btree",
+     "name": "pk_lecturers",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE UNIQUE INDEX uq_lecturers_orcid ON public.lecturers USING btree (orcid) WHERE (orcid IS NOT NULL)",
+     "method": "btree",
+     "name": "uq_lecturers_orcid",
+     "predicate": "(orcid IS NOT NULL)",
+     "primary": false,
+     "unique": true
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE UNIQUE INDEX uq_lecturers_staff_code ON public.lecturers USING btree (staff_code) WHERE (staff_code IS NOT NULL)",
+     "method": "btree",
+     "name": "uq_lecturers_staff_code",
+     "predicate": "(staff_code IS NOT NULL)",
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 411,
+   "uniques": []
+  },
+  "mapping_reviews": {
+   "checks": [
+    {
+     "expr": "CHECK (((action)::text = ANY ((ARRAY['APPROVE'::character varying, 'REJECT'::character varying, 'REVOKE'::character varying, 'REOPEN'::character varying])::text[])))",
+     "name": "ck_mapping_reviews_action"
+    },
+    {
+     "expr": "CHECK (((((action)::text = ANY ((ARRAY['APPROVE'::character varying, 'REJECT'::character varying])::text[])) AND (compensates_review_id IS NULL)) OR (((action)::text = ANY ((ARRAY['REVOKE'::character varying, 'REOPEN'::character varying])::text[])) AND (compensates_review_id IS NOT NULL))))",
+     "name": "ck_mapping_reviews_compensates"
+    },
+    {
+     "expr": "CHECK ((jsonb_typeof(evidence_snapshot) = 'object'::text))",
+     "name": "ck_mapping_reviews_evidence_snapshot_object"
+    },
+    {
+     "expr": "CHECK ((((action)::text = 'APPROVE'::text) OR ((reason IS NOT NULL) AND (btrim(reason) <> ''::text))))",
+     "name": "ck_mapping_reviews_reason_required"
+    },
+    {
+     "expr": "CHECK (((((action)::text = 'APPROVE'::text) AND ((from_status)::text = 'CANDIDATE'::text) AND ((to_status)::text = 'APPROVED'::text)) OR (((action)::text = 'REJECT'::text) AND ((from_status)::text = 'CANDIDATE'::text) AND ((to_status)::text = 'REJECTED'::text)) OR (((action)::text = 'REVOKE'::text) AND ((from_status)::text = 'APPROVED'::text) AND ((to_status)::text = 'REVOKED'::text)) OR (((action)::text = 'REOPEN'::text) AND ((from_status)::text = ANY ((ARRAY['REJECTED'::character varying, 'REVOKED'::character varying])::text[])) AND ((to_status)::text = 'CANDIDATE'::text))))",
+     "name": "ck_mapping_reviews_transitions"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "identity_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "reviewer_user_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "action",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "from_status",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "to_status",
+     "nullable": false,
+     "pos": 6,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "reason",
+     "nullable": true,
+     "pos": 7,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "evidence_snapshot",
+     "nullable": false,
+     "pos": 8,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "compensates_review_id",
+     "nullable": true,
+     "pos": 9,
+     "type": "uuid"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "compensates_review_id"
+     ],
+     "name": "fk_mapping_reviews_compensates_review_id_mapping_reviews",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "mapping_reviews"
+    },
+    {
+     "cols": [
+      "identity_id"
+     ],
+     "name": "fk_mapping_reviews_identity_id_lecturer_scopus_identities",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturer_scopus_identities"
+    },
+    {
+     "cols": [
+      "reviewer_user_id"
+     ],
+     "name": "fk_mapping_reviews_reviewer_user_id_users",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "users"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_mapping_reviews_compensates ON public.mapping_reviews USING btree (compensates_review_id) WHERE (compensates_review_id IS NOT NULL)",
+     "method": "btree",
+     "name": "ix_mapping_reviews_compensates",
+     "predicate": "(compensates_review_id IS NOT NULL)",
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_mapping_reviews_identity_id ON public.mapping_reviews USING btree (identity_id)",
+     "method": "btree",
+     "name": "ix_mapping_reviews_identity_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_mapping_reviews_reviewer ON public.mapping_reviews USING btree (reviewer_user_id)",
+     "method": "btree",
+     "name": "ix_mapping_reviews_reviewer",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_mapping_reviews ON public.mapping_reviews USING btree (id)",
+     "method": "btree",
+     "name": "pk_mapping_reviews",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 0,
+   "uniques": []
+  },
+  "organizations": {
+   "checks": [
+    {
+     "expr": "CHECK (((country_code IS NULL) OR ((country_code)::text ~ '^[A-Z]{2}$'::text)))",
+     "name": "ck_organizations_country_code"
+    },
+    {
+     "expr": "CHECK ((btrim(display_name) <> ''::text))",
+     "name": "ck_organizations_display_name"
+    },
+    {
+     "expr": "CHECK (((source_org_id IS NULL) OR (btrim(source_org_id) <> ''::text)))",
+     "name": "ck_organizations_source_org_id"
+    },
+    {
+     "expr": "CHECK ((btrim((source_system)::text) <> ''::text))",
+     "name": "ck_organizations_source_system"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "source_system",
+     "nullable": false,
+     "pos": 2,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "source_org_id",
+     "nullable": true,
+     "pos": 3,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "ror",
+     "nullable": true,
+     "pos": 4,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "display_name",
+     "nullable": false,
+     "pos": 5,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "country_code",
+     "nullable": true,
+     "pos": 6,
+     "type": "character varying(2)"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 7,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_organizations_ror ON public.organizations USING btree (ror)",
+     "method": "btree",
+     "name": "ix_organizations_ror",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_organizations ON public.organizations USING btree (id)",
+     "method": "btree",
+     "name": "pk_organizations",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE UNIQUE INDEX uq_organizations_source_name ON public.organizations USING btree (source_system, display_name) WHERE (source_org_id IS NULL)",
+     "method": "btree",
+     "name": "uq_organizations_source_name",
+     "predicate": "(source_org_id IS NULL)",
+     "primary": false,
+     "unique": true
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE UNIQUE INDEX uq_organizations_source_org ON public.organizations USING btree (source_system, source_org_id) WHERE (source_org_id IS NOT NULL)",
+     "method": "btree",
+     "name": "uq_organizations_source_org",
+     "predicate": "(source_org_id IS NOT NULL)",
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 217,
+   "uniques": []
+  },
+  "publication_author_affiliation_resolutions": {
+   "checks": [
+    {
+     "expr": "CHECK ((jsonb_typeof(evidence) = 'object'::text))",
+     "name": "ck_publication_author_affiliation_resolutions_evidence_object"
+    },
+    {
+     "expr": "CHECK (((external_position IS NULL) OR (external_position >= 1)))",
+     "name": "ck_publication_author_affiliation_resolutions_ext_position"
+    },
+    {
+     "expr": "CHECK (((((link_status)::text = 'VERIFIED'::text) AND (link_method IS NOT NULL) AND ((link_method)::text = 'ORCID_SCOPUS_ID_BRIDGE'::text)) OR (((link_status)::text = 'CORROBORATED'::text) AND (link_method IS NOT NULL) AND ((link_method)::text = 'POSITION_COUNT_NAME'::text)) OR (((link_status)::text = 'UNRESOLVED'::text) AND (link_method IS NULL))))",
+     "name": "ck_publication_author_affiliation_resolutions_link_method"
+    },
+    {
+     "expr": "CHECK (((link_status)::text = ANY ((ARRAY['VERIFIED'::character varying, 'CORROBORATED'::character varying, 'UNRESOLVED'::character varying])::text[])))",
+     "name": "ck_publication_author_affiliation_resolutions_link_status"
+    },
+    {
+     "expr": "CHECK (((external_author_orcid IS NULL) OR ((external_author_orcid)::text ~ '^[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{3}[0-9X]$'::text)))",
+     "name": "ck_publication_author_affiliation_resolutions_orcid_format"
+    },
+    {
+     "expr": "CHECK (((source_payload_sha256)::text ~ '^[0-9a-f]{64}$'::text))",
+     "name": "ck_publication_author_affiliation_resolutions_payload_hash"
+    },
+    {
+     "expr": "CHECK (((((link_status)::text = 'UNRESOLVED'::text) AND (affiliation_presence IS NULL)) OR (((link_status)::text <> 'UNRESOLVED'::text) AND (affiliation_presence IS NOT NULL) AND ((affiliation_presence)::text = ANY ((ARRAY['PRESENT'::character varying, 'ABSENT'::character varying])::text[])))))",
+     "name": "ck_publication_author_affiliation_resolutions_presence"
+    },
+    {
+     "expr": "CHECK (((((link_status)::text = 'UNRESOLVED'::text) = (unresolved_reason IS NOT NULL)) AND ((unresolved_reason IS NULL) OR (btrim((unresolved_reason)::text) <> ''::text))))",
+     "name": "ck_publication_author_affiliation_resolutions_reason"
+    },
+    {
+     "expr": "CHECK ((((link_status)::text = 'UNRESOLVED'::text) OR (retrieved_at IS NOT NULL)))",
+     "name": "ck_publication_author_affiliation_resolutions_retrieved_at"
+    },
+    {
+     "expr": "CHECK ((btrim((source_system)::text) <> ''::text))",
+     "name": "ck_publication_author_affiliation_resolutions_source_system"
+    },
+    {
+     "expr": "CHECK ((((link_status)::text = 'UNRESOLVED'::text) OR (external_position IS NOT NULL)))",
+     "name": "ck_publication_author_affiliation_resolutions_trusted_position"
+    },
+    {
+     "expr": "CHECK ((((link_status)::text <> 'VERIFIED'::text) OR (external_author_orcid IS NOT NULL)))",
+     "name": "ck_publication_author_affiliation_resolutions_verified_orcid"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "publication_author_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "source_system",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "source_payload_sha256",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(64)"
+    },
+    {
+     "default": null,
+     "name": "link_status",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "link_method",
+     "nullable": true,
+     "pos": 6,
+     "type": "character varying(40)"
+    },
+    {
+     "default": null,
+     "name": "unresolved_reason",
+     "nullable": true,
+     "pos": 7,
+     "type": "character varying(80)"
+    },
+    {
+     "default": null,
+     "name": "affiliation_presence",
+     "nullable": true,
+     "pos": 8,
+     "type": "character varying(10)"
+    },
+    {
+     "default": "'{}'::jsonb",
+     "name": "evidence",
+     "nullable": false,
+     "pos": 9,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "source_doi",
+     "nullable": true,
+     "pos": 10,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "source_work_id",
+     "nullable": true,
+     "pos": 11,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "external_position",
+     "nullable": true,
+     "pos": 12,
+     "type": "integer"
+    },
+    {
+     "default": null,
+     "name": "external_author_name",
+     "nullable": true,
+     "pos": 13,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "external_author_orcid",
+     "nullable": true,
+     "pos": 14,
+     "type": "character varying(19)"
+    },
+    {
+     "default": null,
+     "name": "retrieved_at",
+     "nullable": true,
+     "pos": 15,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": null,
+     "name": "importer_version",
+     "nullable": false,
+     "pos": 16,
+     "type": "character varying(40)"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 17,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "publication_author_id"
+     ],
+     "name": "fk_paar_publication_author_id",
+     "on_delete": "CASCADE",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "publication_authors"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_paar_publication_author ON public.publication_author_affiliation_resolutions USING btree (publication_author_id)",
+     "method": "btree",
+     "name": "ix_paar_publication_author",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_paar_source_status ON public.publication_author_affiliation_resolutions USING btree (source_system, link_status)",
+     "method": "btree",
+     "name": "ix_paar_source_status",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_publication_author_affiliation_resolutions ON public.publication_author_affiliation_resolutions USING btree (id)",
+     "method": "btree",
+     "name": "pk_publication_author_affiliation_resolutions",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_paar_author_source_payload ON public.publication_author_affiliation_resolutions USING btree (publication_author_id, source_system, source_payload_sha256)",
+     "method": "btree",
+     "name": "uq_paar_author_source_payload",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_paar_id_link_status ON public.publication_author_affiliation_resolutions USING btree (id, link_status)",
+     "method": "btree",
+     "name": "uq_paar_id_link_status",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 5502,
+   "uniques": [
+    {
+     "cols": [
+      "publication_author_id",
+      "source_system",
+      "source_payload_sha256"
+     ],
+     "name": "uq_paar_author_source_payload"
+    },
+    {
+     "cols": [
+      "id",
+      "link_status"
+     ],
+     "name": "uq_paar_id_link_status"
+    }
+   ]
+  },
+  "publication_author_affiliations": {
+   "checks": [
+    {
+     "expr": "CHECK (((raw_affiliation_text IS NOT NULL) OR (organization_id IS NOT NULL)))",
+     "name": "ck_publication_author_affiliations_content"
+    },
+    {
+     "expr": "CHECK (((link_status)::text = ANY ((ARRAY['VERIFIED'::character varying, 'CORROBORATED'::character varying])::text[])))",
+     "name": "ck_publication_author_affiliations_link_status"
+    },
+    {
+     "expr": "CHECK ((ord >= 1))",
+     "name": "ck_publication_author_affiliations_ord"
+    },
+    {
+     "expr": "CHECK ((((raw_index IS NULL) = (raw_affiliation_text IS NULL)) AND ((raw_index IS NULL) OR (raw_index >= 1)) AND ((raw_affiliation_text IS NULL) OR (btrim(raw_affiliation_text) <> ''::text))))",
+     "name": "ck_publication_author_affiliations_raw_text"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "resolution_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "link_status",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "ord",
+     "nullable": false,
+     "pos": 4,
+     "type": "integer"
+    },
+    {
+     "default": null,
+     "name": "raw_index",
+     "nullable": true,
+     "pos": 5,
+     "type": "integer"
+    },
+    {
+     "default": null,
+     "name": "raw_affiliation_text",
+     "nullable": true,
+     "pos": 6,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "organization_id",
+     "nullable": true,
+     "pos": 7,
+     "type": "uuid"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 8,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "organization_id"
+     ],
+     "name": "fk_paa_organization_id",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "organizations"
+    },
+    {
+     "cols": [
+      "resolution_id",
+      "link_status"
+     ],
+     "name": "fk_paa_resolution_link_status",
+     "on_delete": "CASCADE",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id",
+      "link_status"
+     ],
+     "ref_table": "publication_author_affiliation_resolutions"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_paa_organization_id ON public.publication_author_affiliations USING btree (organization_id)",
+     "method": "btree",
+     "name": "ix_paa_organization_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_publication_author_affiliations ON public.publication_author_affiliations USING btree (id)",
+     "method": "btree",
+     "name": "pk_publication_author_affiliations",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_paa_resolution_ord ON public.publication_author_affiliations USING btree (resolution_id, ord)",
+     "method": "btree",
+     "name": "uq_paa_resolution_ord",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 4147,
+   "uniques": [
+    {
+     "cols": [
+      "resolution_id",
+      "ord"
+     ],
+     "name": "uq_paa_resolution_ord"
+    }
+   ]
+  },
+  "publication_authors": {
+   "checks": [
+    {
+     "expr": "CHECK ((author_order >= 1))",
+     "name": "ck_publication_authors_author_order"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "publication_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "scopus_author_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "author_order",
+     "nullable": false,
+     "pos": 4,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 5,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "publication_id"
+     ],
+     "name": "fk_publication_authors_publication_id_publications",
+     "on_delete": "CASCADE",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "publications"
+    },
+    {
+     "cols": [
+      "scopus_author_id"
+     ],
+     "name": "fk_publication_authors_scopus_author_id_scopus_authors",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "scopus_authors"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_publication_authors_scopus_author_id ON public.publication_authors USING btree (scopus_author_id)",
+     "method": "btree",
+     "name": "ix_publication_authors_scopus_author_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_publication_authors ON public.publication_authors USING btree (id)",
+     "method": "btree",
+     "name": "pk_publication_authors",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_publication_authors_author ON public.publication_authors USING btree (publication_id, scopus_author_id)",
+     "method": "btree",
+     "name": "uq_publication_authors_author",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_publication_authors_order ON public.publication_authors USING btree (publication_id, author_order)",
+     "method": "btree",
+     "name": "uq_publication_authors_order",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 2751,
+   "uniques": [
+    {
+     "cols": [
+      "publication_id",
+      "scopus_author_id"
+     ],
+     "name": "uq_publication_authors_author"
+    },
+    {
+     "cols": [
+      "publication_id",
+      "author_order"
+     ],
+     "name": "uq_publication_authors_order"
+    }
+   ]
+  },
+  "publication_raw_sources": {
+   "checks": [],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "publication_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "raw_record_id",
+     "nullable": false,
+     "pos": 3,
+     "type": "uuid"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 4,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "publication_id"
+     ],
+     "name": "fk_publication_raw_sources_publication_id_publications",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "publications"
+    },
+    {
+     "cols": [
+      "raw_record_id"
+     ],
+     "name": "fk_publication_raw_sources_raw_record_id_raw_scopus_records",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "raw_scopus_records"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_publication_raw_sources_publication_id ON public.publication_raw_sources USING btree (publication_id)",
+     "method": "btree",
+     "name": "ix_publication_raw_sources_publication_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_publication_raw_sources ON public.publication_raw_sources USING btree (id)",
+     "method": "btree",
+     "name": "pk_publication_raw_sources",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_publication_raw_sources_raw_record_id ON public.publication_raw_sources USING btree (raw_record_id)",
+     "method": "btree",
+     "name": "uq_publication_raw_sources_raw_record_id",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 660,
+   "uniques": [
+    {
+     "cols": [
+      "raw_record_id"
+     ],
+     "name": "uq_publication_raw_sources_raw_record_id"
+    }
+   ]
+  },
+  "publications": {
+   "checks": [
+    {
+     "expr": "CHECK (((cited_by_count IS NULL) OR (cited_by_count >= 0)))",
+     "name": "ck_publications_cited_by_count"
+    },
+    {
+     "expr": "CHECK ((btrim(eid) <> ''::text))",
+     "name": "ck_publications_eid_not_empty"
+    },
+    {
+     "expr": "CHECK ((version >= 1))",
+     "name": "ck_publications_version"
+    },
+    {
+     "expr": "CHECK (((year IS NULL) OR ((year >= 1000) AND (year <= 9999))))",
+     "name": "ck_publications_year_range"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "eid",
+     "nullable": false,
+     "pos": 2,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "doi",
+     "nullable": true,
+     "pos": 3,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "title",
+     "nullable": false,
+     "pos": 4,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "title_normalized",
+     "nullable": false,
+     "pos": 5,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "source_title",
+     "nullable": true,
+     "pos": 6,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "year",
+     "nullable": true,
+     "pos": 7,
+     "type": "integer"
+    },
+    {
+     "default": null,
+     "name": "volume",
+     "nullable": true,
+     "pos": 8,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "issue",
+     "nullable": true,
+     "pos": 9,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "art_no",
+     "nullable": true,
+     "pos": 10,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "page_start",
+     "nullable": true,
+     "pos": 11,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "page_end",
+     "nullable": true,
+     "pos": 12,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "cited_by_count",
+     "nullable": true,
+     "pos": 13,
+     "type": "integer"
+    },
+    {
+     "default": null,
+     "name": "document_type",
+     "nullable": true,
+     "pos": 14,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "publication_stage",
+     "nullable": true,
+     "pos": 15,
+     "type": "character varying(50)"
+    },
+    {
+     "default": null,
+     "name": "open_access_status",
+     "nullable": true,
+     "pos": 16,
+     "type": "character varying(50)"
+    },
+    {
+     "default": "1",
+     "name": "version",
+     "nullable": false,
+     "pos": 17,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 18,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 19,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_publications_doi ON public.publications USING btree (doi) WHERE (doi IS NOT NULL)",
+     "method": "btree",
+     "name": "ix_publications_doi",
+     "predicate": "(doi IS NOT NULL)",
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_publications_year ON public.publications USING btree (year)",
+     "method": "btree",
+     "name": "ix_publications_year",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_publications ON public.publications USING btree (id)",
+     "method": "btree",
+     "name": "pk_publications",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_publications_eid ON public.publications USING btree (eid)",
+     "method": "btree",
+     "name": "uq_publications_eid",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 660,
+   "uniques": [
+    {
+     "cols": [
+      "eid"
+     ],
+     "name": "uq_publications_eid"
+    }
+   ]
+  },
+  "raw_scopus_records": {
+   "checks": [
+    {
+     "expr": "CHECK ((jsonb_typeof(raw_payload) = 'object'::text))",
+     "name": "ck_raw_scopus_records_raw_payload_object"
+    },
+    {
+     "expr": "CHECK (((row_hash)::text ~ '^[0-9a-f]{64}$'::text))",
+     "name": "ck_raw_scopus_records_row_hash"
+    },
+    {
+     "expr": "CHECK ((row_number >= 1))",
+     "name": "ck_raw_scopus_records_row_number"
+    },
+    {
+     "expr": "CHECK (((validation_errors IS NULL) OR (jsonb_typeof(validation_errors) = 'array'::text)))",
+     "name": "ck_raw_scopus_records_validation_errors_array"
+    },
+    {
+     "expr": "CHECK (((validation_status)::text = ANY ((ARRAY['VALID'::character varying, 'INVALID'::character varying])::text[])))",
+     "name": "ck_raw_scopus_records_validation_status"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "import_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "row_number",
+     "nullable": false,
+     "pos": 3,
+     "type": "integer"
+    },
+    {
+     "default": null,
+     "name": "row_hash",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(64)"
+    },
+    {
+     "default": null,
+     "name": "eid_raw",
+     "nullable": true,
+     "pos": 5,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "doi_raw",
+     "nullable": true,
+     "pos": 6,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "raw_payload",
+     "nullable": false,
+     "pos": 7,
+     "type": "jsonb"
+    },
+    {
+     "default": null,
+     "name": "validation_status",
+     "nullable": false,
+     "pos": 8,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "validation_errors",
+     "nullable": true,
+     "pos": 9,
+     "type": "jsonb"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "import_id"
+     ],
+     "name": "fk_raw_scopus_records_import_id_scopus_imports",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "scopus_imports"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_raw_scopus_records_doi_raw ON public.raw_scopus_records USING btree (doi_raw) WHERE (doi_raw IS NOT NULL)",
+     "method": "btree",
+     "name": "ix_raw_scopus_records_doi_raw",
+     "predicate": "(doi_raw IS NOT NULL)",
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_raw_scopus_records_eid_raw ON public.raw_scopus_records USING btree (eid_raw) WHERE (eid_raw IS NOT NULL)",
+     "method": "btree",
+     "name": "ix_raw_scopus_records_eid_raw",
+     "predicate": "(eid_raw IS NOT NULL)",
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_raw_scopus_records ON public.raw_scopus_records USING btree (id)",
+     "method": "btree",
+     "name": "pk_raw_scopus_records",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_raw_scopus_records_import_row ON public.raw_scopus_records USING btree (import_id, row_number)",
+     "method": "btree",
+     "name": "uq_raw_scopus_records_import_row",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 660,
+   "uniques": [
+    {
+     "cols": [
+      "import_id",
+      "row_number"
+     ],
+     "name": "uq_raw_scopus_records_import_row"
+    }
+   ]
+  },
+  "scopus_author_name_variants": {
+   "checks": [
+    {
+     "expr": "CHECK (((variant_type)::text = ANY ((ARRAY['AUTHOR_DISPLAY'::character varying, 'AUTHOR_FULL_NAME'::character varying])::text[])))",
+     "name": "ck_scopus_author_name_variants_variant_type"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "scopus_author_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "variant_type",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(30)"
+    },
+    {
+     "default": null,
+     "name": "variant_name",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "variant_name_normalized",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "first_seen_raw_record_id",
+     "nullable": false,
+     "pos": 6,
+     "type": "uuid"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 7,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "first_seen_raw_record_id"
+     ],
+     "name": "fk_scopus_author_name_variants_first_seen_raw_record_id_d3c5",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "raw_scopus_records"
+    },
+    {
+     "cols": [
+      "scopus_author_id"
+     ],
+     "name": "fk_scopus_author_name_variants_scopus_author_id_scopus_authors",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "scopus_authors"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_author_name_variants_normalized ON public.scopus_author_name_variants USING btree (variant_name_normalized)",
+     "method": "btree",
+     "name": "ix_author_name_variants_normalized",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_author_name_variants_raw_source ON public.scopus_author_name_variants USING btree (first_seen_raw_record_id)",
+     "method": "btree",
+     "name": "ix_author_name_variants_raw_source",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_scopus_author_name_variants ON public.scopus_author_name_variants USING btree (id)",
+     "method": "btree",
+     "name": "pk_scopus_author_name_variants",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_author_name_variants ON public.scopus_author_name_variants USING btree (scopus_author_id, variant_type, variant_name)",
+     "method": "btree",
+     "name": "uq_author_name_variants",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 2768,
+   "uniques": [
+    {
+     "cols": [
+      "scopus_author_id",
+      "variant_type",
+      "variant_name"
+     ],
+     "name": "uq_author_name_variants"
+    }
+   ]
+  },
+  "scopus_authors": {
+   "checks": [
+    {
+     "expr": "CHECK ((btrim(scopus_id) <> ''::text))",
+     "name": "ck_scopus_authors_scopus_id_not_empty"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "scopus_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "preferred_name",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(255)"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 4,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 5,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [],
+   "indexes": [
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_scopus_authors ON public.scopus_authors USING btree (id)",
+     "method": "btree",
+     "name": "pk_scopus_authors",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX uq_scopus_authors_scopus_id ON public.scopus_authors USING btree (scopus_id)",
+     "method": "btree",
+     "name": "uq_scopus_authors_scopus_id",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 1207,
+   "uniques": [
+    {
+     "cols": [
+      "scopus_id"
+     ],
+     "name": "uq_scopus_authors_scopus_id"
+    }
+   ]
+  },
+  "scopus_imports": {
+   "checks": [
+    {
+     "expr": "CHECK (((normalization_summary IS NULL) OR (jsonb_typeof(normalization_summary) = 'object'::text)))",
+     "name": "ck_scopus_imports_ck_scopus_imports_normalization_summa_5872"
+    },
+    {
+     "expr": "CHECK (((error_summary IS NULL) OR (jsonb_typeof(error_summary) = 'object'::text)))",
+     "name": "ck_scopus_imports_error_summary_object"
+    },
+    {
+     "expr": "CHECK (((file_sha256)::text ~ '^[0-9a-f]{64}$'::text))",
+     "name": "ck_scopus_imports_file_sha256"
+    },
+    {
+     "expr": "CHECK (((total_records >= 0) AND (valid_records >= 0) AND (invalid_records >= 0)))",
+     "name": "ck_scopus_imports_record_counts"
+    },
+    {
+     "expr": "CHECK (((status)::text = ANY ((ARRAY['RECEIVED'::character varying, 'PARSING'::character varying, 'VALIDATED'::character varying, 'STAGED'::character varying, 'APPLIED'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying])::text[])))",
+     "name": "ck_scopus_imports_status"
+    },
+    {
+     "expr": "CHECK ((version >= 1))",
+     "name": "ck_scopus_imports_version"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "file_name",
+     "nullable": false,
+     "pos": 2,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "file_sha256",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(64)"
+    },
+    {
+     "default": "0",
+     "name": "total_records",
+     "nullable": false,
+     "pos": 4,
+     "type": "integer"
+    },
+    {
+     "default": "0",
+     "name": "valid_records",
+     "nullable": false,
+     "pos": 5,
+     "type": "integer"
+    },
+    {
+     "default": "0",
+     "name": "invalid_records",
+     "nullable": false,
+     "pos": 6,
+     "type": "integer"
+    },
+    {
+     "default": "'RECEIVED'::character varying",
+     "name": "status",
+     "nullable": false,
+     "pos": 7,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "error_summary",
+     "nullable": true,
+     "pos": 8,
+     "type": "jsonb"
+    },
+    {
+     "default": "1",
+     "name": "version",
+     "nullable": false,
+     "pos": 9,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 11,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": null,
+     "name": "normalization_summary",
+     "nullable": true,
+     "pos": 12,
+     "type": "jsonb"
+    }
+   ],
+   "comment": null,
+   "fks": [],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_scopus_imports_file_sha256 ON public.scopus_imports USING btree (file_sha256)",
+     "method": "btree",
+     "name": "ix_scopus_imports_file_sha256",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_scopus_imports_status ON public.scopus_imports USING btree (status)",
+     "method": "btree",
+     "name": "ix_scopus_imports_status",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_scopus_imports ON public.scopus_imports USING btree (id)",
+     "method": "btree",
+     "name": "pk_scopus_imports",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 1,
+   "uniques": []
+  },
+  "user_notifications": {
+   "checks": [
+    {
+     "expr": "CHECK ((jsonb_typeof(metadata) = 'object'::text))",
+     "name": "ck_user_notifications_metadata_object"
+    },
+    {
+     "expr": "CHECK (((notification_type)::text = ANY ((ARRAY['PROFILE_UPDATED'::character varying, 'ROLE_CHANGED'::character varying, 'ACCOUNT_LOCKED'::character varying, 'ACCOUNT_UNLOCKED'::character varying, 'PASSWORD_RESET'::character varying])::text[])))",
+     "name": "ck_user_notifications_notification_type"
+    },
+    {
+     "expr": "CHECK ((((is_read = false) AND (read_at IS NULL)) OR ((is_read = true) AND (read_at IS NOT NULL))))",
+     "name": "ck_user_notifications_read_consistency"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "user_id",
+     "nullable": false,
+     "pos": 2,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "notification_type",
+     "nullable": false,
+     "pos": 3,
+     "type": "character varying(40)"
+    },
+    {
+     "default": null,
+     "name": "title",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "message",
+     "nullable": false,
+     "pos": 5,
+     "type": "text"
+    },
+    {
+     "default": "'{}'::jsonb",
+     "name": "metadata",
+     "nullable": false,
+     "pos": 6,
+     "type": "jsonb"
+    },
+    {
+     "default": "false",
+     "name": "is_read",
+     "nullable": false,
+     "pos": 7,
+     "type": "boolean"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 8,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": null,
+     "name": "read_at",
+     "nullable": true,
+     "pos": 9,
+     "type": "timestamp with time zone"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "user_id"
+     ],
+     "name": "fk_user_notifications_user_id_users",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "users"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_user_notifications_created_at ON public.user_notifications USING btree (created_at)",
+     "method": "btree",
+     "name": "ix_user_notifications_created_at",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_user_notifications_unread_lookup ON public.user_notifications USING btree (user_id, is_read, created_at)",
+     "method": "btree",
+     "name": "ix_user_notifications_unread_lookup",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE INDEX ix_user_notifications_user_id ON public.user_notifications USING btree (user_id)",
+     "method": "btree",
+     "name": "ix_user_notifications_user_id",
+     "predicate": null,
+     "primary": false,
+     "unique": false
+    },
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_user_notifications ON public.user_notifications USING btree (id)",
+     "method": "btree",
+     "name": "pk_user_notifications",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 0,
+   "uniques": []
+  },
+  "users": {
+   "checks": [
+    {
+     "expr": "CHECK ((auth_version >= 1))",
+     "name": "ck_users_auth_version"
+    },
+    {
+     "expr": "CHECK ((btrim((display_name)::text) <> ''::text))",
+     "name": "ck_users_display_name_not_empty"
+    },
+    {
+     "expr": "CHECK ((btrim((email)::text) <> ''::text))",
+     "name": "ck_users_email_not_empty"
+    },
+    {
+     "expr": "CHECK ((((role)::text <> 'LECTURER'::text) OR (lecturer_id IS NOT NULL)))",
+     "name": "ck_users_lecturer_account_required"
+    },
+    {
+     "expr": "CHECK (((role)::text = ANY ((ARRAY['ADMIN'::character varying, 'REVIEWER'::character varying, 'LECTURER'::character varying])::text[])))",
+     "name": "ck_users_role"
+    },
+    {
+     "expr": "CHECK ((version >= 1))",
+     "name": "ck_users_version"
+    }
+   ],
+   "columns": [
+    {
+     "default": "gen_random_uuid()",
+     "name": "id",
+     "nullable": false,
+     "pos": 1,
+     "type": "uuid"
+    },
+    {
+     "default": null,
+     "name": "email",
+     "nullable": false,
+     "pos": 2,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "password_hash",
+     "nullable": false,
+     "pos": 3,
+     "type": "text"
+    },
+    {
+     "default": null,
+     "name": "display_name",
+     "nullable": false,
+     "pos": 4,
+     "type": "character varying(255)"
+    },
+    {
+     "default": null,
+     "name": "role",
+     "nullable": false,
+     "pos": 5,
+     "type": "character varying(20)"
+    },
+    {
+     "default": null,
+     "name": "lecturer_id",
+     "nullable": true,
+     "pos": 6,
+     "type": "uuid"
+    },
+    {
+     "default": "true",
+     "name": "is_active",
+     "nullable": false,
+     "pos": 7,
+     "type": "boolean"
+    },
+    {
+     "default": "1",
+     "name": "version",
+     "nullable": false,
+     "pos": 8,
+     "type": "integer"
+    },
+    {
+     "default": "now()",
+     "name": "created_at",
+     "nullable": false,
+     "pos": 9,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "now()",
+     "name": "updated_at",
+     "nullable": false,
+     "pos": 10,
+     "type": "timestamp with time zone"
+    },
+    {
+     "default": "1",
+     "name": "auth_version",
+     "nullable": false,
+     "pos": 11,
+     "type": "integer"
+    }
+   ],
+   "comment": null,
+   "fks": [
+    {
+     "cols": [
+      "lecturer_id"
+     ],
+     "name": "fk_users_lecturer_id_lecturers",
+     "on_delete": "RESTRICT",
+     "on_update": "NO ACTION",
+     "ref_cols": [
+      "id"
+     ],
+     "ref_table": "lecturers"
+    }
+   ],
+   "indexes": [
+    {
+     "backs_constraint": true,
+     "definition": "CREATE UNIQUE INDEX pk_users ON public.users USING btree (id)",
+     "method": "btree",
+     "name": "pk_users",
+     "predicate": null,
+     "primary": true,
+     "unique": true
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE UNIQUE INDEX uq_users_email_ci ON public.users USING btree (lower((email)::text))",
+     "method": "btree",
+     "name": "uq_users_email_ci",
+     "predicate": null,
+     "primary": false,
+     "unique": true
+    },
+    {
+     "backs_constraint": false,
+     "definition": "CREATE UNIQUE INDEX uq_users_lecturer ON public.users USING btree (lecturer_id) WHERE (lecturer_id IS NOT NULL)",
+     "method": "btree",
+     "name": "uq_users_lecturer",
+     "predicate": "(lecturer_id IS NOT NULL)",
+     "primary": false,
+     "unique": true
+    }
+   ],
+   "pk": [
+    "id"
+   ],
+   "row_count": 3,
+   "uniques": []
+  }
+ }
+}

@@ -1,0 +1,369 @@
+{
+  "_ghi_chu": "Mô tả nghiệp vụ do Task 19 biên soạn dựa trên docstring ORM (backend/app/models), docs/freeze/M1.0-*, ADR 001-004 và mã dịch vụ. Cấu trúc (cột/kiểu/khóa/ràng buộc) KHÔNG nằm ở đây mà lấy từ schema_snapshot.json.",
+  "clusters": {
+    "A": {"name": "Người dùng và kiểm toán", "tables": ["users", "user_notifications", "audit_events"]},
+    "B": {"name": "Hồ sơ giảng viên (dữ liệu chủ)", "tables": ["lecturers", "lecturer_source_snapshots", "lecturer_known_publications"]},
+    "C": {"name": "Nhập dữ liệu thô Scopus", "tables": ["scopus_imports", "raw_scopus_records"]},
+    "D": {"name": "Công bố và tác giả chuẩn hóa", "tables": ["publications", "publication_raw_sources", "scopus_authors", "scopus_author_name_variants", "publication_authors"]},
+    "E": {"name": "Đơn vị công tác theo tác giả (affiliation)", "tables": ["organizations", "publication_author_affiliation_resolutions", "publication_author_affiliations"]},
+    "F": {"name": "Đối sánh, duyệt và danh tính", "tables": ["candidate_generation_runs", "lecturer_scopus_candidates", "lecturer_scopus_candidate_observations", "lecturer_scopus_candidate_evidence", "lecturer_scopus_candidate_reviews", "lecturer_scopus_identities", "identity_evidence", "mapping_reviews"]}
+  },
+  "generic_columns": {
+    "id": "Khóa chính (UUID sinh bởi gen_random_uuid()).",
+    "created_at": "Thời điểm tạo bản ghi (timestamptz, mặc định now()).",
+    "updated_at": "Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).",
+    "version": "Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1."
+  },
+  "tables": {
+    "users": {
+      "title": "Tài khoản đăng nhập",
+      "desc": "Tài khoản và vai trò (ADMIN / REVIEWER / LECTURER). Một hồ sơ giảng viên có tối đa một tài khoản; tài khoản LECTURER bắt buộc gắn hồ sơ giảng viên.",
+      "uc": "UC-01, 02, 06, 20–22",
+      "columns": {
+        "email": "Email đăng nhập; duy nhất không phân biệt hoa/thường (chỉ mục unique trên lower(email)).",
+        "password_hash": "Mật khẩu đã băm (Argon2id). Không bao giờ lưu mật khẩu thô.",
+        "display_name": "Tên hiển thị.",
+        "role": "Vai trò: ADMIN, REVIEWER hoặc LECTURER.",
+        "lecturer_id": "Hồ sơ giảng viên được liên kết (NULL với ADMIN/REVIEWER; bắt buộc với LECTURER; mỗi hồ sơ tối đa 1 tài khoản).",
+        "is_active": "FALSE = tài khoản bị khóa (đăng nhập bị từ chối).",
+        "auth_version": "Tăng khi đổi mật khẩu/vai trò/khóa để thu hồi các phiên (token) cũ."
+      }
+    },
+    "user_notifications": {
+      "title": "Thông báo cho người dùng",
+      "desc": "Thông báo hệ thống gửi tới người dùng khi tài khoản bị tác động (cập nhật hồ sơ, đổi vai trò, khóa/mở khóa, đặt lại mật khẩu). Được lấy về khi tải trang; chưa có trang Thông báo riêng.",
+      "uc": "UC-03, 06",
+      "columns": {
+        "user_id": "Người nhận.",
+        "notification_type": "PROFILE_UPDATED, ROLE_CHANGED, ACCOUNT_LOCKED, ACCOUNT_UNLOCKED, PASSWORD_RESET.",
+        "title": "Tiêu đề thông báo.",
+        "message": "Nội dung thông báo.",
+        "metadata": "Dữ liệu kèm theo (JSON object).",
+        "is_read": "Đã đọc chưa.",
+        "read_at": "Thời điểm đọc (NULL khi chưa đọc; nhất quán với is_read)."
+      }
+    },
+    "audit_events": {
+      "title": "Nhật ký kiểm toán (chỉ ghi thêm)",
+      "desc": "Nhật ký bất biến theo quy ước ADR-003: chỉ INSERT, không UPDATE/DELETE. Tính chỉ-thêm được bảo đảm ở tầng dịch vụ, KHÔNG có trigger/REVOKE trong DB. entity_id là tham chiếu đa hình (không có khóa ngoại).",
+      "uc": "UC-07 và mọi UC có ghi dữ liệu",
+      "columns": {
+        "entity_type": "Loại thực thể bị tác động (snake_case, ví dụ lecturer, publication_export).",
+        "entity_id": "UUID thực thể bị tác động — KHÔNG có khóa ngoại (đa hình theo entity_type).",
+        "action": "Mã hành động IN HOA (ví dụ LECTURER_CREATED, PUBLICATION_DATASET_EXPORTED).",
+        "actor_type": "USER (người dùng) hoặc SYSTEM (tiến trình hệ thống).",
+        "actor_user_id": "Người thực hiện khi actor_type = USER (FK → users).",
+        "actor_service": "Tên dịch vụ/tiến trình khi actor_type = SYSTEM.",
+        "before_state": "Trạng thái trước (JSON object, tùy chọn).",
+        "after_state": "Trạng thái sau (JSON object, tùy chọn).",
+        "reason": "Lý do/ghi chú.",
+        "request_id": "Mã yêu cầu HTTP.",
+        "correlation_id": "Mã tương quan giữa nhiều sự kiện.",
+        "ip_address": "Địa chỉ IP nguồn.",
+        "user_agent": "User-Agent của trình duyệt/máy khách.",
+        "metadata": "Thông tin bổ sung (JSON object), ví dụ record_count/format của lần xuất."
+      }
+    },
+    "lecturers": {
+      "title": "Hồ sơ giảng viên (dữ liệu chủ)",
+      "desc": "Hồ sơ giảng viên ICTU. KHÔNG chứa Scopus Author ID: liên kết giảng viên ↔ Scopus nằm ở lecturer_scopus_candidates / lecturer_scopus_identities. Email hồ sơ được phép trùng (có cảnh báo); mã cán bộ và ORCID duy nhất khi có.",
+      "uc": "UC-05, 08, 09, 18, 20",
+      "columns": {
+        "staff_code": "Mã cán bộ (có thể NULL; duy nhất khi có giá trị).",
+        "full_name": "Họ tên đầy đủ như nguồn (có thể kèm tiền tố học hàm/học vị như TS., ThS.).",
+        "full_name_normalized": "Họ tên đã chuẩn hóa để tra cứu.",
+        "email": "Email đơn vị (cho phép trùng giữa các hồ sơ; có chỉ mục lower(email)).",
+        "academic_rank": "Học hàm.",
+        "academic_degree": "Học vị.",
+        "position": "Chức vụ.",
+        "department": "Bộ môn/phòng ban (phần lớn dữ liệu nguồn còn trống).",
+        "faculty": "Khoa (phần lớn dữ liệu nguồn còn trống).",
+        "repository_profile_url": "Đường dẫn hồ sơ trên ICTU Repository (khóa nguồn).",
+        "repository_profile_id": "Mã hồ sơ trên ICTU Repository.",
+        "orcid": "ORCID (định dạng 0000-0000-0000-000X); duy nhất khi có giá trị.",
+        "is_active": "Hồ sơ còn hiệu lực."
+      }
+    },
+    "lecturer_source_snapshots": {
+      "title": "Bản chụp nguồn của hồ sơ giảng viên",
+      "desc": "Bản chụp bất biến (append-only) dữ liệu nguồn của một lần nhập hồ sơ giảng viên: payload JSON gốc, SHA-256, phiên bản bộ phân tích. Là cha của lecturer_known_publications qua khóa ghép (id, lecturer_id).",
+      "uc": "UC-08, 25",
+      "columns": {
+        "lecturer_id": "Giảng viên được bản chụp mô tả (có thể NULL khi chưa gán).",
+        "source_system": "Hệ nguồn (ví dụ ICTU Repository).",
+        "source_url": "Địa chỉ nguồn.",
+        "snapshot_hash": "SHA-256 của bản chụp (64 ký tự hex).",
+        "raw_payload": "Payload gốc (JSON object).",
+        "parser_version": "Phiên bản bộ phân tích đã xử lý.",
+        "validation_status": "VALID hoặc INVALID.",
+        "validation_errors": "Danh sách lỗi (JSON array) khi INVALID.",
+        "fetched_at": "Thời điểm lấy dữ liệu nguồn."
+      }
+    },
+    "lecturer_known_publications": {
+      "title": "Công bố đã biết của giảng viên (từ nguồn ICTU/Craw)",
+      "desc": "Công bố do nguồn ICTU liệt kê cho một giảng viên; dùng làm bằng chứng công bố khi sinh ứng viên (khớp DOI/tiêu đề với công bố Scopus). Khóa ghép (snapshot_id, lecturer_id) bảo đảm công bố thuộc đúng giảng viên của bản chụp.",
+      "uc": "UC-08, 24, 25",
+      "columns": {
+        "lecturer_id": "Giảng viên sở hữu công bố.",
+        "snapshot_id": "Bản chụp nguồn chứa công bố (FK ghép cùng lecturer_id).",
+        "title_raw": "Tiêu đề nguyên văn.",
+        "title_normalized": "Tiêu đề đã chuẩn hóa để so khớp.",
+        "doi_raw": "DOI nguyên văn.",
+        "doi_normalized": "DOI đã chuẩn hóa (chữ thường, bỏ tiền tố URL) để so khớp.",
+        "source_title_raw": "Tên nguồn xuất bản nguyên văn (chuỗi, không chuẩn hóa).",
+        "published_year": "Năm xuất bản (1000–9999)."
+      }
+    },
+    "scopus_imports": {
+      "title": "Đợt nhập CSV Scopus",
+      "desc": "Một lần tải tệp CSV Scopus: SHA-256 tệp để chống nhập trùng, thống kê bản ghi, vòng đời trạng thái và tóm tắt chuẩn hóa. Không có khóa ngoại tới users (người nhập được truy qua audit_events).",
+      "uc": "UC-10, 11, 12",
+      "columns": {
+        "file_name": "Tên tệp tải lên.",
+        "file_sha256": "SHA-256 nội dung tệp (chống nhập trùng nội dung).",
+        "total_records": "Tổng số dòng dữ liệu.",
+        "valid_records": "Số dòng hợp lệ.",
+        "invalid_records": "Số dòng không hợp lệ.",
+        "status": "RECEIVED, PARSING, VALIDATED, STAGED, APPLIED, FAILED hoặc CANCELLED.",
+        "error_summary": "Tóm tắt lỗi nhập (JSON object).",
+        "normalization_summary": "Bộ đếm kết quả chuẩn hóa công bố/tác giả (JSON object)."
+      }
+    },
+    "raw_scopus_records": {
+      "title": "Dòng dữ liệu thô Scopus (bất biến)",
+      "desc": "Từng dòng CSV được giữ nguyên trong raw_payload (JSON) cùng row_hash; không bị sửa khi chuẩn hóa. EID thô KHÔNG unique ở bảng này (tính duy nhất nằm ở publications.eid).",
+      "uc": "UC-10, 11",
+      "columns": {
+        "import_id": "Đợt nhập chứa dòng.",
+        "row_number": "Số thứ tự dòng trong tệp (>= 1); duy nhất trong một đợt.",
+        "row_hash": "SHA-256 của dòng.",
+        "eid_raw": "EID nguyên văn (có thể trống/sai).",
+        "doi_raw": "DOI nguyên văn.",
+        "raw_payload": "Toàn bộ giá trị các cột của dòng (JSON object).",
+        "validation_status": "VALID hoặc INVALID.",
+        "validation_errors": "Lỗi theo dòng (JSON array) khi INVALID."
+      }
+    },
+    "publications": {
+      "title": "Công bố chuẩn hóa",
+      "desc": "Công bố sau chuẩn hóa, mỗi EID một dòng (khóa chống trùng). DOI lưu theo văn bản nguồn (đã cắt khoảng trắng, chưa chuẩn hóa chữ thường/tiền tố); nguồn xuất bản là chuỗi source_title (CHƯA có bảng thực thể nguồn xuất bản).",
+      "uc": "UC-11, 13–15, 22",
+      "columns": {
+        "eid": "Scopus EID chuẩn tắc (duy nhất).",
+        "doi": "DOI theo văn bản nguồn (chưa chuẩn hóa).",
+        "title": "Tiêu đề công bố.",
+        "title_normalized": "Tiêu đề chuẩn hóa (Unicode NFKC, chữ thường).",
+        "source_title": "Tên nguồn xuất bản (tạp chí/hội nghị) dạng chuỗi.",
+        "year": "Năm xuất bản (1000–9999).",
+        "volume": "Tập.",
+        "issue": "Số.",
+        "art_no": "Mã bài báo.",
+        "page_start": "Trang bắt đầu.",
+        "page_end": "Trang kết thúc.",
+        "cited_by_count": "Số lần được trích dẫn (>= 0).",
+        "document_type": "Loại tài liệu (Article, Conference Paper…).",
+        "publication_stage": "Giai đoạn xuất bản.",
+        "open_access_status": "Tình trạng truy cập mở."
+      }
+    },
+    "publication_raw_sources": {
+      "title": "Nguồn gốc công bố (dòng thô → công bố)",
+      "desc": "Bảng provenance nối mỗi dòng thô với công bố chuẩn hóa sinh ra từ nó. Mỗi dòng thô tối đa một công bố; một công bố có thể có nhiều dòng thô (nhiều lần nhập).",
+      "uc": "UC-11, 13",
+      "columns": {
+        "publication_id": "Công bố chuẩn hóa.",
+        "raw_record_id": "Dòng thô nguồn (duy nhất)."
+      }
+    },
+    "scopus_authors": {
+      "title": "Tác giả Scopus",
+      "desc": "Một tác giả theo Scopus Author ID (duy nhất). Là thực thể trung tâm cho đối sánh; chưa gắn với giảng viên cho đến khi một ứng viên được duyệt.",
+      "uc": "UC-12, 16, 24",
+      "columns": {
+        "scopus_id": "Scopus Author ID (duy nhất).",
+        "preferred_name": "Tên ưu tiên khi tạo tác giả (ưu tiên dạng tên đầy đủ hơn dạng hiển thị — `scopus_author_normalizer.py`)."
+      }
+    },
+    "scopus_author_name_variants": {
+      "title": "Các dạng tên của tác giả Scopus",
+      "desc": "Mọi dạng tên đã gặp của một tác giả (dạng hiển thị và dạng đầy đủ). Là các 'bề mặt' tên để so khớp với tên giảng viên khi sinh ứng viên.",
+      "uc": "UC-12, 24",
+      "columns": {
+        "scopus_author_id": "Tác giả.",
+        "variant_type": "AUTHOR_DISPLAY hoặc AUTHOR_FULL_NAME.",
+        "variant_name": "Tên nguyên văn.",
+        "variant_name_normalized": "Tên chuẩn hóa.",
+        "first_seen_raw_record_id": "Dòng thô nơi dạng tên này xuất hiện lần đầu (provenance)."
+      }
+    },
+    "publication_authors": {
+      "title": "Vị trí tác giả trong công bố",
+      "desc": "Quan hệ N–N giữa công bố và tác giả, có thuộc tính thứ tự tác giả. Mỗi (công bố, tác giả) một dòng và mỗi (công bố, thứ tự) một dòng. Là mốc để gắn đơn vị công tác theo từng tác giả trên từng bài.",
+      "uc": "UC-12, 13, 22",
+      "columns": {
+        "publication_id": "Công bố (xóa công bố sẽ xóa dây chuyền vị trí tác giả).",
+        "scopus_author_id": "Tác giả.",
+        "author_order": "Thứ tự tác giả trong bài (>= 1)."
+      }
+    },
+    "organizations": {
+      "title": "Tổ chức (theo nguồn ngoài)",
+      "desc": "Tổ chức do nguồn ngoài (OpenAlex/Crossref) cung cấp. Duy nhất theo (nguồn, mã tổ chức) hoặc (nguồn, tên) khi nguồn không có mã. Không chứa tổ chức do Scopus cung cấp.",
+      "uc": "UC-13, 25",
+      "columns": {
+        "source_system": "Hệ nguồn ngoài (script nạp hỗ trợ `openalex`, `crossref`).",
+        "source_org_id": "Mã tổ chức theo nguồn (có thể NULL).",
+        "ror": "Mã ROR (nếu có).",
+        "display_name": "Tên hiển thị.",
+        "country_code": "Mã quốc gia ISO-2 (chữ in hoa)."
+      }
+    },
+    "publication_author_affiliation_resolutions": {
+      "title": "Kết quả đối chiếu đơn vị theo (vị trí tác giả × nguồn)",
+      "desc": "Với mỗi vị trí tác giả trên một bài và mỗi nguồn ngoài, lưu độ tin cậy của việc gán tác giả nguồn ngoài cho vị trí Scopus: VERIFIED (qua chuỗi ORCID↔Scopus ID), CORROBORATED (cùng số tác giả/vị trí/tên) hoặc UNRESOLVED (kèm lý do). Mỗi nguồn có bản ghi riêng.",
+      "uc": "UC-13, 25",
+      "columns": {
+        "publication_author_id": "Vị trí tác giả được đối chiếu.",
+        "source_system": "Nguồn ngoài (`openalex` hoặc `crossref` theo script nạp).",
+        "source_payload_sha256": "SHA-256 payload nguồn (chống nạp trùng).",
+        "link_status": "VERIFIED, CORROBORATED hoặc UNRESOLVED.",
+        "link_method": "ORCID_SCOPUS_ID_BRIDGE (VERIFIED) hoặc POSITION_COUNT_NAME (CORROBORATED); NULL khi UNRESOLVED.",
+        "unresolved_reason": "Lý do khi UNRESOLVED (bắt buộc khi và chỉ khi UNRESOLVED).",
+        "affiliation_presence": "PRESENT/ABSENT: nguồn có/không liệt kê đơn vị (NULL khi UNRESOLVED).",
+        "evidence": "Bằng chứng đối chiếu (JSON object).",
+        "source_doi": "DOI theo nguồn ngoài.",
+        "source_work_id": "Mã công trình trong nguồn ngoài.",
+        "external_position": "Vị trí tác giả trong nguồn ngoài (>= 1; bắt buộc khi không UNRESOLVED).",
+        "external_author_name": "Tên tác giả theo nguồn ngoài.",
+        "external_author_orcid": "ORCID tác giả theo nguồn ngoài (bắt buộc khi VERIFIED).",
+        "retrieved_at": "Thời điểm lấy dữ liệu nguồn ngoài (bắt buộc khi không UNRESOLVED).",
+        "importer_version": "Phiên bản trình nạp."
+      }
+    },
+    "publication_author_affiliations": {
+      "title": "Dòng đơn vị gắn với một kết quả đối chiếu",
+      "desc": "Các đơn vị (chuỗi gốc và/hoặc tổ chức chuẩn hóa) của một resolution đáng tin cậy. Chỉ tồn tại cho VERIFIED/CORROBORATED; link_status ở đây luôn bằng link_status của resolution nhờ FK ghép (resolution_id, link_status).",
+      "uc": "UC-13, 25",
+      "columns": {
+        "resolution_id": "Resolution cha (xóa resolution sẽ xóa dây chuyền).",
+        "link_status": "Bản sao link_status của resolution (VERIFIED/CORROBORATED), ép nhất quán bằng FK ghép.",
+        "ord": "Thứ tự đơn vị (>= 1).",
+        "raw_index": "Chỉ số chuỗi đơn vị gốc trong nguồn (>= 1; NULL khi không có chuỗi gốc).",
+        "raw_affiliation_text": "Chuỗi đơn vị nguyên văn của nhà xuất bản.",
+        "organization_id": "Tổ chức chuẩn hóa (tùy chọn; phải có chuỗi gốc hoặc tổ chức)."
+      }
+    },
+    "candidate_generation_runs": {
+      "title": "Lần chạy sinh ứng viên",
+      "desc": "Một lần chạy bộ sinh ứng viên (CLI): bộ luật + phiên bản, ảnh chụp trạng thái nguồn, trạng thái chạy.",
+      "uc": "UC-24",
+      "columns": {
+        "rule_set_id": "Mã bộ luật.",
+        "rule_set_version": "Phiên bản bộ luật.",
+        "source_state": "Ảnh chụp trạng thái dữ liệu đầu vào (JSON object).",
+        "status": "RUNNING, COMPLETED hoặc FAILED.",
+        "started_at": "Thời điểm bắt đầu.",
+        "completed_at": "Thời điểm kết thúc (bắt buộc khi không còn RUNNING)."
+      }
+    },
+    "lecturer_scopus_candidates": {
+      "title": "Ứng viên đối sánh (giảng viên ↔ tác giả Scopus)",
+      "desc": "Đề xuất rằng một giảng viên có thể là một tác giả Scopus. Mỗi cặp (giảng viên, tác giả) một dòng. Đây là FACT truy xuất, KHÔNG phải quyết định danh tính; trạng thái đổi bởi người duyệt.",
+      "uc": "UC-17, 18, 24",
+      "columns": {
+        "lecturer_id": "Giảng viên.",
+        "scopus_author_id": "Tác giả Scopus.",
+        "status": "PENDING, ACCEPTED, REJECTED hoặc SUPERSEDED.",
+        "first_seen_at": "Lần đầu bộ sinh thấy cặp này.",
+        "last_seen_at": "Lần gần nhất bộ sinh thấy cặp này."
+      }
+    },
+    "lecturer_scopus_candidate_observations": {
+      "title": "Lần quan sát ứng viên trong một lần chạy",
+      "desc": "Ảnh chụp trạng thái của một ứng viên tại một lần chạy (candidate_snapshot + hash). Duyệt luôn gắn với quan sát hiện hành để phát hiện dữ liệu đã cũ.",
+      "uc": "UC-17, 18, 24",
+      "columns": {
+        "candidate_id": "Ứng viên.",
+        "generation_run_id": "Lần chạy sinh ứng viên.",
+        "observed_at": "Thời điểm quan sát.",
+        "candidate_snapshot": "Ảnh chụp ứng viên (JSON object).",
+        "observation_hash": "SHA-256 của quan sát."
+      }
+    },
+    "lecturer_scopus_candidate_evidence": {
+      "title": "Bằng chứng của quan sát ứng viên",
+      "desc": "Bằng chứng giải thích vì sao một cặp được đề xuất: NAME (so khớp tên theo luật) hoặc PUBLICATION (công bố đã biết trùng DOI/tiêu đề). Không có điểm số.",
+      "uc": "UC-17, 24",
+      "columns": {
+        "observation_id": "Quan sát chứa bằng chứng.",
+        "evidence_kind": "NAME hoặc PUBLICATION.",
+        "rule_id": "Mã luật sinh bằng chứng.",
+        "rule_version": "Phiên bản luật.",
+        "payload": "Chi tiết bằng chứng (JSON object).",
+        "source_refs": "Tham chiếu nguồn (JSON array).",
+        "evidence_fingerprint": "Dấu vân tay SHA-256 (chống trùng)."
+      }
+    },
+    "lecturer_scopus_candidate_reviews": {
+      "title": "Quyết định duyệt ứng viên",
+      "desc": "Mỗi lần người có quyền ACCEPT/REJECT một ứng viên (REOPEN có trong CHECK nhưng chưa có API). Lưu trạng thái trước/sau, phiên bản ứng viên, lý do (bắt buộc với REJECT/REOPEN), ảnh chụp bằng chứng và danh tính được tạo (nếu ACCEPT).",
+      "uc": "UC-18, 19",
+      "columns": {
+        "candidate_id": "Ứng viên được duyệt.",
+        "observation_id": "Quan sát hiện hành tại thời điểm duyệt.",
+        "reviewer_user_id": "Người duyệt (FK → users).",
+        "action": "ACCEPT, REJECT hoặc REOPEN.",
+        "from_status": "Trạng thái ứng viên trước khi duyệt.",
+        "to_status": "Trạng thái ứng viên sau khi duyệt.",
+        "candidate_version": "Phiên bản ứng viên lúc duyệt (phát hiện duyệt trên dữ liệu cũ).",
+        "reason": "Lý do (bắt buộc khi không phải ACCEPT).",
+        "evidence_snapshot": "Ảnh chụp bằng chứng người duyệt đã xem (JSON object).",
+        "resulting_identity_id": "Danh tính APPROVED được tạo khi ACCEPT (NULL nếu REJECT)."
+      }
+    },
+    "lecturer_scopus_identities": {
+      "title": "Danh tính giảng viên ↔ tác giả Scopus",
+      "desc": "Liên kết đã chốt. Một Scopus Author ID chỉ được APPROVED cho đúng một giảng viên (chỉ mục unique một phần). Hiện chỉ đường ACCEPT tạo APPROVED; REVOKE/REOPEN/recommendation chưa có mã ghi.",
+      "uc": "UC-18, 20–23",
+      "columns": {
+        "lecturer_id": "Giảng viên.",
+        "scopus_author_id": "Tác giả Scopus.",
+        "status": "CANDIDATE, APPROVED, REJECTED hoặc REVOKED.",
+        "recommendation": "MATCH/NO_MATCH/MANUAL_VERIFY (chưa có mã ghi cột này).",
+        "recommendation_algorithm_version": "Phiên bản thuật toán khuyến nghị (đi cùng recommendation).",
+        "recommended_at": "Thời điểm khuyến nghị (đi cùng recommendation)."
+      }
+    },
+    "identity_evidence": {
+      "title": "Bằng chứng gắn với danh tính",
+      "desc": "Bằng chứng được sao từ ứng viên sang danh tính khi ACCEPT (NAME → NAME_SIMILARITY; PUBLICATION → DOI_EXACT/PUBLICATION_OVERLAP). CHECK cho phép thêm APPROVED_ID, ORCID_EXACT, COAUTHOR_CONFIRMED, AFFILIATION_MATCH nhưng chưa có mã tạo các loại này.",
+      "uc": "UC-18",
+      "columns": {
+        "identity_id": "Danh tính.",
+        "evidence_type": "APPROVED_ID, ORCID_EXACT, DOI_EXACT, PUBLICATION_OVERLAP, COAUTHOR_CONFIRMED, NAME_SIMILARITY, AFFILIATION_MATCH.",
+        "direction": "SUPPORTS hoặc CONTRADICTS.",
+        "confidence_score": "Điểm tin cậy 0–1; luôn NULL hiện nay (không có điểm do máy tính).",
+        "algorithm_version": "Phiên bản thuật toán/luật.",
+        "features": "Đặc trưng bằng chứng (JSON object).",
+        "source_refs": "Tham chiếu nguồn (JSON array).",
+        "evidence_fingerprint": "Dấu vân tay SHA-256 (chống trùng)."
+      }
+    },
+    "mapping_reviews": {
+      "title": "Lịch sử đổi trạng thái danh tính (dự phòng)",
+      "desc": "Thiết kế dự phòng cho APPROVE/REJECT/REVOKE/REOPEN ở cấp danh tính, có bù trừ (compensates_review_id). HIỆN CHƯA CÓ MÃ GHI và 0 dòng; không phải chức năng hoàn tác đã triển khai.",
+      "uc": "(chưa dùng)",
+      "columns": {
+        "identity_id": "Danh tính.",
+        "reviewer_user_id": "Người duyệt.",
+        "action": "APPROVE, REJECT, REVOKE hoặc REOPEN.",
+        "from_status": "Trạng thái trước.",
+        "to_status": "Trạng thái sau.",
+        "reason": "Lý do (bắt buộc khi không phải APPROVE).",
+        "evidence_snapshot": "Ảnh chụp bằng chứng (JSON object).",
+        "compensates_review_id": "Quyết định được bù trừ (bắt buộc với REVOKE/REOPEN, cấm với APPROVE/REJECT)."
+      }
+    }
+  }
+}

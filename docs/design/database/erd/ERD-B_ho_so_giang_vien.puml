@@ -1,0 +1,103 @@
+@startuml ERD-B_ho_so_giang_vien
+' Nguồn: docs/design/database/source/schema_snapshot.json (sinh bởi tools/gen_database_assets.py) — KHÔNG sửa tay phần sinh tự động.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+  FontSize 12
+  AttributeFontSize 11
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam packageStyle rectangle
+hide circle
+title ERD-B — Cụm B: Hồ sơ giảng viên (dữ liệu chủ)
+
+entity "lecturers" as lecturers #FCF3CF {
+  *id : uuid <<PK>>
+  --
+  staff_code : varchar(50)
+  *full_name : varchar(255)
+  *full_name_normalized : varchar(255)
+  email : varchar(255)
+  academic_rank : varchar(50)
+  academic_degree : varchar(50)
+  position : varchar(100)
+  department : varchar(150)
+  faculty : varchar(150)
+  repository_profile_url : text
+  repository_profile_id : varchar(100)
+  orcid : varchar(19)
+  *is_active : boolean
+  *version : integer
+  *created_at : timestamptz
+  *updated_at : timestamptz
+}
+
+entity "lecturer_source_snapshots" as lecturer_source_snapshots #FCF3CF {
+  *id : uuid <<PK>>
+  --
+  lecturer_id : uuid <<FK>>
+  *source_system : varchar(50)
+  *source_url : text
+  *snapshot_hash : varchar(64)
+  *raw_payload : jsonb
+  *parser_version : varchar(100)
+  *validation_status : varchar(20)
+  validation_errors : jsonb
+  *fetched_at : timestamptz
+  *created_at : timestamptz
+}
+
+entity "lecturer_known_publications" as lecturer_known_publications #FCF3CF {
+  *id : uuid <<PK>>
+  --
+  *lecturer_id : uuid <<FK>>
+  *snapshot_id : uuid <<FK>>
+  *title_raw : text
+  *title_normalized : text
+  doi_raw : varchar(255)
+  doi_normalized : varchar(255)
+  source_title_raw : text
+  published_year : integer
+  *created_at : timestamptz
+}
+
+entity "lecturer_scopus_candidates" as lecturer_scopus_candidates #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm F)
+}
+
+entity "lecturer_scopus_identities" as lecturer_scopus_identities #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm F)
+}
+
+entity "users" as users #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm A)
+}
+
+lecturer_source_snapshots ||--o{ lecturer_known_publications : snapshot_id, lecturer_id
+lecturers ||--o{ lecturer_scopus_candidates : lecturer_id
+lecturers ||--o{ lecturer_scopus_identities : lecturer_id
+lecturers |o--o{ lecturer_source_snapshots : lecturer_id
+lecturers |o--o| users : lecturer_id
+legend bottom right
+  <b>Chú giải</b>
+  * = NOT NULL · <<PK>> khóa chính · <<FK>> khóa ngoại · <<UQ>> duy nhất
+  Đầu nối (crow's foot): hai gạch = đúng 1 · vòng tròn + gạch = 0..1 · vòng tròn + chân chim = 0..*
+  Nhãn trên đường nối = cột khóa ngoại ở bảng con
+  Nguồn: PostgreSQL thật (alembic a9c2e4f71b30)
+endlegend
+
+@enduml

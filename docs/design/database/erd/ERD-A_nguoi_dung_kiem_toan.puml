@@ -1,0 +1,102 @@
+@startuml ERD-A_nguoi_dung_kiem_toan
+' Nguồn: docs/design/database/source/schema_snapshot.json (sinh bởi tools/gen_database_assets.py) — KHÔNG sửa tay phần sinh tự động.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+  FontSize 12
+  AttributeFontSize 11
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam packageStyle rectangle
+hide circle
+title ERD-A — Cụm A: Người dùng và kiểm toán
+
+left to right direction
+entity "users" as users #E8DAEF {
+  *id : uuid <<PK>>
+  --
+  *email : varchar(255)
+  *password_hash : text
+  *display_name : varchar(255)
+  *role : varchar(20)
+  lecturer_id : uuid <<FK>>
+  *is_active : boolean
+  *version : integer
+  *created_at : timestamptz
+  *updated_at : timestamptz
+  *auth_version : integer
+}
+
+entity "user_notifications" as user_notifications #E8DAEF {
+  *id : uuid <<PK>>
+  --
+  *user_id : uuid <<FK>>
+  *notification_type : varchar(40)
+  *title : varchar(255)
+  *message : text
+  *metadata : jsonb
+  *is_read : boolean
+  *created_at : timestamptz
+  read_at : timestamptz
+}
+
+entity "audit_events" as audit_events #E8DAEF {
+  *id : uuid <<PK>>
+  --
+  *entity_type : varchar(100)
+  *entity_id : uuid
+  *action : varchar(64)
+  *actor_type : varchar(20)
+  actor_user_id : uuid <<FK>>
+  actor_service : varchar(100)
+  before_state : jsonb
+  after_state : jsonb
+  reason : text
+  request_id : varchar(128)
+  correlation_id : varchar(128)
+  ip_address : inet
+  user_agent : text
+  metadata : jsonb
+  *created_at : timestamptz
+}
+
+entity "lecturer_scopus_candidate_reviews" as lecturer_scopus_candidate_reviews #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm F)
+}
+
+entity "lecturers" as lecturers #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm B)
+}
+
+entity "mapping_reviews" as mapping_reviews #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm F)
+}
+
+users |o--o{ audit_events : actor_user_id
+users ||--o{ lecturer_scopus_candidate_reviews : reviewer_user_id
+users ||--o{ mapping_reviews : reviewer_user_id
+users ||--o{ user_notifications : user_id
+lecturers |o--o| users : lecturer_id
+legend bottom right
+  <b>Chú giải</b>
+  * = NOT NULL · <<PK>> khóa chính · <<FK>> khóa ngoại · <<UQ>> duy nhất
+  Đầu nối (crow's foot): hai gạch = đúng 1 · vòng tròn + gạch = 0..1 · vòng tròn + chân chim = 0..*
+  Nhãn trên đường nối = cột khóa ngoại ở bảng con
+  Nguồn: PostgreSQL thật (alembic a9c2e4f71b30)
+endlegend
+
+@enduml

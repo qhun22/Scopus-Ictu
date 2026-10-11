@@ -1,0 +1,420 @@
+// Scopus–ICTU — lược đồ PostgreSQL thật (alembic a9c2e4f71b30). SINH TỰ ĐỘNG từ schema_snapshot.json.
+// Dán vào https://dbdiagram.io để xem/chỉnh. Không sửa quan hệ nếu không đổi DB thật.
+
+Project scopus_ictu {
+  database_type: 'PostgreSQL'
+}
+
+// ===== Cụm A: Người dùng và kiểm toán =====
+Table users {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  email varchar(255) [not null, note: 'Email đăng nhập; duy nhất không phân biệt hoa/thường (chỉ mục unique trên lower(email)).']
+  password_hash text [not null, note: 'Mật khẩu đã băm (Argon2id). Không bao giờ lưu mật khẩu thô.']
+  display_name varchar(255) [not null, note: 'Tên hiển thị.']
+  role varchar(20) [not null, note: 'Vai trò: ADMIN, REVIEWER hoặc LECTURER.']
+  lecturer_id uuid [note: 'Hồ sơ giảng viên được liên kết (NULL với ADMIN/REVIEWER; bắt buộc với LECTURER; mỗi hồ sơ tối đa 1 tài khoản).']
+  is_active boolean [not null, default: 'true', note: 'FALSE = tài khoản bị khóa (đăng nhập bị từ chối).']
+  version integer [not null, default: '1', note: 'Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  auth_version integer [not null, default: '1', note: 'Tăng khi đổi mật khẩu/vai trò/khóa để thu hồi các phiên (token) cũ.']
+  Note: 'Tài khoản đăng nhập'
+}
+
+Table user_notifications {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  user_id uuid [not null, note: 'Người nhận.']
+  notification_type varchar(40) [not null, note: 'PROFILE_UPDATED, ROLE_CHANGED, ACCOUNT_LOCKED, ACCOUNT_UNLOCKED, PASSWORD_RESET.']
+  title varchar(255) [not null, note: 'Tiêu đề thông báo.']
+  message text [not null, note: 'Nội dung thông báo.']
+  metadata jsonb [not null, default: '\'{}\'::jsonb', note: 'Dữ liệu kèm theo (JSON object).']
+  is_read boolean [not null, default: 'false', note: 'Đã đọc chưa.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  read_at timestamptz [note: 'Thời điểm đọc (NULL khi chưa đọc; nhất quán với is_read).']
+  Note: 'Thông báo cho người dùng'
+}
+
+Table audit_events {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  entity_type varchar(100) [not null, note: 'Loại thực thể bị tác động (snake_case, ví dụ lecturer, publication_export).']
+  entity_id uuid [not null, note: 'UUID thực thể bị tác động — KHÔNG có khóa ngoại (đa hình theo entity_type).']
+  action varchar(64) [not null, note: 'Mã hành động IN HOA (ví dụ LECTURER_CREATED, PUBLICATION_DATASET_EXPORTED).']
+  actor_type varchar(20) [not null, note: 'USER (người dùng) hoặc SYSTEM (tiến trình hệ thống).']
+  actor_user_id uuid [note: 'Người thực hiện khi actor_type = USER (FK → users).']
+  actor_service varchar(100) [note: 'Tên dịch vụ/tiến trình khi actor_type = SYSTEM.']
+  before_state jsonb [note: 'Trạng thái trước (JSON object, tùy chọn).']
+  after_state jsonb [note: 'Trạng thái sau (JSON object, tùy chọn).']
+  reason text [note: 'Lý do/ghi chú.']
+  request_id varchar(128) [note: 'Mã yêu cầu HTTP.']
+  correlation_id varchar(128) [note: 'Mã tương quan giữa nhiều sự kiện.']
+  ip_address inet [note: 'Địa chỉ IP nguồn.']
+  user_agent text [note: 'User-Agent của trình duyệt/máy khách.']
+  metadata jsonb [note: 'Thông tin bổ sung (JSON object), ví dụ record_count/format của lần xuất.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  Note: 'Nhật ký kiểm toán (chỉ ghi thêm)'
+}
+
+// ===== Cụm B: Hồ sơ giảng viên (dữ liệu chủ) =====
+Table lecturers {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  staff_code varchar(50) [note: 'Mã cán bộ (có thể NULL; duy nhất khi có giá trị).']
+  full_name varchar(255) [not null, note: 'Họ tên đầy đủ như nguồn (có thể kèm tiền tố học hàm/học vị như TS., ThS.).']
+  full_name_normalized varchar(255) [not null, note: 'Họ tên đã chuẩn hóa để tra cứu.']
+  email varchar(255) [note: 'Email đơn vị (cho phép trùng giữa các hồ sơ; có chỉ mục lower(email)).']
+  academic_rank varchar(50) [note: 'Học hàm.']
+  academic_degree varchar(50) [note: 'Học vị.']
+  position varchar(100) [note: 'Chức vụ.']
+  department varchar(150) [note: 'Bộ môn/phòng ban (phần lớn dữ liệu nguồn còn trống).']
+  faculty varchar(150) [note: 'Khoa (phần lớn dữ liệu nguồn còn trống).']
+  repository_profile_url text [note: 'Đường dẫn hồ sơ trên ICTU Repository (khóa nguồn).']
+  repository_profile_id varchar(100) [note: 'Mã hồ sơ trên ICTU Repository.']
+  orcid varchar(19) [note: 'ORCID (định dạng 0000-0000-0000-000X); duy nhất khi có giá trị.']
+  is_active boolean [not null, default: 'true', note: 'Hồ sơ còn hiệu lực.']
+  version integer [not null, default: '1', note: 'Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  Note: 'Hồ sơ giảng viên (dữ liệu chủ)'
+}
+
+Table lecturer_source_snapshots {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  lecturer_id uuid [note: 'Giảng viên được bản chụp mô tả (có thể NULL khi chưa gán).']
+  source_system varchar(50) [not null, note: 'Hệ nguồn (ví dụ ICTU Repository).']
+  source_url text [not null, note: 'Địa chỉ nguồn.']
+  snapshot_hash varchar(64) [not null, note: 'SHA-256 của bản chụp (64 ký tự hex).']
+  raw_payload jsonb [not null, note: 'Payload gốc (JSON object).']
+  parser_version varchar(100) [not null, note: 'Phiên bản bộ phân tích đã xử lý.']
+  validation_status varchar(20) [not null, note: 'VALID hoặc INVALID.']
+  validation_errors jsonb [note: 'Danh sách lỗi (JSON array) khi INVALID.']
+  fetched_at timestamptz [not null, note: 'Thời điểm lấy dữ liệu nguồn.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (id, lecturer_id) [unique, name: 'uq_lecturer_source_snapshots_id_lecturer']
+  }
+  Note: 'Bản chụp nguồn của hồ sơ giảng viên'
+}
+
+Table lecturer_known_publications {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  lecturer_id uuid [not null, note: 'Giảng viên sở hữu công bố.']
+  snapshot_id uuid [not null, note: 'Bản chụp nguồn chứa công bố (FK ghép cùng lecturer_id).']
+  title_raw text [not null, note: 'Tiêu đề nguyên văn.']
+  title_normalized text [not null, note: 'Tiêu đề đã chuẩn hóa để so khớp.']
+  doi_raw varchar(255) [note: 'DOI nguyên văn.']
+  doi_normalized varchar(255) [note: 'DOI đã chuẩn hóa (chữ thường, bỏ tiền tố URL) để so khớp.']
+  source_title_raw text [note: 'Tên nguồn xuất bản nguyên văn (chuỗi, không chuẩn hóa).']
+  published_year integer [note: 'Năm xuất bản (1000–9999).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  Note: 'Công bố đã biết của giảng viên (từ nguồn ICTU/Craw)'
+}
+
+// ===== Cụm C: Nhập dữ liệu thô Scopus =====
+Table scopus_imports {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  file_name varchar(255) [not null, note: 'Tên tệp tải lên.']
+  file_sha256 varchar(64) [not null, note: 'SHA-256 nội dung tệp (chống nhập trùng nội dung).']
+  total_records integer [not null, default: '0', note: 'Tổng số dòng dữ liệu.']
+  valid_records integer [not null, default: '0', note: 'Số dòng hợp lệ.']
+  invalid_records integer [not null, default: '0', note: 'Số dòng không hợp lệ.']
+  status varchar(20) [not null, default: '\'RECEIVED\'::character varying', note: 'RECEIVED, PARSING, VALIDATED, STAGED, APPLIED, FAILED hoặc CANCELLED.']
+  error_summary jsonb [note: 'Tóm tắt lỗi nhập (JSON object).']
+  version integer [not null, default: '1', note: 'Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  normalization_summary jsonb [note: 'Bộ đếm kết quả chuẩn hóa công bố/tác giả (JSON object).']
+  Note: 'Đợt nhập CSV Scopus'
+}
+
+Table raw_scopus_records {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  import_id uuid [not null, note: 'Đợt nhập chứa dòng.']
+  row_number integer [not null, note: 'Số thứ tự dòng trong tệp (>= 1); duy nhất trong một đợt.']
+  row_hash varchar(64) [not null, note: 'SHA-256 của dòng.']
+  eid_raw text [note: 'EID nguyên văn (có thể trống/sai).']
+  doi_raw text [note: 'DOI nguyên văn.']
+  raw_payload jsonb [not null, note: 'Toàn bộ giá trị các cột của dòng (JSON object).']
+  validation_status varchar(20) [not null, note: 'VALID hoặc INVALID.']
+  validation_errors jsonb [note: 'Lỗi theo dòng (JSON array) khi INVALID.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (import_id, row_number) [unique, name: 'uq_raw_scopus_records_import_row']
+  }
+  Note: 'Dòng dữ liệu thô Scopus (bất biến)'
+}
+
+// ===== Cụm D: Công bố và tác giả chuẩn hóa =====
+Table publications {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  eid text [not null, unique, note: 'Scopus EID chuẩn tắc (duy nhất).']
+  doi varchar(255) [note: 'DOI theo văn bản nguồn (chưa chuẩn hóa).']
+  title text [not null, note: 'Tiêu đề công bố.']
+  title_normalized text [not null, note: 'Tiêu đề chuẩn hóa (Unicode NFKC, chữ thường).']
+  source_title text [note: 'Tên nguồn xuất bản (tạp chí/hội nghị) dạng chuỗi.']
+  year integer [note: 'Năm xuất bản (1000–9999).']
+  volume text [note: 'Tập.']
+  issue text [note: 'Số.']
+  art_no text [note: 'Mã bài báo.']
+  page_start text [note: 'Trang bắt đầu.']
+  page_end text [note: 'Trang kết thúc.']
+  cited_by_count integer [note: 'Số lần được trích dẫn (>= 0).']
+  document_type varchar(50) [note: 'Loại tài liệu (Article, Conference Paper…).']
+  publication_stage varchar(50) [note: 'Giai đoạn xuất bản.']
+  open_access_status varchar(50) [note: 'Tình trạng truy cập mở.']
+  version integer [not null, default: '1', note: 'Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  Note: 'Công bố chuẩn hóa'
+}
+
+Table publication_raw_sources {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  publication_id uuid [not null, note: 'Công bố chuẩn hóa.']
+  raw_record_id uuid [not null, unique, note: 'Dòng thô nguồn (duy nhất).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  Note: 'Nguồn gốc công bố (dòng thô → công bố)'
+}
+
+Table scopus_authors {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  scopus_id text [not null, unique, note: 'Scopus Author ID (duy nhất).']
+  preferred_name varchar(255) [not null, note: 'Tên ưu tiên khi tạo tác giả (ưu tiên dạng tên đầy đủ hơn dạng hiển thị — `scopus_author_normalizer.py`).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  Note: 'Tác giả Scopus'
+}
+
+Table scopus_author_name_variants {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  scopus_author_id uuid [not null, note: 'Tác giả.']
+  variant_type varchar(30) [not null, note: 'AUTHOR_DISPLAY hoặc AUTHOR_FULL_NAME.']
+  variant_name varchar(255) [not null, note: 'Tên nguyên văn.']
+  variant_name_normalized varchar(255) [not null, note: 'Tên chuẩn hóa.']
+  first_seen_raw_record_id uuid [not null, note: 'Dòng thô nơi dạng tên này xuất hiện lần đầu (provenance).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (scopus_author_id, variant_type, variant_name) [unique, name: 'uq_author_name_variants']
+  }
+  Note: 'Các dạng tên của tác giả Scopus'
+}
+
+Table publication_authors {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  publication_id uuid [not null, note: 'Công bố (xóa công bố sẽ xóa dây chuyền vị trí tác giả).']
+  scopus_author_id uuid [not null, note: 'Tác giả.']
+  author_order integer [not null, note: 'Thứ tự tác giả trong bài (>= 1).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (publication_id, scopus_author_id) [unique, name: 'uq_publication_authors_author']
+    (publication_id, author_order) [unique, name: 'uq_publication_authors_order']
+  }
+  Note: 'Vị trí tác giả trong công bố'
+}
+
+// ===== Cụm E: Đơn vị công tác theo tác giả (affiliation) =====
+Table organizations {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  source_system varchar(50) [not null, note: 'Hệ nguồn ngoài (script nạp hỗ trợ `openalex`, `crossref`).']
+  source_org_id text [note: 'Mã tổ chức theo nguồn (có thể NULL).']
+  ror text [note: 'Mã ROR (nếu có).']
+  display_name text [not null, note: 'Tên hiển thị.']
+  country_code varchar(2) [note: 'Mã quốc gia ISO-2 (chữ in hoa).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  Note: 'Tổ chức (theo nguồn ngoài)'
+}
+
+Table publication_author_affiliation_resolutions {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  publication_author_id uuid [not null, note: 'Vị trí tác giả được đối chiếu.']
+  source_system varchar(50) [not null, note: 'Nguồn ngoài (`openalex` hoặc `crossref` theo script nạp).']
+  source_payload_sha256 varchar(64) [not null, note: 'SHA-256 payload nguồn (chống nạp trùng).']
+  link_status varchar(20) [not null, note: 'VERIFIED, CORROBORATED hoặc UNRESOLVED.']
+  link_method varchar(40) [note: 'ORCID_SCOPUS_ID_BRIDGE (VERIFIED) hoặc POSITION_COUNT_NAME (CORROBORATED); NULL khi UNRESOLVED.']
+  unresolved_reason varchar(80) [note: 'Lý do khi UNRESOLVED (bắt buộc khi và chỉ khi UNRESOLVED).']
+  affiliation_presence varchar(10) [note: 'PRESENT/ABSENT: nguồn có/không liệt kê đơn vị (NULL khi UNRESOLVED).']
+  evidence jsonb [not null, default: '\'{}\'::jsonb', note: 'Bằng chứng đối chiếu (JSON object).']
+  source_doi text [note: 'DOI theo nguồn ngoài.']
+  source_work_id text [note: 'Mã công trình trong nguồn ngoài.']
+  external_position integer [note: 'Vị trí tác giả trong nguồn ngoài (>= 1; bắt buộc khi không UNRESOLVED).']
+  external_author_name text [note: 'Tên tác giả theo nguồn ngoài.']
+  external_author_orcid varchar(19) [note: 'ORCID tác giả theo nguồn ngoài (bắt buộc khi VERIFIED).']
+  retrieved_at timestamptz [note: 'Thời điểm lấy dữ liệu nguồn ngoài (bắt buộc khi không UNRESOLVED).']
+  importer_version varchar(40) [not null, note: 'Phiên bản trình nạp.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (publication_author_id, source_system, source_payload_sha256) [unique, name: 'uq_paar_author_source_payload']
+    (id, link_status) [unique, name: 'uq_paar_id_link_status']
+  }
+  Note: 'Kết quả đối chiếu đơn vị theo (vị trí tác giả × nguồn)'
+}
+
+Table publication_author_affiliations {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  resolution_id uuid [not null, note: 'Resolution cha (xóa resolution sẽ xóa dây chuyền).']
+  link_status varchar(20) [not null, note: 'Bản sao link_status của resolution (VERIFIED/CORROBORATED), ép nhất quán bằng FK ghép.']
+  ord integer [not null, note: 'Thứ tự đơn vị (>= 1).']
+  raw_index integer [note: 'Chỉ số chuỗi đơn vị gốc trong nguồn (>= 1; NULL khi không có chuỗi gốc).']
+  raw_affiliation_text text [note: 'Chuỗi đơn vị nguyên văn của nhà xuất bản.']
+  organization_id uuid [note: 'Tổ chức chuẩn hóa (tùy chọn; phải có chuỗi gốc hoặc tổ chức).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (resolution_id, ord) [unique, name: 'uq_paa_resolution_ord']
+  }
+  Note: 'Dòng đơn vị gắn với một kết quả đối chiếu'
+}
+
+// ===== Cụm F: Đối sánh, duyệt và danh tính =====
+Table candidate_generation_runs {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  rule_set_id text [not null, note: 'Mã bộ luật.']
+  rule_set_version text [not null, note: 'Phiên bản bộ luật.']
+  source_state jsonb [not null, note: 'Ảnh chụp trạng thái dữ liệu đầu vào (JSON object).']
+  status varchar(20) [not null, default: '\'RUNNING\'::character varying', note: 'RUNNING, COMPLETED hoặc FAILED.']
+  started_at timestamptz [not null, default: 'now()', note: 'Thời điểm bắt đầu.']
+  completed_at timestamptz [note: 'Thời điểm kết thúc (bắt buộc khi không còn RUNNING).']
+  version integer [not null, default: '1', note: 'Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  Note: 'Lần chạy sinh ứng viên'
+}
+
+Table lecturer_scopus_candidates {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  lecturer_id uuid [not null, note: 'Giảng viên.']
+  scopus_author_id uuid [not null, note: 'Tác giả Scopus.']
+  status varchar(20) [not null, default: '\'PENDING\'::character varying', note: 'PENDING, ACCEPTED, REJECTED hoặc SUPERSEDED.']
+  first_seen_at timestamptz [not null, default: 'now()', note: 'Lần đầu bộ sinh thấy cặp này.']
+  last_seen_at timestamptz [not null, default: 'now()', note: 'Lần gần nhất bộ sinh thấy cặp này.']
+  version integer [not null, default: '1', note: 'Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  indexes {
+    (lecturer_id, scopus_author_id) [unique, name: 'uq_lecturer_scopus_candidates_pair']
+  }
+  Note: 'Ứng viên đối sánh (giảng viên ↔ tác giả Scopus)'
+}
+
+Table lecturer_scopus_candidate_observations {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  candidate_id uuid [not null, note: 'Ứng viên.']
+  generation_run_id uuid [not null, note: 'Lần chạy sinh ứng viên.']
+  observed_at timestamptz [not null, note: 'Thời điểm quan sát.']
+  candidate_snapshot jsonb [not null, note: 'Ảnh chụp ứng viên (JSON object).']
+  observation_hash varchar(64) [not null, note: 'SHA-256 của quan sát.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (candidate_id, generation_run_id) [unique, name: 'uq_candidate_observations_candidate_run']
+  }
+  Note: 'Lần quan sát ứng viên trong một lần chạy'
+}
+
+Table lecturer_scopus_candidate_evidence {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  observation_id uuid [not null, note: 'Quan sát chứa bằng chứng.']
+  evidence_kind varchar(30) [not null, note: 'NAME hoặc PUBLICATION.']
+  rule_id text [not null, note: 'Mã luật sinh bằng chứng.']
+  rule_version text [not null, note: 'Phiên bản luật.']
+  payload jsonb [not null, note: 'Chi tiết bằng chứng (JSON object).']
+  source_refs jsonb [not null, note: 'Tham chiếu nguồn (JSON array).']
+  evidence_fingerprint varchar(64) [not null, note: 'Dấu vân tay SHA-256 (chống trùng).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (observation_id, rule_id, rule_version, evidence_fingerprint) [unique, name: 'uq_candidate_evidence_descriptor']
+  }
+  Note: 'Bằng chứng của quan sát ứng viên'
+}
+
+Table lecturer_scopus_candidate_reviews {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  candidate_id uuid [not null, note: 'Ứng viên được duyệt.']
+  observation_id uuid [not null, note: 'Quan sát hiện hành tại thời điểm duyệt.']
+  reviewer_user_id uuid [not null, note: 'Người duyệt (FK → users).']
+  action varchar(20) [not null, note: 'ACCEPT, REJECT hoặc REOPEN.']
+  from_status varchar(20) [not null, note: 'Trạng thái ứng viên trước khi duyệt.']
+  to_status varchar(20) [not null, note: 'Trạng thái ứng viên sau khi duyệt.']
+  candidate_version integer [not null, note: 'Phiên bản ứng viên lúc duyệt (phát hiện duyệt trên dữ liệu cũ).']
+  reason text [note: 'Lý do (bắt buộc khi không phải ACCEPT).']
+  evidence_snapshot jsonb [not null, note: 'Ảnh chụp bằng chứng người duyệt đã xem (JSON object).']
+  resulting_identity_id uuid [note: 'Danh tính APPROVED được tạo khi ACCEPT (NULL nếu REJECT).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  Note: 'Quyết định duyệt ứng viên'
+}
+
+Table lecturer_scopus_identities {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  lecturer_id uuid [not null, note: 'Giảng viên.']
+  scopus_author_id uuid [not null, note: 'Tác giả Scopus.']
+  status varchar(20) [not null, default: '\'CANDIDATE\'::character varying', note: 'CANDIDATE, APPROVED, REJECTED hoặc REVOKED.']
+  recommendation varchar(30) [note: 'MATCH/NO_MATCH/MANUAL_VERIFY (chưa có mã ghi cột này).']
+  recommendation_algorithm_version varchar(100) [note: 'Phiên bản thuật toán khuyến nghị (đi cùng recommendation).']
+  recommended_at timestamptz [note: 'Thời điểm khuyến nghị (đi cùng recommendation).']
+  version integer [not null, default: '1', note: 'Số phiên bản dùng cho khóa lạc quan (optimistic locking); luôn >= 1.']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  updated_at timestamptz [not null, default: 'now()', note: 'Thời điểm cập nhật gần nhất (timestamptz, mặc định now()).']
+  indexes {
+    (lecturer_id, scopus_author_id) [unique, name: 'uq_lecturer_scopus_identities_pair']
+  }
+  Note: 'Danh tính giảng viên ↔ tác giả Scopus'
+}
+
+Table identity_evidence {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  identity_id uuid [not null, note: 'Danh tính.']
+  evidence_type varchar(40) [not null, note: 'APPROVED_ID, ORCID_EXACT, DOI_EXACT, PUBLICATION_OVERLAP, COAUTHOR_CONFIRMED, NAME_SIMILARITY, AFFILIATION_MATCH.']
+  direction varchar(20) [not null, note: 'SUPPORTS hoặc CONTRADICTS.']
+  confidence_score numeric(5,4) [note: 'Điểm tin cậy 0–1; luôn NULL hiện nay (không có điểm do máy tính).']
+  algorithm_version varchar(100) [not null, note: 'Phiên bản thuật toán/luật.']
+  features jsonb [not null, note: 'Đặc trưng bằng chứng (JSON object).']
+  source_refs jsonb [not null, note: 'Tham chiếu nguồn (JSON array).']
+  evidence_fingerprint varchar(64) [not null, note: 'Dấu vân tay SHA-256 (chống trùng).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  indexes {
+    (identity_id, evidence_type, algorithm_version, evidence_fingerprint) [unique, name: 'uq_identity_evidence_dedup']
+  }
+  Note: 'Bằng chứng gắn với danh tính'
+}
+
+Table mapping_reviews {
+  id uuid [pk, default: 'gen_random_uuid()', note: 'Khóa chính (UUID sinh bởi gen_random_uuid()).']
+  identity_id uuid [not null, note: 'Danh tính.']
+  reviewer_user_id uuid [not null, note: 'Người duyệt.']
+  action varchar(20) [not null, note: 'APPROVE, REJECT, REVOKE hoặc REOPEN.']
+  from_status varchar(20) [not null, note: 'Trạng thái trước.']
+  to_status varchar(20) [not null, note: 'Trạng thái sau.']
+  reason text [note: 'Lý do (bắt buộc khi không phải APPROVE).']
+  evidence_snapshot jsonb [not null, note: 'Ảnh chụp bằng chứng (JSON object).']
+  compensates_review_id uuid [note: 'Quyết định được bù trừ (bắt buộc với REVOKE/REOPEN, cấm với APPROVE/REJECT).']
+  created_at timestamptz [not null, default: 'now()', note: 'Thời điểm tạo bản ghi (timestamptz, mặc định now()).']
+  Note: 'Lịch sử đổi trạng thái danh tính (dự phòng)'
+}
+
+// ===== Quan hệ (30 khóa ngoại) =====
+Ref fk_audit_events_actor_user_id_users: audit_events.actor_user_id > users.id [delete: restrict]
+Ref fk_identity_evidence_identity_id_lecturer_scopus_identities: identity_evidence.identity_id > lecturer_scopus_identities.id [delete: restrict]
+Ref fk_lecturer_known_publications_snapshot_lecturer: lecturer_known_publications.(snapshot_id, lecturer_id) > lecturer_source_snapshots.(id, lecturer_id) [delete: restrict]
+Ref fk_lecturer_scopus_candidate_evidence_observation_id_le_d76b: lecturer_scopus_candidate_evidence.observation_id > lecturer_scopus_candidate_observations.id [delete: restrict]
+Ref fk_lecturer_scopus_candidate_observations_candidate_id__26b4: lecturer_scopus_candidate_observations.candidate_id > lecturer_scopus_candidates.id [delete: restrict]
+Ref fk_lecturer_scopus_candidate_observations_generation_ru_f0a3: lecturer_scopus_candidate_observations.generation_run_id > candidate_generation_runs.id [delete: restrict]
+Ref fk_lecturer_scopus_candidate_reviews_candidate_id_lectu_d610: lecturer_scopus_candidate_reviews.candidate_id > lecturer_scopus_candidates.id [delete: restrict]
+Ref fk_lecturer_scopus_candidate_reviews_observation_id_lec_05f7: lecturer_scopus_candidate_reviews.observation_id > lecturer_scopus_candidate_observations.id [delete: restrict]
+Ref fk_lecturer_scopus_candidate_reviews_resulting_identity_a592: lecturer_scopus_candidate_reviews.resulting_identity_id > lecturer_scopus_identities.id [delete: restrict]
+Ref fk_lecturer_scopus_candidate_reviews_reviewer_user_id_users: lecturer_scopus_candidate_reviews.reviewer_user_id > users.id [delete: restrict]
+Ref fk_lecturer_scopus_candidates_lecturer_id_lecturers: lecturer_scopus_candidates.lecturer_id > lecturers.id [delete: restrict]
+Ref fk_lecturer_scopus_candidates_scopus_author_id_scopus_author: lecturer_scopus_candidates.scopus_author_id > scopus_authors.id [delete: restrict]
+Ref fk_lecturer_scopus_identities_lecturer_id_lecturers: lecturer_scopus_identities.lecturer_id > lecturers.id [delete: restrict]
+Ref fk_lecturer_scopus_identities_scopus_author_id_scopus_author: lecturer_scopus_identities.scopus_author_id - scopus_authors.id [delete: restrict]
+Ref fk_lecturer_source_snapshots_lecturer_id_lecturers: lecturer_source_snapshots.lecturer_id > lecturers.id [delete: restrict]
+Ref fk_mapping_reviews_compensates_review_id_mapping_reviews: mapping_reviews.compensates_review_id > mapping_reviews.id [delete: restrict]
+Ref fk_mapping_reviews_identity_id_lecturer_scopus_identities: mapping_reviews.identity_id > lecturer_scopus_identities.id [delete: restrict]
+Ref fk_mapping_reviews_reviewer_user_id_users: mapping_reviews.reviewer_user_id > users.id [delete: restrict]
+Ref fk_paar_publication_author_id: publication_author_affiliation_resolutions.publication_author_id > publication_authors.id [delete: cascade]
+Ref fk_paa_organization_id: publication_author_affiliations.organization_id > organizations.id [delete: restrict]
+Ref fk_paa_resolution_link_status: publication_author_affiliations.(resolution_id, link_status) > publication_author_affiliation_resolutions.(id, link_status) [delete: cascade]
+Ref fk_publication_authors_publication_id_publications: publication_authors.publication_id > publications.id [delete: cascade]
+Ref fk_publication_authors_scopus_author_id_scopus_authors: publication_authors.scopus_author_id > scopus_authors.id [delete: restrict]
+Ref fk_publication_raw_sources_publication_id_publications: publication_raw_sources.publication_id > publications.id [delete: restrict]
+Ref fk_publication_raw_sources_raw_record_id_raw_scopus_records: publication_raw_sources.raw_record_id - raw_scopus_records.id [delete: restrict]
+Ref fk_raw_scopus_records_import_id_scopus_imports: raw_scopus_records.import_id > scopus_imports.id [delete: restrict]
+Ref fk_scopus_author_name_variants_first_seen_raw_record_id_d3c5: scopus_author_name_variants.first_seen_raw_record_id > raw_scopus_records.id [delete: restrict]
+Ref fk_scopus_author_name_variants_scopus_author_id_scopus_autho: scopus_author_name_variants.scopus_author_id > scopus_authors.id [delete: restrict]
+Ref fk_user_notifications_user_id_users: user_notifications.user_id > users.id [delete: restrict]
+Ref fk_users_lecturer_id_lecturers: users.lecturer_id - lecturers.id [delete: restrict]

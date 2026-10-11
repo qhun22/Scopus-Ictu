@@ -1,0 +1,123 @@
+@startuml ERD-D_cong_bo_tac_gia
+' Nguồn: docs/design/database/source/schema_snapshot.json (sinh bởi tools/gen_database_assets.py) — KHÔNG sửa tay phần sinh tự động.
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #34495E
+  FontSize 12
+  AttributeFontSize 11
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam packageStyle rectangle
+hide circle
+title ERD-D — Cụm D: Công bố và tác giả chuẩn hóa
+
+entity "publications" as publications #D6EAF8 {
+  *id : uuid <<PK>>
+  --
+  *eid : text <<UQ>>
+  doi : varchar(255)
+  *title : text
+  *title_normalized : text
+  source_title : text
+  year : integer
+  volume : text
+  issue : text
+  art_no : text
+  page_start : text
+  page_end : text
+  cited_by_count : integer
+  document_type : varchar(50)
+  publication_stage : varchar(50)
+  open_access_status : varchar(50)
+  *version : integer
+  *created_at : timestamptz
+  *updated_at : timestamptz
+}
+
+entity "publication_raw_sources" as publication_raw_sources #D6EAF8 {
+  *id : uuid <<PK>>
+  --
+  *publication_id : uuid <<FK>>
+  *raw_record_id : uuid <<FK>> <<UQ>>
+  *created_at : timestamptz
+}
+
+entity "scopus_authors" as scopus_authors #D6EAF8 {
+  *id : uuid <<PK>>
+  --
+  *scopus_id : text <<UQ>>
+  *preferred_name : varchar(255)
+  *created_at : timestamptz
+  *updated_at : timestamptz
+}
+
+entity "scopus_author_name_variants" as scopus_author_name_variants #D6EAF8 {
+  *id : uuid <<PK>>
+  --
+  *scopus_author_id : uuid <<FK>>
+  *variant_type : varchar(30)
+  *variant_name : varchar(255)
+  *variant_name_normalized : varchar(255)
+  *first_seen_raw_record_id : uuid <<FK>>
+  *created_at : timestamptz
+}
+
+entity "publication_authors" as publication_authors #D6EAF8 {
+  *id : uuid <<PK>>
+  --
+  *publication_id : uuid <<FK>>
+  *scopus_author_id : uuid <<FK>>
+  *author_order : integer
+  *created_at : timestamptz
+}
+
+entity "lecturer_scopus_candidates" as lecturer_scopus_candidates #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm F)
+}
+
+entity "lecturer_scopus_identities" as lecturer_scopus_identities #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm F)
+}
+
+entity "publication_author_affiliation_resolutions" as publication_author_affiliation_resolutions #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm E)
+}
+
+entity "raw_scopus_records" as raw_scopus_records #EEEEEE {
+  *id : uuid <<PK>>
+  ..
+  (bảng thuộc cụm C)
+}
+
+scopus_authors ||--o{ lecturer_scopus_candidates : scopus_author_id
+scopus_authors ||--o| lecturer_scopus_identities : scopus_author_id
+publication_authors ||--o{ publication_author_affiliation_resolutions : publication_author_id
+publications ||--o{ publication_authors : publication_id
+scopus_authors ||--o{ publication_authors : scopus_author_id
+publications ||--o{ publication_raw_sources : publication_id
+raw_scopus_records ||--o| publication_raw_sources : raw_record_id
+raw_scopus_records ||--o{ scopus_author_name_variants : first_seen_raw_record_id
+scopus_authors ||--o{ scopus_author_name_variants : scopus_author_id
+legend bottom right
+  <b>Chú giải</b>
+  * = NOT NULL · <<PK>> khóa chính · <<FK>> khóa ngoại · <<UQ>> duy nhất
+  Đầu nối (crow's foot): hai gạch = đúng 1 · vòng tròn + gạch = 0..1 · vòng tròn + chân chim = 0..*
+  Nhãn trên đường nối = cột khóa ngoại ở bảng con
+  Nguồn: PostgreSQL thật (alembic a9c2e4f71b30)
+endlegend
+
+@enduml
