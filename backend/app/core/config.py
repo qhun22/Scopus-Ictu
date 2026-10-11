@@ -89,6 +89,13 @@ class Settings(BaseSettings):
         validation_alias="SCOPUS_NORMALIZATION_BATCH_SIZE",
     )
 
+    # ------------------------------------------------------------------
+    # Author-affiliation source bundle (offline).  Fixed by the operator; the
+    # ADMIN workflow never accepts a path from a request.  Optional: without it
+    # the workflow reports "source not configured" and nothing else breaks.
+    # ------------------------------------------------------------------
+    affiliation_source_dir: str | None = Field(None, validation_alias="AFFILIATION_SOURCE_DIR")
+
     model_config = SettingsConfigDict(
         env_file=str(LOCAL_ENV_FILE),
         env_file_encoding="utf-8",

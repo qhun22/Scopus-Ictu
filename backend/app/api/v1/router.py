@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    affiliations,
     audits,
     auth,
     authors,
@@ -41,6 +42,9 @@ router.include_router(publications.router, prefix="/publications", tags=["public
 router.include_router(authors.router, prefix="/authors", tags=["authors"])
 router.include_router(matching.router, prefix="/matching", tags=["matching"])
 router.include_router(reviews.router, prefix="/reviews", tags=["reviews"])
+router.include_router(
+    affiliations.router, prefix="/affiliations", tags=["affiliations"]
+)
 router.include_router(audits.router, prefix="/audits", tags=["audits"])
 router.include_router(search.router, prefix="/search", tags=["search"])
 router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])

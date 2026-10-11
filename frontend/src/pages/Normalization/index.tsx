@@ -11,6 +11,7 @@ import { useI18n } from "../../i18n";
 import { useToast } from "../../contexts/ToastContext";
 import ModalPortal from "../../components/common/ModalPortal";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import AffiliationsTab from "./AffiliationsTab";
 import AuthorsTab from "./AuthorsTab";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
@@ -49,11 +50,11 @@ export default function NormalizationPage() {
   const [searchParams] = useSearchParams();
   const requestedImportId = searchParams.get("import");
 
-  const [activeTab, setActiveTab] = useState<"publications" | "authors">("publications");
+  const [activeTab, setActiveTab] = useState<"publications" | "authors" | "affiliations">("publications");
   const [history, setHistory] = useState<ScopusImport[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "completed" | "failed">("all");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "pending" | "processing" | "completed" | "failed">("all");
 
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(10);
@@ -88,9 +89,13 @@ export default function NormalizationPage() {
     void fetchImports();
   }, []);
 
-  // Only Scopus imports are eligible for Publication Normalization
+  // Only Scopus imports are eligible for Publication Normalization.
+  // Imports cancelled before normalization ever started never belong to this page.
   const scopusImports = useMemo(() => {
-    return history.filter((item) => item.type !== "LECTURERS");
+    return history.filter(
+      (item) =>
+        item.type !== "LECTURERS" && !(item.status === "CANCELLED" && !item.normalization),
+    );
   }, [history]);
 
   // Lifecycle classifications
@@ -150,7 +155,11 @@ export default function NormalizationPage() {
   // Filtered history list
   const filteredHistory = useMemo(() => {
     let list = historyImports;
-    if (historyStatusFilter === "completed") {
+    if (historyStatusFilter === "pending") {
+      list = list.filter(isPending);
+    } else if (historyStatusFilter === "processing") {
+      list = list.filter(isProcessing);
+    } else if (historyStatusFilter === "completed") {
       list = list.filter(isCompleted);
     } else if (historyStatusFilter === "failed") {
       list = list.filter(isFailed);
@@ -287,8 +296,30 @@ export default function NormalizationPage() {
             </svg>
             <span className="truncate">{t.normalization.tabs.authors}</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("affiliations")}
+            data-testid="tab-affiliations"
+            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              activeTab === "affiliations"
+                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
+                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
+            }`}
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <span className="truncate">{locale === "vi" ? "Đơn vị tác giả" : "Author affiliations"}</span>
+          </button>
         </div>
       </div>
+
+      {activeTab === "affiliations" && (
+        <div className="tab-fade-in">
+          <AffiliationsTab locale={locale} />
+        </div>
+      )}
 
       {/* Tab Content: Authors Tab (M2.6B) */}
       {activeTab === "authors" && (
@@ -305,42 +336,71 @@ export default function NormalizationPage() {
       {activeTab === "publications" && (
         <div className="tab-fade-in space-y-5">
           {/* Summary KPI Cards — Matching /imports & /lecturers visual rhythm */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+            <button
+              type="button"
+              onClick={() => { setHistoryStatusFilter("all"); setHistoryPage(1); }}
+              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "all" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+            >
+              <span className="text-xs font-medium text-slate-500">
+                {locale === "vi" ? "Tổng đợt nhập" : "Total imports"}
+              </span>
+              <p className="mt-1 text-2xl font-black text-slate-800">
+                {scopusImports.length}
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "pending" ? "all" : "pending"); setHistoryPage(1); }}
+              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "pending" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+            >
               <span className="text-xs font-medium text-slate-500">
                 {t.normalization.summary.pending}
               </span>
               <p className="mt-1 text-2xl font-black text-slate-800">
                 {countPending}
               </p>
-            </div>
+            </button>
 
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+            <button
+              type="button"
+              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "processing" ? "all" : "processing"); setHistoryPage(1); }}
+              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "processing" ? "border-blue-300 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200/80 bg-white hover:border-blue-200 hover:bg-blue-50/40"}`}
+            >
               <span className="text-xs font-medium text-[#3A5FC3]">
                 {t.normalization.summary.processing}
               </span>
               <p className="mt-1 text-2xl font-black text-[#3A5FC3]">
                 {countProcessing}
               </p>
-            </div>
+            </button>
 
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+            <button
+              type="button"
+              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "completed" ? "all" : "completed"); setHistoryPage(1); }}
+              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "completed" ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200/80 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"}`}
+            >
               <span className="text-xs font-medium text-emerald-600">
                 {t.normalization.summary.completed}
               </span>
               <p className="mt-1 text-2xl font-black text-emerald-600">
                 {countCompleted}
               </p>
-            </div>
+            </button>
 
-            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+            <button
+              type="button"
+              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "failed" ? "all" : "failed"); setHistoryPage(1); }}
+              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "failed" ? "border-rose-300 bg-rose-50 ring-2 ring-rose-200" : "border-slate-200/80 bg-white hover:border-rose-200 hover:bg-rose-50/40"}`}
+            >
               <span className="text-xs font-medium text-rose-600">
                 {t.normalization.summary.failed}
               </span>
               <p className="mt-1 text-2xl font-black text-rose-600">
                 {countFailed}
               </p>
-            </div>
+            </button>
           </div>
 
           {/* SECTION 1: CẦN XỬ LÝ (Actionable Queue Table) */}
@@ -354,7 +414,7 @@ export default function NormalizationPage() {
               </p>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+            <div className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
@@ -499,8 +559,8 @@ export default function NormalizationPage() {
               </h2>
             </div>
 
-            {/* Toolbar: Search input + Status dropdown */}
-            <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+            {/* Toolbar: Search input only (status filter via KPI cards) */}
+            <div className="flex flex-col gap-3 rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -515,26 +575,10 @@ export default function NormalizationPage() {
                   className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
                 />
               </div>
-
-              <div className="flex items-center gap-2">
-                <label htmlFor="norm-history-status-filter" className="text-xs font-medium text-slate-500 whitespace-nowrap">
-                  {locale === "vi" ? "Trạng thái:" : "Status:"}
-                </label>
-                <select
-                  id="norm-history-status-filter"
-                  value={historyStatusFilter}
-                  onChange={(e) => setHistoryStatusFilter(e.target.value as "all" | "completed" | "failed")}
-                  className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
-                >
-                  <option value="all">{locale === "vi" ? "Tất cả" : "All"}</option>
-                  <option value="completed">{t.normalization.summary.completed}</option>
-                  <option value="failed">{t.normalization.summary.failed}</option>
-                </select>
-              </div>
             </div>
 
             {/* Simple History Table */}
-            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+            <div className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
@@ -653,8 +697,8 @@ export default function NormalizationPage() {
                 </table>
               </div>
 
-              {/* Footer info & Pagination Controls (Visible even at total=0) */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+              {/* Footer info & Pagination Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
                 <div className="flex items-center gap-3">
                   <span>
                     {locale === "vi" ? "Hiển thị" : "Showing"} <strong>{paginatedHistory.length}</strong> {locale === "vi" ? "trong" : "of"} {filteredHistory.length} {locale === "vi" ? "đợt nhập" : "imports"}
@@ -669,7 +713,7 @@ export default function NormalizationPage() {
                         setHistoryPageSize(Number(e.target.value));
                         setHistoryPage(1);
                       }}
-                      className="h-6.5 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                      className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
                     >
                       <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                       <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -679,23 +723,34 @@ export default function NormalizationPage() {
                   </div>
                 </div>
 
-                <nav aria-label="Pagination" className="flex items-center gap-2">
+                <nav aria-label="Pagination" className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentHistoryPage <= 1}
-                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     {locale === "vi" ? "Trang trước" : "Previous"}
                   </button>
-                  <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
-                    {locale === "vi" ? "Trang" : "Page"} <strong>{currentHistoryPage}</strong> / {historyTotalPages}
-                  </span>
+                  <span className="text-slate-400 px-0.5">{locale === "vi" ? "Trang" : "Page"}</span>
+                  <input
+                    type="number"
+                    aria-label={locale === "vi" ? "Đến trang" : "Go to page"}
+                    min={1}
+                    max={historyTotalPages}
+                    value={currentHistoryPage}
+                    onChange={(e) => {
+                      const val = Math.max(1, Math.min(historyTotalPages, parseInt(e.target.value, 10) || 1));
+                      setHistoryPage(val);
+                    }}
+                    className="h-8 w-14 rounded-md border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                  <span className="text-slate-400">/ <strong className="text-slate-600">{historyTotalPages}</strong></span>
                   <button
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.min(historyTotalPages, prev + 1))}
                     disabled={currentHistoryPage >= historyTotalPages}
-                    className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     {locale === "vi" ? "Trang sau" : "Next"}
                   </button>
@@ -750,7 +805,7 @@ export default function NormalizationPage() {
                 {/* ROW 1: 2 Equal Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                   {/* CARD 1: THÔNG TIN NGUỒN */}
-                  <div className="flex flex-col rounded-xl border border-blue-100 bg-blue-50/20 p-4 shadow-2xs">
+                  <div className="flex flex-col rounded-lg border border-blue-100 bg-blue-50/20 p-4 shadow-2xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-blue-100/70">
                       <div className="flex items-center gap-2">
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
@@ -803,7 +858,7 @@ export default function NormalizationPage() {
                   </div>
 
                   {/* CARD 2: KẾT QUẢ XỬ LÝ */}
-                  <div className="flex flex-col rounded-xl border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
+                  <div className="flex flex-col rounded-lg border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
                       <div className="flex items-center gap-2">
                         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
@@ -897,7 +952,7 @@ export default function NormalizationPage() {
                 )}
 
                 {/* Collapsible: Technical info & Provenance */}
-                <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3">
+                <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3">
                   <button
                     type="button"
                     onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}

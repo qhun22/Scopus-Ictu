@@ -1,6 +1,6 @@
 import type {
   AffiliationLinkStatus,
-  AffiliationSummaryRead,
+  AuthorAffiliationRead,
   PublicationAuthorRead,
 } from "../../types/publication";
 
@@ -13,17 +13,33 @@ const STATUS_STYLE: Record<AffiliationLinkStatus, string> = {
   NOT_RECONCILED: "bg-slate-50 text-slate-400 border-slate-200",
 };
 
+// Display labels only: the enum values in the API and database are unchanged.
+const STATUS_LABEL: Record<AffiliationLinkStatus, Record<Locale, string>> = {
+  VERIFIED: { vi: "Đã xác minh định danh", en: "Identity verified" },
+  CORROBORATED: { vi: "Đã đối chiếu · Chưa xác minh", en: "Cross-checked · Not verified" },
+  UNRESOLVED: { vi: "Chưa xác định", en: "Unresolved" },
+  NOT_RECONCILED: { vi: "Chưa đối chiếu", en: "Not reconciled" },
+};
+
+export function statusLabel(status: AffiliationLinkStatus, locale: Locale): string {
+  return STATUS_LABEL[status][locale];
+}
+
 function statusHint(status: AffiliationLinkStatus, locale: Locale): string {
   const vi: Record<AffiliationLinkStatus, string> = {
-    VERIFIED: "Đã xác minh bằng chuỗi định danh ORCID → Scopus Author ID.",
-    CORROBORATED: "Chỉ đối chiếu theo số tác giả + vị trí + tên. CHƯA được xác minh.",
-    UNRESOLVED: "Không đủ bằng chứng; không gán đơn vị nào.",
-    NOT_RECONCILED: "Chưa chạy đối chiếu affiliation cho tác giả này.",
+    VERIFIED:
+      "Định danh được xác minh bằng chuỗi ORCID → Scopus Author ID. Đơn vị là lời khai của nguồn metadata ngoài (OpenAlex/Crossref), không phải xác nhận trực tiếp của Scopus.",
+    CORROBORATED:
+      "Chỉ đối chiếu theo số tác giả + vị trí + tên; không có định danh chung nên CHƯA được xác minh.",
+    UNRESOLVED: "Không đủ bằng chứng; không gán đơn vị nào cho tác giả này.",
+    NOT_RECONCILED: "Chưa chạy đối chiếu đơn vị cho tác giả này.",
   };
   const en: Record<AffiliationLinkStatus, string> = {
-    VERIFIED: "Verified through an ORCID → Scopus Author ID identifier chain.",
-    CORROBORATED: "Matched only by author count + position + name. NOT verified.",
-    UNRESOLVED: "Insufficient evidence; no unit is assigned.",
+    VERIFIED:
+      "Identity verified through an ORCID → Scopus Author ID chain. The unit is the external metadata source's statement (OpenAlex/Crossref), not asserted by Scopus.",
+    CORROBORATED:
+      "Matched only by author count + position + name; no shared identifier, so NOT verified.",
+    UNRESOLVED: "Insufficient evidence; no unit is assigned to this author.",
     NOT_RECONCILED: "No affiliation reconciliation has been run for this author.",
   };
   return (locale === "vi" ? vi : en)[status];
@@ -57,6 +73,23 @@ export function reasonLabel(code: string, locale: Locale): string {
 }
 
 const SOURCE_LABEL: Record<string, string> = { openalex: "OpenAlex", crossref: "Crossref" };
+
+/** One short, honest line on WHY a unit is attached (never raises the confidence). */
+function evidenceLine(a: AuthorAffiliationRead, locale: Locale): string {
+  const vi = locale === "vi";
+  const p = a.provenance;
+  const where = p.external_position != null ? (vi ? ` · vị trí ${p.external_position} trên nguồn` : ` · position ${p.external_position} at the source`) : "";
+  if (a.link_status === "VERIFIED") {
+    const orcid = typeof p.evidence?.orcid === "string" ? p.evidence.orcid : null;
+    const declared = Array.isArray(p.evidence?.declared_by) ? (p.evidence.declared_by as string[]).join(", ") : "";
+    return vi
+      ? `Bằng chứng: ORCID ${orcid ?? "?"} khai Scopus ID của tác giả${declared ? ` (${declared})` : ""}${where}`
+      : `Evidence: ORCID ${orcid ?? "?"} declares this Scopus ID${declared ? ` (${declared})` : ""}${where}`;
+  }
+  return vi
+    ? `Bằng chứng: chỉ khớp số tác giả + vị trí + tên (không có định danh chung)${where}`
+    : `Evidence: matched only by author count + position + name (no shared identifier)${where}`;
+}
 const sourceLabel = (s: string) => SOURCE_LABEL[s] ?? s;
 
 export function AffiliationBadge({
@@ -68,54 +101,85 @@ export function AffiliationBadge({
   locale: Locale;
   small?: boolean;
 }) {
-  const text = status === "NOT_RECONCILED" ? (locale === "vi" ? "Chưa đối chiếu" : "Not reconciled") : status;
   return (
     <span
       title={statusHint(status, locale)}
       data-testid={`aff-badge-${status}`}
-      className={`inline-flex items-center rounded border font-bold ${small ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-[11px]"} ${STATUS_STYLE[status]}`}
+      className={`inline-flex items-center whitespace-nowrap rounded border font-bold ${small ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-[11px]"} ${STATUS_STYLE[status]}`}
     >
-      {text}
+      {statusLabel(status, locale)}
     </span>
   );
 }
 
+/**
+ * Trust level of the UNIT shown for an author (not of the identity link).
+ * An author whose identity is verified by a source that lists no unit, while
+ * another source lists a unit only by cross-checking, has a cross-checked unit.
+ */
+type UnitLevel = "VERIFIED" | "CORROBORATED" | "NO_UNIT_VERIFIED" | "NO_UNIT_CORROBORATED" | "UNRESOLVED" | "NOT_RECONCILED";
+
+function unitLevel(author: PublicationAuthorRead): UnitLevel {
+  const status = author.affiliation_status ?? "NOT_RECONCILED";
+  if (status === "NOT_RECONCILED") return "NOT_RECONCILED";
+  if (status === "UNRESOLVED") return "UNRESOLVED";
+  const items = author.affiliations ?? [];
+  if (items.some((a) => a.link_status === "VERIFIED")) return "VERIFIED";
+  if (items.length > 0) return "CORROBORATED";
+  return status === "VERIFIED" ? "NO_UNIT_VERIFIED" : "NO_UNIT_CORROBORATED";
+}
+
 export function AffiliationSummaryBar({
-  summary,
+  authors,
   locale,
 }: {
-  summary: AffiliationSummaryRead | null | undefined;
+  authors: PublicationAuthorRead[];
   locale: Locale;
 }) {
-  if (!summary) return null;
-  const all: Array<{ status: AffiliationLinkStatus; label: string; value: number }> = [
-    { status: "VERIFIED", label: locale === "vi" ? "có đơn vị" : "with unit", value: summary.verified_with_affiliation },
-    { status: "VERIFIED", label: locale === "vi" ? "nguồn không có đơn vị" : "source lists no unit", value: summary.verified_without_affiliation },
-    { status: "CORROBORATED", label: locale === "vi" ? "có đơn vị" : "with unit", value: summary.corroborated_with_affiliation },
-    { status: "CORROBORATED", label: locale === "vi" ? "nguồn không có đơn vị" : "source lists no unit", value: summary.corroborated_without_affiliation },
-    { status: "UNRESOLVED", label: locale === "vi" ? "chưa xác định" : "unresolved", value: summary.unresolved },
-    { status: "NOT_RECONCILED", label: locale === "vi" ? "chưa đối chiếu" : "not reconciled", value: summary.not_reconciled },
+  if (authors.length === 0) return null;
+  const counts: Record<UnitLevel, number> = {
+    VERIFIED: 0,
+    CORROBORATED: 0,
+    NO_UNIT_VERIFIED: 0,
+    NO_UNIT_CORROBORATED: 0,
+    UNRESOLVED: 0,
+    NOT_RECONCILED: 0,
+  };
+  for (const a of authors) counts[unitLevel(a)] += 1;
+
+  const vi = locale === "vi";
+  const all: Array<{ key: UnitLevel; status: AffiliationLinkStatus; label: string }> = [
+    { key: "VERIFIED", status: "VERIFIED", label: vi ? "có đơn vị" : "with unit" },
+    { key: "CORROBORATED", status: "CORROBORATED", label: vi ? "có đơn vị" : "with unit" },
+    {
+      key: "NO_UNIT_VERIFIED",
+      status: "VERIFIED",
+      label: vi ? "nguồn xác minh không có đơn vị" : "verifying source lists no unit",
+    },
+    { key: "NO_UNIT_CORROBORATED", status: "CORROBORATED", label: vi ? "nguồn không có đơn vị" : "source lists no unit" },
+    { key: "UNRESOLVED", status: "UNRESOLVED", label: vi ? "không gán được đơn vị" : "no unit assigned" },
+    { key: "NOT_RECONCILED", status: "NOT_RECONCILED", label: vi ? "chưa đối chiếu" : "not reconciled" },
   ];
-  const items = all.filter((i) => i.value > 0 || i.status !== "NOT_RECONCILED");
+  const items = all.filter((i) => counts[i.key] > 0);
   return (
     <div className="mb-3 space-y-2 rounded-lg border border-slate-100 bg-slate-50/60 p-3" data-testid="aff-summary">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600">
         <span className="font-semibold">
-          {locale === "vi" ? `Affiliation theo ${summary.authors} tác giả:` : `Affiliation across ${summary.authors} authors:`}
+          {vi ? `Đơn vị theo ${authors.length} tác giả:` : `Units across ${authors.length} authors:`}
         </span>
-        {items.map((i, idx) => (
-          <span key={`${i.status}-${idx}`} className="inline-flex items-center gap-1">
+        {items.map((i) => (
+          <span key={i.key} className="inline-flex items-center gap-1">
             <AffiliationBadge status={i.status} locale={locale} small />
             <span>
-              {i.value} {i.label}
+              {counts[i.key]} {vi ? "tác giả" : counts[i.key] === 1 ? "author" : "authors"} {i.label}
             </span>
           </span>
         ))}
       </div>
       <p className="text-[11px] leading-snug text-slate-500">
-        {locale === "vi"
-          ? "Đơn vị lấy từ nguồn metadata ngoài (OpenAlex/Crossref), không phải xác nhận trực tiếp của Scopus. CORROBORATED chỉ là đối chiếu theo số tác giả + vị trí + tên, chưa được xác minh."
-          : "Affiliations come from external metadata sources (OpenAlex/Crossref), not asserted by Scopus. CORROBORATED is matched by author count + position + name only and is not verified."}
+        {vi
+          ? "Đơn vị lấy từ nguồn metadata ngoài (OpenAlex, Crossref), không phải xác nhận trực tiếp của Scopus. “Đã xác minh định danh” nghĩa là có chuỗi ORCID → Scopus Author ID; “Đã đối chiếu · Chưa xác minh” chỉ khớp theo số tác giả, vị trí và tên."
+          : "Units come from external metadata sources (OpenAlex, Crossref), not asserted by Scopus. “Identity verified” means an ORCID → Scopus Author ID chain exists; “Cross-checked · Not verified” is matched only by author count, position and name."}
       </p>
     </div>
   );
@@ -128,18 +192,20 @@ export function AuthorAffiliationCell({
   author: PublicationAuthorRead;
   locale: Locale;
 }) {
+  const vi = locale === "vi";
   const status = author.affiliation_status ?? "NOT_RECONCILED";
   const affiliations = author.affiliations ?? [];
   const resolutions = author.affiliation_resolutions ?? [];
-  const noUnit = locale === "vi" ? "Chưa có thông tin đơn vị" : "No unit information yet";
+  const noUnit = vi ? "Chưa có thông tin đơn vị" : "No unit information yet";
 
   const resolutionLine = resolutions.length > 0 && (
-    <div className="mt-1 text-[10px] text-slate-400" data-testid="aff-resolutions">
+    <div className="mt-1 text-[10px] text-slate-500" data-testid="aff-resolutions">
+      {vi ? "Theo nguồn: " : "By source: "}
       {resolutions
         .map((r) =>
           r.link_status === "UNRESOLVED"
-            ? `${sourceLabel(r.source_system)}: UNRESOLVED${r.unresolved_reason ? ` (${reasonLabel(r.unresolved_reason, locale)})` : ""}`
-            : `${sourceLabel(r.source_system)}: ${r.link_status}${r.affiliation_presence === "ABSENT" ? (locale === "vi" ? " — nguồn không có đơn vị" : " — source lists no unit") : ""}`,
+            ? `${sourceLabel(r.source_system)}: ${statusLabel("UNRESOLVED", locale)}${r.unresolved_reason ? ` (${reasonLabel(r.unresolved_reason, locale)})` : ""}`
+            : `${sourceLabel(r.source_system)}: ${statusLabel(r.link_status, locale)}${r.affiliation_presence === "ABSENT" ? (vi ? " — nguồn không có đơn vị" : " — source lists no unit") : ""}`,
         )
         .join(" · ")}
     </div>
@@ -154,35 +220,51 @@ export function AuthorAffiliationCell({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <AffiliationBadge status={status} locale={locale} />
-          <span className="text-slate-500">{locale === "vi" ? "Chưa xác định được đơn vị" : "Unit could not be determined"}</span>
+          <span className="text-slate-500">{vi ? "Chưa xác định được đơn vị" : "Unit could not be determined"}</span>
         </div>
         {resolutionLine}
       </div>
     );
   }
 
+  // Identity verified by one source while the only unit listed comes from another
+  // source by cross-checking: say so, so the unit is not read as verified.
+  const verifiedWithoutUnitSources = resolutions
+    .filter((r) => r.link_status === "VERIFIED" && r.affiliation_presence === "ABSENT")
+    .map((r) => sourceLabel(r.source_system));
+  const unitOnlyCrossChecked =
+    status === "VERIFIED" && affiliations.length > 0 && !affiliations.some((a) => a.link_status === "VERIFIED");
+
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <AffiliationBadge status={status} locale={locale} />
-        {affiliations.length === 0 && (
+      {affiliations.length === 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <AffiliationBadge status={status} locale={locale} />
           <span className="font-medium text-slate-500" data-testid="aff-no-unit">
             {noUnit}
           </span>
-        )}
-      </div>
+        </div>
+      )}
+      {unitOnlyCrossChecked && (
+        <p className="mb-1 text-[11px] leading-snug text-amber-700" data-testid="aff-cross-checked-note">
+          {vi
+            ? `Định danh đã xác minh${verifiedWithoutUnitSources.length ? ` qua ${verifiedWithoutUnitSources.join(", ")}` : ""} nhưng nguồn đó không có đơn vị; đơn vị bên dưới chỉ ở mức đối chiếu, chưa xác minh.`
+            : `Identity verified${verifiedWithoutUnitSources.length ? ` via ${verifiedWithoutUnitSources.join(", ")}` : ""} but that source lists no unit; the unit below is only cross-checked, not verified.`}
+        </p>
+      )}
       {affiliations.length > 0 && (
-        <ul className="mt-1.5 space-y-1.5">
+        <ul className="space-y-1.5">
           {affiliations.map((a, i) => (
             <li key={`${a.source_system}-${i}`} className="leading-snug" data-testid="aff-item">
               <div className="flex flex-wrap items-center gap-1.5">
                 <AffiliationBadge status={a.link_status} locale={locale} small />
                 <span className="rounded bg-slate-100 px-1.5 text-[10px] font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
-                <span className="text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{locale === "vi" ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
+                <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
               </div>
+              <div className="ml-1 mt-0.5 text-[10px] text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
               {a.organizations.length > 0 && (
                 <div className="ml-1 mt-0.5 flex flex-wrap gap-1 text-[10px] text-slate-500">
-                  <span>{locale === "vi" ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
+                  <span>{vi ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
                   {a.organizations.map((o, k) => (
                     <span key={`${o.source_org_id ?? o.display_name}-${k}`} className="rounded bg-sky-50 px-1.5 text-sky-700">
                       {o.display_name}
