@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giảng viên — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_shell.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S06/S07 — Danh sách & Chi tiết giảng viên (/lecturers) — AS-IS
+  Task 20B-R1 · 10/10/2026
+  Nguồn: frontend/src/pages/Lecturers/index.tsx + Modal
+  States: list-data / list-empty / list-loading / list-error + modal open/close
+  GAP-h: LECTURER role chỉ thấy 4 menu items (khác ADMIN)
+  Ảnh tham chiếu: A_lecturers_1440x900.png
+-->
+<style>
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 40px 20px;
+}
+.modal-box {
+  background: white;
+  border-radius: 16px;
+  width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.modal-box-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--color-border-default);
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.modal-box-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.modal-box-footer { padding: 16px 24px; border-top: 1px solid var(--color-border-default); display: flex; justify-content: flex-end; gap: 8px; }
+.lecturer-avatar-lg {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--color-brand-primary);
+  color: white;
+  font-size: 22px;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pub-mini { display: flex; flex-direction: column; gap: 6px; }
+.pub-mini-item {
+  font-size: 12px; color: var(--color-text-secondary);
+  padding: 6px 8px; background: #F8FAFC; border-radius: 6px;
+}
+.pub-mini-item strong { color: var(--color-text-primary); display: block; margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">SCOPUS ICTU</div>
+        <div class="sidebar-brand-sub">Cổng thông tin Scopus</div>
+        <span class="sidebar-version">M2.3</span>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="index.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Trang chủ</a>
+      <a class="nav-item" href="s05_dashboard.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        Tổng quan</a>
+      <a class="nav-item" href="s04_imports.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Nhập dữ liệu</a>
+      <a class="nav-item active" href="s06_lecturers.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Giảng viên</a>
+      <a class="nav-item" href="s02_publications.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Công bố</a>
+      <a class="nav-item" href="s09_reviews.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Duyệt đối sánh</a>
+      <a class="nav-item" href="s13_review_history.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Lịch sử review</a>
+      <a class="nav-item" href="s14_audit_logs.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Nhật ký hệ thống</a>
+      <a class="nav-item" href="s15_tasks.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tác vụ</a>
+    </div>
+  </nav>
+
+  <div class="main-area">
+    <header class="topbar">
+      <span class="topbar-title">Giảng viên ICTU</span>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <button class="lang-switch-btn active">VI</button>
+          <div class="lang-switch-sep"></div>
+          <button class="lang-switch-btn">EN</button>
+        </div>
+        <span class="role-badge admin">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+          Quản trị viên
+        </span>
+        <button class="user-btn">
+          <div class="user-avatar">A</div>
+          Nguyễn Văn An
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- State switcher -->
+      <div style="display:flex;gap:6px;margin-bottom:16px">
+        <button id="btn-data" class="btn btn-primary btn-sm" onclick="showState('data')">Có dữ liệu</button>
+        <button id="btn-empty" class="btn btn-secondary btn-sm" onclick="showState('empty')">Trống</button>
+        <button id="btn-loading" class="btn btn-secondary btn-sm" onclick="showState('loading')">Đang tải</button>
+        <button id="btn-error" class="btn btn-secondary btn-sm" onclick="showState('error')">Lỗi 503</button>
+        <button id="btn-modal" class="btn btn-secondary btn-sm" onclick="openModal()">Xem modal GV</button>
+      </div>
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Giảng viên ICTU</h1>
+          <p class="page-desc">Danh sách giảng viên trong cơ sở dữ liệu Scopus–ICTU</p>
+        </div>
+        <button class="btn btn-primary btn-sm">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Thêm giảng viên
+        </button>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar" style="margin-bottom:16px">
+        <div class="filter-group">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" class="input" style="padding-left:32px;width:280px" placeholder="Tìm tên, email, mã GV...">
+          </div>
+          <select class="input" style="width:160px">
+            <option>Tất cả khoa</option>
+            <option>Khoa CNTT</option>
+            <option>Khoa KTPM</option>
+            <option>Khoa HTTT</option>
+          </select>
+        </div>
+        <div class="filter-actions">
+          <button class="btn btn-secondary btn-sm">Xóa lọc</button>
+        </div>
+      </div>
+
+      <!-- ── DATA state ──────────────────────────────────────────── -->
+      <div id="state-data">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Giảng viên</th>
+                <th>Học vị / Học hàm</th>
+                <th>Chuyên ngành</th>
+                <th>Khoa / Bộ môn</th>
+                <th style="text-align:right">Công bố</th>
+                <th style="width:80px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--color-brand-primary);color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">TM</div>
+                    <div><div style="font-weight:600;font-size:13px">Trần Văn Minh</div><div style="font-size:11px;color:var(--color-text-muted)">tran.van.minh@ictu.ac.vn</div></div>
+                  </div>
+                </td>
+                <td><span style="font-size:12px;font-weight:600;background:#EEF2FF;color:#4338CA;padding:2px 7px;border-radius:9999px;border:1px solid #C7D2FE">PGS.TS.</span></td>
+                <td style="font-size:12px;color:var(--color-text-body)">Học máy &amp; AI</td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Khoa CNTT / HTTT</td>
+                <td style="text-align:right;font-weight:700;color:var(--color-brand-primary)">47</td>
+                <td>
+                  <a href="s07_lecturer_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:32px;height:32px;border-radius:50%;background:#6366F1;color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">NL</div>
+                    <div><div style="font-weight:600;font-size:13px">Nguyễn Thị Lan</div><div style="font-size:11px;color:var(--color-text-muted)">nguyen.thi.lan@ictu.ac.vn</div></div>
+                  </div>
+                </td>
+                <td><span style="font-size:12px;font-weight:600;background:#EEF2FF;color:#4338CA;padding:2px 7px;border-radius:9999px;border:1px solid #C7D2FE">TS.</span></td>
+                <td style="font-size:12px;color:var(--color-text-body)">An ninh mạng</td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Khoa CNTT / ATTT</td>
+                <td style="text-align:right;font-weight:700;color:var(--color-brand-primary)">38</td>
+                <td><a href="s07_lecturer_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:32px;height:32px;border-radius:50%;background:#8B5CF6;color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">LL</div>
+                    <div><div style="font-weight:600;font-size:13px">Lê Hùng Linh</div><div style="font-size:11px;color:var(--color-text-muted)">le.hung.linh@ictu.ac.vn</div></div>
+                  </div>
+                </td>
+                <td><span style="font-size:12px;font-weight:600;background:#EEF2FF;color:#4338CA;padding:2px 7px;border-radius:9999px;border:1px solid #C7D2FE">TS.</span></td>
+                <td style="font-size:12px;color:var(--color-text-body)">Kỹ thuật phần mềm</td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Khoa KTPM / PTPM</td>
+                <td style="text-align:right;font-weight:700;color:var(--color-brand-primary)">31</td>
+                <td><a href="s07_lecturer_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:32px;height:32px;border-radius:50%;background:#EC4899;color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">ND</div>
+                    <div><div style="font-weight:600;font-size:13px">Nguyễn Thị Dung</div><div style="font-size:11px;color:var(--color-text-muted)">nguyen.thi.dung@ictu.ac.vn</div></div>
+                  </div>
+                </td>
+                <td><span style="font-size:12px;font-weight:600;background:#F8FAFC;color:#475569;padding:2px 7px;border-radius:9999px;border:1px solid #E2E8F0">ThS.</span></td>
+                <td style="font-size:12px;color:var(--color-text-body)">Hệ thống thông tin</td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Khoa HTTT / CNTT</td>
+                <td style="text-align:right;font-weight:700;color:var(--color-brand-primary)">24</td>
+                <td><a href="s07_lecturer_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:32px;height:32px;border-radius:50%;background:#0D9488;color:white;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">PT</div>
+                    <div><div style="font-weight:600;font-size:13px">Phạm Quang Tuấn</div><div style="font-size:11px;color:var(--color-text-muted)">pham.quang.tuan@ictu.ac.vn</div></div>
+                  </div>
+                </td>
+                <td><span style="font-size:12px;font-weight:600;background:#EEF2FF;color:#4338CA;padding:2px 7px;border-radius:9999px;border:1px solid #C7D2FE">GS.TS.</span></td>
+                <td style="font-size:12px;color:var(--color-text-body)">Xử lý ngôn ngữ tự nhiên</td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Khoa CNTT / HTTT</td>
+                <td style="text-align:right;font-weight:700;color:var(--color-brand-primary)">22</td>
+                <td><a href="s07_lecturer_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="table-footer">
+            Hiển thị 5 / 89 giảng viên &nbsp;·&nbsp;
+            <button class="btn btn-ghost btn-xs">‹</button>
+            <strong>1</strong>
+            <button class="btn btn-ghost btn-xs">2</button>
+            …
+            <button class="btn btn-ghost btn-xs">9</button>
+            <button class="btn btn-ghost btn-xs">›</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── EMPTY state ─────────────────────────────────────────── -->
+      <div id="state-empty" style="display:none">
+        <div class="state-box">
+          <svg width="48" height="48" fill="none" stroke="var(--color-text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <p>Chưa có giảng viên nào</p>
+          <button class="btn btn-primary btn-sm" onclick="openModal()">Thêm giảng viên đầu tiên</button>
+        </div>
+      </div>
+
+      <!-- ── LOADING state ───────────────────────────────────────── -->
+      <div id="state-loading" style="display:none">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Đang tải danh sách giảng viên...</p>
+        </div>
+      </div>
+
+      <!-- ── ERROR state ─────────────────────────────────────────── -->
+      <div id="state-error" style="display:none">
+        <div class="error-state">
+          <svg width="40" height="40" fill="none" stroke="var(--color-danger)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 8v4m0 4h.01"/></svg>
+          <p>Không thể tải danh sách giảng viên</p>
+          <span style="font-size:12px;color:var(--color-text-muted)">503 Service Unavailable</span>
+          <button class="btn btn-secondary btn-sm" onclick="showState('data')" style="margin-top:8px">Thử lại</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Lecturer detail modal -->
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-box-header">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div class="lecturer-avatar-lg">TM</div>
+        <div>
+          <h2 style="font-size:18px;font-weight:700;color:var(--color-text-primary)">PGS.TS. Trần Văn Minh</h2>
+          <p style="font-size:13px;color:var(--color-text-secondary)">Khoa CNTT · tran.van.minh@ictu.ac.vn</p>
+          <div style="display:flex;gap:6px;margin-top:4px">
+            <span class="badge badge-pending" style="font-size:10px">Đang hoạt động</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal()" style="flex-shrink:0">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-box-body">
+      <!-- Basic info -->
+      <div>
+        <h3 style="font-size:12px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Thông tin cơ bản</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+          <div><span style="color:var(--color-text-muted)">Mã GV:</span> <strong>GV001</strong></div>
+          <div><span style="color:var(--color-text-muted)">Học vị:</span> <strong>PGS.TS.</strong></div>
+          <div><span style="color:var(--color-text-muted)">Khoa:</span> <strong>Khoa CNTT</strong></div>
+          <div><span style="color:var(--color-text-muted)">Bộ môn:</span> <strong>CNTT</strong></div>
+          <div><span style="color:var(--color-text-muted)">SĐT:</span> <strong>0912 345 678</strong></div>
+          <div><span style="color:var(--color-text-muted)">Scopus Author IDs:</span> <strong style="font-family:'Roboto Mono',monospace;font-size:11px">56893421200</strong></div>
+        </div>
+      </div>
+      <!-- Publication summary -->
+      <div>
+        <h3 style="font-size:12px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">Thống kê công bố</h3>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+          <div style="text-align:center;background:#F8FAFC;border-radius:8px;padding:10px">
+            <div style="font-size:18px;font-weight:700;color:var(--color-brand-primary)">47</div>
+            <div style="font-size:11px;color:var(--color-text-muted)">Tổng công bố</div>
+          </div>
+          <div style="text-align:center;background:#F8FAFC;border-radius:8px;padding:10px">
+            <div style="font-size:18px;font-weight:700;color:var(--color-badge-accepted-text)">38</div>
+            <div style="font-size:11px;color:var(--color-text-muted)">ACCEPTED</div>
+          </div>
+          <div style="text-align:center;background:#F8FAFC;border-radius:8px;padding:10px">
+            <div style="font-size:18px;font-weight:700;color:var(--color-badge-pending-text)">4</div>
+            <div style="font-size:11px;color:var(--color-text-muted)">PENDING</div>
+          </div>
+        </div>
+        <div class="pub-mini">
+          <div class="pub-mini-item">
+            <strong>Deep Learning for Vietnamese NLP: A Comprehensive Survey (2024)</strong>
+            Neural Networks · ACCEPTED
+          </div>
+          <div class="pub-mini-item">
+            <strong>Blockchain-based Academic Certificate Verification System (2023)</strong>
+            IEEE Access · ACCEPTED
+          </div>
+          <div class="pub-mini-item">
+            <strong>A Novel Approach to Vietnamese Text Classification (2023)</strong>
+            Expert Systems · SUPERSEDED
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-box-footer">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Đóng</button>
+      <a href="s02_publications.html" class="btn btn-primary btn-sm">Xem công bố</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function showState(s) {
+  ['data','empty','loading','error'].forEach(id => {
+    document.getElementById('state-'+id).style.display = 'none';
+    const b = document.getElementById('btn-'+id);
+    if (b) b.className = 'btn btn-secondary btn-sm';
+  });
+  document.getElementById('state-'+s).style.display = '';
+  const b = document.getElementById('btn-'+s);
+  if (b) b.className = 'btn btn-primary btn-sm';
+}
+function openModal() {
+  document.getElementById('modal-overlay').style.display = 'flex';
+  document.getElementById('btn-modal').className = 'btn btn-primary btn-sm';
+}
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+  document.getElementById('btn-modal').className = 'btn btn-secondary btn-sm';
+}
+</script>
+</body>
+</html>

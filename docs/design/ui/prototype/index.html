@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scopus–ICTU · Design Prototype Index</title>
+<link rel="stylesheet" href="_tokens.css">
+<style>
+body { padding: 40px; background: var(--color-bg-page); }
+.index-wrap { max-width: 900px; margin: 0 auto; }
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.subtitle { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 32px; }
+.warning-box {
+  background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 12px;
+  padding: 14px 18px; font-size: 13px; color: #92400E; margin-bottom: 28px;
+  display: flex; gap: 10px;
+}
+.section { margin-bottom: 32px; }
+.section h2 { font-size: 14px; font-weight: 700; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border-default); }
+.screen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.screen-card {
+  background: white; border: 1px solid var(--color-border-default); border-radius: 12px;
+  padding: 16px; text-decoration: none; color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.screen-card:hover { border-color: var(--color-brand-primary); box-shadow: 0 4px 12px rgba(58,95,195,0.1); }
+.screen-card .sc-id { font-size: 11px; font-weight: 700; color: var(--color-brand-primary); font-family: 'Roboto Mono', monospace; }
+.screen-card .sc-name { font-size: 14px; font-weight: 600; color: var(--color-text-primary); }
+.screen-card .sc-route { font-size: 11px; color: var(--color-text-muted); font-family: 'Roboto Mono', monospace; }
+.screen-card .sc-status { display: inline-flex; padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 700; border: 1px solid; margin-top: 4px; width: fit-content; }
+.st-asis { background: #ECFDF5; border-color: #A7F3D0; color: #047857; }
+.st-proposed { background: #FFFBEB; border-color: #FCD34D; color: #92400E; }
+.st-partial { background: #EEF2FF; border-color: #C7D2FE; color: #4338CA; }
+</style>
+</head>
+<body>
+<div class="index-wrap">
+  <h1>Scopus–ICTU · Design Prototype</h1>
+  <p class="subtitle">Task 20B-R1 · 10/10/2026 · Nguồn: mã React/Tailwind nhánh main@530bf0f + Task 20A/R2</p>
+
+  <div class="warning-box">
+    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    <div>
+      <strong>Dữ liệu minh họa.</strong> Tên giảng viên, số liệu, email trong prototype là DỮ LIỆU GIẢ an toàn, không phải dữ liệu thật từ hệ thống.
+      Đây là nguồn thiết kế bàn giao — KHÔNG thay thế frontend production.
+      Trạng thái AS-IS phản ánh UI đang chạy thật (đối chiếu bằng ảnh chụp thật DB ui20b).
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>PI 2.3 — 6 nhóm bắt buộc</h2>
+    <div class="screen-grid">
+      <a class="screen-card" href="s02_publications.html">
+        <span class="sc-id">PI2.3-1 · S02</span>
+        <span class="sc-name">Danh sách công bố</span>
+        <span class="sc-route">/publications</span>
+        <span class="sc-status st-asis">AS-IS · IMPLEMENTED</span>
+      </a>
+      <a class="screen-card" href="s03_pub_detail.html">
+        <span class="sc-id">PI2.3-2 · S03</span>
+        <span class="sc-name">Chi tiết công bố</span>
+        <span class="sc-route">/publications/:eid</span>
+        <span class="sc-status st-asis">AS-IS · IMPLEMENTED</span>
+      </a>
+      <a class="screen-card" href="s04_imports.html">
+        <span class="sc-id">PI2.3-3 · S04</span>
+        <span class="sc-name">Nhập dữ liệu</span>
+        <span class="sc-route">/imports</span>
+        <span class="sc-status st-asis">AS-IS · IMPLEMENTED</span>
+      </a>
+      <a class="screen-card" href="s20_normalization_proposed.html">
+        <span class="sc-id">PI2.3-4 · S20</span>
+        <span class="sc-name">So sánh chuẩn hóa</span>
+        <span class="sc-route">/publications/:eid/normalization</span>
+        <span class="sc-status st-proposed">PROPOSED · CHƯA TRIỂN KHAI</span>
+      </a>
+      <a class="screen-card" href="s09_reviews.html">
+        <span class="sc-id">PI2.3-5 · S09</span>
+        <span class="sc-name">Hàng đợi phê duyệt</span>
+        <span class="sc-route">/reviews</span>
+        <span class="sc-status st-asis">AS-IS · IMPLEMENTED</span>
+      </a>
+      <a class="screen-card" href="s05_dashboard.html">
+        <span class="sc-id">PI2.3-6 · S05</span>
+        <span class="sc-name">Tổng quan / Thống kê</span>
+        <span class="sc-route">/dashboard</span>
+        <span class="sc-status st-asis">AS-IS · IMPLEMENTED</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Review & Governance (P0 bổ sung)</h2>
+    <div class="screen-grid">
+      <a class="screen-card" href="s09_reviews.html">
+        <span class="sc-id">S09 · Candidate Detail</span>
+        <span class="sc-name">Chi tiết bằng chứng đối sánh</span>
+        <span class="sc-route">/reviews → modal</span>
+        <span class="sc-status st-asis">AS-IS</span>
+      </a>
+      <a class="screen-card" href="s09_reviews.html#accept-dialog">
+        <span class="sc-id">S11 · ACCEPT Dialog</span>
+        <span class="sc-name">Dialog xác nhận ACCEPT / 409</span>
+        <span class="sc-route">/reviews → dialog</span>
+        <span class="sc-status st-asis">AS-IS</span>
+      </a>
+      <a class="screen-card" href="s09_reviews.html#reject-dialog">
+        <span class="sc-id">S12 · REJECT Dialog</span>
+        <span class="sc-name">Dialog REJECT + lý do</span>
+        <span class="sc-route">/reviews → dialog</span>
+        <span class="sc-status st-asis">AS-IS</span>
+      </a>
+      <a class="screen-card" href="s13_review_history.html">
+        <span class="sc-id">S13</span>
+        <span class="sc-name">Lịch sử review</span>
+        <span class="sc-route">/review-history</span>
+        <span class="sc-status st-asis">AS-IS · IMPLEMENTED</span>
+      </a>
+      <a class="screen-card" href="s14_audit_logs.html">
+        <span class="sc-id">S14</span>
+        <span class="sc-name">Nhật ký hệ thống</span>
+        <span class="sc-route">/audit-logs</span>
+        <span class="sc-status st-asis">AS-IS · IMPLEMENTED</span>
+      </a>
+      <a class="screen-card" href="s15_tasks.html">
+        <span class="sc-id">S15</span>
+        <span class="sc-name">Tác vụ (placeholder)</span>
+        <span class="sc-route">/tasks</span>
+        <span class="sc-status st-asis">AS-IS · PLACEHOLDER</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Các màn khác</h2>
+    <div class="screen-grid">
+      <a class="screen-card" href="s01_login.html">
+        <span class="sc-id">S01</span>
+        <span class="sc-name">Đăng nhập</span>
+        <span class="sc-route">/login</span>
+        <span class="sc-status st-asis">AS-IS</span>
+      </a>
+      <a class="screen-card" href="s06_lecturers.html">
+        <span class="sc-id">S06/S07</span>
+        <span class="sc-name">Danh sách & Chi tiết giảng viên</span>
+        <span class="sc-route">/lecturers</span>
+        <span class="sc-status st-asis">AS-IS</span>
+      </a>
+    </div>
+  </div>
+</div>
+</body>
+</html>

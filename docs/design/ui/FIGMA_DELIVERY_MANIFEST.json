@@ -1,0 +1,128 @@
+{
+  "task": "Task 20B — Figma UI/UX Design",
+  "date": "2026-10-10",
+  "deadline": "2026-10-14",
+  "status": "PARTIAL / HANDOFF_READY — Foundations ✅; Components & Screens chưa tạo do rate limit MCP",
+
+  "figma": {
+    "fileKey": "JL6qaElA0zehVEVhURJiIC",
+    "url": "https://www.figma.com/design/JL6qaElA0zehVEVhURJiIC",
+    "plan": "Starter (3 page max)",
+    "pages": [
+      {
+        "id": "8:2",
+        "name": "00–02 · Cover · Design Foundations · Components",
+        "sections": ["00 — Cover / Tổng quan dự án", "01 — Design Foundations", "02 — Components"],
+        "status": "PARTIAL — Cover + Foundations initiated; rate limit hit"
+      },
+      {
+        "id": "8:3",
+        "name": "03–06 · Screens · User Flows & Prototype",
+        "sections": ["03 — Core Screens", "04 — Review & Governance", "05 — Proposed Screens", "06 — User Flows & Prototype"],
+        "status": "EMPTY — chờ sau rate limit reset"
+      },
+      {
+        "id": "0:1",
+        "name": "07 · Design Handoff + 99 LEGACY v0",
+        "sections": ["07 — Design Handoff", "99 — LEGACY v0"],
+        "status": "Legacy 9 frames preserved; Section 07 chưa tạo"
+      }
+    ],
+    "variableCollections": [
+      { "id": "VariableCollectionId:3:2", "name": "Scopus–ICTU / Color · Semantic", "mode": "Light", "count": 43 },
+      { "id": "VariableCollectionId:11:2", "name": "Primitives · Tailwind 3.4", "mode": "Value", "count": 42 },
+      { "id": "VariableCollectionId:11:79", "name": "Scopus–ICTU / Spacing · Radius · Size · Layout", "mode": "Value", "count": 36 }
+    ],
+    "totalVariables": 121,
+    "textStyles": 19,
+    "effectStyles": 6,
+    "componentsCreated": 0,
+    "screensCreated": 0,
+    "legacyFrames": 9,
+    "prototypeFlows": 0,
+    "reason_partial": "Figma MCP rate limit hit on Starter plan during Phase 2 (Section 00/01 creation). Components and screens require additional use_figma calls."
+  },
+
+  "screenshots": {
+    "total": 101,
+    "directory": "_quan_ly_do_an/evidence/task20b/screenshots/",
+    "log": "_quan_ly_do_an/evidence/task20b/screenshots/_capture_log.jsonl",
+    "db": "scopus_ictu_test_ui20b_20261010",
+    "viewports": ["1440x900", "1366x768", "1920x1080", "390x844"],
+    "roles": ["ADMIN", "REVIEWER", "LECTURER", "PUBLIC"],
+    "states": ["default", "loading", "error_503", "empty", "validation", "modal", "toast", "conflict_409"]
+  },
+
+  "documents": {
+    "tokens_json": "docs/design/ui/tokens.json",
+    "design_system_spec": "docs/design/ui/DESIGN_SYSTEM_SPEC.md",
+    "screen_inventory": "docs/design/ui/SCREEN_INVENTORY.md",
+    "screen_to_route_mapping": "docs/design/ui/SCREEN_TO_ROUTE_MAPPING.md",
+    "component_inventory": "docs/design/ui/COMPONENT_INVENTORY.md",
+    "user_flows": "docs/design/ui/USER_FLOWS.md",
+    "figma_handoff": "docs/design/ui/FIGMA_HANDOFF.md",
+    "figma_visual_qa": "docs/design/ui/FIGMA_VISUAL_QA.md",
+    "figma_delivery_manifest": "docs/design/ui/FIGMA_DELIVERY_MANIFEST.json",
+    "task20b_report": "docs/design/ui/TASK20B_FIGMA_REPORT.md"
+  },
+
+  "pi_2_3_coverage": {
+    "group_1_list": { "screens": ["S02 /publications", "S06 /lecturers"], "status": "DOCUMENTED + SCREENSHOT ✅" },
+    "group_2_detail": { "screens": ["S03 /publications/:eid", "S07 /lecturers detail modal"], "status": "DOCUMENTED + SCREENSHOT ✅" },
+    "group_3_import": { "screens": ["S04 /imports (7 states + modal)"], "status": "DOCUMENTED + SCREENSHOT ✅" },
+    "group_4_normalization": { "screens": ["S20 PROPOSED (not implemented)"], "status": "PROPOSED — no screenshot, spec only" },
+    "group_5_approval_queue": { "screens": ["S09–S12 /reviews (10+ states)"], "status": "DOCUMENTED + SCREENSHOT ✅" },
+    "group_6_statistics": { "screens": ["S05 /dashboard"], "status": "DOCUMENTED + SCREENSHOT ✅" }
+  },
+
+  "priority_pages": {
+    "reviews": "✅ 10+ states documented + screenshot",
+    "review_history": "✅ 4 states documented + screenshot",
+    "audit_logs": "✅ 4 states documented + screenshot",
+    "tasks": "✅ Placeholder documented + screenshot"
+  },
+
+  "rbac_verified": {
+    "admin": "✅ All 10 menu items verified",
+    "reviewer": "✅ 4 menu items; /dashboard redirect verified (screenshot)",
+    "lecturer": "✅ 4 menu items; /reviews redirect verified (screenshot)"
+  },
+
+  "design_to_code_gaps": [
+    { "id": "GAP-a", "severity": "HIGH", "file": "pages/Imports/index.tsx", "description": "Cột Thao tác bị cắt tại 1440px", "effort_h": 2 },
+    { "id": "GAP-b", "severity": "MEDIUM", "file": "pages/ApprovalQueue/index.tsx", "description": "Modal dùng AntD: màu primary sai, font không Saira", "effort_h": 6 },
+    { "id": "GAP-c", "severity": "MEDIUM", "file": "pages/ApprovalQueue/index.tsx", "description": "Bộ đếm textarea REJECT chồng nút footer", "effort_h": 1 },
+    { "id": "GAP-d", "severity": "LOW", "file": "pages/Publications/index.tsx", "description": "Nút Chi tiết xuống dòng tại 1440", "effort_h": 1 },
+    { "id": "GAP-e", "severity": "LOW", "file": "pages/Publications/Detail.tsx", "description": "Header hiển thị Hệ thống thay vì tiêu đề trang", "effort_h": 0.5 },
+    { "id": "GAP-f", "severity": "LOW", "file": "tailwind.config.js", "description": "shadow-xs/2xs không hoạt động TW 3.4", "effort_h": 0.5 },
+    { "id": "GAP-g", "severity": "LOW", "file": "index.html / CSS", "description": "font-black 900 không tải", "effort_h": 0.5 },
+    { "id": "GAP-h", "severity": "LOW", "file": "pages/Lecturer/*.tsx", "description": "Container LECTURER khác chuẩn", "effort_h": 2 },
+    { "id": "GAP-i", "severity": "LOW", "file": "pages/AuditLogs/index.tsx", "description": "Filter xuống dòng; placeholder bị cắt", "effort_h": 1 },
+    { "id": "GAP-j", "severity": "LOW", "file": "pages/ReviewHistory/index.tsx", "description": "Hiển thị mã thay vì nhãn tiếng Việt", "effort_h": 1 }
+  ],
+
+  "git_status": {
+    "branch": "main",
+    "last_commit": "530bf0f",
+    "modified_not_committed": [
+      "frontend/src/App.tsx",
+      "frontend/src/pages/ApprovalQueue/index.tsx",
+      "frontend/src/pages/AuditLogs/index.tsx",
+      "frontend/src/pages/Imports/index.tsx",
+      "frontend/src/pages/Normalization/index.tsx",
+      "frontend/src/pages/ReviewHistory/index.tsx"
+    ],
+    "untracked": ["docs/design/", "docs/planning/"]
+  },
+
+  "pending_before_14_10": [
+    "Chờ Figma MCP rate limit reset (~24-48h sau 10/10)",
+    "Tạo component frames (Phase 2.c) — ~7 lần use_figma",
+    "Tạo màn hình frames (Phase 3) — ~3 lần use_figma",
+    "Visual QA so sánh frame↔ảnh thật",
+    "Prototype reactions (Flow 1–5)",
+    "Section 07 Handoff (Page 3)",
+    "Commit docs/design/ui/ sau khi GVHD/người dùng xem xét",
+    "KHÔNG sửa production code trừ khi được phê duyệt từng GAP"
+  ]
+}

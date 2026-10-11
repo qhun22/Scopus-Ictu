@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tổng quan — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_shell.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S05 — Tổng quan / Thống kê (/dashboard) — MIXED: AS-IS + PROPOSED · PI2.3-6
+  Task 20B-R1 · 10/10/2026 | Sửa R3: 10/10/2026 (tách AS-IS vs PROPOSED)
+  Nguồn: frontend/src/pages/Dashboard/index.tsx
+         frontend/src/types/dashboard.ts (DashboardSummary)
+  AS-IS (đã có): KPI cards (total_publications, total_lecturers, identity_counts.APPROVED,
+                 pending_review_count), latest_import card, recent_audit_actions table.
+  PROPOSED (chưa có): bar chart theo năm, donut trạng thái, top lecturers ranking.
+  4 states: data / empty / loading / error
+  Ảnh tham chiếu: A_dashboard_1440x900.png
+-->
+<style>
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.chart-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.chart-card { background: white; border: 1px solid var(--color-border-default); border-radius: 12px; padding: 20px; }
+.chart-title { font-size: 14px; font-weight: 700; color: var(--color-text-primary); margin-bottom: 16px; }
+/* Bar chart mockup */
+.bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
+.bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+.bar { border-radius: 4px 4px 0 0; width: 100%; transition: height 0.3s; }
+.bar-label { font-size: 9px; color: var(--color-text-muted); }
+/* Donut mockup */
+.donut-wrap { position: relative; width: 120px; height: 120px; margin: 0 auto 16px; }
+.donut-wrap svg { transform: rotate(-90deg); }
+.donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+/* Status row */
+.status-list { display: flex; flex-direction: column; gap: 8px; }
+.status-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+/* Recent imports table */
+.bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">SCOPUS ICTU</div>
+        <div class="sidebar-brand-sub">Cổng thông tin Scopus</div>
+        <span class="sidebar-version">M2.3</span>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="index.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Trang chủ</a>
+      <a class="nav-item active" href="s05_dashboard.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        Tổng quan</a>
+      <a class="nav-item" href="s04_imports.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Nhập dữ liệu</a>
+      <a class="nav-item" href="s06_lecturers.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Giảng viên</a>
+      <a class="nav-item" href="s02_publications.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Công bố</a>
+      <a class="nav-item" href="s09_reviews.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Duyệt đối sánh</a>
+      <a class="nav-item" href="s13_review_history.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Lịch sử review</a>
+      <a class="nav-item" href="s14_audit_logs.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Nhật ký hệ thống</a>
+      <a class="nav-item" href="s15_tasks.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tác vụ</a>
+    </div>
+  </nav>
+
+  <div class="main-area">
+    <header class="topbar">
+      <span class="topbar-title">Tổng quan</span>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <button class="lang-switch-btn active">VI</button>
+          <div class="lang-switch-sep"></div>
+          <button class="lang-switch-btn">EN</button>
+        </div>
+        <span class="role-badge admin">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+          Quản trị viên
+        </span>
+        <button class="user-btn">
+          <div class="user-avatar">A</div>
+          Nguyễn Văn An
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- State switcher -->
+      <div style="display:flex;gap:6px;margin-bottom:16px">
+        <button id="btn-data" class="btn btn-primary btn-sm" onclick="showState('data')">Có dữ liệu</button>
+        <button id="btn-empty" class="btn btn-secondary btn-sm" onclick="showState('empty')">Trống</button>
+        <button id="btn-loading" class="btn btn-secondary btn-sm" onclick="showState('loading')">Đang tải</button>
+        <button id="btn-error" class="btn btn-secondary btn-sm" onclick="showState('error')">Lỗi 503</button>
+      </div>
+
+      <div class="page-header" style="margin-bottom:20px">
+        <div>
+          <h1 class="page-title">Tổng quan hệ thống</h1>
+          <p class="page-desc">Thống kê công bố Scopus tại ICTU · Cập nhật: 10/10/2026 14:00</p>
+        </div>
+      </div>
+
+      <!-- ── DATA state ──────────────────────────────────────────── -->
+      <div id="state-data">
+        <!-- ── AS-IS: KPI cards (DashboardSummary fields) ──────────── -->
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-card-label">Tổng công bố <code style="font-size:10px;color:var(--color-text-muted)">total_publications</code></div>
+            <div class="stat-card-value">1,247</div>
+            <div class="stat-card-sub" style="color:var(--color-text-muted)">Dữ liệu minh họa</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Đã xác nhận <code style="font-size:10px;color:var(--color-text-muted)">identity_counts.APPROVED</code></div>
+            <div class="stat-card-value" style="color:var(--color-badge-accepted-text)">836</div>
+            <div class="stat-card-sub">Candidate đã APPROVED</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Chờ duyệt <code style="font-size:10px;color:var(--color-text-muted)">pending_review_count</code></div>
+            <div class="stat-card-value" style="color:var(--color-badge-pending-text)">142</div>
+            <div class="stat-card-sub">Cần xem xét</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card-label">Giảng viên <code style="font-size:10px;color:var(--color-text-muted)">total_lecturers</code></div>
+            <div class="stat-card-value">89</div>
+            <div class="stat-card-sub">active: <strong>72</strong></div>
+          </div>
+        </div>
+
+        <!-- ── AS-IS: Identity counts bảng (DashboardSummary.identity_counts) ── -->
+        <div class="chart-card" style="margin-bottom:14px">
+          <div class="chart-title" style="display:flex;align-items:center;gap:8px">
+            Phân bổ trạng thái identity
+            <span class="badge" style="background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;font-size:10px;padding:2px 8px">AS-IS</span>
+          </div>
+          <div class="status-list">
+            <div class="status-row">
+              <div style="display:flex;align-items:center;gap:6px"><div class="status-dot" style="background:#3B82F6"></div><span>CANDIDATE <code style="font-size:10px">identity_counts.CANDIDATE</code></span></div>
+              <span style="font-weight:600">142</span>
+            </div>
+            <div class="status-row">
+              <div style="display:flex;align-items:center;gap:6px"><div class="status-dot" style="background:#10B981"></div><span>APPROVED <code style="font-size:10px">identity_counts.APPROVED</code></span></div>
+              <span style="font-weight:600">836</span>
+            </div>
+            <div class="status-row">
+              <div style="display:flex;align-items:center;gap:6px"><div class="status-dot" style="background:#EF4444"></div><span>REJECTED <code style="font-size:10px">identity_counts.REJECTED</code></span></div>
+              <span style="font-weight:600">269</span>
+            </div>
+            <div class="status-row">
+              <div style="display:flex;align-items:center;gap:6px"><div class="status-dot" style="background:#9CA3AF"></div><span>REVOKED <code style="font-size:10px">identity_counts.REVOKED</code></span></div>
+              <span style="font-weight:600">0</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--color-text-muted);margin-top:10px">
+            Nguồn: <code>DashboardSummary.identity_counts</code> từ <code>/api/v1/dashboard/summary</code> · Dữ liệu minh họa
+          </div>
+        </div>
+
+        <!-- ── PROPOSED: Charts (chưa có trong production) ─────────── -->
+        <div style="border: 2px dashed #F59E0B; border-radius: 12px; background: #FFFBEB; padding: 16px; margin-bottom: 14px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            <svg width="16" height="16" fill="none" stroke="#D97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span style="font-size:12px;font-weight:700;color:#D97706">THIẾT KẾ ĐỀ XUẤT — Biểu đồ thống kê (CHƯA triển khai trong production)</span>
+          </div>
+          <div style="font-size:11px;color:#92400E;margin-bottom:12px">
+            Backend hiện trả về <code>DashboardSummary</code> không có dữ liệu chuỗi thời gian. Biểu đồ bên dưới là ý tưởng thiết kế tương lai — không phản ánh chức năng hiện tại.
+          </div>
+          <!-- Bar chart PROPOSED -->
+          <div class="chart-grid" style="opacity:0.75">
+            <div class="chart-card" style="border-style:dashed">
+              <div class="chart-title" style="color:#92400E">Công bố theo năm [PROPOSED — mock data]</div>
+              <div class="bar-chart">
+                <div class="bar-wrap"><div class="bar" style="height:40%;background:#F59E0B;opacity:0.6"></div><div class="bar-label">2020</div></div>
+                <div class="bar-wrap"><div class="bar" style="height:55%;background:#F59E0B;opacity:0.7"></div><div class="bar-label">2021</div></div>
+                <div class="bar-wrap"><div class="bar" style="height:70%;background:#F59E0B;opacity:0.8"></div><div class="bar-label">2022</div></div>
+                <div class="bar-wrap"><div class="bar" style="height:85%;background:#F59E0B;opacity:0.9"></div><div class="bar-label">2023</div></div>
+                <div class="bar-wrap"><div class="bar" style="height:100%;background:#F59E0B"></div><div class="bar-label">2024</div></div>
+                <div class="bar-wrap"><div class="bar" style="height:30%;background:#F59E0B;opacity:0.5"></div><div class="bar-label">2025</div></div>
+              </div>
+              <div style="font-size:10px;color:#92400E;margin-top:8px">* Số liệu giả — endpoint chưa có</div>
+            </div>
+            <!-- Donut PROPOSED -->
+            <div class="chart-card" style="border-style:dashed">
+              <div class="chart-title" style="color:#92400E">Tỉ lệ identity [PROPOSED — mock data]</div>
+              <div class="donut-wrap">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="40" fill="none" stroke="#E2E8F0" stroke-width="20"/>
+                  <circle cx="60" cy="60" r="40" fill="none" stroke="#F59E0B" stroke-width="20" stroke-dasharray="167 84"/>
+                  <circle cx="60" cy="60" r="40" fill="none" stroke="#FCD34D" stroke-width="20" stroke-dasharray="71 180" stroke-dashoffset="-167"/>
+                </svg>
+                <div class="donut-center">
+                  <div style="font-size:18px;font-weight:700;color:#92400E">—</div>
+                  <div style="font-size:10px;color:#92400E">đề xuất</div>
+                </div>
+              </div>
+              <div style="font-size:10px;color:#92400E;text-align:center">Cần API endpoint mới để render</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom row: AS-IS (latest_import) + PROPOSED (top lecturers) -->
+        <div class="bottom-grid">
+          <!-- Top lecturers — PROPOSED (không có trong DashboardSummary) -->
+          <div class="chart-card" style="border-style:dashed;border-color:#F59E0B">
+            <div class="chart-title" style="display:flex;align-items:center;gap:8px">
+              Top giảng viên có nhiều công bố
+              <span class="badge" style="background:#FEF3C7;color:#D97706;border:1px solid #FCD34D;font-size:10px;padding:2px 8px">PROPOSED</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+                <div style="width:24px;height:24px;background:var(--color-brand-primary);border-radius:50%;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">1</div>
+                <span style="flex:1">PGS.TS. Trần Văn Minh</span>
+                <span style="font-weight:700;color:var(--color-brand-primary)">47</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+                <div style="width:24px;height:24px;background:#6366F1;border-radius:50%;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">2</div>
+                <span style="flex:1">TS. Nguyễn Thị Lan</span>
+                <span style="font-weight:700;color:var(--color-brand-primary)">38</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+                <div style="width:24px;height:24px;background:#8B5CF6;border-radius:50%;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">3</div>
+                <span style="flex:1">TS. Lê Hùng Linh</span>
+                <span style="font-weight:700;color:var(--color-brand-primary)">31</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+                <div style="width:24px;height:24px;background:#A78BFA;border-radius:50%;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">4</div>
+                <span style="flex:1">ThS. Nguyễn Thị Dung</span>
+                <span style="font-weight:700;color:var(--color-brand-primary)">24</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+                <div style="width:24px;height:24px;background:#C4B5FD;border-radius:50%;color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">5</div>
+                <span style="flex:1">GS.TS. Phạm Quang Tuấn</span>
+                <span style="font-weight:700;color:var(--color-brand-primary)">22</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent imports — AS-IS (latest_scopus_import + recent_audit_actions) -->
+          <div class="chart-card">
+            <div class="chart-title" style="display:flex;align-items:center;gap:8px">
+              Lần nhập gần đây
+              <span class="badge" style="background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;font-size:10px;padding:2px 8px">AS-IS</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-default)">
+                <div>
+                  <div style="font-weight:600;color:var(--color-text-primary)">scopus_2024_Q4.csv</div>
+                  <div style="color:var(--color-text-muted)">10/10/2026 · +248 bản ghi</div>
+                </div>
+                <span class="badge badge-accepted">OK</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding-bottom:8px;border-bottom:1px solid var(--color-border-default)">
+                <div>
+                  <div style="font-weight:600;color:var(--color-text-primary)">scopus_2024_Q3.csv</div>
+                  <div style="color:var(--color-text-muted)">08/10/2026 · +185 bản ghi</div>
+                </div>
+                <span class="badge badge-accepted">OK</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px">
+                <div>
+                  <div style="font-weight:600;color:var(--color-text-primary)">other_db_export.csv</div>
+                  <div style="color:var(--color-text-muted)">05/10/2026 · Không phải Scopus</div>
+                </div>
+                <span class="badge badge-rejected">Lỗi</span>
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--color-text-muted);margin-top:10px">
+              Nguồn: <code>DashboardSummary.latest_scopus_import</code> · Dữ liệu minh họa
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── EMPTY state ─────────────────────────────────────────── -->
+      <div id="state-empty" style="display:none">
+        <div class="state-box">
+          <svg width="48" height="48" fill="none" stroke="var(--color-text-muted)" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="1.5"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="1.5"/></svg>
+          <p>Chưa có dữ liệu thống kê</p>
+          <a href="s04_imports.html" class="btn btn-primary btn-sm">Nhập dữ liệu Scopus</a>
+        </div>
+      </div>
+
+      <!-- ── LOADING state ───────────────────────────────────────── -->
+      <div id="state-loading" style="display:none">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Đang tải thống kê...</p>
+        </div>
+      </div>
+
+      <!-- ── ERROR state ─────────────────────────────────────────── -->
+      <div id="state-error" style="display:none">
+        <div class="error-state">
+          <svg width="40" height="40" fill="none" stroke="var(--color-danger)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 8v4m0 4h.01"/></svg>
+          <p>Không thể tải dữ liệu thống kê</p>
+          <span style="font-size:12px;color:var(--color-text-muted)">503 Service Unavailable</span>
+          <button class="btn btn-secondary btn-sm" onclick="showState('data')" style="margin-top:8px">Thử lại</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+function showState(s) {
+  ['data','empty','loading','error'].forEach(id => {
+    document.getElementById('state-'+id).style.display = 'none';
+    const b = document.getElementById('btn-'+id);
+    if (b) b.className = 'btn btn-secondary btn-sm';
+  });
+  document.getElementById('state-'+s).style.display = '';
+  const b = document.getElementById('btn-'+s);
+  if (b) b.className = 'btn btn-primary btn-sm';
+}
+</script>
+</body>
+</html>

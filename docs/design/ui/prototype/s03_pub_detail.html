@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chi tiết công bố — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_shell.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S03 — Chi tiết công bố (/publications/:eid) — AS-IS · PI2.3-2
+  Task 20B-R1 · 10/10/2026
+  Nguồn: frontend/src/pages/Publications/Detail.tsx
+  4 states: data / loading / error / not-found
+  GAP-e: detail sections layout — cần kiểm tra vs ảnh thật
+  Ảnh tham chiếu: A_pub_detail_1440x900.png
+-->
+<style>
+.detail-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+.detail-section {
+  background: white;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 14px;
+}
+.detail-section h3 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-default);
+}
+.info-row {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #F8FAFC;
+}
+.info-row:last-child { border-bottom: none; }
+.info-label {
+  width: 140px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.info-value {
+  flex: 1;
+  color: var(--color-text-primary);
+}
+.doi-link { color: var(--color-brand-primary); text-decoration: none; font-size: 12px; font-family: 'Roboto Mono', monospace; }
+.doi-link:hover { text-decoration: underline; }
+.breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); margin-bottom: 16px; }
+.breadcrumb a { color: var(--color-brand-primary); text-decoration: none; }
+.breadcrumb-sep { color: var(--color-border-strong); }
+.candidate-card {
+  background: white;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s;
+}
+.candidate-card:hover { border-color: var(--color-brand-primary); }
+.candidate-name { font-size: 14px; font-weight: 700; color: var(--color-text-primary); }
+.candidate-meta { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+.score-bar-wrap { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.score-bar-bg { flex: 1; background: #F1F5F9; border-radius: 4px; height: 6px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 4px; background: var(--color-brand-primary); }
+.score-pct { font-size: 12px; font-weight: 700; color: var(--color-brand-primary); width: 36px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">SCOPUS ICTU</div>
+        <div class="sidebar-brand-sub">Cổng thông tin Scopus</div>
+        <span class="sidebar-version">M2.3</span>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="index.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Trang chủ</a>
+      <a class="nav-item" href="s05_dashboard.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        Tổng quan</a>
+      <a class="nav-item" href="s04_imports.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Nhập dữ liệu</a>
+      <a class="nav-item" href="s06_lecturers.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Giảng viên</a>
+      <a class="nav-item active" href="s02_publications.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Công bố</a>
+      <a class="nav-item" href="s09_reviews.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Duyệt đối sánh</a>
+      <a class="nav-item" href="s13_review_history.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Lịch sử review</a>
+      <a class="nav-item" href="s14_audit_logs.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Nhật ký hệ thống</a>
+      <a class="nav-item" href="s15_tasks.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tác vụ</a>
+    </div>
+  </nav>
+
+  <div class="main-area">
+    <header class="topbar">
+      <span class="topbar-title">Chi tiết công bố</span>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <button class="lang-switch-btn active">VI</button>
+          <div class="lang-switch-sep"></div>
+          <button class="lang-switch-btn">EN</button>
+        </div>
+        <span class="role-badge admin">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+          Quản trị viên
+        </span>
+        <button class="user-btn">
+          <div class="user-avatar">A</div>
+          Nguyễn Văn An
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- State switcher -->
+      <div style="display:flex;gap:6px;margin-bottom:16px">
+        <button id="btn-data" class="btn btn-primary btn-sm" onclick="showState('data')">Có dữ liệu</button>
+        <button id="btn-loading" class="btn btn-secondary btn-sm" onclick="showState('loading')">Đang tải</button>
+        <button id="btn-error" class="btn btn-secondary btn-sm" onclick="showState('error')">Lỗi 503</button>
+        <button id="btn-notfound" class="btn btn-secondary btn-sm" onclick="showState('notfound')">404</button>
+      </div>
+
+      <!-- Breadcrumb -->
+      <div class="breadcrumb" id="breadcrumb-nav">
+        <a href="s02_publications.html">Công bố</a>
+        <span class="breadcrumb-sep">›</span>
+        <span>85148623741</span>
+      </div>
+
+      <!-- ── DATA state ──────────────────────────────────────────── -->
+      <div id="state-data">
+        <!-- Title + badges row -->
+        <div style="margin-bottom:20px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px">
+            <h1 style="font-size:18px;font-weight:700;color:var(--color-text-primary);line-height:1.4;flex:1">
+              Deep Learning for Vietnamese Natural Language Processing: A Comprehensive Survey
+            </h1>
+            <div style="display:flex;gap:6px;flex-shrink:0;align-items:center">
+              <span class="badge badge-accepted">ACCEPTED</span>
+              <span class="badge badge-has-pub">Có công bố</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <a href="#" class="doi-link">10.1016/j.neunet.2024.01.023</a>
+            <span style="color:var(--color-border-strong)">·</span>
+            <span style="font-size:12px;color:var(--color-text-muted)">EID: 85148623741</span>
+            <span style="color:var(--color-border-strong)">·</span>
+            <span style="font-size:12px;color:var(--color-text-muted)">Năm: 2024</span>
+            <a href="s09_reviews.html" class="btn btn-ghost btn-xs" style="margin-left:8px">Xem trong hàng đợi</a>
+          </div>
+        </div>
+
+        <div class="detail-grid">
+          <!-- Left column -->
+          <div>
+            <!-- Publication info -->
+            <div class="detail-section">
+              <h3>Thông tin công bố</h3>
+              <div class="info-row">
+                <span class="info-label">Tạp chí / Hội nghị</span>
+                <span class="info-value">Neural Networks · Elsevier</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Tên viết tắt</span>
+                <span class="info-value">Neural Netw.</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Tập / Số</span>
+                <span class="info-value">Vol. 172, Pages 1–24</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">ISSN</span>
+                <span class="info-value" style="font-family:'Roboto Mono',monospace;font-size:12px">0893-6080</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Loại tài liệu</span>
+                <span class="info-value">Review</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Ngôn ngữ</span>
+                <span class="info-value">English</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Chỉ mục Scopus</span>
+                <span class="info-value">ScienceDirect · Q1</span>
+              </div>
+            </div>
+
+            <!-- Authors -->
+            <div class="detail-section">
+              <h3>Danh sách tác giả Scopus</h3>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px">
+                  <div>
+                    <div style="font-weight:600">Tran, Van Minh</div>
+                    <div style="font-size:11px;color:var(--color-text-muted);font-family:'Roboto Mono',monospace">56893421200</div>
+                  </div>
+                  <span class="badge badge-accepted" style="font-size:10px">Đã khớp: PGS.TS. Trần Văn Minh</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px">
+                  <div>
+                    <div style="font-weight:600">Nguyen, Thi Lan</div>
+                    <div style="font-size:11px;color:var(--color-text-muted);font-family:'Roboto Mono',monospace">57203145887</div>
+                  </div>
+                  <span class="badge badge-accepted" style="font-size:10px">Đã khớp: TS. Nguyễn Thị Lan</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:13px">
+                  <div>
+                    <div style="font-weight:600">Le, Hung Linh</div>
+                    <div style="font-size:11px;color:var(--color-text-muted);font-family:'Roboto Mono',monospace">56548128100</div>
+                  </div>
+                  <span class="badge badge-pending" style="font-size:10px">Chờ duyệt</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Abstract -->
+            <div class="detail-section">
+              <h3>Tóm tắt</h3>
+              <p style="font-size:13px;color:var(--color-text-secondary);line-height:1.7">
+                This paper presents a comprehensive survey of deep learning approaches applied to Vietnamese Natural Language Processing (NLP).
+                We systematically review over 200 research papers published between 2018 and 2024, covering tasks such as word segmentation,
+                part-of-speech tagging, named entity recognition, sentiment analysis, and machine translation.
+                Our analysis reveals significant advances driven by transformer-based architectures adapted for Vietnamese linguistic characteristics,
+                including tone marks and morphological complexity. We identify key challenges and future research directions specific to Vietnamese NLP.
+              </p>
+            </div>
+          </div>
+
+          <!-- Right column -->
+          <div>
+            <!-- Matching candidates -->
+            <div class="detail-section">
+              <h3>Ứng viên đối sánh</h3>
+              <div style="margin-bottom:12px">
+                <div class="candidate-card">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                      <div class="candidate-name">PGS.TS. Trần Văn Minh</div>
+                      <div class="candidate-meta">GV đại học · Khoa CNTT · tran.van.minh@ictu.ac.vn</div>
+                    </div>
+                    <span class="badge badge-accepted" style="font-size:10px">ACCEPTED</span>
+                  </div>
+                  <div class="score-bar-wrap">
+                    <span style="font-size:11px;color:var(--color-text-muted)">Độ khớp</span>
+                    <div class="score-bar-bg">
+                      <div class="score-bar-fill" style="width:92%"></div>
+                    </div>
+                    <span class="score-pct">92%</span>
+                  </div>
+                </div>
+                <div class="candidate-card">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                      <div class="candidate-name">TS. Nguyễn Thị Lan</div>
+                      <div class="candidate-meta">GV đại học · Khoa CNTT · nguyen.thi.lan@ictu.ac.vn</div>
+                    </div>
+                    <span class="badge badge-accepted" style="font-size:10px">ACCEPTED</span>
+                  </div>
+                  <div class="score-bar-wrap">
+                    <span style="font-size:11px;color:var(--color-text-muted)">Độ khớp</span>
+                    <div class="score-bar-bg">
+                      <div class="score-bar-fill" style="width:88%"></div>
+                    </div>
+                    <span class="score-pct">88%</span>
+                  </div>
+                </div>
+              </div>
+              <a href="s09_reviews.html" class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">
+                Xem trong hàng đợi duyệt
+              </a>
+            </div>
+
+            <!-- Quick stats -->
+            <div class="detail-section">
+              <h3>Thống kê nhanh</h3>
+              <div class="info-row">
+                <span class="info-label">Trích dẫn (Scopus)</span>
+                <span class="info-value" style="font-weight:700">47</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">H-index tác giả 1</span>
+                <span class="info-value">18</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Lần nhập đầu</span>
+                <span class="info-value">08/10/2026</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Cập nhật lần cuối</span>
+                <span class="info-value">10/10/2026</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LOADING state ───────────────────────────────────────── -->
+      <div id="state-loading" style="display:none">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Đang tải chi tiết công bố...</p>
+        </div>
+      </div>
+
+      <!-- ── ERROR state ─────────────────────────────────────────── -->
+      <div id="state-error" style="display:none">
+        <div class="error-state">
+          <svg width="40" height="40" fill="none" stroke="var(--color-danger)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 8v4m0 4h.01"/></svg>
+          <p>Không thể tải chi tiết công bố</p>
+          <span style="font-size:12px;color:var(--color-text-muted)">503 Service Unavailable</span>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-secondary btn-sm" onclick="showState('data')">Thử lại</button>
+            <a href="s02_publications.html" class="btn btn-ghost btn-sm">Quay lại danh sách</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 404 state ───────────────────────────────────────────── -->
+      <div id="state-notfound" style="display:none">
+        <div class="state-box">
+          <svg width="48" height="48" fill="none" stroke="var(--color-text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <p>Không tìm thấy công bố</p>
+          <span style="font-size:12px;color:var(--color-text-muted)">EID này không tồn tại trong hệ thống</span>
+          <a href="s02_publications.html" class="btn btn-secondary btn-sm" style="margin-top:8px">Quay lại danh sách</a>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+function showState(s) {
+  ['data','loading','error','notfound'].forEach(id => {
+    document.getElementById('state-'+id).style.display = 'none';
+    const b = document.getElementById('btn-'+id);
+    if (b) b.className = 'btn btn-secondary btn-sm';
+  });
+  document.getElementById('state-'+s).style.display = '';
+  const b = document.getElementById('btn-'+s);
+  if (b) b.className = 'btn btn-primary btn-sm';
+  document.getElementById('breadcrumb-nav').style.display = (s === 'data') ? 'flex' : 'none';
+}
+</script>
+</body>
+</html>

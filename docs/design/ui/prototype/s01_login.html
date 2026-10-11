@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng nhập — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S01 — Đăng nhập (/login) — AS-IS
+  Task 20B-R1 · 10/10/2026
+  Nguồn: frontend/src/pages/Login/index.tsx
+  4 states: default / submitting / error / redirect-after-login
+  Ảnh tham chiếu: A_login_1440x900.png, A_login_error_1440x900.png
+-->
+<style>
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-page);
+  padding: 40px 20px;
+}
+.login-wrap {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.brand-icon {
+  width: 56px; height: 56px;
+  background: var(--color-brand-primary);
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-icon svg { color: white; }
+.brand-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+.brand-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.login-card {
+  background: white;
+  border: 1px solid var(--color-border-default);
+  border-radius: 16px;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.login-card h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 0;
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.input-error {
+  border-color: var(--color-danger) !important;
+  background: #FEF2F2;
+}
+.field-error {
+  font-size: 12px;
+  color: var(--color-danger);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.login-footer {
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+/* State selector */
+.state-selector {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  background: white;
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.state-selector label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  padding: 0 4px 4px;
+}
+.state-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-default);
+  background: white;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+}
+.state-btn.active {
+  background: var(--color-brand-primary);
+  color: white;
+  border-color: var(--color-brand-primary);
+}
+</style>
+</head>
+<body>
+
+<!-- State selector overlay -->
+<div class="state-selector">
+  <label>Trạng thái</label>
+  <button class="state-btn active" onclick="showState('default')">Mặc định</button>
+  <button class="state-btn" onclick="showState('submitting')">Đang xử lý</button>
+  <button class="state-btn" onclick="showState('error')">Lỗi xác thực</button>
+  <button class="state-btn" onclick="showState('redirect')">Chuyển trang</button>
+</div>
+
+<div class="login-wrap">
+  <!-- Brand -->
+  <div class="login-brand">
+    <div class="brand-icon">
+      <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    <div>
+      <div class="brand-name">Scopus–ICTU</div>
+      <div class="brand-sub">Hệ thống quản lý công bố khoa học</div>
+    </div>
+  </div>
+
+  <!-- Login card -->
+  <div class="login-card">
+    <h2>Đăng nhập</h2>
+
+    <!-- Error alert (state: error) -->
+    <div id="error-alert" class="alert alert-danger" style="display:none">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng thử lại.
+    </div>
+
+    <!-- Redirect notice (state: redirect) -->
+    <div id="redirect-alert" class="alert" style="display:none;background:#ECFDF5;border-color:#A7F3D0;color:#047857">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      Đăng nhập thành công! Đang chuyển hướng...
+    </div>
+
+    <form onsubmit="return false">
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="form-field">
+          <label class="form-label">Tên đăng nhập</label>
+          <input type="text" class="input" id="username-input" placeholder="admin@ictu.ac.vn" value="">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Mật khẩu</label>
+          <input type="password" class="input" id="password-input" placeholder="••••••••" value="">
+          <div class="field-error" id="field-error" style="display:none">
+            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M12 8v4m0 4h.01"/></svg>
+            Mật khẩu phải có ít nhất 6 ký tự
+          </div>
+        </div>
+        <button id="login-btn" class="btn btn-primary" style="width:100%;justify-content:center;gap:8px;">
+          <span id="btn-text">Đăng nhập</span>
+          <span id="btn-spinner" style="display:none">
+            <span class="spinner" style="width:14px;height:14px;border-width:2px;border-color:rgba(255,255,255,0.3);border-top-color:white;display:inline-block;"></span>
+          </span>
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="login-footer">
+    Hệ thống Quản lý Công bố Scopus · ICTU · Phiên bản 2.3
+  </div>
+</div>
+
+<script>
+function showState(s) {
+  const btns = document.querySelectorAll('.state-btn');
+  btns.forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  const errorAlert = document.getElementById('error-alert');
+  const redirectAlert = document.getElementById('redirect-alert');
+  const loginBtn = document.getElementById('login-btn');
+  const btnText = document.getElementById('btn-text');
+  const btnSpinner = document.getElementById('btn-spinner');
+  const usernameInput = document.getElementById('username-input');
+  const passwordInput = document.getElementById('password-input');
+  const fieldError = document.getElementById('field-error');
+
+  errorAlert.style.display = 'none';
+  redirectAlert.style.display = 'none';
+  usernameInput.classList.remove('input-error');
+  passwordInput.classList.remove('input-error');
+  fieldError.style.display = 'none';
+  loginBtn.disabled = false;
+  btnText.textContent = 'Đăng nhập';
+  btnSpinner.style.display = 'none';
+
+  if (s === 'default') {
+    usernameInput.value = 'admin@ictu.ac.vn';
+    passwordInput.value = '';
+  } else if (s === 'submitting') {
+    usernameInput.value = 'admin@ictu.ac.vn';
+    passwordInput.value = '••••••••';
+    loginBtn.disabled = true;
+    btnText.textContent = 'Đang xử lý...';
+    btnSpinner.style.display = 'inline';
+  } else if (s === 'error') {
+    usernameInput.value = 'admin@ictu.ac.vn';
+    passwordInput.value = 'wrongpassword';
+    usernameInput.classList.add('input-error');
+    passwordInput.classList.add('input-error');
+    errorAlert.style.display = 'flex';
+  } else if (s === 'redirect') {
+    usernameInput.value = 'admin@ictu.ac.vn';
+    passwordInput.value = '••••••••';
+    redirectAlert.style.display = 'flex';
+    loginBtn.disabled = true;
+    btnText.textContent = 'Đang chuyển hướng...';
+  }
+}
+</script>
+</body>
+</html>

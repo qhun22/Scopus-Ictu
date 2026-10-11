@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hàng đợi phê duyệt — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_shell.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S09–S12 — Hàng đợi phê duyệt (/reviews) — AS-IS · PI2.3-5
+  Task 20B-R1 · 10/10/2026 | Sửa R3: 10/10/2026 (xóa score giả)
+  Nguồn: frontend/src/pages/ApprovalQueue/index.tsx
+         frontend/src/types/review.ts (ReviewQueueItem, ReviewCandidateDetail)
+  QUAN TRỌNG: Hệ thống production KHÔNG có match score định lượng (%).
+  Evidence thực tế: name_evidence[], publication_evidence[], is_ambiguous,
+  is_shared_scopus_author, candidate_count_for_scopus_author.
+  States: list-data / list-empty / list-loading / list-error
+  + candidate-detail modal (S10) — bằng chứng thật: NAME + PUBLICATION evidence
+  + ACCEPT dialog (S11) + ACCEPT 409-conflict (S11b)
+  + REJECT dialog (S12)
+  GAP-b: AntD modal primary color #1677FF (AS-IS) vs #3A5FC3 (TO-BE)
+  GAP-c: REJECT dialog textarea resize + char count
+  Ảnh tham chiếu: A_reviews_1440x900.png, A_reviews_accept_1440x900.png,
+                  A_reviews_reject_1440x900.png, A_reviews_409_1440x900.png
+-->
+<style>
+/* Modal layers */
+.modal-layer {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 40px 20px;
+}
+.modal-lg {
+  background: white; border-radius: 16px; width: 700px;
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.modal-sm {
+  background: white; border-radius: 16px; width: 440px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+.mh { padding: 18px 24px 14px; border-bottom: 1px solid var(--color-border-default); display: flex; justify-content: space-between; align-items: center; }
+.mb { padding: 20px 24px; }
+.mf { padding: 14px 24px; border-top: 1px solid var(--color-border-default); display: flex; justify-content: flex-end; gap: 8px; }
+/* GAP-b notice */
+.gap-b {
+  background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 6px;
+  padding: 6px 10px; font-size: 11px; color: #92400E; margin-bottom: 12px;
+}
+/* Evidence section */
+.evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.evidence-col { }
+.evidence-title { font-size: 11px; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+.evidence-item { display: flex; gap: 8px; padding: 4px 0; font-size: 12px; }
+.ev-label { color: var(--color-text-muted); width: 80px; flex-shrink: 0; }
+.ev-value { color: var(--color-text-primary); font-weight: 500; }
+/* Evidence summary box (AS-IS: name + publication evidence counts) */
+.evidence-summary { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; display: flex; gap: 16px; flex-wrap: wrap; }
+.ev-count-item { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
+.ev-count-num { font-size: 22px; font-weight: 800; color: var(--color-brand-primary); }
+.ev-count-label { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; text-align: center; }
+.ev-count-item.warning .ev-count-num { color: #D97706; }
+.ambiguity-flag { background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 6px; padding: 5px 10px; font-size: 11px; color: #92400E; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+/* Rule evidence list */
+.rule-ev-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.rule-ev-item { font-size: 12px; padding: 4px 8px; background: #F0FDF4; border-left: 3px solid #22C55E; border-radius: 0 4px 4px 0; color: #166534; font-family: 'Roboto Mono', monospace; }
+.rule-ev-item.name-ev { background: #EFF6FF; border-left-color: #3B82F6; color: #1E40AF; font-family: inherit; font-size: 12px; }
+/* Conflict box */
+.conflict-box { background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 10px; padding: 16px; }
+.conflict-icon-wrap { width: 48px; height: 48px; background: #FEE2E2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+/* Reason textarea */
+.reason-wrap { position: relative; }
+.reason-wrap textarea { width: 100%; resize: none; font-family: inherit; }
+.char-count { position: absolute; bottom: 8px; right: 10px; font-size: 11px; color: var(--color-text-muted); pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">SCOPUS ICTU</div>
+        <div class="sidebar-brand-sub">Cổng thông tin Scopus</div>
+        <span class="sidebar-version">M2.3</span>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="index.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Trang chủ</a>
+      <a class="nav-item" href="s05_dashboard.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        Tổng quan</a>
+      <a class="nav-item" href="s04_imports.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Nhập dữ liệu</a>
+      <a class="nav-item" href="s06_lecturers.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Giảng viên</a>
+      <a class="nav-item" href="s02_publications.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Công bố</a>
+      <a class="nav-item active" href="s09_reviews.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Duyệt đối sánh</a>
+      <a class="nav-item" href="s13_review_history.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Lịch sử review</a>
+      <a class="nav-item" href="s14_audit_logs.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Nhật ký hệ thống</a>
+      <a class="nav-item" href="s15_tasks.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tác vụ</a>
+    </div>
+  </nav>
+
+  <div class="main-area">
+    <header class="topbar">
+      <span class="topbar-title">Hàng đợi phê duyệt</span>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <button class="lang-switch-btn active">VI</button>
+          <div class="lang-switch-sep"></div>
+          <button class="lang-switch-btn">EN</button>
+        </div>
+        <span class="role-badge reviewer">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+          Phê duyệt viên
+        </span>
+        <button class="user-btn">
+          <div class="user-avatar">P</div>
+          Phạm Văn Duyệt
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- State / modal switcher -->
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+        <button id="btn-data" class="btn btn-primary btn-sm" onclick="showState('data')">Có dữ liệu</button>
+        <button id="btn-empty" class="btn btn-secondary btn-sm" onclick="showState('empty')">Trống</button>
+        <button id="btn-loading" class="btn btn-secondary btn-sm" onclick="showState('loading')">Đang tải</button>
+        <button id="btn-error" class="btn btn-secondary btn-sm" onclick="showState('error')">Lỗi 503</button>
+        <span style="border-left:1px solid var(--color-border-default);margin:0 4px"></span>
+        <button id="btn-detail" class="btn btn-secondary btn-sm" onclick="openModal('detail')">Modal Chi tiết (S10)</button>
+        <button id="btn-accept" class="btn btn-secondary btn-sm" onclick="openModal('accept')">Dialog ACCEPT (S11)</button>
+        <button id="btn-reject" class="btn btn-secondary btn-sm" onclick="openModal('reject')" id="reject-dialog">Dialog REJECT (S12)</button>
+        <button id="btn-conflict" class="btn btn-secondary btn-sm" onclick="openModal('conflict')">409 Conflict</button>
+      </div>
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Hàng đợi phê duyệt</h1>
+          <p class="page-desc">Duyệt đối sánh giảng viên ICTU ↔ tác giả Scopus</p>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar" style="margin-bottom:16px">
+        <div class="filter-group">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" class="input" style="padding-left:32px;width:240px" placeholder="Tìm tên GV, EID...">
+          </div>
+          <select class="input" style="width:140px">
+            <option>Tất cả trạng thái</option>
+            <option>PENDING</option>
+            <option>ACCEPTED</option>
+            <option>REJECTED</option>
+          </select>
+        </div>
+        <div class="filter-actions">
+          <button class="btn btn-secondary btn-sm">Xóa lọc</button>
+        </div>
+      </div>
+
+      <!-- ── DATA state ──────────────────────────────────────────── -->
+      <div id="state-data">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>GV ICTU</th>
+                <th>Tác giả Scopus (Author ID)</th>
+                <th style="width:180px">Công bố hỗ trợ</th>
+                <th style="width:110px">Bằng chứng</th>
+                <th style="width:100px">Trạng thái</th>
+                <th style="width:100px">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div style="font-weight:600;font-size:13px">ThS. Nguyễn Thị Dung</div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Khoa HTTT</div>
+                </td>
+                <td>
+                  <div style="font-size:13px">Nguyen, Thi Dung</div>
+                  <div style="font-size:11px;color:var(--color-text-muted);font-family:'Roboto Mono',monospace">59253245500</div>
+                </td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Deep Learning for Vietnamese NLP…</td>
+                <td style="font-size:12px">
+                  <span title="name_evidence_count" style="color:var(--color-brand-primary);font-weight:600">3 tên</span>
+                  <span style="color:var(--color-text-muted)"> · </span>
+                  <span title="publication_support_count" style="color:#059669;font-weight:600">5 CB</span>
+                </td>
+                <td><span class="badge badge-pending">PENDING</span></td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-ghost btn-xs" onclick="openModal('detail')">Xem</button>
+                    <button class="btn btn-ghost btn-xs" style="color:var(--color-badge-accepted-text)" onclick="openModal('accept')">✓</button>
+                    <button class="btn btn-ghost btn-xs" style="color:var(--color-danger)" onclick="openModal('reject')">✗</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="font-weight:600;font-size:13px">TS. Lê Hùng Linh</div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Khoa KTPM</div>
+                </td>
+                <td>
+                  <div style="font-size:13px">Le, Hung Linh</div>
+                  <div style="font-size:11px;color:var(--color-text-muted);font-family:'Roboto Mono',monospace">56548128100</div>
+                </td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Machine Learning for E-Learning…</td>
+                <td style="font-size:12px">
+                  <span title="name_evidence_count" style="color:var(--color-brand-primary);font-weight:600">2 tên</span>
+                  <span style="color:var(--color-text-muted)"> · </span>
+                  <span title="publication_support_count" style="color:#059669;font-weight:600">2 CB</span>
+                  <span style="color:#D97706;font-weight:600;font-size:11px" title="is_ambiguous"> ⚠ ambiguous</span>
+                </td>
+                <td><span class="badge badge-pending">PENDING</span></td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-ghost btn-xs" onclick="openModal('detail')">Xem</button>
+                    <button class="btn btn-ghost btn-xs" style="color:var(--color-badge-accepted-text)" onclick="openModal('accept')">✓</button>
+                    <button class="btn btn-ghost btn-xs" style="color:var(--color-danger)" onclick="openModal('reject')">✗</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="font-weight:600;font-size:13px">PGS.TS. Trần Văn Minh</div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Khoa CNTT</div>
+                </td>
+                <td>
+                  <div style="font-size:13px">Tran, Van Minh</div>
+                  <div style="font-size:11px;color:var(--color-text-muted);font-family:'Roboto Mono',monospace">56893421200</div>
+                </td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Graph Neural Networks…</td>
+                <td style="font-size:12px">
+                  <span title="name_evidence_count" style="color:var(--color-brand-primary);font-weight:600">4 tên</span>
+                  <span style="color:var(--color-text-muted)"> · </span>
+                  <span title="publication_support_count" style="color:#059669;font-weight:600">8 CB</span>
+                </td>
+                <td><span class="badge badge-accepted">ACCEPTED</span></td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-ghost btn-xs" onclick="openModal('detail')">Xem</button>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div style="font-weight:600;font-size:13px">GS.TS. Phạm Quang Tuấn</div>
+                  <div style="font-size:11px;color:var(--color-text-muted)">Khoa CNTT</div>
+                </td>
+                <td>
+                  <div style="font-size:13px">Pham, Q.T.</div>
+                  <div style="font-size:11px;color:var(--color-text-muted);font-family:'Roboto Mono',monospace">57204721308</div>
+                </td>
+                <td style="font-size:12px;color:var(--color-text-secondary)">Fuzzy Logic IoT Networks…</td>
+                <td style="font-size:12px">
+                  <span title="name_evidence_count" style="color:var(--color-brand-primary);font-weight:600">1 tên</span>
+                  <span style="color:var(--color-text-muted)"> · </span>
+                  <span title="publication_support_count" style="color:#059669;font-weight:600">0 CB</span>
+                  <span style="color:#D97706;font-weight:600;font-size:11px" title="is_shared_scopus_author"> ⚠ shared ID</span>
+                </td>
+                <td><span class="badge badge-rejected">REJECTED</span></td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-ghost btn-xs" onclick="openModal('detail')">Xem</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="table-footer">
+            Hiển thị 4 / 142 ứng viên chờ · 10/trang
+            <button class="btn btn-ghost btn-xs">‹</button>
+            <strong>1</strong>
+            <button class="btn btn-ghost btn-xs">2</button>
+            …
+            <button class="btn btn-ghost btn-xs">15</button>
+            <button class="btn btn-ghost btn-xs">›</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── EMPTY state ─────────────────────────────────────────── -->
+      <div id="state-empty" style="display:none">
+        <div class="state-box">
+          <svg width="48" height="48" fill="none" stroke="var(--color-text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <p>Không có ứng viên nào chờ duyệt</p>
+          <span style="font-size:12px;color:var(--color-text-muted)">Tất cả đã được xử lý</span>
+        </div>
+      </div>
+
+      <!-- ── LOADING state ───────────────────────────────────────── -->
+      <div id="state-loading" style="display:none">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Đang tải hàng đợi...</p>
+        </div>
+      </div>
+
+      <!-- ── ERROR state ─────────────────────────────────────────── -->
+      <div id="state-error" style="display:none">
+        <div class="error-state">
+          <svg width="40" height="40" fill="none" stroke="var(--color-danger)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 8v4m0 4h.01"/></svg>
+          <p>Không thể tải hàng đợi phê duyệt</p>
+          <span style="font-size:12px;color:var(--color-text-muted)">503 Service Unavailable</span>
+          <button class="btn btn-secondary btn-sm" onclick="showState('data')" style="margin-top:8px">Thử lại</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ── MODAL: Candidate Detail (S10) ─────────────────────────── -->
+<div id="modal-detail" class="modal-layer" style="display:none" onclick="if(event.target===this)closeModal('detail')">
+  <div class="modal-lg">
+    <div class="mh">
+      <div>
+        <h2 style="font-size:16px;font-weight:700;color:var(--color-text-primary)">Chi tiết bằng chứng đối sánh</h2>
+        <p style="font-size:12px;color:var(--color-text-muted)">ThS. Nguyễn Thị Dung ↔ Nguyen, Thi Dung (59253245500)</p>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('detail')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="mb">
+      <div class="gap-b">
+        <strong>GAP-b (AS-IS):</strong> Màu nút xác nhận trong dialog AntD hiện là #1677FF. TO-BE: #3A5FC3 (--color-brand-primary).
+        Prototype này hiển thị màu TO-BE.
+      </div>
+
+      <!-- Evidence summary (AS-IS: name_evidence + publication_evidence từ ReviewCandidateDetail) -->
+      <div class="evidence-summary">
+        <div class="ev-count-item">
+          <span class="ev-count-num">3</span>
+          <span class="ev-count-label">Bằng chứng tên<br><code style="font-size:10px">name_evidence</code></span>
+        </div>
+        <div class="ev-count-item">
+          <span class="ev-count-num">5</span>
+          <span class="ev-count-label">Công bố hỗ trợ<br><code style="font-size:10px">publication_support_count</code></span>
+        </div>
+        <div class="ev-count-item">
+          <span class="ev-count-num">1</span>
+          <span class="ev-count-label">Ứng viên khác<br><code style="font-size:10px">candidate_count_for_lecturer</code></span>
+        </div>
+        <div style="margin-left:auto;display:flex;align-items:center">
+          <span class="badge badge-pending">PENDING</span>
+        </div>
+      </div>
+      <!-- is_ambiguous flag nếu có -->
+      <div class="ambiguity-flag" style="display:none" id="flag-ambiguous">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <strong>Cảnh báo:</strong> Tác giả Scopus này đang được dùng chung bởi nhiều giảng viên (is_shared_scopus_author = true)
+      </div>
+
+      <!-- Side-by-side: GV ICTU vs Tác giả Scopus -->
+      <div class="evidence-grid">
+        <div>
+          <div class="evidence-title">GV ICTU (hồ sơ nội bộ)</div>
+          <div class="evidence-item"><span class="ev-label">Họ tên:</span><span class="ev-value">Nguyễn Thị Dung</span></div>
+          <div class="evidence-item"><span class="ev-label">Học vị:</span><span class="ev-value">ThS.</span></div>
+          <div class="evidence-item"><span class="ev-label">Khoa:</span><span class="ev-value">Khoa HTTT</span></div>
+          <div class="evidence-item"><span class="ev-label">Email:</span><span class="ev-value">nguyen.thi.dung@ictu.ac.vn</span></div>
+          <div class="evidence-item"><span class="ev-label">ORCID:</span><span class="ev-value" style="font-family:monospace;font-size:11px">0000-0002-1234-5678</span></div>
+        </div>
+        <div>
+          <div class="evidence-title">Tác giả Scopus</div>
+          <div class="evidence-item"><span class="ev-label">Họ tên:</span><span class="ev-value">Nguyen, Thi Dung</span></div>
+          <div class="evidence-item"><span class="ev-label">Author ID:</span><span class="ev-value" style="font-family:monospace;font-size:11px">59253245500</span></div>
+          <div class="evidence-item"><span class="ev-label">Affiliation:</span><span class="ev-value">Information Technology University</span></div>
+          <div class="evidence-item"><span class="ev-label">Biến thể tên:</span><span class="ev-value" style="font-size:11px">Nguyen T.D., N.T. Dung</span></div>
+        </div>
+      </div>
+      <!-- NAME evidence list (rule-based, AS-IS) -->
+      <div style="margin-bottom:10px">
+        <div class="evidence-title" style="margin-bottom:6px">Bằng chứng tên (name_evidence)</div>
+        <ul class="rule-ev-list">
+          <li class="rule-ev-item name-ev">rule: lecturer_name_exact · "Nguyễn Thị Dung" ↔ "Nguyen, Thi Dung"</li>
+          <li class="rule-ev-item name-ev">rule: affiliation_match · ICTU ↔ Information Technology University</li>
+          <li class="rule-ev-item name-ev">rule: email_domain_match · @ictu.ac.vn (internal)</li>
+        </ul>
+      </div>
+      <!-- PUBLICATION evidence list (AS-IS: DOI_EXACT / TITLE_EXACT) -->
+      <div>
+        <div class="evidence-title" style="margin-bottom:6px">Công bố hỗ trợ (publication_evidence · reconciliation)</div>
+        <ul class="rule-ev-list">
+          <li class="rule-ev-item">DOI_EXACT · "Deep Learning for Vietnamese NLP…" · EID: 85148623741</li>
+          <li class="rule-ev-item">TITLE_EXACT · "Transformer-based NER for Vietnamese" · EID: 85178234100</li>
+          <li class="rule-ev-item">DOI_EXACT · "BERT Fine-tuning for Sentiment Analysis" · EID: 85162345678</li>
+          <li class="rule-ev-item">TITLE_EXACT · "Neural MT En→Vi Survey" · EID: 85134512300</li>
+          <li class="rule-ev-item">DOI_EXACT · "Low-resource NLP Benchmark" · EID: 85190012345</li>
+        </ul>
+      </div>
+
+      <!-- Publication detail -->
+      <div style="background:#F8FAFC;border-radius:8px;padding:14px;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;margin-bottom:8px">Công bố đang xem xét</div>
+        <div style="font-size:13px;font-weight:600;color:var(--color-text-primary)">Deep Learning for Vietnamese Natural Language Processing: A Comprehensive Survey</div>
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-top:4px">Neural Networks · 2024 · EID: 85148623741</div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('detail')">Đóng</button>
+      <button class="btn btn-danger btn-sm" onclick="closeModal('detail');openModal('reject')">Từ chối</button>
+      <button class="btn btn-primary btn-sm" onclick="closeModal('detail');openModal('accept')">Xác nhận khớp</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: ACCEPT Dialog (S11) ────────────────────────────── -->
+<div id="modal-accept" class="modal-layer" style="display:none" onclick="if(event.target===this)closeModal('accept')" id="accept-dialog">
+  <div class="modal-sm">
+    <div class="mh">
+      <h2 style="font-size:15px;font-weight:700;color:var(--color-text-primary)">Xác nhận đối sánh</h2>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('accept')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="mb">
+      <div class="gap-b">
+        <strong>GAP-b:</strong> AS-IS: nút "Xác nhận" màu #1677FF (AntD default). TO-BE: #3A5FC3. Prototype hiển thị TO-BE.
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
+        <div style="width:44px;height:44px;background:#ECFDF5;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="22" height="22" fill="none" stroke="#059669" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div>
+          <p style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:6px">Xác nhận đây là cùng một người?</p>
+          <p style="font-size:13px;color:var(--color-text-secondary)">
+            GV ICTU: <strong>ThS. Nguyễn Thị Dung</strong><br>
+            Tác giả Scopus: <strong>Nguyen, Thi Dung</strong> (59253245500)<br>
+            Bằng chứng: <strong style="color:var(--color-brand-primary)">3 tên</strong> · <strong style="color:#059669">5 công bố hỗ trợ</strong>
+          </p>
+        </div>
+      </div>
+      <div style="background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;padding:10px 14px;font-size:12px;color:#047857">
+        Hành động này sẽ thay đổi trạng thái thành <strong>ACCEPTED</strong> và ghi vào nhật ký kiểm toán.
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('accept')">Hủy</button>
+      <button class="btn btn-primary btn-sm" onclick="closeModal('accept')">Xác nhận ACCEPT</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: 409 Conflict (S11b) ────────────────────────────── -->
+<div id="modal-conflict" class="modal-layer" style="display:none" onclick="if(event.target===this)closeModal('conflict')">
+  <div class="modal-sm">
+    <div class="mh">
+      <h2 style="font-size:15px;font-weight:700;color:var(--color-text-primary)">Xung đột đối sánh · 409</h2>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('conflict')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="mb">
+      <div class="conflict-box">
+        <div class="conflict-icon-wrap">
+          <svg width="24" height="24" fill="none" stroke="#DC2626" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        </div>
+        <p style="font-size:13px;font-weight:600;color:#DC2626;margin-bottom:8px">Xung đột: Tác giả này đã được đối sánh</p>
+        <p style="font-size:12px;color:#7F1D1D;">
+          Tác giả Scopus <strong>Nguyen, Thi Dung (59253245500)</strong> đã được ACCEPTED với giảng viên <strong>TS. Nguyễn Thị Duyên</strong> trước đó.
+        </p>
+        <div style="background:white;border-radius:6px;padding:10px;margin-top:10px;font-size:12px;color:#991B1B">
+          <div><strong>Quyết định hiện tại:</strong> ACCEPTED ngày 08/10/2026</div>
+          <div><strong>Phê duyệt bởi:</strong> Phạm Văn Duyệt</div>
+          <div><strong>Xung đột với GV:</strong> ThS. Nguyễn Thị Dung (yêu cầu mới)</div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--color-text-secondary);margin-top:12px">
+        Để tiếp tục, cần xem lại quyết định cũ trước khi tạo đối sánh mới.
+      </p>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('conflict')">Đóng</button>
+      <button class="btn btn-danger btn-sm" onclick="closeModal('conflict')">Xem quyết định cũ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: REJECT Dialog (S12) ────────────────────────────── -->
+<div id="modal-reject" class="modal-layer" style="display:none" onclick="if(event.target===this)closeModal('reject')" id="reject-dialog">
+  <div class="modal-sm">
+    <div class="mh">
+      <h2 style="font-size:15px;font-weight:700;color:var(--color-text-primary)">Từ chối đối sánh</h2>
+      <button class="btn btn-ghost btn-xs" onclick="closeModal('reject')">
+        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="mb">
+      <div class="gap-b">
+        <strong>GAP-c:</strong> AS-IS: textarea có thể kéo to/nhỏ tự do, chưa có char count. TO-BE: resize:none + char counter. Prototype hiển thị TO-BE.
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
+        <div style="width:44px;height:44px;background:#FEF2F2;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="22" height="22" fill="none" stroke="#DC2626" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </div>
+        <div>
+          <p style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:6px">Từ chối đối sánh này?</p>
+          <p style="font-size:13px;color:var(--color-text-secondary)">
+            GV ICTU: <strong>ThS. Nguyễn Thị Dung</strong><br>
+            Tác giả Scopus: <strong>Nguyen, Thi Dung</strong> (59253245500)
+          </p>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:13px;font-weight:600;color:var(--color-text-primary);display:block;margin-bottom:6px">
+          Lý do từ chối <span style="color:var(--color-danger)">*</span>
+        </label>
+        <div class="reason-wrap">
+          <textarea class="input" rows="4" maxlength="500" style="resize:none;padding-bottom:24px" placeholder="Nhập lý do từ chối đối sánh này..."
+            oninput="document.getElementById('char-count-val').textContent=this.value.length"></textarea>
+          <div class="char-count"><span id="char-count-val">0</span>/500</div>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('reject')">Hủy</button>
+      <button class="btn btn-danger btn-sm" onclick="closeModal('reject')">Xác nhận REJECT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function showState(s) {
+  ['data','empty','loading','error'].forEach(id => {
+    document.getElementById('state-'+id).style.display = 'none';
+    const b = document.getElementById('btn-'+id);
+    if (b) b.className = 'btn btn-secondary btn-sm';
+  });
+  document.getElementById('state-'+s).style.display = '';
+  const b = document.getElementById('btn-'+s);
+  if (b) b.className = 'btn btn-primary btn-sm';
+}
+function openModal(m) {
+  document.getElementById('modal-'+m).style.display = 'flex';
+  const b = document.getElementById('btn-'+m);
+  if (b) b.className = 'btn btn-primary btn-sm';
+}
+function closeModal(m) {
+  document.getElementById('modal-'+m).style.display = 'none';
+  const b = document.getElementById('btn-'+m);
+  if (b) b.className = 'btn btn-secondary btn-sm';
+}
+</script>
+</body>
+</html>

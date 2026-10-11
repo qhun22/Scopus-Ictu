@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nhập dữ liệu — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_shell.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S04 — Nhập dữ liệu (/imports) — AS-IS · PI2.3-3
+  Task 20B-R1 · 10/10/2026
+  Nguồn: frontend/src/pages/Imports/index.tsx
+  States: idle / drag-over / file-selected / uploading / import-success / import-error / non-scopus-error / list
+  GAP-a: Dropzone background không đúng màu thiết kế (#EEF2FF yêu cầu, thực tế transparent)
+  Ảnh tham chiếu: A_imports_idle_1440x900.png, A_imports_uploading_1440x900.png,
+                  A_imports_success_1440x900.png, A_imports_error_1440x900.png
+-->
+<style>
+.gap-notice {
+  background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 8px;
+  padding: 10px 14px; font-size: 12px; color: #92400E; margin-bottom: 16px;
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.import-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.import-left { display: flex; flex-direction: column; gap: 16px; }
+.import-right { display: flex; flex-direction: column; gap: 16px; }
+/* Upload progress */
+.progress-wrap {
+  background: #F1F5F9;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--color-brand-primary);
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.3s;
+}
+/* Import history table */
+.import-history { }
+.import-count-badge {
+  display: inline-flex;
+  background: var(--color-brand-primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  margin-left: 6px;
+}
+/* Dropzone TO-BE color */
+.dropzone.design-spec {
+  background: #EEF2FF;
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">SCOPUS ICTU</div>
+        <div class="sidebar-brand-sub">Cổng thông tin Scopus</div>
+        <span class="sidebar-version">M2.3</span>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="index.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Trang chủ</a>
+      <a class="nav-item" href="s05_dashboard.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        Tổng quan</a>
+      <a class="nav-item active" href="s04_imports.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Nhập dữ liệu</a>
+      <a class="nav-item" href="s06_lecturers.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Giảng viên</a>
+      <a class="nav-item" href="s02_publications.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Công bố</a>
+      <a class="nav-item" href="s09_reviews.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Duyệt đối sánh</a>
+      <a class="nav-item" href="s13_review_history.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Lịch sử review</a>
+      <a class="nav-item" href="s14_audit_logs.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Nhật ký hệ thống</a>
+      <a class="nav-item" href="s15_tasks.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tác vụ</a>
+    </div>
+  </nav>
+
+  <div class="main-area">
+    <header class="topbar">
+      <span class="topbar-title">Nhập dữ liệu Scopus</span>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <button class="lang-switch-btn active">VI</button>
+          <div class="lang-switch-sep"></div>
+          <button class="lang-switch-btn">EN</button>
+        </div>
+        <span class="role-badge admin">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+          Quản trị viên
+        </span>
+        <button class="user-btn">
+          <div class="user-avatar">A</div>
+          Nguyễn Văn An
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- State switcher -->
+      <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;">
+        <button id="btn-idle" class="btn btn-primary btn-sm" onclick="showState('idle')">Chờ upload</button>
+        <button id="btn-drag" class="btn btn-secondary btn-sm" onclick="showState('drag')">Kéo thả</button>
+        <button id="btn-selected" class="btn btn-secondary btn-sm" onclick="showState('selected')">File đã chọn</button>
+        <button id="btn-uploading" class="btn btn-secondary btn-sm" onclick="showState('uploading')">Đang nhập</button>
+        <button id="btn-success" class="btn btn-secondary btn-sm" onclick="showState('success')">Thành công</button>
+        <button id="btn-error" class="btn btn-secondary btn-sm" onclick="showState('error')">Lỗi nhập</button>
+        <button id="btn-nonscopus" class="btn btn-secondary btn-sm" onclick="showState('nonscopus')">Không phải Scopus</button>
+        <button id="btn-list" class="btn btn-secondary btn-sm" onclick="showState('list')">Lịch sử nhập</button>
+      </div>
+
+      <!-- GAP-a notice -->
+      <div class="gap-notice">
+        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span><strong>GAP-a (HIGH):</strong> Màu nền Dropzone AS-IS: <code>transparent</code>. Thiết kế TO-BE: <code>#EEF2FF</code> (--color-brand-subtle). Prototype hiển thị TO-BE.</span>
+      </div>
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Nhập dữ liệu Scopus</h1>
+          <p class="page-desc">Tải lên file CSV xuất từ Scopus để nhập vào hệ thống</p>
+        </div>
+      </div>
+
+      <!-- ── STATE: idle / drag / selected ──────────────────────── -->
+      <div id="state-upload">
+        <div class="import-grid">
+          <div class="import-left">
+            <!-- Dropzone -->
+            <div id="dropzone" class="dropzone design-spec" onclick="showState('selected')">
+              <div class="dropzone-icon">
+                <svg width="28" height="28" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+              </div>
+              <div id="dropzone-main-text" class="dropzone-text-primary">Kéo thả file CSV vào đây</div>
+              <div class="dropzone-text-secondary">hoặc <span style="color:var(--color-brand-primary);font-weight:600;cursor:pointer">chọn file từ máy tính</span></div>
+              <div class="dropzone-hint">Chỉ chấp nhận file <strong>.csv</strong> xuất từ Scopus · Tối đa 50 MB</div>
+            </div>
+
+            <!-- File info (state: selected) -->
+            <div id="file-info" style="display:none" class="card" style="padding:16px">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+                <div style="width:40px;height:40px;background:#EEF2FF;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <svg width="20" height="20" fill="none" stroke="var(--color-brand-primary)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">scopus_export_2024_Q4.csv</div>
+                  <div style="font-size:12px;color:var(--color-text-muted)">2.4 MB · CSV · Sẵn sàng nhập</div>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="showState('idle')">
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Upload button -->
+            <div id="upload-btn-wrap">
+              <button id="upload-btn" class="btn btn-primary" style="width:100%;justify-content:center" onclick="showState('uploading')">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                Bắt đầu nhập
+              </button>
+            </div>
+          </div>
+
+          <div class="import-right">
+            <!-- Info card -->
+            <div class="card" style="padding:16px">
+              <h3 style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--color-text-primary)">Hướng dẫn xuất file Scopus</h3>
+              <ol style="font-size:12px;color:var(--color-text-secondary);padding-left:16px;display:flex;flex-direction:column;gap:6px;margin:0">
+                <li>Vào Scopus → kết quả tìm kiếm → chọn <strong>Export</strong></li>
+                <li>Chọn định dạng <strong>CSV</strong></li>
+                <li>Chọn các trường: EID, Title, Authors, Year, Source, DOI…</li>
+                <li>Tải file về và upload lên đây</li>
+              </ol>
+              <div class="alert" style="margin-top:12px;background:#EFF6FF;border-color:#BFDBFE;color:#1E40AF;font-size:12px;padding:8px 12px">
+                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Hệ thống kiểm tra cột <code>EID</code> để xác minh file xuất từ Scopus
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STATE: uploading ────────────────────────────────────── -->
+      <div id="state-uploading" style="display:none">
+        <div class="card" style="padding:28px;max-width:560px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+            <div class="spinner" style="width:40px;height:40px;border-width:3px"></div>
+            <div>
+              <div style="font-size:16px;font-weight:600;color:var(--color-text-primary)">Đang xử lý file...</div>
+              <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px">scopus_export_2024_Q4.csv · 2.4 MB</div>
+            </div>
+            <div style="width:100%">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--color-text-muted);margin-bottom:6px">
+                <span>Đang phân tích dữ liệu...</span>
+                <span>67%</span>
+              </div>
+              <div class="progress-wrap">
+                <div class="progress-bar" style="width:67%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STATE: success ──────────────────────────────────────── -->
+      <div id="state-success" style="display:none">
+        <div class="card" style="padding:28px;max-width:560px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+            <div style="width:56px;height:56px;background:#ECFDF5;border-radius:50%;display:flex;align-items:center;justify-content:center">
+              <svg width="28" height="28" fill="none" stroke="#059669" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--color-text-primary)">Nhập dữ liệu thành công!</div>
+              <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px">scopus_export_2024_Q4.csv đã được xử lý</div>
+            </div>
+            <div style="width:100%;background:#F8FAFC;border-radius:8px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center">
+              <div>
+                <div style="font-size:20px;font-weight:700;color:var(--color-brand-primary)">248</div>
+                <div style="font-size:11px;color:var(--color-text-muted)">Bản ghi mới</div>
+              </div>
+              <div>
+                <div style="font-size:20px;font-weight:700;color:#F59E0B">12</div>
+                <div style="font-size:11px;color:var(--color-text-muted)">Trùng lặp</div>
+              </div>
+              <div>
+                <div style="font-size:20px;font-weight:700;color:#6B7280">3</div>
+                <div style="font-size:11px;color:var(--color-text-muted)">Bỏ qua</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="showState('idle')">Nhập thêm</button>
+              <a href="s02_publications.html" class="btn btn-primary btn-sm">Xem danh sách công bố</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STATE: error ────────────────────────────────────────── -->
+      <div id="state-error" style="display:none">
+        <div class="card" style="padding:28px;max-width:560px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+            <div style="width:56px;height:56px;background:#FEF2F2;border-radius:50%;display:flex;align-items:center;justify-content:center">
+              <svg width="28" height="28" fill="none" stroke="#DC2626" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--color-text-primary)">Lỗi khi nhập dữ liệu</div>
+              <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px">Không thể xử lý file CSV</div>
+            </div>
+            <div class="alert alert-danger" style="width:100%;text-align:left;font-size:12px">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M12 8v4m0 4h.01"/></svg>
+              Lỗi xử lý CSV tại dòng 45: giá trị cột "Year" không hợp lệ (giá trị: "N/A"). Vui lòng kiểm tra lại file.
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="showState('idle')">Thử lại</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STATE: non-scopus error ─────────────────────────────── -->
+      <div id="state-nonscopus" style="display:none">
+        <div class="card" style="padding:28px;max-width:560px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center">
+            <div style="width:56px;height:56px;background:#FEF3C7;border-radius:50%;display:flex;align-items:center;justify-content:center">
+              <svg width="28" height="28" fill="none" stroke="#D97706" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:var(--color-text-primary)">File không phải xuất từ Scopus</div>
+              <div style="font-size:13px;color:var(--color-text-secondary);margin-top:4px">other_export.csv</div>
+            </div>
+            <div class="alert" style="width:100%;text-align:left;font-size:12px;background:#FFFBEB;border-color:#FCD34D;color:#92400E">
+              <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              File CSV không chứa cột <strong>EID</strong> — đây là trường bắt buộc của file xuất từ Scopus. Hệ thống chỉ chấp nhận file CSV xuất trực tiếp từ cơ sở dữ liệu Scopus.
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="showState('idle')">Chọn file khác</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STATE: list (lịch sử nhập) ─────────────────────────── -->
+      <div id="state-list" style="display:none">
+        <div style="margin-bottom:16px;display:flex;justify-content:flex-end">
+          <button class="btn btn-primary btn-sm" onclick="showState('idle')">
+            <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Nhập thêm
+          </button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Thời gian</th>
+                <th>File</th>
+                <th>Trạng thái</th>
+                <th>Mới</th>
+                <th>Trùng</th>
+                <th>Người nhập</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="white-space:nowrap;font-size:12px">10/10/2026 14:32</td>
+                <td>scopus_export_2024_Q4.csv</td>
+                <td><span class="badge badge-accepted">Thành công</span></td>
+                <td>248</td>
+                <td>12</td>
+                <td>Nguyễn Văn An</td>
+              </tr>
+              <tr>
+                <td style="white-space:nowrap;font-size:12px">08/10/2026 09:15</td>
+                <td>scopus_2024_Q3.csv</td>
+                <td><span class="badge badge-accepted">Thành công</span></td>
+                <td>185</td>
+                <td>7</td>
+                <td>Nguyễn Văn An</td>
+              </tr>
+              <tr>
+                <td style="white-space:nowrap;font-size:12px">05/10/2026 11:50</td>
+                <td>other_db_export.csv</td>
+                <td><span class="badge badge-rejected">Không phải Scopus</span></td>
+                <td>—</td>
+                <td>—</td>
+                <td>Trần Thị Bích</td>
+              </tr>
+              <tr>
+                <td style="white-space:nowrap;font-size:12px">01/10/2026 08:00</td>
+                <td>scopus_2024_Q2.csv</td>
+                <td><span class="badge badge-accepted">Thành công</span></td>
+                <td>312</td>
+                <td>28</td>
+                <td>Nguyễn Văn An</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="table-footer">
+            Hiển thị 4 / 4 lần nhập
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+function showState(s) {
+  ['upload','uploading','success','error','nonscopus','list'].forEach(id => {
+    document.getElementById('state-'+id).style.display = 'none';
+  });
+  ['idle','drag','selected','uploading','success','error','nonscopus','list'].forEach(id => {
+    const b = document.getElementById('btn-'+id);
+    if (b) { b.className = 'btn btn-secondary btn-sm'; }
+  });
+
+  const btnId = 'btn-' + s;
+  const stateId = s === 'idle' || s === 'drag' || s === 'selected' ? 'upload' : 'state-' + s;
+
+  if (s === 'idle' || s === 'drag' || s === 'selected') {
+    document.getElementById('state-upload').style.display = '';
+    const dz = document.getElementById('dropzone');
+    const fileInfo = document.getElementById('file-info');
+    const mainText = document.getElementById('dropzone-main-text');
+    if (s === 'idle') {
+      dz.className = 'dropzone design-spec';
+      mainText.textContent = 'Kéo thả file CSV vào đây';
+      fileInfo.style.display = 'none';
+    } else if (s === 'drag') {
+      dz.className = 'dropzone design-spec drag-over';
+      mainText.textContent = 'Thả file vào đây để upload';
+      fileInfo.style.display = 'none';
+    } else {
+      dz.className = 'dropzone design-spec selected';
+      mainText.textContent = 'File đã chọn:';
+      fileInfo.style.display = '';
+    }
+  } else {
+    document.getElementById('state-' + s).style.display = '';
+  }
+
+  const b = document.getElementById(btnId);
+  if (b) b.className = 'btn btn-primary btn-sm';
+}
+</script>
+</body>
+</html>

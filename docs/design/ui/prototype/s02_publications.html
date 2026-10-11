@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Danh sách công bố — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_shell.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S02 — Danh sách công bố (/publications) — AS-IS · PI2.3-1
+  Task 20B-R1 · 10/10/2026 | Sửa R3: 10/10/2026 (làm rõ trạng thái identity)
+  Nguồn: frontend/src/pages/Publications/index.tsx
+         frontend/src/types/publication.ts
+  QUAN TRỌNG: Publication không có trạng thái ACCEPTED/PENDING/REJECTED riêng.
+  Trạng thái bên dưới là trạng thái CANDIDATE IDENTITY (từ ApprovalQueue/ReviewHistory),
+  nghĩa là: "tác giả của công bố này đã được đối sánh hay chưa?"
+  Xem thêm: CandidateStatus trong frontend/src/types/review.ts
+  4 states: data / empty / loading / error
+  GAP-d: Badges "Có công bố" / "Dùng chung" — màu cần kiểm tra
+  Ảnh tham chiếu: A_publications_1440x900.png
+-->
+<style>
+.filter-bar-pubs {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid var(--color-border-default);
+  border-radius: 10px;
+}
+.eid-link {
+  font-size: 11px;
+  color: var(--color-brand-primary);
+  font-family: 'Roboto Mono', monospace;
+  text-decoration: none;
+}
+.eid-link:hover { text-decoration: underline; }
+.title-cell { max-width: 320px; }
+.title-cell a {
+  color: var(--color-text-primary);
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.title-cell a:hover { color: var(--color-brand-primary); text-decoration: underline; }
+.authors-cell {
+  font-size: 12px; color: var(--color-text-secondary);
+  max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">SCOPUS ICTU</div>
+        <div class="sidebar-brand-sub">Cổng thông tin Scopus</div>
+        <span class="sidebar-version">M2.3</span>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="index.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Trang chủ</a>
+      <a class="nav-item" href="s05_dashboard.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        Tổng quan</a>
+      <a class="nav-item" href="s04_imports.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Nhập dữ liệu</a>
+      <a class="nav-item" href="s06_lecturers.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Giảng viên</a>
+      <a class="nav-item active" href="s02_publications.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Công bố</a>
+      <a class="nav-item" href="s09_reviews.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Duyệt đối sánh</a>
+      <a class="nav-item" href="s13_review_history.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Lịch sử review</a>
+      <a class="nav-item" href="s14_audit_logs.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Nhật ký hệ thống</a>
+      <a class="nav-item" href="s15_tasks.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tác vụ</a>
+    </div>
+  </nav>
+
+  <div class="main-area">
+    <header class="topbar">
+      <span class="topbar-title">Danh sách công bố</span>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <button class="lang-switch-btn active">VI</button>
+          <div class="lang-switch-sep"></div>
+          <button class="lang-switch-btn">EN</button>
+        </div>
+        <span class="role-badge admin">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+          Quản trị viên
+        </span>
+        <button class="user-btn">
+          <div class="user-avatar">A</div>
+          Nguyễn Văn An
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- State switcher -->
+      <div style="display:flex;gap:6px;margin-bottom:16px">
+        <button id="btn-data" class="btn btn-primary btn-sm" onclick="showState('data')">Có dữ liệu</button>
+        <button id="btn-empty" class="btn btn-secondary btn-sm" onclick="showState('empty')">Trống</button>
+        <button id="btn-loading" class="btn btn-secondary btn-sm" onclick="showState('loading')">Đang tải</button>
+        <button id="btn-error" class="btn btn-secondary btn-sm" onclick="showState('error')">Lỗi 503</button>
+      </div>
+
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Công bố Scopus</h1>
+          <p class="page-desc">Danh sách tất cả công bố nhập từ Scopus</p>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar-pubs">
+        <div style="flex:1;min-width:200px">
+          <div class="search-input-wrap" style="max-width:360px">
+            <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" class="input" style="padding-left:32px" placeholder="Tìm tiêu đề, tác giả, EID...">
+          </div>
+        </div>
+        <select class="input" style="width:200px" title="Lọc theo trạng thái đối sánh tác giả (CandidateStatus)">
+          <option>Tất cả đối sánh tác giả</option>
+          <option>ACCEPTED — Đã xác nhận</option>
+          <option>PENDING — Chờ duyệt</option>
+          <option>REJECTED — Đã từ chối</option>
+          <option>SUPERSEDED — Bị thay thế</option>
+        </select>
+        <select class="input" style="width:120px">
+          <option>Tất cả năm</option>
+          <option>2026</option>
+          <option>2025</option>
+          <option>2024</option>
+          <option>2023</option>
+        </select>
+        <button class="btn btn-secondary btn-sm">Xóa lọc</button>
+      </div>
+
+      <!-- ── DATA state ──────────────────────────────────────────── -->
+      <div id="state-data">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:110px">EID</th>
+                <th>Tiêu đề</th>
+                <th style="width:180px">Tác giả</th>
+                <th style="width:50px">Năm</th>
+                <th style="width:120px" title="Trạng thái đối sánh tác giả (CandidateStatus), không phải trạng thái của công bố">Đối sánh tác giả ⓘ</th>
+                <th style="width:90px">Loại</th>
+                <th style="width:60px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><a href="s03_pub_detail.html" class="eid-link">85148623741</a></td>
+                <td class="title-cell"><a href="s03_pub_detail.html">Deep Learning for Vietnamese Natural Language Processing: A Comprehensive Survey</a></td>
+                <td class="authors-cell" title="Trần Văn Minh, Nguyễn Thị Lan, Lê Hùng Linh">Trần Văn Minh, Nguyễn Thị Lan…</td>
+                <td>2024</td>
+                <td><span class="badge badge-accepted">ACCEPTED</span></td>
+                <td><span class="badge badge-has-pub">Có công bố</span></td>
+                <td><a href="s03_pub_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+              <tr>
+                <td><a href="s03_pub_detail.html" class="eid-link">85132145872</a></td>
+                <td class="title-cell"><a href="s03_pub_detail.html">Fuzzy Logic Based Anomaly Detection in IoT Networks</a></td>
+                <td class="authors-cell">Nguyễn Thị Lan, Phạm Quang Tuấn</td>
+                <td>2024</td>
+                <td><span class="badge badge-pending">PENDING</span></td>
+                <td><span class="badge badge-shared">Dùng chung</span></td>
+                <td><a href="s09_reviews.html" class="btn btn-ghost btn-xs">Duyệt</a></td>
+              </tr>
+              <tr>
+                <td><a href="s03_pub_detail.html" class="eid-link">85118934520</a></td>
+                <td class="title-cell"><a href="s03_pub_detail.html">Machine Learning Approaches for Student Performance Prediction in E-Learning</a></td>
+                <td class="authors-cell">Lê Hùng Linh, Trần Thị Bích</td>
+                <td>2023</td>
+                <td><span class="badge badge-rejected">REJECTED</span></td>
+                <td><span class="badge badge-shared">Dùng chung</span></td>
+                <td><a href="s03_pub_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+              <tr>
+                <td><a href="s03_pub_detail.html" class="eid-link">85099012344</a></td>
+                <td class="title-cell"><a href="s03_pub_detail.html">Blockchain-based Academic Certificate Verification System</a></td>
+                <td class="authors-cell">PGS.TS. Trần Văn Minh</td>
+                <td>2023</td>
+                <td><span class="badge badge-accepted">ACCEPTED</span></td>
+                <td><span class="badge badge-has-pub">Có công bố</span></td>
+                <td><a href="s03_pub_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+              <tr>
+                <td><a href="s03_pub_detail.html" class="eid-link">85087634521</a></td>
+                <td class="title-cell"><a href="s03_pub_detail.html">A Novel Approach to Vietnamese Text Classification Using BERT</a></td>
+                <td class="authors-cell">Nguyễn Thị Dung, Trần Văn Minh</td>
+                <td>2023</td>
+                <td><span class="badge badge-superseded">SUPERSEDED</span></td>
+                <td>—</td>
+                <td><a href="s03_pub_detail.html" class="btn btn-ghost btn-xs">Chi tiết</a></td>
+              </tr>
+              <tr>
+                <td><a href="s03_pub_detail.html" class="eid-link">85076512890</a></td>
+                <td class="title-cell"><a href="s03_pub_detail.html">Graph Neural Networks for Knowledge Graph Completion in Vietnamese</a></td>
+                <td class="authors-cell">GS.TS. Phạm Quang Tuấn</td>
+                <td>2022</td>
+                <td><span class="badge badge-pending">PENDING</span></td>
+                <td>—</td>
+                <td><a href="s09_reviews.html" class="btn btn-ghost btn-xs">Duyệt</a></td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;font-size:11px;color:#1E40AF;margin-bottom:8px">
+            ⓘ <strong>Cột "Đối sánh tác giả"</strong> hiển thị trạng thái <code>CandidateStatus</code> của ứng viên identity — không phải trạng thái của công bố Scopus. Một công bố có thể chưa có tác giả nào được đối sánh (hiển thị "—").
+          </div>
+          <div class="table-footer">
+            Hiển thị 6 / 1,247 công bố &nbsp;·&nbsp;
+            <button class="btn btn-ghost btn-xs">‹</button>
+            <strong>1</strong>
+            <button class="btn btn-ghost btn-xs">2</button>
+            <button class="btn btn-ghost btn-xs">3</button>
+            …
+            <button class="btn btn-ghost btn-xs">125</button>
+            <button class="btn btn-ghost btn-xs">›</button>
+            &nbsp; 10 / trang
+          </div>
+        </div>
+      </div>
+
+      <!-- ── EMPTY state ─────────────────────────────────────────── -->
+      <div id="state-empty" style="display:none">
+        <div class="state-box">
+          <svg width="48" height="48" fill="none" stroke="var(--color-text-muted)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+          <p>Chưa có công bố nào</p>
+          <a href="s04_imports.html" class="btn btn-primary btn-sm">Nhập dữ liệu Scopus</a>
+        </div>
+      </div>
+
+      <!-- ── LOADING state ───────────────────────────────────────── -->
+      <div id="state-loading" style="display:none">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Đang tải danh sách công bố...</p>
+        </div>
+      </div>
+
+      <!-- ── ERROR state ─────────────────────────────────────────── -->
+      <div id="state-error" style="display:none">
+        <div class="error-state">
+          <svg width="40" height="40" fill="none" stroke="var(--color-danger)" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="1.5"/><path stroke-linecap="round" stroke-width="1.5" d="M12 8v4m0 4h.01"/></svg>
+          <p>Không thể tải danh sách công bố</p>
+          <span style="font-size:12px;color:var(--color-text-muted)">503 Service Unavailable</span>
+          <button class="btn btn-secondary btn-sm" onclick="showState('data')" style="margin-top:8px">Thử lại</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<script>
+function showState(s) {
+  ['data','empty','loading','error'].forEach(id => {
+    document.getElementById('state-'+id).style.display = 'none';
+    const b = document.getElementById('btn-'+id);
+    if (b) b.className = 'btn btn-secondary btn-sm';
+  });
+  document.getElementById('state-'+s).style.display = '';
+  const b = document.getElementById('btn-'+s);
+  if (b) b.className = 'btn btn-primary btn-sm';
+}
+</script>
+</body>
+</html>

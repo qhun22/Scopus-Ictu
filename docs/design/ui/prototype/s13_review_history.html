@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lịch sử review — Scopus–ICTU Prototype</title>
+<link rel="stylesheet" href="_tokens.css">
+<link rel="stylesheet" href="_shell.css">
+<link rel="stylesheet" href="_components.css">
+<!--
+  S13 — Lịch sử review (/review-history)
+  AS-IS · Task 20B-R1 · 10/10/2026
+  DỮ LIỆU MINH HỌA — không phải dữ liệu thật từ hệ thống.
+  Nguồn: frontend/src/pages/ReviewHistory/index.tsx
+  Ảnh tham chiếu: A_reviewhistory_data_1440x900.png, R_reviewhistory_data_1440x900.png
+  GAP-j: ActionBadge hiển thị mã ACCEPT/REJECT thay vì nhãn tiếng Việt; PENDING→ACCEPTED thay vì nhãn VN.
+-->
+<style>
+  .transition-badge { display: flex; align-items: center; gap: 6px; }
+  .arrow { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="sidebar-brand-name">SCOPUS ICTU</div>
+        <div class="sidebar-brand-sub">Cổng thông tin Scopus</div>
+        <span class="sidebar-version">M2.3</span>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item" href="s19_home.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Trang chủ</a>
+      <a class="nav-item" href="s05_dashboard.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        Tổng quan</a>
+      <a class="nav-item" href="s04_imports.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Nhập dữ liệu</a>
+      <a class="nav-item" href="s06_lecturers.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Giảng viên</a>
+      <a class="nav-item" href="s02_publications.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Công bố</a>
+      <a class="nav-item" href="s09_reviews.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Duyệt đối sánh</a>
+      <a class="nav-item active" href="s13_review_history.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Lịch sử review</a>
+      <a class="nav-item" href="s14_audit_logs.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Nhật ký hệ thống</a>
+      <a class="nav-item" href="s15_tasks.html">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Tác vụ</a>
+    </div>
+  </nav>
+
+  <!-- ── Main ────────────────────────────────────────────────────── -->
+  <div class="main-area">
+    <header class="topbar">
+      <span class="topbar-title">Lịch sử review</span>
+      <div class="topbar-right">
+        <div class="lang-switch">
+          <button class="lang-switch-btn active">VI</button>
+          <div class="lang-switch-sep"></div>
+          <button class="lang-switch-btn">EN</button>
+        </div>
+        <span class="role-badge admin">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+          Quản trị viên
+        </span>
+        <button class="user-btn">
+          <div class="user-avatar">A</div>
+          Nguyễn Văn An
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Page Header -->
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1>Lịch sử review</h1>
+          <p>Theo dõi toàn bộ lịch sử quyết định đối sánh của phê duyệt viên</p>
+        </div>
+        <button class="btn btn-secondary btn-sm">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Làm mới
+        </button>
+      </div>
+
+      <!-- GAP-j notice -->
+      <div class="alert alert-warning" style="font-size:12px;">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div>
+          <strong>GAP-j (LOW · TO-BE):</strong> UI hiện tại hiển thị mã <code>ACCEPT</code>/<code>REJECT</code> và trạng thái <code>PENDING→ACCEPTED</code> dạng raw. Thiết kế đề xuất: dùng nhãn tiếng Việt "Đã xác nhận" / "Đã từ chối" và hiển thị trạng thái thân thiện hơn.
+          Ảnh thật: <em>A_reviewhistory_data_1440x900.png</em>.
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="filter-bar">
+        <div class="filter-group">
+          <span class="filter-label">Quyết định</span>
+          <select class="input input-xs" style="width:160px">
+            <option value="">Tất cả</option>
+            <option value="ACCEPT">Đã xác nhận (ACCEPT)</option>
+            <option value="REJECT">Đã từ chối (REJECT)</option>
+            <option value="REOPEN">Mở lại (REOPEN)</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Từ ngày</span>
+          <input type="datetime-local" class="input input-xs" style="width:190px" value="2026-10-01T00:00">
+        </div>
+        <div class="filter-group">
+          <span class="filter-label">Đến ngày</span>
+          <input type="datetime-local" class="input input-xs" style="width:190px" value="2026-10-10T23:59">
+        </div>
+        <div class="filter-actions">
+          <button class="btn btn-secondary btn-xs">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+            Áp dụng
+          </button>
+          <button class="btn btn-secondary btn-xs">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Xóa bộ lọc
+          </button>
+        </div>
+      </div>
+
+      <!-- State selector (prototype) -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--color-text-muted);align-items:center;">
+        <span>Xem trạng thái:</span>
+        <button onclick="showState('data')" class="btn btn-xs" id="btn-data" style="background:var(--color-brand-primary);color:white;border-color:var(--color-brand-primary)">Có dữ liệu</button>
+        <button onclick="showState('empty')" class="btn btn-xs" id="btn-empty">Trống</button>
+        <button onclick="showState('loading')" class="btn btn-xs" id="btn-loading">Đang tải</button>
+        <button onclick="showState('error')" class="btn btn-xs" id="btn-error">Lỗi 503</button>
+      </div>
+
+      <!-- STATE: Data -->
+      <div id="state-data">
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Quyết định</th>
+                  <th>Chuyển trạng thái</th>
+                  <th>Giảng viên ICTU</th>
+                  <th>Tác giả Scopus</th>
+                  <th>Phê duyệt viên</th>
+                  <th>Lý do</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Row 1: ACCEPT — AS-IS hiển thị mã, prototype hiển thị nhãn VN -->
+                <tr>
+                  <td style="white-space:nowrap;color:var(--color-text-secondary)">10/10/2026 14:32</td>
+                  <td>
+                    <!-- AS-IS: badge mã -->
+                    <span class="badge-mono badge-mono-accept" style="padding:2px 8px;border-radius:4px;border:1px solid;display:inline-block">ACCEPT</span>
+                    <!-- TO-BE nhãn VN (đề xuất, xem GAP-j) -->
+                    <div style="margin-top:3px;font-size:10px;color:var(--color-text-muted)">[TO-BE: "Đã xác nhận"]</div>
+                  </td>
+                  <td>
+                    <div class="transition-badge">
+                      <span class="badge-mono" style="padding:2px 6px;border-radius:4px;border:1px solid">PENDING</span>
+                      <span class="arrow">→</span>
+                      <span class="badge-mono" style="padding:2px 6px;border-radius:4px;border:1px solid">ACCEPTED</span>
+                    </div>
+                    <div style="font-size:10px;color:var(--color-text-muted);margin-top:2px">[TO-BE: "Chờ duyệt → Đã xác nhận"]</div>
+                  </td>
+                  <td>
+                    <div class="cell-primary">ThS. Nguyễn Thị Dung</div>
+                    <div class="cell-sub">GV-CNTT-2015</div>
+                  </td>
+                  <td>
+                    <div>Nguyen Thi Dung</div>
+                    <div class="mono" style="font-size:10px;color:var(--color-text-muted)">59253245500</div>
+                  </td>
+                  <td>Lê Văn Phê Duyệt</td>
+                  <td style="color:var(--color-text-muted);font-style:italic">—</td>
+                </tr>
+                <!-- Row 2: REJECT -->
+                <tr>
+                  <td style="white-space:nowrap;color:var(--color-text-secondary)">10/10/2026 09:15</td>
+                  <td>
+                    <span class="badge-mono badge-mono-reject" style="padding:2px 8px;border-radius:4px;border:1px solid;display:inline-block">REJECT</span>
+                    <div style="margin-top:3px;font-size:10px;color:var(--color-text-muted)">[TO-BE: "Đã từ chối"]</div>
+                  </td>
+                  <td>
+                    <div class="transition-badge">
+                      <span class="badge-mono" style="padding:2px 6px;border-radius:4px;border:1px solid">PENDING</span>
+                      <span class="arrow">→</span>
+                      <span class="badge-mono" style="padding:2px 6px;border-radius:4px;border:1px solid">REJECTED</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-primary">TS. Lê Hùng Linh</div>
+                    <div class="cell-sub">GV-CNTT-2018</div>
+                  </td>
+                  <td>
+                    <div>Le Hung Linh</div>
+                    <div class="mono" style="font-size:10px;color:var(--color-text-muted)">56548128100</div>
+                  </td>
+                  <td>Lê Văn Phê Duyệt</td>
+                  <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Minh họa trên DB kiểm thử: bằng chứng tên chưa đủ để xác nhận.">Minh họa: bằng chứng tên chưa đủ</td>
+                </tr>
+                <!-- Row 3: ACCEPT by another reviewer -->
+                <tr>
+                  <td style="white-space:nowrap;color:var(--color-text-secondary)">09/10/2026 16:48</td>
+                  <td>
+                    <span class="badge-mono badge-mono-accept" style="padding:2px 8px;border-radius:4px;border:1px solid;display:inline-block">ACCEPT</span>
+                  </td>
+                  <td>
+                    <div class="transition-badge">
+                      <span class="badge-mono" style="padding:2px 6px;border-radius:4px;border:1px solid">PENDING</span>
+                      <span class="arrow">→</span>
+                      <span class="badge-mono" style="padding:2px 6px;border-radius:4px;border:1px solid">ACCEPTED</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-primary">PGS.TS. Trần Văn Minh</div>
+                    <div class="cell-sub">GV-KHMT-2010</div>
+                  </td>
+                  <td>
+                    <div>Tran Van Minh</div>
+                    <div class="mono" style="font-size:10px;color:var(--color-text-muted)">57213876543</div>
+                  </td>
+                  <td>Nguyễn Phê Duyệt</td>
+                  <td style="color:var(--color-text-muted);font-style:italic">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-footer">
+            <div class="table-footer-info">
+              <span>Trang <strong>1</strong> / 1 · <strong>3</strong> bản ghi</span>
+              <div style="display:flex;align-items:center;gap:6px;padding-left:8px;border-left:1px solid var(--color-border-default)">
+                <select class="page-size-select">
+                  <option>20</option>
+                  <option>50</option>
+                  <option>100</option>
+                </select>
+              </div>
+            </div>
+            <nav class="table-footer-nav">
+              <button class="page-btn" disabled>← Trước</button>
+              <button class="page-btn" disabled>Sau →</button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Empty -->
+      <div id="state-empty" style="display:none">
+        <div class="state-box">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          <h3>Chưa có lịch sử</h3>
+          <p>Chưa có quyết định nào được ghi lại trong khoảng thời gian đã chọn.</p>
+        </div>
+      </div>
+
+      <!-- STATE: Loading -->
+      <div id="state-loading" style="display:none">
+        <div class="state-box">
+          <div class="spinner"></div>
+          <p>Đang tải dữ liệu...</p>
+        </div>
+      </div>
+
+      <!-- STATE: Error -->
+      <div id="state-error" style="display:none">
+        <div class="error-state">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <div>
+            <strong>Không thể tải dữ liệu lịch sử review</strong>
+            <p style="font-size:12px;margin-top:4px">Lỗi kết nối đến máy chủ (503 Service Unavailable). Vui lòng thử lại.</p>
+            <button class="btn btn-secondary btn-xs" style="margin-top:8px">Thử lại</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+function showState(s) {
+  ['data','empty','loading','error'].forEach(id => {
+    document.getElementById('state-'+id).style.display = id === s ? '' : 'none';
+    const btn = document.getElementById('btn-'+id);
+    if (btn) { btn.style.background = id===s ? 'var(--color-brand-primary)' : ''; btn.style.color = id===s ? 'white' : ''; btn.style.borderColor = id===s ? 'var(--color-brand-primary)' : ''; }
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+/*
+ * Design Tokens — Scopus–ICTU · Task 20B-R1
+ * Nguồn: docs/design/ui/tokens.json (primitive → semantic)
+ * Không phụ thuộc framework. Dùng với Tailwind CDN hoặc vanilla CSS.
+ * Không sửa file này nếu không cập nhật tokens.json trước.
+ */
+
+/* ── Google Fonts: Saira (400–700) + Roboto Mono ──────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700&family=Roboto+Mono:wght@400&display=swap');
+
+/* ── CSS Custom Properties ─────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --color-brand-primary: #3A5FC3;
+  --color-brand-hover:   #2F4EA6;
+  --color-brand-subtle:  #EBEFF9;
+
+  /* Backgrounds */
+  --color-bg-page:    #F4F6FB;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-subtle:  #F8FAFC;  /* slate-50 */
+  --color-bg-muted:   #F1F5F9;  /* slate-100 */
+  --color-bg-login:   #EEF2F7;
+
+  /* Borders */
+  --color-border-default: #E2E8F0;  /* slate-200 */
+  --color-border-subtle:  #F1F5F9;  /* slate-100 */
+  --color-border-strong:  #CBD5E1;  /* slate-300 */
+
+  /* Text */
+  --color-text-primary:   #172033;  /* base/ink */
+  --color-text-body:      #334155;  /* slate-700 */
+  --color-text-secondary: #64748B;  /* slate-500 */
+  --color-text-muted:     #94A3B8;  /* slate-400 */
+  --color-text-inverse:   #FFFFFF;
+  --color-icon-default:   #64748B;
+
+  /* Status: success (emerald) */
+  --color-status-success-bg:     #ECFDF5;
+  --color-status-success-border: #A7F3D0;
+  --color-status-success-text:   #047857;
+
+  /* Status: warning (amber) */
+  --color-status-warning-bg:     #FFFBEB;
+  --color-status-warning-border: #FDE68A;
+  --color-status-warning-text:   #B45309;
+
+  /* Status: danger (rose) */
+  --color-status-danger-bg:     #FFF1F2;
+  --color-status-danger-border: #FECDD3;
+  --color-status-danger-text:   #BE123C;
+  --color-status-danger-solid:  #E11D48;
+
+  /* Status: info (indigo) */
+  --color-status-info-bg:     #EEF2FF;
+  --color-status-info-border: #C7D2FE;
+  --color-status-info-text:   #4338CA;
+
+  /* Status: neutral (slate) */
+  --color-status-neutral-bg:     #F1F5F9;
+  --color-status-neutral-border: #E2E8F0;
+  --color-status-neutral-text:   #475569;
+
+  /* Status: accent (cyan) */
+  --color-status-accent-bg:   #ECFEFF;
+  --color-status-accent-text: #0E7490;
+
+  /* Status: violet */
+  --color-status-violet-bg:   #F5F3FF;
+  --color-status-violet-text: #6D28D9;
+
+  /* Status: blue */
+  --color-status-blue-bg:   #EFF6FF;
+  --color-status-blue-text: #3A5FC3;
+
+  /* Others */
+  --color-accent-teal:    #0D9488;
+  --color-proposed-flag:  #FCD34D;
+
+  /* Spacing */
+  --space-0-5: 2px;
+  --space-1:   4px;
+  --space-1-5: 6px;
+  --space-2:   8px;
+  --space-2-5: 10px;
+  --space-3:   12px;
+  --space-3-5: 14px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-8:   32px;
+  --space-12:  48px;
+
+  /* Radius */
+  --radius-sm:  4px;
+  --radius-md:  6px;
+  --radius-lg:  8px;
+  --radius-xl:  12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* Control heights */
+  --size-control-2xs: 24px;
+  --size-control-xs:  28px;
+  --size-control-sm:  32px;
+  --size-control-md:  36px;
+  --size-control-lg:  40px;
+  --size-control-xl:  48px;
+
+  /* Layout */
+  --layout-sidebar:          256px;
+  --layout-sidebar-collapsed: 80px;
+  --layout-header:            64px;
+  --layout-content-padding:   24px;
+
+  /* Typography scale */
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 13px;
+  --text-md:   14px;
+  --text-lg:   16px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+
+  /* Shadow (đơn giản, không dùng shadow-xs/2xs TW3.4 vì không sinh CSS) */
+  --shadow-card: 0 0 0 1px var(--color-border-default);
+  --shadow-sm:   0 1px 2px 0 rgb(0 0 0 / 0.06);
+  --shadow-xl:   0 10px 15px -3px rgb(0 0 0 / 0.08);
+  --shadow-2xl:  0 20px 25px -5px rgb(0 0 0 / 0.10);
+  --shadow-login: 0 20px 60px -10px rgb(59 130 246 / 0.15);
+  --shadow-focus: 0 0 0 3px rgb(58 95 195 / 0.20);
+}
+
+/* ── Base reset ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Saira', sans-serif;
+  font-size: var(--text-md);
+  color: var(--color-text-primary);
+  background: var(--color-bg-page);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
