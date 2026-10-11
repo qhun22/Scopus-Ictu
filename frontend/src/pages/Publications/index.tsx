@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { exportPublicationsJson, getPublications } from "../../api/publications";
@@ -58,6 +58,9 @@ function buildFiltersFromDraft(
 
 export default function PublicationsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawScopusId = searchParams.get("scopus_id") ?? "";
+  const scopusIdFilter = /^\d{1,32}$/.test(rawScopusId) ? rawScopusId : undefined;
   const { locale } = useI18n();
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === "ADMIN";
@@ -128,6 +131,7 @@ export default function PublicationsPage() {
             page: currentPage,
             page_size: currentPageSize,
             q: qDebounced || undefined,
+            scopus_id: scopusIdFilter,
             ...appliedFilters,
           },
           { signal: controller.signal },
@@ -158,7 +162,7 @@ export default function PublicationsPage() {
         setLoadingMore(false);
       }
     },
-    [qDebounced, appliedFilters],
+    [qDebounced, appliedFilters, scopusIdFilter],
   );
 
   // ── Single trigger: appliedFilters + page + pageSize + qDebounced ────────
@@ -174,7 +178,7 @@ export default function PublicationsPage() {
     // closure); we list page + pageSize + appliedFilters + qDebounced to drive
     // the trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, appliedFilters, qDebounced]);
+  }, [page, pageSize, appliedFilters, qDebounced, scopusIdFilter]);
 
   // ── Debounce free-text search + reset to page 1 when it changes ─────────
   useEffect(() => {
@@ -195,6 +199,7 @@ export default function PublicationsPage() {
   };
 
   const handleClear = () => {
+    if (scopusIdFilter) setSearchParams({}, { replace: true });
     setQ("");
     setQDebounced("");
     setDraftYear("");
@@ -225,6 +230,7 @@ export default function PublicationsPage() {
   const isApplyDirty = !filtersEqual(draftFiltersNormalized, appliedFilters);
 
   const hasAnyInput =
+    !!scopusIdFilter ||
     !!q ||
     !!qDebounced ||
     !!draftYear ||
@@ -256,7 +262,7 @@ export default function PublicationsPage() {
   const colTitle = locale === "vi" ? "Công bố" : "Publication";
   const colEid = "EID";
   const colYear = locale === "vi" ? "Năm" : "Year";
-  const colSource = locale === "vi" ? "Nguồn tạp chí" : "Source";
+  const colSource = locale === "vi" ? "Nguồn xuất bản" : "Source title";
   const colDocType = locale === "vi" ? "Loại tài liệu" : "Document Type";
   const colCitations = locale === "vi" ? "Trích dẫn" : "Citations";
   const colStage = locale === "vi" ? "Giai đoạn xuất bản" : "Publication Stage";
@@ -341,6 +347,28 @@ export default function PublicationsPage() {
           </div>
         )}
       </div>
+
+      {scopusIdFilter && (
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900"
+          data-testid="scopus-id-chip"
+        >
+          <span>
+            {locale === "vi" ? "Đang lọc theo tác giả Scopus ID " : "Filtered by Scopus Author ID "}
+            <b>{scopusIdFilter}</b>
+          </span>
+          <button
+            type="button"
+            className="rounded border border-sky-300 bg-white px-2 py-0.5 font-semibold text-sky-800 hover:bg-sky-100"
+            onClick={() => {
+              setSearchParams({}, { replace: true });
+              setPage(1);
+            }}
+          >
+            {locale === "vi" ? "Bỏ lọc" : "Clear"}
+          </button>
+        </div>
+      )}
 
       {/* ── Filter Bar ──────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs space-y-3">
@@ -535,8 +563,8 @@ export default function PublicationsPage() {
                     <td className="px-4 py-3 whitespace-nowrap text-slate-700">
                       {fmtYear(pub.year)}
                     </td>
-                    <td className="px-4 py-3 max-w-0">
-                      <span className="block max-w-[140px] truncate text-slate-700" title={pub.source_title ?? ""}>
+                    <td className="px-4 py-3 min-w-[180px] max-w-[260px]">
+                      <span className="block line-clamp-2 break-words text-slate-700" title={pub.source_title ?? ""}>
                         {fmtField(pub.source_title)}
                       </span>
                     </td>

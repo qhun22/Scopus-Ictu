@@ -22,13 +22,14 @@ from app.services.search_queries import (
 )
 
 router = APIRouter()
-SearchReader = Annotated[User, Depends(require_role("ADMIN", "REVIEWER"))]
+# LECTURER may look up publications and Scopus authors; the lecturer group is withheld.
+SearchReader = Annotated[User, Depends(require_role("ADMIN", "REVIEWER", "LECTURER"))]
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
 
 @router.get("", response_model=SearchResponse)
 def global_search_endpoint(
-    _reader: SearchReader,
+    reader: SearchReader,
     db: DatabaseSession,
     q: Annotated[str, Query()],
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
@@ -56,10 +57,14 @@ def global_search_endpoint(
         )
 
     try:
-        return global_search(db, q=trimmed_q, limit=limit)
+        result = global_search(db, q=trimmed_q, limit=limit)
     except SQLAlchemyError as exc:
         raise APIError(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Không thể truy vấn dữ liệu tra cứu.",
             code="DATABASE_UNAVAILABLE",
         ) from exc
+
+    if reader.role == "LECTURER":
+        return result.model_copy(update={"lecturers": []})
+    return result

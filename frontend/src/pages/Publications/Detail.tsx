@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { getPublicationByEid } from "../../api/publications";
 import { PublicationDetailResponse } from "../../types/publication";
+import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n";
 import { AffiliationSummaryBar, AuthorAffiliationCell } from "./AuthorAffiliations";
 
@@ -15,6 +16,9 @@ export default function PublicationDetailPage() {
   const navigate = useNavigate();
   const { eid } = useParams<{ eid: string }>();
   const { locale } = useI18n();
+  const { user } = useAuth();
+  // LECTURER gets a read-only academic view: no import trace, no other lecturers' data.
+  const isLecturer = user?.role === "LECTURER";
 
   const [publication, setPublication] = useState<PublicationDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,7 +111,7 @@ export default function PublicationDetailPage() {
   };
 
   // ── Labels ────────────────────────────────────────────────────────────────
-  const backLabel = locale === "vi" ? "← Quay lại danh sách công bố" : "← Back to publications list";
+  const backLabel = locale === "vi" ? " Quay lại danh sách công bố" : " Back to publications list";
   const sectionMeta = locale === "vi" ? "Thông tin công bố" : "Publication Metadata";
   const sectionAuthors = locale === "vi" ? "Danh sách tác giả (Scopus)" : "Scopus Authors";
   const sectionLinks = locale === "vi" ? "Liên kết giảng viên ICTU" : "Approved ICTU Lecturer Links";
@@ -186,7 +190,7 @@ export default function PublicationDetailPage() {
     title, eid: pubEid, doi, year, source_title,
     volume, issue, art_no, page_start, page_end,
     cited_by_count, document_type, publication_stage, open_access_status,
-    authors, approved_lecturer_links, provenance, affiliation_summary,
+    authors, approved_lecturer_links, provenance,
   } = publication;
 
   const provenanceToShow = showAllProvenance ? provenance : provenance.slice(0, 3);
@@ -218,9 +222,9 @@ export default function PublicationDetailPage() {
           <MetaItem label="EID" value={pubEid} mono />
           <MetaItem label="DOI" value={fmtField(doi)} mono={false} />
           <MetaItem label={locale === "vi" ? "Năm xuất bản" : "Year"} value={fmtYear(year)} />
-          <MetaItem label={locale === "vi" ? "Nguồn tạp chí" : "Source"} value={fmtField(source_title)} />
-          <MetaItem label="Volume" value={fmtField(volume)} />
-          <MetaItem label="Issue" value={fmtField(issue)} />
+          <MetaItem label={locale === "vi" ? "Nguồn xuất bản" : "Source title"} value={fmtField(source_title)} />
+          <MetaItem label={locale === "vi" ? "Tập" : "Volume"} value={fmtField(volume)} />
+          <MetaItem label={locale === "vi" ? "Số tạp chí" : "Issue"} value={fmtField(issue)} />
           <MetaItem label={locale === "vi" ? "Số bài (Art. No.)" : "Article No."} value={fmtField(art_no)} />
           <MetaItem label={locale === "vi" ? "Trang đầu" : "Page Start"} value={fmtField(page_start)} />
           <MetaItem label={locale === "vi" ? "Trang cuối" : "Page End"} value={fmtField(page_end)} />
@@ -248,7 +252,7 @@ export default function PublicationDetailPage() {
             <p className="mb-2 text-xs text-slate-500" data-testid="author-count">
               {locale === "vi" ? `${authors.length} tác giả, theo thứ tự trên bài báo.` : `${authors.length} authors, in publication order.`}
             </p>
-            <AffiliationSummaryBar summary={affiliation_summary} locale={locale} />
+            <AffiliationSummaryBar authors={authors} locale={locale} />
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
                 <tr>
@@ -262,7 +266,16 @@ export default function PublicationDetailPage() {
                 {authors.map((a) => (
                   <tr key={`${a.scopus_id}-${a.author_order}`} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-3 py-2.5 text-center text-slate-500">{a.author_order}</td>
-                    <td className="px-3 py-2.5 font-medium text-slate-800">{a.preferred_name}</td>
+                    <td className="px-3 py-2.5 font-medium text-slate-800">
+                      <Link
+                        to={`/publications?scopus_id=${encodeURIComponent(a.scopus_id)}`}
+                        className="text-[#3A5FC3] hover:underline"
+                        title={locale === "vi" ? "Xem các công bố của tác giả này" : "List this author's publications"}
+                        data-testid="author-link"
+                      >
+                        {a.preferred_name}
+                      </Link>
+                    </td>
                     <td className="px-3 py-2.5 font-mono text-slate-500">{a.scopus_id}</td>
                     <td className="px-3 py-2.5 align-top">
                       <AuthorAffiliationCell author={a} locale={locale} />
@@ -275,6 +288,8 @@ export default function PublicationDetailPage() {
         )}
       </section>
 
+      {!isLecturer && (
+        <>
       {/* ── Section C: Approved Lecturer Links (always visible) ─────────── */}
       <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
@@ -368,6 +383,8 @@ export default function PublicationDetailPage() {
           </>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

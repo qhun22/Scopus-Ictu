@@ -55,8 +55,8 @@ export default function App() {
               {/* Universal landing route */}
               <Route path="/home" element={<HomePage />} />
 
-              {/* Admin + Reviewer Routes */}
-              <Route element={<RoleRoute allowedRoles={["ADMIN", "REVIEWER"]} />}>
+              {/* Read-only academic lookup: ADMIN, REVIEWER and LECTURER */}
+              <Route element={<RoleRoute allowedRoles={["ADMIN", "REVIEWER", "LECTURER"]} />}>
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/publications" element={<PublicationsPage />} />
                 <Route path="/publications/:eid" element={<PublicationDetailPage />} />

@@ -212,9 +212,17 @@ def test_search_requires_authentication(client: TestClient) -> None:
     assert client.get(SEARCH_URL, params={"q": "alpha"}).status_code == 401
 
 
-def test_search_rejects_lecturer_role(client: TestClient, authenticate) -> None:
+def test_search_for_lecturer_hides_the_lecturer_group(client: TestClient, authenticate, seeded) -> None:
+    authenticate("ADMIN")
+    admin = client.get(SEARCH_URL, params={"q": "alpha"}).json()
+    assert admin["lecturers"], "fixture must contain a matching lecturer"
     authenticate("LECTURER")
-    assert client.get(SEARCH_URL, params={"q": "alpha"}).status_code == 403
+    response = client.get(SEARCH_URL, params={"q": "alpha"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lecturers"] == []
+    assert body["publications"] == admin["publications"]
+    assert body["scopus_authors"] == admin["scopus_authors"]
 
 
 @pytest.mark.parametrize("role", ["ADMIN", "REVIEWER"])

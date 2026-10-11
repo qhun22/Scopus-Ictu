@@ -64,6 +64,7 @@ def publication_filters(
     document_type: str | None,
     publication_stage: str | None,
     open_access_status: str | None,
+    scopus_id: str | None = None,
 ) -> list[object]:
     conditions: list[object] = []
     trimmed_q = _trim_optional(q)
@@ -76,6 +77,19 @@ def publication_filters(
                 Publication.doi.ilike(pattern, escape="\\"),
                 folded(Publication.source_title).like(fold_text(pattern), escape="\\"),
             )
+        )
+
+    trimmed_scopus_id = _trim_optional(scopus_id)
+    if trimmed_scopus_id is not None:
+        # Publications in which this Scopus author appears (any position).
+        conditions.append(
+            select(PublicationAuthor.id)
+            .join(ScopusAuthor, ScopusAuthor.id == PublicationAuthor.scopus_author_id)
+            .where(
+                PublicationAuthor.publication_id == Publication.id,
+                ScopusAuthor.scopus_id == trimmed_scopus_id,
+            )
+            .exists()
         )
 
     if year is not None:
@@ -100,6 +114,7 @@ def _list_statement(
     document_type: str | None,
     publication_stage: str | None,
     open_access_status: str | None,
+    scopus_id: str | None = None,
 ):
     return select(Publication).where(
         *publication_filters(
@@ -108,6 +123,7 @@ def _list_statement(
             document_type=document_type,
             publication_stage=publication_stage,
             open_access_status=open_access_status,
+            scopus_id=scopus_id,
         )
     )
 
@@ -122,6 +138,7 @@ def list_publications(
     document_type: str | None = None,
     publication_stage: str | None = None,
     open_access_status: str | None = None,
+    scopus_id: str | None = None,
 ) -> PublicationListResponse:
     """Return a deterministic page of canonical publications without writes."""
 
@@ -131,6 +148,7 @@ def list_publications(
         document_type=document_type,
         publication_stage=publication_stage,
         open_access_status=open_access_status,
+        scopus_id=scopus_id,
     )
     total = session.scalar(
         select(func.count()).select_from(statement.order_by(None).subquery())

@@ -179,8 +179,10 @@ def test_lecturer_and_anonymous_have_no_admin_access(db, client) -> None:
         assert anonymous.get(path).status_code == 401
     anonymous.close()
     assert _login(client, "lecturer@bootstrap.test", "lecturer-pass-1").status_code == 200
-    for path in ("/api/v1/users", "/api/v1/lecturers", "/api/v1/audits", "/api/v1/reviews/candidates", "/api/v1/publications"):
+    for path in ("/api/v1/users", "/api/v1/lecturers", "/api/v1/audits", "/api/v1/reviews/candidates"):
         assert client.get(path).status_code == 403, path
+    # Read-only academic lookup is deliberately open to LECTURER (decision 2026-10-11).
+    assert client.get("/api/v1/publications").status_code == 200
 
 
 def test_main_refuses_without_external_config_and_on_wrong_targets(monkeypatch) -> None:
@@ -196,3 +198,16 @@ def test_main_refuses_without_external_config_and_on_wrong_targets(monkeypatch) 
     monkeypatch.setattr(settings, "db_port", 55432)
     assert boot.main(["--dry-run", "--expected-database", "wrong_demo_db", "--allow-weak-demo-password"]) == 2
     assert boot.main(["--apply", "--expected-database", settings.db_name]) == 2  # weak password, flag missing
+
+
+def test_role_option_creates_an_unlinked_read_only_account(db: Session) -> None:
+    lecturer = boot.create_admin(db, "viewer@bootstrap.test", "viewer-pass-1", "LECTURER")
+    reviewer = boot.create_admin(db, "reviewer@bootstrap.test", "reviewer-pass-1", "REVIEWER")
+    assert (lecturer.role, lecturer.lecturer_id) == ("LECTURER", None)
+    assert (reviewer.role, reviewer.lecturer_id) == ("REVIEWER", None)
+    assert db.scalar(select(func.count()).select_from(Lecturer)) == 0  # no lecturer profile is invented
+    actions = db.scalars(select(AuditEvent.after_state["role"].astext).where(AuditEvent.action == "DEMO_ADMIN_BOOTSTRAPPED")).all()
+    assert sorted(actions) == ["LECTURER", "REVIEWER"]
+    assert boot.plan_for(db, "viewer@bootstrap.test", "viewer-pass-1", "LECTURER").action == "EXISTS_OK"
+    # the same account is NOT a usable ADMIN: nothing is ever changed or escalated
+    assert boot.plan_for(db, "viewer@bootstrap.test", "viewer-pass-1", "ADMIN").action == "UNSUITABLE"

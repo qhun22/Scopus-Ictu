@@ -21,7 +21,9 @@ from app.services.publication_export import export_publications
 from app.services.publication_queries import get_publication_detail, list_publications
 
 router = APIRouter()
-PublicationReader = Annotated[User, Depends(require_role("ADMIN", "REVIEWER"))]
+# LECTURER gets read-only list/detail (academic lookup); see ``_for_role`` for
+# what is withheld.  Export stays ADMIN-only.
+PublicationReader = Annotated[User, Depends(require_role("ADMIN", "REVIEWER", "LECTURER"))]
 PublicationAdmin = Annotated[User, Depends(require_role("ADMIN"))]
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
@@ -32,6 +34,19 @@ def _database_unavailable(exc: SQLAlchemyError) -> APIError:
         detail="Không thể truy vấn dữ liệu công bố.",
         code="DATABASE_UNAVAILABLE",
     )
+
+
+def _for_role(result: PublicationDetailResponse, reader: User) -> PublicationDetailResponse:
+    """Withhold administrative data from LECTURER (read-only academic lookup).
+
+    Authors, affiliations and their evidence stay visible.  Internal import
+    provenance (file names/hashes, row numbers) and the approved lecturer links
+    (staff code, ORCID of other lecturers) are removed.
+    """
+
+    if reader.role != "LECTURER":
+        return result
+    return result.model_copy(update={"provenance": [], "approved_lecturer_links": []})
 
 
 @router.get("", response_model=PublicationListResponse)
@@ -45,6 +60,7 @@ def list_publication_endpoint(
     document_type: Annotated[str | None, Query(max_length=50)] = None,
     publication_stage: Annotated[str | None, Query(max_length=50)] = None,
     open_access_status: Annotated[str | None, Query(max_length=50)] = None,
+    scopus_id: Annotated[str | None, Query(max_length=32, pattern=r"^\d*$")] = None,
 ) -> PublicationListResponse:
     """List canonical publications using server-side filtering and pagination."""
 
@@ -58,6 +74,7 @@ def list_publication_endpoint(
             document_type=document_type,
             publication_stage=publication_stage,
             open_access_status=open_access_status,
+            scopus_id=scopus_id,
         )
     except SQLAlchemyError as exc:
         raise _database_unavailable(exc) from exc
@@ -156,7 +173,7 @@ def export_publication_endpoint(
 @router.get("/{eid}", response_model=PublicationDetailResponse)
 def get_publication_endpoint(
     eid: str,
-    _reader: PublicationReader,
+    reader: PublicationReader,
     db: DatabaseSession,
 ) -> PublicationDetailResponse:
     """Return one canonical publication by its unique EID."""
@@ -172,4 +189,4 @@ def get_publication_endpoint(
             detail="Không tìm thấy công bố.",
             code="PUBLICATION_NOT_FOUND",
         )
-    return result
+    return _for_role(result, reader)

@@ -545,9 +545,30 @@ def test_list_requires_authentication(client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_list_forbids_lecturer(client: TestClient, authenticate) -> None:
+def test_list_allows_lecturer_read_only(client: TestClient, authenticate, catalog) -> None:
+    """Decision 2026-10-11: LECTURER may look publications up (read-only), no export."""
+
     response = _get(client, "LECTURER", "/api/v1/publications", authenticate)
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert response.json()["total"] == len(catalog)
+    export = _get(client, "LECTURER", "/api/v1/publications/export", authenticate)
+    assert export.status_code == 403
+
+
+def test_list_filters_by_scopus_author_id(client: TestClient, authenticate, catalog) -> None:
+    """The author lookup: every publication in which that Scopus ID appears, any position."""
+
+    ids = {
+        eid: [a["scopus_id"] for a in _get(client, "ADMIN", f"/api/v1/publications/{eid}", authenticate).json()["authors"]]
+        for eid in ("EID-2024-A", "EID-2024-B", "EID-2023-G", "EID-NULL-D", "EID-2022-E")
+    }
+    target = next(sid for sids in ids.values() for sid in sids)
+    expected = sorted(eid for eid, sids in ids.items() if target in sids)
+    response = _get(client, "LECTURER", f"/api/v1/publications?scopus_id={target}", authenticate)
+    assert response.status_code == 200
+    assert sorted(item["eid"] for item in response.json()["items"]) == expected
+    assert _get(client, "LECTURER", "/api/v1/publications?scopus_id=0000", authenticate).json()["total"] == 0
+    assert _get(client, "LECTURER", "/api/v1/publications?scopus_id=1%27%20OR", authenticate).status_code == 422
 
 
 def test_list_empty_catalog(client: TestClient, authenticate) -> None:
@@ -768,11 +789,19 @@ def test_detail_requires_authentication(client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_detail_forbids_lecturer(client: TestClient, authenticate) -> None:
-    response = _get(
-        client, "LECTURER", "/api/v1/publications/EID-2024-A", authenticate
-    )
-    assert response.status_code == 403
+def test_detail_for_lecturer_withholds_administrative_data(
+    client: TestClient, authenticate, catalog
+) -> None:
+    admin = _get(client, "ADMIN", "/api/v1/publications/EID-2024-A", authenticate).json()
+    lecturer = _get(client, "LECTURER", "/api/v1/publications/EID-2024-A", authenticate)
+    assert lecturer.status_code == 200
+    body = lecturer.json()
+    # Academic content is identical ...
+    for key in ("eid", "title", "doi", "authors", "affiliation_summary"):
+        assert body[key] == admin[key], key
+    # ... internal import provenance and other lecturers' data are withheld.
+    assert body["provenance"] == [] and body["approved_lecturer_links"] == []
+    assert admin["approved_lecturer_links"], "fixture must have an approved link for the contrast to mean anything"
 
 
 def test_detail_unknown_eid_is_stable_404(client: TestClient, authenticate) -> None:

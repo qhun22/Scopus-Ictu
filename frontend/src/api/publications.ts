@@ -17,7 +17,7 @@ export interface PublicationExportFilters {
 
 /**
  * List canonical publications with server-side filtering and pagination.
- * Only ADMIN and REVIEWER roles are authorised by the backend.
+ * ADMIN, REVIEWER and LECTURER (read-only) are authorised by the backend.
  */
 export async function getPublications(
   query: PublicationListQuery = {},
@@ -37,6 +37,10 @@ export async function getPublications(
   }
   if (query.open_access_status !== undefined && query.open_access_status.trim()) {
     params.set("open_access_status", query.open_access_status.trim());
+  }
+
+  if (query.scopus_id !== undefined && /^\d+$/.test(query.scopus_id.trim())) {
+    params.set("scopus_id", query.scopus_id.trim());
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : "";

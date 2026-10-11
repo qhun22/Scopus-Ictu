@@ -92,12 +92,16 @@ def validate_guards(
         )
 
 
-def plan_for(session: Session, email: str, password: str) -> Plan:
+ROLES = ("ADMIN", "REVIEWER", "LECTURER")
+_DISPLAY = {"ADMIN": ADMIN_LABEL, "REVIEWER": "Người rà soát", "LECTURER": "Giảng viên (tra cứu)"}
+
+
+def plan_for(session: Session, email: str, password: str, role: str = "ADMIN") -> Plan:
     existing = session.scalar(select(User).where(func.lower(User.email) == email.strip().lower()))
     if existing is None:
-        return Plan("CREATE", f"no account with this e-mail; will create ADMIN '{email.strip()}'")
+        return Plan("CREATE", f"no account with this e-mail; will create {role} '{email.strip()}'")
     matches = password_hasher.verify(password, existing.password_hash)
-    if existing.role.upper() != "ADMIN" or not existing.is_active or existing.lecturer_id is not None:
+    if existing.role.upper() != role or not existing.is_active or existing.lecturer_id is not None:
         return Plan(
             "UNSUITABLE",
             f"account exists with role={existing.role} active={existing.is_active} "
@@ -105,16 +109,18 @@ def plan_for(session: Session, email: str, password: str) -> Plan:
             matches,
         )
     note = "configured password matches" if matches else "configured password does NOT match the stored credential (not overwritten)"
-    return Plan("EXISTS_OK", f"active ADMIN already exists; {note}", matches)
+    return Plan("EXISTS_OK", f"active {role} already exists; {note}", matches)
 
 
-def create_admin(session: Session, email: str, password: str) -> User:
+def create_admin(session: Session, email: str, password: str, role: str = "ADMIN") -> User:
+    """Create ONE account (ADMIN by default; REVIEWER / an unlinked read-only LECTURER on request)."""
+
     user = User(
         id=uuid.uuid4(),
         email=email.strip(),
         password_hash=password_hasher.hash(password),
-        display_name=ADMIN_LABEL,
-        role="ADMIN",
+        display_name=_DISPLAY[role],
+        role=role,
         lecturer_id=None,
         is_active=True,
     )
@@ -128,8 +134,8 @@ def create_admin(session: Session, email: str, password: str) -> User:
             actor_type="SYSTEM",
             actor_user_id=None,
             actor_service="bootstrap_demo_admin",
-            after_state={"email": user.email, "role": "ADMIN", "display_name": ADMIN_LABEL},
-            reason="Isolated demo ADMIN created by bootstrap_demo_admin (no approval step; credential from external config)",
+            after_state={"email": user.email, "role": role, "display_name": _DISPLAY[role]},
+            reason=f"Isolated demo {role} created by bootstrap_demo_admin (no approval step; credential from external config)",
         )
     )
     session.commit()
@@ -151,6 +157,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--expected-database", required=True)
     p.add_argument("--expected-port", type=int, default=None)
     p.add_argument("--allow-weak-demo-password", action="store_true")
+    p.add_argument("--role", choices=ROLES, default="ADMIN")
+    p.add_argument("--email-env", default=EMAIL_ENV, help="name of the variable holding the e-mail")
+    p.add_argument("--password-env", default=PASSWORD_ENV, help="name of the variable holding the password")
     return p
 
 
@@ -161,7 +170,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         url = URL.create("postgresql+psycopg2", username=settings.db_user, password=settings.db_password,
                          host=settings.db_host, port=settings.db_port, database=settings.db_name)
-        email, password = os.environ.get(EMAIL_ENV), os.environ.get(PASSWORD_ENV)
+        email, password = os.environ.get(args.email_env), os.environ.get(args.password_env)
         validate_guards(
             environment=settings.environment, url=url, expected_database=args.expected_database,
             expected_port=args.expected_port, email=email, password=password, allow_weak=args.allow_weak_demo_password,
@@ -170,10 +179,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ident = verify_server_identity(reader, args.expected_database, args.expected_port)
         print(f"target: database={ident['database']} port={ident['port']} addr={ident['address']}")
         with Session(reader) as session:
-            plan = plan_for(session, email, password)
+            plan = plan_for(session, email, password, args.role)
             others = other_accounts(session, email)
             session.rollback()
-        report: dict[str, Any] = {"mode": "dry-run" if args.dry_run else "apply", "email": email.strip(), "plan": plan.action,
+        report: dict[str, Any] = {"mode": "dry-run" if args.dry_run else "apply", "email": email.strip(), "role": args.role, "plan": plan.action,
                                   "detail": plan.detail, "other_accounts_untouched": [f"{e} ({r})" for e, r, _ in others]}
         if plan.action == "UNSUITABLE":
             print(report)
@@ -186,7 +195,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             try:
                 verify_server_identity(writer, args.expected_database, args.expected_port)
                 with Session(writer) as session:  # fresh session, no prior statements
-                    user = create_admin(session, email, password)
+                    user = create_admin(session, email, password, args.role)
                     report["created_user_id"] = str(user.id)
             finally:
                 writer.dispose()

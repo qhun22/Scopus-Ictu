@@ -130,4 +130,6 @@ export interface PublicationListQuery {
   document_type?: string;
   publication_stage?: string;
   open_access_status?: string;
+  /** Only publications in which this Scopus Author ID appears. */
+  scopus_id?: string;
 }

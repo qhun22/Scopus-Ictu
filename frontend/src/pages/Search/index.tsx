@@ -5,13 +5,17 @@ import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { getSearch } from "../../api/search";
 import { SearchResponse } from "../../types/search";
+import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n";
 
 const MIN_QUERY_LENGTH = 2;
 const GROUP_LIMIT = 5;
 
 export default function SearchPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const { user } = useAuth();
+  // The lecturer directory is not part of the read-only lookup offered to LECTURER.
+  const showLecturers = user?.role !== "LECTURER";
   const [searchParams, setSearchParams] = useSearchParams();
 
   const urlQuery = searchParams.get("q") ?? "";
@@ -192,21 +196,23 @@ export default function SearchPage() {
 
       {!isLoading && !errorMessage && results && hasAnyResult && (
         <div className="space-y-4">
-          <ResultSection title={t.search.lecturersTitle} empty={t.search.noLecturers} count={results.lecturers.length}>
-            <ul className="divide-y divide-slate-100">
-              {results.lecturers.map((item, idx) => (
-                <li key={`${item.full_name}|${item.staff_code ?? ""}|${item.orcid ?? ""}|${item.department ?? ""}|${item.faculty ?? ""}|${idx}`} className="py-2.5">
-                  <p className="text-sm font-semibold text-slate-800">{item.full_name}</p>
-                  <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
-                    {item.staff_code && <Meta label={t.search.staffCode} value={item.staff_code} />}
-                    {item.department && <Meta label={t.search.department} value={item.department} />}
-                    {item.faculty && <Meta label={t.search.faculty} value={item.faculty} />}
-                    {item.orcid && <Meta label={t.search.orcid} value={item.orcid} />}
-                  </dl>
-                </li>
-              ))}
-            </ul>
-          </ResultSection>
+          {showLecturers && (
+            <ResultSection title={t.search.lecturersTitle} empty={t.search.noLecturers} count={results.lecturers.length}>
+              <ul className="divide-y divide-slate-100">
+                {results.lecturers.map((item, idx) => (
+                  <li key={`${item.full_name}|${item.staff_code ?? ""}|${item.orcid ?? ""}|${item.department ?? ""}|${item.faculty ?? ""}|${idx}`} className="py-2.5">
+                    <p className="text-sm font-semibold text-slate-800">{item.full_name}</p>
+                    <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+                      {item.staff_code && <Meta label={t.search.staffCode} value={item.staff_code} />}
+                      {item.department && <Meta label={t.search.department} value={item.department} />}
+                      {item.faculty && <Meta label={t.search.faculty} value={item.faculty} />}
+                      {item.orcid && <Meta label={t.search.orcid} value={item.orcid} />}
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            </ResultSection>
+          )}
 
           <ResultSection title={t.search.publicationsTitle} empty={t.search.noPublications} count={results.publications.length}>
             <ul className="divide-y divide-slate-100">
@@ -238,9 +244,19 @@ export default function SearchPage() {
             <ul className="divide-y divide-slate-100">
               {results.scopus_authors.map((item) => (
                 <li key={item.scopus_id} className="py-2.5">
-                  <p className="text-sm font-semibold text-slate-800">{item.preferred_name}</p>
+                  <Link
+                    to={`/publications?scopus_id=${encodeURIComponent(item.scopus_id)}`}
+                    className="text-sm font-semibold text-[#3A5FC3] hover:underline"
+                    data-testid="author-publications-link"
+                  >
+                    {item.preferred_name}
+                  </Link>
                   <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
                     <Meta label={t.search.scopusId} value={item.scopus_id} />
+                    <Meta
+                      label={locale === "vi" ? "Công bố" : "Publications"}
+                      value={locale === "vi" ? "bấm tên để xem các bài của tác giả này" : "click the name to list this author's papers"}
+                    />
                   </dl>
                 </li>
               ))}

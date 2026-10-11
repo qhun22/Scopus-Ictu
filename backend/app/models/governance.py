@@ -106,12 +106,9 @@ class User(Base):
         CheckConstraint(
             "role IN ('ADMIN', 'REVIEWER', 'LECTURER')", name="role"
         ),
-        # CHECK (role <> 'LECTURER' OR lecturer_id IS NOT NULL) — C5-04.
-        # FC-01: ck_users_lecturer_account_required
-        CheckConstraint(
-            "role <> 'LECTURER' OR lecturer_id IS NOT NULL",
-            name="lecturer_account_required",
-        ),
+        # C5-04 (CHECK role <> 'LECTURER' OR lecturer_id IS NOT NULL) was
+        # dropped by revision f6a1b2c3d4e5: a LECTURER account may exist before
+        # (or without) a lecturer profile and is then strictly read-only.
         # C5-02: case-insensitive unique email.
         Index(
             "uq_users_email_ci",
