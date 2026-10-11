@@ -1,0 +1,563 @@
+[
+ {
+  "method": "GET",
+  "path": "/api/v1/audits",
+  "summary": "List audit events (ADMIN only)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/auth/login",
+  "summary": "Login",
+  "access": "PUBLIC",
+  "roles": [],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/auth/logout",
+  "summary": "Logout",
+  "access": "PUBLIC",
+  "roles": [],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/auth/me",
+  "summary": "Current user",
+  "access": "AUTHENTICATED",
+  "roles": [],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/auth/users",
+  "summary": "Deprecated admin user list alias",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": true
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/authors",
+  "summary": "list_authors",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/authors/normalize-import/{import_id}",
+  "summary": "Run author normalization for an APPLIED Scopus import (M2.6B)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/authors/stats",
+  "summary": "author_stats",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/authors/{author_id}",
+  "summary": "author_detail",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/dashboard/summary",
+  "summary": "Tổng hợp số liệu bảng điều khiển (chỉ ADMIN)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/imports",
+  "summary": "import_history",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/imports/config",
+  "summary": "import_config",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/imports/history",
+  "summary": "import_history",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/imports/scopus",
+  "summary": "Create a durable raw Scopus CSV import job",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/v1/imports/{import_id}",
+  "summary": "delete_import_endpoint",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/imports/{import_id}",
+  "summary": "import_detail",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/imports/{import_id}/archive",
+  "summary": "archive_import_endpoint",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/imports/{import_id}/cancel",
+  "summary": "cancel_import_endpoint",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/imports/{import_id}/normalize",
+  "summary": "Normalize raw Scopus records for a completed import (M2.6A)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/imports/{import_id}/restore-history",
+  "summary": "restore_import_endpoint",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/imports/{import_id}/rollback",
+  "summary": "rollback_import_endpoint",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers",
+  "summary": "List all lecturers master data with optional linked user accounts",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/lecturers",
+  "summary": "create_lecturer",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/export",
+  "summary": "Export the ICTU lecturer dataset (verified source identities) as importable JSON",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/lecturers/import",
+  "summary": "Apply a previously previewed ICTU lecturer dataset to the database",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/lecturers/import/preview",
+  "summary": "Preview an ICTU lecturer dataset before importing (read-only)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/lecturers/import/{import_id}/rollback",
+  "summary": "Rollback an applied ICTU lecturer dataset import",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/master",
+  "summary": "Server-side paginated lecturer master-data listing",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/me/identities",
+  "summary": "get_my_identities",
+  "access": "ROLE:LECTURER",
+  "roles": [
+   "LECTURER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/me/profile",
+  "summary": "get_my_profile",
+  "access": "ROLE:LECTURER",
+  "roles": [
+   "LECTURER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/me/publications",
+  "summary": "get_my_publications",
+  "access": "ROLE:LECTURER",
+  "roles": [
+   "LECTURER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/ping",
+  "summary": "Lecturers healthcheck",
+  "access": "PUBLIC",
+  "roles": [],
+  "deprecated": false
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/v1/lecturers/unlinked/cleanup",
+  "summary": "Clean orphan unlinked lecturer records (no active user account attached)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/v1/lecturers/{lecturer_id}",
+  "summary": "delete_lecturer",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/v1/lecturers/{lecturer_id}",
+  "summary": "update_lecturer",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "PUT",
+  "path": "/api/v1/lecturers/{lecturer_id}",
+  "summary": "update_lecturer",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/{lecturer_id}/scopus/identities",
+  "summary": "get_admin_identities",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/{lecturer_id}/scopus/profile",
+  "summary": "get_admin_profile",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/lecturers/{lecturer_id}/scopus/publications",
+  "summary": "get_admin_publications",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/matching/ping",
+  "summary": "M0 healthcheck",
+  "access": "PUBLIC",
+  "roles": [],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/notifications/unread",
+  "summary": "List the current user's unread notifications",
+  "access": "AUTHENTICATED",
+  "roles": [],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/notifications/{notification_id}/read",
+  "summary": "Mark one owned notification as read",
+  "access": "AUTHENTICATED",
+  "roles": [],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/publications",
+  "summary": "list_publication_endpoint",
+  "access": "ROLE:ADMIN,REVIEWER",
+  "roles": [
+   "ADMIN",
+   "REVIEWER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/publications/export",
+  "summary": "export_publication_endpoint",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/publications/{eid}",
+  "summary": "get_publication_endpoint",
+  "access": "ROLE:ADMIN,REVIEWER",
+  "roles": [
+   "ADMIN",
+   "REVIEWER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/reviews/candidates",
+  "summary": "List deterministic human-review candidate roots",
+  "access": "ROLE:ADMIN,REVIEWER",
+  "roles": [
+   "ADMIN",
+   "REVIEWER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/reviews/candidates/{candidate_id}",
+  "summary": "Get the current human-review context for one candidate",
+  "access": "ROLE:ADMIN,REVIEWER",
+  "roles": [
+   "ADMIN",
+   "REVIEWER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/reviews/candidates/{candidate_id}/reviews",
+  "summary": "Accept or reject one candidate through CandidateReviewService",
+  "access": "ROLE:ADMIN,REVIEWER",
+  "roles": [
+   "ADMIN",
+   "REVIEWER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/reviews/history",
+  "summary": "List review history (read-only, append-only source of truth)",
+  "access": "ROLE:ADMIN,REVIEWER",
+  "roles": [
+   "ADMIN",
+   "REVIEWER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/search",
+  "summary": "global_search_endpoint",
+  "access": "ROLE:ADMIN,REVIEWER",
+  "roles": [
+   "ADMIN",
+   "REVIEWER"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/users",
+  "summary": "List user accounts",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/users/{user_id}",
+  "summary": "Get a user account",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/v1/users/{user_id}",
+  "summary": "Update a user profile or role",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/users/{user_id}/lock",
+  "summary": "Lock a user account",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/users/{user_id}/reset-password",
+  "summary": "Reset a user password",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "POST",
+  "path": "/api/v1/users/{user_id}/unlock",
+  "summary": "Unlock a user account",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/health",
+  "summary": "Health check",
+  "access": "PUBLIC",
+  "roles": [],
+  "deprecated": false
+ }
+]

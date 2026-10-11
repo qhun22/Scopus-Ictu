@@ -1,0 +1,74 @@
+@startuml AUTH-ACT-02-activity
+' Sơ đồ 2: Activity — Quy trình đăng nhập email + mật khẩu (AS-IS)
+' Tập trung vào luồng chính và các rẽ nhánh quan trọng
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ActivityBackgroundColor #D6EAF8
+skinparam ActivityBorderColor #2471A3
+skinparam ActivityFontSize 13
+skinparam ActivityFontName "Arial"
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 12
+skinparam NoteBackgroundColor #FFF9C4
+skinparam NoteBorderColor #D4AC0D
+
+title AUTH-ACT-02 -- Quy trinh Dang nhap Email & Mat khau (AS-IS)
+
+start
+
+:Người dùng nhập email và mật khẩu;
+
+if (Email hợp lệ và\nkết thúc @ictu.edu.vn?) then (Không)
+  :Hiển thị lỗi định dạng\nhoặc sai miền;
+  note right
+    Kiểm tra tại Frontend
+    Login/index.tsx:47-51
+    Không gọi API
+  end note
+  stop
+endif
+
+:POST /api/v1/auth/login\n{email, password};
+
+if (User tồn tại trong DB?) then (Không)
+  :401 INVALID_CREDENTIALS\n"Email hoặc mật khẩu không đúng.";
+  stop
+endif
+
+if (Mật khẩu Argon2id\nkhớp?) then (Không)
+  if (Có thông báo\nPASSWORD_RESET?) then (Có)
+    :401 PASSWORD_RESET_BY_ADMIN\n"Mật khẩu đã được Admin thay đổi.";
+    stop
+  else (Không)
+    :401 INVALID_CREDENTIALS;
+    stop
+  endif
+endif
+
+if (is_active = TRUE?) then (Không)
+  :403 ACCOUNT_LOCKED\n"Tài khoản đang bị khóa.";
+  stop
+endif
+
+:Tạo JWT {sub, email, role, av}\nHS256 · exp = 120 phút;
+
+:Set-Cookie: access_token\n(HttpOnly, SameSite=Lax);
+
+:200 OK + UserResponse\n{id, email, role, display_name};
+
+:AuthContext.setUser()\nChuyển hướng /home;
+
+note right
+  Mỗi request tiếp theo:
+  get_current_user() xác minh
+  JWT + is_active + av
+  dependencies.py:87
+end note
+
+:Truy cập hệ thống\ntheo vai trò ADMIN/REVIEWER/LECTURER;
+
+stop
+
+@enduml

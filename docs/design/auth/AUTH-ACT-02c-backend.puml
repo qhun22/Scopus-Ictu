@@ -1,0 +1,43 @@
+@startuml AUTH-ACT-02c-backend
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ActivityBackgroundColor #D6EAF8
+skinparam ActivityBorderColor #2471A3
+skinparam ActivityFontSize 13
+skinparam ActivityFontName "Arial"
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 12
+skinparam NoteBackgroundColor #FFF9C4
+skinparam NoteBorderColor #D4AC0D
+
+title AUTH-ACT-02c (2/3) -- Xac minh Backend (AS-IS)
+
+start
+
+-> (Tu trang 1/3)\nPOST nhan duoc;
+
+:Tim user PostgreSQL\nlower(email)=lower(:email);
+
+if (User ton tai?) then (Khong)
+  :401 INVALID_CREDENTIALS;
+  stop
+endif
+
+:Argon2id verify;
+
+if (Mat khau khop?) then (Khong)
+  if (Co thong bao\nPASSWORD_RESET?) then (Co)
+    :401 PASSWORD_RESET_BY_ADMIN;
+    stop
+  else (Khong)
+    :401 INVALID_CREDENTIALS;
+    stop
+  endif
+endif
+
+-> (Tiep trang 3/3);
+end
+
+@enduml

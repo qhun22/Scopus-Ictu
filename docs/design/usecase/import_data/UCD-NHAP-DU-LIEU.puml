@@ -1,0 +1,43 @@
+@startuml UCD-NHAP-DU-LIEU
+' Sinh tự động bởi build_ucd_nhap_du_lieu.py cùng tập quan hệ với UCD-NHAP-DU-LIEU.svg.
+' PlantUML tự bố cục (ra hình ngang); bản in A4 dọc dùng SVG có tọa độ kiểm soát.
+left to right direction
+skinparam dpi 120
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 14
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam actor {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam ArrowColor black
+title Use Case — Phân hệ Nhập dữ liệu (Scopus–ICTU)
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+rectangle "Hệ thống Scopus–ICTU — Phân hệ Nhập dữ liệu" {
+  usecase "<i>Nhập dữ liệu</i>\n<i>từ tệp</i>" as P
+  usecase "Nhập tệp CSV\ncông bố Scopus" as N1
+  usecase "Nhập tệp JSON\ndanh sách giảng viên" as N2
+  usecase "Xử lý cảnh báo\ntệp trùng" as C
+  usecase "Hủy tiến trình nhập" as D
+  usecase "Hoàn tác đợt nhập\ngiảng viên" as E
+  usecase "Xem lịch sử\ncác đợt nhập" as N7
+  usecase "Xem chi tiết\nđợt nhập" as N8
+  usecase "Xóa đợt nhập" as N10
+  usecase "Ẩn đợt nhập\nkhỏi lịch sử" as N9
+}
+ADMIN -- N1
+ADMIN -- N2
+ADMIN -- N7
+ADMIN -- N8
+ADMIN -- N10
+P <|-- N1
+P <|-- N2
+P <.. C : <<extend>>
+P <.. D : <<extend>>
+N2 <.. E : <<extend>>
+N10 <.. N9 : <<extend>>
+@enduml

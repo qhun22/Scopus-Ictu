@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>AUTH Diagrams - Luong Dang Nhap ICTU</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: white; font-family: Arial, sans-serif; }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    overflow: hidden;
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8pt;
+  }
+  .page:last-child { page-break-after: auto; }
+  .page img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+</style>
+</head>
+<body>
+
+<!-- Page 1: Use Case -->
+<div class="page">
+  <img src="AUTH-UC-01-usecase.png" alt="AUTH-UC-01 Use Case">
+</div>
+
+<!-- Page 2: Activity 02a - Frontend validation -->
+<div class="page">
+  <img src="AUTH-ACT-02a-validation.png" alt="AUTH-ACT-02a Frontend Validation">
+</div>
+
+<!-- Page 3: Activity 02c - Backend verification -->
+<div class="page">
+  <img src="AUTH-ACT-02c-backend.png" alt="AUTH-ACT-02c Backend Verification">
+</div>
+
+<!-- Page 4: Activity 02b - JWT session -->
+<div class="page">
+  <img src="AUTH-ACT-02b-session.png" alt="AUTH-ACT-02b JWT Session">
+</div>
+
+<!-- Page 5: Sequence - Success -->
+<div class="page">
+  <img src="AUTH-SEQ-03a-success.png" alt="AUTH-SEQ-03a Success">
+</div>
+
+<!-- Page 6: Sequence - Failures -->
+<div class="page">
+  <img src="AUTH-SEQ-03b-failures.png" alt="AUTH-SEQ-03b Failures">
+</div>
+
+<!-- Page 7: Activity 04 - Google PROPOSED -->
+<div class="page">
+  <img src="AUTH-ACT-04-google-proposed.png" alt="AUTH-ACT-04 Google Proposed">
+</div>
+
+</body>
+</html>

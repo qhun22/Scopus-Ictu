@@ -1,0 +1,45 @@
+@startuml _probe_xt
+' Thử nghiệm đo font: nhóm XT (4 UC) → A4 dọc
+left to right direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 11
+skinparam ArrowThickness 1.5
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 13
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+  FontSize 13
+}
+skinparam rectangle {
+  BackgroundColor #FEFEFE
+  BorderColor #5D6D7E
+  FontSize 12
+  FontStyle bold
+}
+
+title <size:14><b>Nhóm Xác thực & Giám sát</b></size>
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+
+rectangle "Xác thực, Thông báo và Giám sát" {
+  usecase "UC-01\nĐăng nhập" as UC01
+  usecase "UC-02\nĐăng xuất và\nkiểm tra phiên" as UC02
+  usecase "UC-03\nNhận thông báo\ntài khoản" as UC03
+  usecase "UC-07\nXem nhật ký\nkiểm toán" as UC07
+}
+
+ADMIN --> UC01
+ADMIN --> UC02
+ADMIN --> UC03
+ADMIN --> UC07
+
+@enduml

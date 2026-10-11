@@ -1,0 +1,22 @@
+@startuml _probe_title
+left to right direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #D6EAF8
+  BorderColor #2471A3
+  FontSize 13
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B7770D
+  FontSize 13
+}
+title UCD-0A (2/5) - Xac thuc, Thong bao va Giam sat
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+usecase "UC-01\nĐăng nhập" as UC01
+ADMIN --> UC01
+@enduml

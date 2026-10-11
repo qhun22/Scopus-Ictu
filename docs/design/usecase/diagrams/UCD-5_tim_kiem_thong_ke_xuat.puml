@@ -1,0 +1,45 @@
+@startuml UCD-5_tim_kiem_thong_ke_xuat
+' Nguồn: docs/design/usecase/usecase_map.json (sinh bởi tools/gen_usecase_assets.py). Không sửa tay phần sinh tự động.
+left to right direction
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 12
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+
+title UCD-5 — Nhóm 5: Tìm kiếm, thống kê và xuất dữ liệu
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+actor "Phê duyệt viên\n(REVIEWER)" as REVIEWER
+
+rectangle "Nhóm 5 — Tìm kiếm, thống kê và xuất dữ liệu" {
+  usecase "UC-14\nTra cứu tổng hợp (giảng\nviên, công bố, tác giả)" as UC14
+  usecase "UC-04\nXem thống kê tổng quan\n(dashboard)\n[một phần]" as UC04
+  usecase "UC-15\nXuất dữ liệu công bố ra\nJSON" as UC15
+  usecase "UC-09\nXuất hồ sơ giảng viên ra\nJSON" as UC09
+}
+
+ADMIN --> UC14
+REVIEWER --> UC14
+ADMIN --> UC04
+ADMIN --> UC15
+ADMIN --> UC09
+legend bottom right
+  <b>Chú giải</b>
+  Oval = use case có thật trong mã (ID khớp UC_INVENTORY.md)
+  [CLI] chạy bằng script · [API] chỉ có API, chưa có giao diện · [một phần] triển khai chưa đầy đủ
+  Đường nét liền actor—UC = quyền truy cập đã đối chiếu với require_role (RBAC_API_MATRIX)
+endlegend
+
+@enduml

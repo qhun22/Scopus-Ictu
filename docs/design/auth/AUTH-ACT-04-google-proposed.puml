@@ -1,0 +1,31 @@
+@startuml AUTH-ACT-04-google-proposed
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ActivityBackgroundColor #FEF9E7
+skinparam ActivityBorderColor #B7770D
+skinparam ActivityFontSize 13
+skinparam ActivityFontName "Arial"
+skinparam ArrowColor #7D6608
+skinparam ArrowFontSize 12
+
+title AUTH-ACT-04 -- Google OAuth [PROPOSED]
+
+note : [DE XUAT] Chua trien khai - M2.1
+
+start
+:Nhan Google OAuth;
+if (Google xac thuc?) then (Khong)
+  stop
+endif
+if (email_verified\nVA @ictu.edu.vn?) then (Khong)
+  stop
+endif
+if (User active?) then (Khong)
+  stop
+endif
+:JWT + Cookie → /home;
+stop
+
+@enduml

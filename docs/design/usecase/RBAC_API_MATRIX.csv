@@ -1,0 +1,58 @@
+﻿method,path,access,deprecated,summary
+GET,/api/v1/audits,ROLE:ADMIN,False,List audit events (ADMIN only)
+POST,/api/v1/auth/login,PUBLIC,False,Login
+POST,/api/v1/auth/logout,PUBLIC,False,Logout
+GET,/api/v1/auth/me,AUTHENTICATED,False,Current user
+GET,/api/v1/auth/users,ROLE:ADMIN,True,Deprecated admin user list alias
+GET,/api/v1/authors,ROLE:ADMIN,False,list_authors
+POST,/api/v1/authors/normalize-import/{import_id},ROLE:ADMIN,False,Run author normalization for an APPLIED Scopus import (M2.6B)
+GET,/api/v1/authors/stats,ROLE:ADMIN,False,author_stats
+GET,/api/v1/authors/{author_id},ROLE:ADMIN,False,author_detail
+GET,/api/v1/dashboard/summary,ROLE:ADMIN,False,Tổng hợp số liệu bảng điều khiển (chỉ ADMIN)
+GET,/api/v1/imports,ROLE:ADMIN,False,import_history
+GET,/api/v1/imports/config,ROLE:ADMIN,False,import_config
+GET,/api/v1/imports/history,ROLE:ADMIN,False,import_history
+POST,/api/v1/imports/scopus,ROLE:ADMIN,False,Create a durable raw Scopus CSV import job
+DELETE,/api/v1/imports/{import_id},ROLE:ADMIN,False,delete_import_endpoint
+GET,/api/v1/imports/{import_id},ROLE:ADMIN,False,import_detail
+POST,/api/v1/imports/{import_id}/archive,ROLE:ADMIN,False,archive_import_endpoint
+POST,/api/v1/imports/{import_id}/cancel,ROLE:ADMIN,False,cancel_import_endpoint
+POST,/api/v1/imports/{import_id}/normalize,ROLE:ADMIN,False,Normalize raw Scopus records for a completed import (M2.6A)
+POST,/api/v1/imports/{import_id}/restore-history,ROLE:ADMIN,False,restore_import_endpoint
+POST,/api/v1/imports/{import_id}/rollback,ROLE:ADMIN,False,rollback_import_endpoint
+GET,/api/v1/lecturers,ROLE:ADMIN,False,List all lecturers master data with optional linked user accounts
+POST,/api/v1/lecturers,ROLE:ADMIN,False,create_lecturer
+GET,/api/v1/lecturers/export,ROLE:ADMIN,False,Export the ICTU lecturer dataset (verified source identities) as importable JSON
+POST,/api/v1/lecturers/import,ROLE:ADMIN,False,Apply a previously previewed ICTU lecturer dataset to the database
+POST,/api/v1/lecturers/import/preview,ROLE:ADMIN,False,Preview an ICTU lecturer dataset before importing (read-only)
+POST,/api/v1/lecturers/import/{import_id}/rollback,ROLE:ADMIN,False,Rollback an applied ICTU lecturer dataset import
+GET,/api/v1/lecturers/master,ROLE:ADMIN,False,Server-side paginated lecturer master-data listing
+GET,/api/v1/lecturers/me/identities,ROLE:LECTURER,False,get_my_identities
+GET,/api/v1/lecturers/me/profile,ROLE:LECTURER,False,get_my_profile
+GET,/api/v1/lecturers/me/publications,ROLE:LECTURER,False,get_my_publications
+GET,/api/v1/lecturers/ping,PUBLIC,False,Lecturers healthcheck
+DELETE,/api/v1/lecturers/unlinked/cleanup,ROLE:ADMIN,False,Clean orphan unlinked lecturer records (no active user account attached)
+DELETE,/api/v1/lecturers/{lecturer_id},ROLE:ADMIN,False,delete_lecturer
+PATCH,/api/v1/lecturers/{lecturer_id},ROLE:ADMIN,False,update_lecturer
+PUT,/api/v1/lecturers/{lecturer_id},ROLE:ADMIN,False,update_lecturer
+GET,/api/v1/lecturers/{lecturer_id}/scopus/identities,ROLE:ADMIN,False,get_admin_identities
+GET,/api/v1/lecturers/{lecturer_id}/scopus/profile,ROLE:ADMIN,False,get_admin_profile
+GET,/api/v1/lecturers/{lecturer_id}/scopus/publications,ROLE:ADMIN,False,get_admin_publications
+GET,/api/v1/matching/ping,PUBLIC,False,M0 healthcheck
+GET,/api/v1/notifications/unread,AUTHENTICATED,False,List the current user's unread notifications
+POST,/api/v1/notifications/{notification_id}/read,AUTHENTICATED,False,Mark one owned notification as read
+GET,/api/v1/publications,"ROLE:ADMIN,REVIEWER",False,list_publication_endpoint
+GET,/api/v1/publications/export,ROLE:ADMIN,False,export_publication_endpoint
+GET,/api/v1/publications/{eid},"ROLE:ADMIN,REVIEWER",False,get_publication_endpoint
+GET,/api/v1/reviews/candidates,"ROLE:ADMIN,REVIEWER",False,List deterministic human-review candidate roots
+GET,/api/v1/reviews/candidates/{candidate_id},"ROLE:ADMIN,REVIEWER",False,Get the current human-review context for one candidate
+POST,/api/v1/reviews/candidates/{candidate_id}/reviews,"ROLE:ADMIN,REVIEWER",False,Accept or reject one candidate through CandidateReviewService
+GET,/api/v1/reviews/history,"ROLE:ADMIN,REVIEWER",False,"List review history (read-only, append-only source of truth)"
+GET,/api/v1/search,"ROLE:ADMIN,REVIEWER",False,global_search_endpoint
+GET,/api/v1/users,ROLE:ADMIN,False,List user accounts
+GET,/api/v1/users/{user_id},ROLE:ADMIN,False,Get a user account
+PATCH,/api/v1/users/{user_id},ROLE:ADMIN,False,Update a user profile or role
+POST,/api/v1/users/{user_id}/lock,ROLE:ADMIN,False,Lock a user account
+POST,/api/v1/users/{user_id}/reset-password,ROLE:ADMIN,False,Reset a user password
+POST,/api/v1/users/{user_id}/unlock,ROLE:ADMIN,False,Unlock a user account
+GET,/health,PUBLIC,False,Health check

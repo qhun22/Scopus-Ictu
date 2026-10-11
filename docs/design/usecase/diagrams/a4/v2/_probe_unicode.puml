@@ -1,0 +1,31 @@
+@startuml _probe_unicode
+left to right direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #D6EAF8
+  BorderColor #2471A3
+  FontSize 13
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B7770D
+  FontSize 13
+}
+skinparam rectangle {
+  BackgroundColor #FEFEFE
+  BorderColor #5D6D7E
+  FontSize 12
+  FontStyle bold
+}
+title Thử nghiệm Unicode — Tiếng Việt có dấu
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+rectangle "Xác thực & Giám sát" {
+  usecase "UC-01\nĐăng nhập" as UC01
+  usecase "UC-02\nĐăng xuất và\nkiểm tra phiên" as UC02
+}
+ADMIN --> UC01
+ADMIN --> UC02
+@enduml

@@ -1,0 +1,80 @@
+@startuml UCD-0A_part2_a4
+' UCD-0A Phần 2/2 — Quản lý công bố, Chuẩn hóa & Phê duyệt, Tìm kiếm & Xuất (12 UC)
+' Bản A4 landscape. Nguồn: UCD-0A_tong_the_admin.puml (Task 19, không sửa gốc).
+top to bottom direction
+
+skinparam dpi 96
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam pageMargin 10
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam ArrowThickness 1.2
+
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 11
+  FontName "Segoe UI"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+  FontSize 11
+  FontName "Segoe UI"
+}
+skinparam rectangle {
+  BackgroundColor #FDFEFE
+  BorderColor #7F8C8D
+  FontSize 10
+  FontStyle bold
+  FontName "Segoe UI"
+}
+
+title <size:12>UCD-0A (2/2) — Quản trị viên: Quản lý công bố · Chuẩn hóa · Tìm kiếm</size>
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+
+rectangle "Nhóm 3 — Quản lý công bố" {
+  usecase "UC-13\nXem danh sách &\nchi tiết công bố" as UC13
+}
+
+rectangle "Nhóm 4 — Chuẩn hóa & Phê duyệt" {
+  usecase "UC-11\nChuẩn hóa công bố\ntừ bản ghi thô" as UC11
+  usecase "UC-12\nBóc tách\ntác giả Scopus" as UC12
+  usecase "UC-17\nXem hàng đợi\nứng viên & bằng chứng" as UC17
+  usecase "UC-18\nDuyệt ứng viên\n(ACCEPT / REJECT)" as UC18
+  usecase "UC-19\nXem lịch\nsử review" as UC19
+}
+
+rectangle "Nhóm 5 — Tìm kiếm & Xuất dữ liệu" {
+  usecase "UC-14\nTra cứu\ntổng hợp" as UC14
+  usecase "UC-04\nXem thống kê\ntổng quan [một phần]" as UC04
+  usecase "UC-15\nXuất công bố\nra JSON" as UC15
+  usecase "UC-09\nXuất hồ sơ\ngiảng viên ra JSON" as UC09
+}
+
+ADMIN --> UC13
+ADMIN --> UC11
+ADMIN --> UC12
+ADMIN --> UC17
+ADMIN --> UC18
+ADMIN --> UC19
+ADMIN --> UC14
+ADMIN --> UC04
+ADMIN --> UC15
+ADMIN --> UC09
+
+UC18 .> UC17 : <<include>>
+
+legend bottom right
+  <b>Chú giải</b>
+  [một phần] = chưa hoàn chỉnh
+  --> Actor to UC: RBAC đã kiểm tra
+  ..> «include»: UC bắt buộc gọi UC khác
+  <i>Xem UCD-0A (1/2) cho XT-G2</i>
+endlegend
+
+@enduml

@@ -1,0 +1,57 @@
+@startuml AUTH-UC-01-usecase
+' Sơ đồ 1: Use Case — Xác thực và Đăng nhập (AS-IS)
+' Nguồn: backend/app/api/v1/endpoints/auth.py, frontend/src/pages/Login/index.tsx
+left to right direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam ArrowThickness 1.5
+skinparam usecase {
+  BackgroundColor #D6EAF8
+  BorderColor #2471A3
+  FontSize 13
+  FontName "Arial"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B7770D
+  FontSize 13
+  FontName "Arial"
+}
+skinparam rectangle {
+  BackgroundColor #FEFEFE
+  BorderColor #2471A3
+  FontSize 13
+  FontStyle bold
+  FontName "Arial"
+}
+
+title AUTH-UC-01 -- Use Case: Xac thuc va Dang nhap (AS-IS)
+
+actor "Người dùng\n@ictu.edu.vn" as User
+
+rectangle "Hệ thống Scopus-ICTU" {
+  usecase "UC-01\nĐăng nhập bằng\nemail và mật khẩu" as UC01
+  usecase "UC-02\nKiểm tra định dạng\nvà miền email\n[Frontend]" as UC02
+  usecase "UC-03\nXác minh thông tin\nđăng nhập" as UC03
+  usecase "UC-04\nCấp phiên JWT\n(HttpOnly Cookie)" as UC04
+  usecase "UC-07\nĐăng xuất và\nhủy phiên" as UC07
+}
+
+User --> UC01
+User --> UC07
+UC01 .> UC02 : <<include>>
+UC01 .> UC03 : <<include>>
+UC03 .> UC04 : <<include>>
+
+legend bottom
+  [Frontend] = chỉ kiểm tra phía trình duyệt
+  <<include>> = bước bắt buộc trong luồng chính
+  Kiểm tra miền @ictu.edu.vn chỉ ở Frontend
+endlegend
+
+@enduml

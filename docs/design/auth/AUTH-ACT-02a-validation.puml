@@ -1,0 +1,30 @@
+@startuml AUTH-ACT-02a-validation
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ActivityBackgroundColor #D6EAF8
+skinparam ActivityBorderColor #2471A3
+skinparam ActivityFontSize 13
+skinparam ActivityFontName "Arial"
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 12
+
+title AUTH-ACT-02a (1/3) -- Kiem tra Frontend (AS-IS)
+
+start
+:Nhap email + mat khau;
+if (Mat khau rong?) then (Co)
+  stop
+endif
+if (Email hop le?) then (Khong)
+  stop
+endif
+if (@ictu.edu.vn?) then (Khong)
+  stop
+endif
+:POST /api/v1/auth/login;
+-> (Trang 2/3);
+end
+
+@enduml

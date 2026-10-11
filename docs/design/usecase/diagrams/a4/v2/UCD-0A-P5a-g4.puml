@@ -1,0 +1,57 @@
+@startuml UCD-0A-P5a-g4
+' UCD-0A Trang 5 — Nhóm 4: Chuẩn hóa & Phê duyệt (5 UC)
+left to right direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam ArrowThickness 1.5
+skinparam usecase {
+  BackgroundColor #D6EAF8
+  BorderColor #2471A3
+  FontSize 13
+  FontName "Arial"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B7770D
+  FontSize 13
+  FontName "Arial"
+}
+skinparam rectangle {
+  BackgroundColor #FEFEFE
+  BorderColor #2471A3
+  FontSize 13
+  FontStyle bold
+  FontName "Arial"
+}
+
+title UCD-0A (5/6) -- Nhom 4: Chuan hoa, Doi soat va Phe duyet
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+
+rectangle "Nhóm 4 — Chuẩn hóa, Đối soát và Phê duyệt" {
+  usecase "UC-11\nChuẩn hóa công bố\ntừ bản ghi thô" as UC11
+  usecase "UC-12\nBóc tách\ntác giả Scopus" as UC12
+  usecase "UC-17\nXem hàng đợi\nứng viên & bằng chứng" as UC17
+  usecase "UC-18\nDuyệt ứng viên\n(ACCEPT / REJECT)" as UC18
+  usecase "UC-19\nXem lịch sử\nphê duyệt" as UC19
+}
+
+ADMIN --> UC11
+ADMIN --> UC12
+ADMIN --> UC17
+ADMIN --> UC18
+ADMIN --> UC19
+
+UC18 .> UC17 : <<include>>
+
+legend bottom
+  <<include>> = UC-18 bắt buộc gọi UC-17 khi thực thi
+  --> Actor đến UC: quyền truy cập RBAC đã kiểm tra
+endlegend
+
+@enduml

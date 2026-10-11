@@ -1,0 +1,63 @@
+@startuml UCD-0A-P2-xt-g1
+' UCD-0A Trang 2/4 — Nhóm Xác thực (XT) và Nhóm 1 (Nhập dữ liệu)
+' 8 UC. A4 dọc.
+left to right direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam ArrowThickness 1.5
+skinparam usecase {
+  BackgroundColor #D6EAF8
+  BorderColor #2471A3
+  FontSize 13
+  FontName "Arial"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B7770D
+  FontSize 13
+  FontName "Arial"
+}
+skinparam rectangle {
+  BackgroundColor #FEFEFE
+  BorderColor #5D6D7E
+  FontSize 12
+  FontStyle bold
+  FontName "Arial"
+}
+
+title UCD-0A (2/4) -- Nhom Xac thuc & Giam sat va Nhom 1 Nhap du lieu
+
+actor "Quan tri vien\n(ADMIN)" as ADMIN
+
+rectangle "Xac thuc, Thong bao va Giam sat" {
+  usecase "UC-01\nDang nhap" as UC01
+  usecase "UC-02\nDang xuat va\nkiem tra phien" as UC02
+  usecase "UC-03\nNhan thong bao\ntai khoan" as UC03
+  usecase "UC-07\nXem nhat ky\nkiem toan" as UC07
+}
+
+rectangle "Nhom 1: Nhap du lieu" {
+  usecase "UC-08\nNhap ho so\ngiang vien (JSON)" as UC08
+  usecase "UC-08a\nHoan tac\ndot nhap ho so" as UC08a
+  usecase "UC-10\nNhap tep\nCSV Scopus" as UC10
+  usecase "UC-10a\nQuan ly\ndot nhap CSV" as UC10a
+}
+
+ADMIN --> UC01
+ADMIN --> UC02
+ADMIN --> UC03
+ADMIN --> UC07
+ADMIN --> UC08
+ADMIN --> UC08a
+ADMIN --> UC10
+ADMIN --> UC10a
+
+UC08a .> UC08 : <<extend>>
+UC10a .> UC10 : <<extend>>
+
+@enduml

@@ -1,0 +1,40 @@
+@startuml AUTH-SEQ-03a-success
+' Sơ đồ 3a: Sequence đăng nhập thành công (AS-IS)
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam SequenceArrowThickness 1.5
+skinparam SequenceArrowColor #2C3E50
+skinparam SequenceArrowFontSize 12
+skinparam SequenceArrowFontName "Arial"
+skinparam ParticipantBackgroundColor #D6EAF8
+skinparam ParticipantBorderColor #2471A3
+skinparam ParticipantFontSize 13
+skinparam ParticipantFontName "Arial"
+skinparam ActorBackgroundColor #FDEBD0
+skinparam ActorBorderColor #B7770D
+skinparam NoteBackgroundColor #FFF9C4
+skinparam NoteBorderColor #D4AC0D
+skinparam LifeLineBorderColor #AAB7B8
+
+title AUTH-SEQ-03a -- Dang nhap Thanh Cong (AS-IS)
+
+actor Người_dùng as User
+participant Frontend as FE
+participant "API\n/auth/login" as API
+
+User -> FE : email@ictu.edu.vn\n+ mật khẩu
+FE -> FE : Validate miền @ictu.edu.vn
+FE -> API : POST /api/v1/auth/login
+note right of API
+  1. Tìm user theo email
+  2. Argon2id verify
+  3. Kiểm tra is_active
+  4. Tạo JWT (HS256)
+  auth.py:51-121
+end note
+API --> FE : 200 OK + Cookie\n{id, email, role}
+FE --> User : /home\n"Đăng nhập thành công"
+
+@enduml

@@ -1,0 +1,58 @@
+{
+  "_ghi_chu": "Nguồn sự thật cho sơ đồ Use Case của Task 19. Mọi UC có route/API/script thật. tools/check_consistency.py đối chiếu tệp này với RBAC_API_MATRIX.json (rút từ mã FastAPI) và frontend/src/App.tsx; tools/gen_usecase_assets.py sinh sơ đồ + bảng từ tệp này.",
+  "actors": {
+    "ADMIN": "Quản trị viên",
+    "REVIEWER": "Phê duyệt viên",
+    "LECTURER": "Giảng viên",
+    "TECH": "Kỹ thuật viên (chạy script CLI — không phải vai trò trong ứng dụng)"
+  },
+  "groups": {
+    "XT": "Xác thực, thông báo và giám sát",
+    "G1": "Nhóm 1 — Nhập dữ liệu",
+    "G2": "Nhóm 2 — Quản lý hồ sơ tác giả/giảng viên",
+    "G3": "Nhóm 3 — Quản lý công bố",
+    "G4": "Nhóm 4 — Chuẩn hóa, đối soát và phê duyệt",
+    "G5": "Nhóm 5 — Tìm kiếm, thống kê và xuất dữ liệu"
+  },
+  "unmapped_ops_allowed": {
+    "GET /health": "healthcheck hạ tầng, không phải nghiệp vụ",
+    "GET /api/v1/lecturers/ping": "healthcheck giữ chỗ M2.3",
+    "GET /api/v1/matching/ping": "giữ chỗ M0 ('matching-stub'), không phải nghiệp vụ"
+  },
+  "use_cases": [
+    {"id": "UC-01", "name": "Đăng nhập", "group": "XT", "actors": ["ADMIN", "REVIEWER", "LECTURER"], "ops": ["POST /api/v1/auth/login"], "ui": ["/login"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-02", "name": "Đăng xuất và kiểm tra phiên", "group": "XT", "actors": ["ADMIN", "REVIEWER", "LECTURER"], "ops": ["POST /api/v1/auth/logout", "GET /api/v1/auth/me"], "ui": [], "ui_note": "Menu người dùng ở Header (mọi trang)", "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-03", "name": "Nhận thông báo tài khoản", "group": "XT", "actors": ["ADMIN", "REVIEWER", "LECTURER"], "ops": ["GET /api/v1/notifications/unread", "POST /api/v1/notifications/{notification_id}/read"], "ui": [], "ui_note": "Cơ chế nền: lấy khi tải trang rồi hiển thị; không có trang/chuông Thông báo", "status": "MỘT PHẦN (cơ chế nền)"},
+    {"id": "UC-07", "name": "Xem nhật ký kiểm toán", "group": "XT", "actors": ["ADMIN"], "ops": ["GET /api/v1/audits"], "ui": ["/audit-logs"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+
+    {"id": "UC-08", "name": "Nhập hồ sơ giảng viên từ JSON (kiểm tra, xem trước, nhập)", "group": "G1", "actors": ["ADMIN"], "ops": ["POST /api/v1/lecturers/import/preview", "POST /api/v1/lecturers/import"], "ui": ["/imports"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-08a", "name": "Hoàn tác đợt nhập hồ sơ giảng viên", "group": "G1", "actors": ["ADMIN"], "ops": ["POST /api/v1/lecturers/import/{import_id}/rollback", "POST /api/v1/imports/{import_id}/rollback"], "ui": ["/imports"], "extends": "UC-08", "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-10", "name": "Nhập tệp CSV Scopus", "group": "G1", "actors": ["ADMIN"], "ops": ["POST /api/v1/imports/scopus", "GET /api/v1/imports/config", "GET /api/v1/imports", "GET /api/v1/imports/history", "GET /api/v1/imports/{import_id}"], "ui": ["/imports"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-10a", "name": "Quản lý đợt nhập CSV (hủy, lưu trữ, khôi phục lịch sử, xóa)", "group": "G1", "actors": ["ADMIN"], "ops": ["POST /api/v1/imports/{import_id}/cancel", "POST /api/v1/imports/{import_id}/archive", "POST /api/v1/imports/{import_id}/restore-history", "DELETE /api/v1/imports/{import_id}"], "ui": ["/imports"], "extends": "UC-10", "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-25", "name": "Nạp công bố đã biết (Craw) và đơn vị công tác ngoài (OpenAlex/Crossref)", "group": "G1", "actors": ["TECH"], "ops": [], "script": ["backend/scripts/ingest_craw_known_publications.py", "backend/scripts/import_author_affiliations.py"], "ui": [], "status": "CHỈ CLI"},
+
+    {"id": "UC-05", "name": "Quản lý hồ sơ giảng viên", "group": "G2", "actors": ["ADMIN"], "ops": ["GET /api/v1/lecturers", "GET /api/v1/lecturers/master", "POST /api/v1/lecturers", "PATCH /api/v1/lecturers/{lecturer_id}", "PUT /api/v1/lecturers/{lecturer_id}", "DELETE /api/v1/lecturers/{lecturer_id}", "DELETE /api/v1/lecturers/unlinked/cleanup"], "ui": ["/lecturers"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-06", "name": "Quản lý tài khoản và phân quyền", "group": "G2", "actors": ["ADMIN"], "ops": ["GET /api/v1/users", "GET /api/v1/users/{user_id}", "PATCH /api/v1/users/{user_id}", "POST /api/v1/users/{user_id}/lock", "POST /api/v1/users/{user_id}/unlock", "POST /api/v1/users/{user_id}/reset-password", "GET /api/v1/auth/users"], "ui": ["/lecturers"], "ui_note": "Nằm trong cửa sổ Chi tiết giảng viên; /users chuyển hướng sang /lecturers; GET /auth/users là bí danh cũ (deprecated)", "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-16", "name": "Xem tác giả Scopus (danh sách, thống kê, chi tiết)", "group": "G2", "actors": ["ADMIN"], "ops": ["GET /api/v1/authors", "GET /api/v1/authors/stats", "GET /api/v1/authors/{author_id}"], "ui": ["/normalization"], "ui_note": "Tab 'Tác giả'; chi tiết tác giả chưa có nút trên UI", "status": "MỘT PHẦN (UI chưa có chi tiết)"},
+    {"id": "UC-20", "name": "Xem hồ sơ cá nhân", "group": "G2", "actors": ["LECTURER"], "ops": ["GET /api/v1/lecturers/me/profile"], "ui": ["/profile"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-21", "name": "Xem liên kết Scopus đã duyệt của tôi", "group": "G2", "actors": ["LECTURER"], "ops": ["GET /api/v1/lecturers/me/identities"], "ui": ["/identity"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-23", "name": "Quản trị xem hồ sơ/danh tính/công bố Scopus của một giảng viên", "group": "G2", "actors": ["ADMIN"], "ops": ["GET /api/v1/lecturers/{lecturer_id}/scopus/profile", "GET /api/v1/lecturers/{lecturer_id}/scopus/identities", "GET /api/v1/lecturers/{lecturer_id}/scopus/publications"], "ui": [], "status": "CHỈ API (chưa có UI)"},
+
+    {"id": "UC-13", "name": "Xem danh sách và chi tiết công bố (kèm đơn vị theo tác giả, nguồn gốc dòng CSV)", "group": "G3", "actors": ["ADMIN", "REVIEWER"], "ops": ["GET /api/v1/publications", "GET /api/v1/publications/{eid}"], "ui": ["/publications", "/publications/:eid"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-22", "name": "Xem công bố của tôi (từ danh tính APPROVED)", "group": "G3", "actors": ["LECTURER"], "ops": ["GET /api/v1/lecturers/me/publications"], "ui": ["/my-publications"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+
+    {"id": "UC-11", "name": "Chuẩn hóa công bố từ bản ghi thô", "group": "G4", "actors": ["ADMIN"], "ops": ["POST /api/v1/imports/{import_id}/normalize"], "ui": ["/normalization"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-12", "name": "Bóc tách tác giả Scopus", "group": "G4", "actors": ["ADMIN"], "ops": ["POST /api/v1/authors/normalize-import/{import_id}"], "ui": ["/normalization"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-24", "name": "Sinh ứng viên đối sánh (lưu bền, idempotent)", "group": "G4", "actors": ["TECH"], "ops": [], "script": ["backend/scripts/generate_matching_candidates.py"], "ui": [], "status": "CHỈ CLI"},
+    {"id": "UC-17", "name": "Xem hàng đợi ứng viên và bằng chứng", "group": "G4", "actors": ["ADMIN", "REVIEWER"], "ops": ["GET /api/v1/reviews/candidates", "GET /api/v1/reviews/candidates/{candidate_id}"], "ui": ["/reviews"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-18", "name": "Duyệt ứng viên (ACCEPT / REJECT)", "group": "G4", "actors": ["ADMIN", "REVIEWER"], "ops": ["POST /api/v1/reviews/candidates/{candidate_id}/reviews"], "ui": ["/reviews"], "includes": ["UC-17"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-19", "name": "Xem lịch sử review", "group": "G4", "actors": ["ADMIN", "REVIEWER"], "ops": ["GET /api/v1/reviews/history"], "ui": ["/review-history"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+
+    {"id": "UC-14", "name": "Tra cứu tổng hợp (giảng viên, công bố, tác giả)", "group": "G5", "actors": ["ADMIN", "REVIEWER"], "ops": ["GET /api/v1/search"], "ui": ["/search"], "status": "ĐÃ TRIỂN KHAI (UI+API)"},
+    {"id": "UC-04", "name": "Xem thống kê tổng quan (dashboard)", "group": "G5", "actors": ["ADMIN"], "ops": ["GET /api/v1/dashboard/summary"], "ui": ["/dashboard"], "status": "MỘT PHẦN (chỉ số đếm; biểu đồ giữ chỗ)"},
+    {"id": "UC-15", "name": "Xuất dữ liệu công bố ra JSON", "group": "G5", "actors": ["ADMIN"], "ops": ["GET /api/v1/publications/export"], "ui": ["/publications"], "ui_note": "Nút Xuất JSON ở trang Công bố", "status": "ĐÃ TRIỂN KHAI (UI+API); chỉ JSON"},
+    {"id": "UC-09", "name": "Xuất hồ sơ giảng viên ra JSON", "group": "G5", "actors": ["ADMIN"], "ops": ["GET /api/v1/lecturers/export"], "ui": ["/lecturers"], "ui_note": "Nút Xuất JSON ở trang Giảng viên", "status": "ĐÃ TRIỂN KHAI (UI+API); chỉ JSON"},
+
+    {"id": "UC-26", "name": "Khởi tạo dữ liệu và tài khoản ADMIN demo", "group": "XT", "actors": ["TECH"], "ops": [], "script": ["backend/scripts/bootstrap_demo_admin.py", "backend/scripts/seed_demo_users.py", "alembic upgrade head"], "ui": [], "status": "CHỈ CLI"}
+  ]
+}

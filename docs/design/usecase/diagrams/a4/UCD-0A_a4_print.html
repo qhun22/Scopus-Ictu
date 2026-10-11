@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>UCD-0A — Use Case Diagram ADMIN (A4 Landscape)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #fff;
+  }
+
+  .page {
+    width: 281mm;
+    height: 194mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    page-break-after: always;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .page:last-child {
+    page-break-after: auto;
+  }
+
+  .diagram-img {
+    width: 281mm;
+    height: auto;
+    max-height: 188mm;
+    object-fit: contain;
+    display: block;
+  }
+
+  .page-label {
+    font-size: 7pt;
+    color: #999;
+    text-align: right;
+    width: 100%;
+    margin-top: 1mm;
+    font-style: italic;
+  }
+
+  @media screen {
+    body { background: #e5e5e5; padding: 20px; }
+    .page {
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      margin: 20px auto;
+      padding: 8mm;
+      width: 297mm;
+      height: 210mm;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <img class="diagram-img"
+       src="UCD-0A_part1_a4.svg"
+       alt="UCD-0A (1/2) — Xác thực · Nhập dữ liệu · Quản lý hồ sơ">
+  <div class="page-label">UCD-0A Phần 1/2 · Xem tiếp trang 2 cho Nhóm 3–5</div>
+</div>
+
+<div class="page">
+  <img class="diagram-img"
+       src="UCD-0A_part2_a4.svg"
+       alt="UCD-0A (2/2) — Quản lý công bố · Chuẩn hóa · Tìm kiếm">
+  <div class="page-label">UCD-0A Phần 2/2 · Xem trang 1 cho Xác thực và Nhóm 1–2</div>
+</div>
+
+</body>
+</html>

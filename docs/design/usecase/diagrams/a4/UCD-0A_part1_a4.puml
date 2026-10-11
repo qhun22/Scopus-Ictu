@@ -1,0 +1,86 @@
+@startuml UCD-0A_part1_a4
+' UCD-0A Phần 1/2 — Xác thực, Nhập dữ liệu, Quản lý hồ sơ (10 UC)
+' Bản A4 landscape. Nguồn: UCD-0A_tong_the_admin.puml (Task 19, không sửa gốc).
+top to bottom direction
+
+skinparam dpi 96
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam pageMargin 10
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam ArrowThickness 1.2
+
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 11
+  FontName "Segoe UI"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+  FontSize 11
+  FontName "Segoe UI"
+}
+skinparam rectangle {
+  BackgroundColor #FDFEFE
+  BorderColor #7F8C8D
+  FontSize 10
+  FontStyle bold
+  FontName "Segoe UI"
+}
+
+title <size:12>UCD-0A (1/2) — Quản trị viên: Xác thực · Nhập dữ liệu · Quản lý hồ sơ</size>
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+
+rectangle "Xác thực & Giám sát" {
+  usecase "UC-01\nĐăng nhập" as UC01
+  usecase "UC-02\nĐăng xuất /\nkiểm tra phiên" as UC02
+  usecase "UC-03\nNhận thông báo\n[một phần]" as UC03
+  usecase "UC-07\nXem nhật ký\nkiểm toán" as UC07
+}
+
+rectangle "Nhóm 1 — Nhập dữ liệu" {
+  usecase "UC-08\nNhập hồ sơ\ngiảng viên (JSON)" as UC08
+  usecase "UC-08a\nHoàn tác\nđợt nhập hồ sơ" as UC08a
+  usecase "UC-10\nNhập tệp\nCSV Scopus" as UC10
+  usecase "UC-10a\nQuản lý\nđợt nhập CSV" as UC10a
+}
+
+rectangle "Nhóm 2 — Quản lý hồ sơ" {
+  usecase "UC-05\nQuản lý hồ sơ\ngiảng viên" as UC05
+  usecase "UC-06\nQuản lý tài khoản\n& phân quyền" as UC06
+  usecase "UC-16\nXem tác giả\nScopus [một phần]" as UC16
+  usecase "UC-23\nXem hồ sơ/danh tính/\ncông bố [API]" as UC23
+}
+
+ADMIN --> UC01
+ADMIN --> UC02
+ADMIN --> UC03
+ADMIN --> UC07
+ADMIN --> UC08
+ADMIN --> UC08a
+ADMIN --> UC10
+ADMIN --> UC10a
+ADMIN --> UC05
+ADMIN --> UC06
+ADMIN --> UC16
+ADMIN --> UC23
+
+UC08a .> UC08 : <<extend>>
+UC10a .> UC10 : <<extend>>
+
+legend bottom right
+  <b>Chú giải</b>
+  [một phần] = chưa hoàn chỉnh
+  [API] = chỉ có API, chưa có UI
+  --> Actor to UC: RBAC đã kiểm tra
+  ..> «extend»: UC mở rộng UC khác
+  <i>Xem tiếp UCD-0A (2/2) cho G3-G5</i>
+endlegend
+
+@enduml

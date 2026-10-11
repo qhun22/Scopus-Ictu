@@ -1,0 +1,116 @@
+@startuml UCD-0A_tong_the_admin_a4
+' Bản A4 landscape — sinh từ UCD-0A_tong_the_admin.puml (Task 19, giữ nguyên bản gốc).
+' Tối ưu hóa bố cục A4 landscape (297×210mm). Font 10pt = 13.33px @ 96dpi.
+' Không sửa ngữ nghĩa, không sửa RBAC, không sửa include/extend.
+top to bottom direction
+
+skinparam dpi 96
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 10
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam pageMargin 12
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 9
+skinparam ArrowThickness 1
+
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 10
+  FontName "Segoe UI"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+  FontSize 10
+  FontName "Segoe UI"
+}
+skinparam rectangle {
+  BackgroundColor #FDFEFE
+  BorderColor #7F8C8D
+  FontSize 9
+  FontStyle bold
+  FontName "Segoe UI"
+}
+
+title <size:11>UCD-0A — Use Case tổng thể của Quản trị viên (ADMIN): 22 UC</size>
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+
+package "Xác thực & Giám sát" as XT #FDFEFE {
+  usecase "UC-01 Đăng nhập" as UC01
+  usecase "UC-02 Đăng xuất / kiểm tra phiên" as UC02
+  usecase "UC-03 Nhận thông báo [một phần]" as UC03
+  usecase "UC-07 Xem nhật ký kiểm toán" as UC07
+}
+
+package "Nhóm 1 — Nhập dữ liệu" as G1 #FDFEFE {
+  usecase "UC-08 Nhập hồ sơ giảng viên (JSON)" as UC08
+  usecase "UC-08a Hoàn tác đợt nhập hồ sơ" as UC08a
+  usecase "UC-10 Nhập tệp CSV Scopus" as UC10
+  usecase "UC-10a Quản lý đợt nhập CSV" as UC10a
+}
+
+package "Nhóm 2 — Quản lý hồ sơ" as G2 #FDFEFE {
+  usecase "UC-05 Quản lý hồ sơ giảng viên" as UC05
+  usecase "UC-06 Quản lý tài khoản & phân quyền" as UC06
+  usecase "UC-16 Xem tác giả Scopus [một phần]" as UC16
+  usecase "UC-23 Xem hồ sơ/danh tính/công bố [API]" as UC23
+}
+
+package "Nhóm 3 — Quản lý công bố" as G3 #FDFEFE {
+  usecase "UC-13 Xem danh sách & chi tiết công bố" as UC13
+}
+
+package "Nhóm 4 — Chuẩn hóa & Phê duyệt" as G4 #FDFEFE {
+  usecase "UC-11 Chuẩn hóa công bố từ bản ghi thô" as UC11
+  usecase "UC-12 Bóc tách tác giả Scopus" as UC12
+  usecase "UC-17 Xem hàng đợi ứng viên & bằng chứng" as UC17
+  usecase "UC-18 Duyệt ứng viên (ACCEPT / REJECT)" as UC18
+  usecase "UC-19 Xem lịch sử review" as UC19
+}
+
+package "Nhóm 5 — Tìm kiếm & Xuất dữ liệu" as G5 #FDFEFE {
+  usecase "UC-14 Tra cứu tổng hợp" as UC14
+  usecase "UC-04 Xem thống kê tổng quan [một phần]" as UC04
+  usecase "UC-15 Xuất công bố ra JSON" as UC15
+  usecase "UC-09 Xuất hồ sơ giảng viên ra JSON" as UC09
+}
+
+ADMIN --> UC01
+ADMIN --> UC02
+ADMIN --> UC03
+ADMIN --> UC07
+ADMIN --> UC08
+ADMIN --> UC08a
+ADMIN --> UC10
+ADMIN --> UC10a
+ADMIN --> UC05
+ADMIN --> UC06
+ADMIN --> UC16
+ADMIN --> UC23
+ADMIN --> UC13
+ADMIN --> UC11
+ADMIN --> UC12
+ADMIN --> UC17
+ADMIN --> UC18
+ADMIN --> UC19
+ADMIN --> UC14
+ADMIN --> UC04
+ADMIN --> UC15
+ADMIN --> UC09
+
+UC08a .> UC08 : <<extend>>
+UC10a .> UC10 : <<extend>>
+UC18 .> UC17 : <<include>>
+
+legend bottom right
+  <b>Chú giải</b>
+  Oval = use case đã triển khai (ID khớp UC_INVENTORY.md)
+  [một phần] = chưa hoàn chỉnh · [API] = chỉ API, chưa có UI
+  ─── Actor → UC: quyền truy cập (RBAC đã kiểm tra)
+  ╌╌╌ «extend» / «include»: quan hệ UC
+endlegend
+
+@enduml

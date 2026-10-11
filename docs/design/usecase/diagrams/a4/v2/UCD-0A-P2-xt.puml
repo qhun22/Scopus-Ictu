@@ -1,0 +1,54 @@
+@startuml UCD-0A-P2-xt
+' UCD-0A Trang 2 — Nhóm Xác thực, Thông báo và Giám sát (4 UC)
+' A4 dọc. Font 13pt @ dpi 150.
+left to right direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam ArrowThickness 1.5
+skinparam usecase {
+  BackgroundColor #D6EAF8
+  BorderColor #2471A3
+  FontSize 13
+  FontName "Arial"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B7770D
+  FontSize 13
+  FontName "Arial"
+}
+skinparam rectangle {
+  BackgroundColor #FEFEFE
+  BorderColor #2471A3
+  FontSize 13
+  FontStyle bold
+  FontName "Arial"
+}
+
+title UCD-0A (2/6) - Xac thuc, Thong bao va Giam sat
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+
+rectangle "Xác thực, Thông báo và Giám sát" {
+  usecase "UC-01\nĐăng nhập" as UC01
+  usecase "UC-02\nĐăng xuất và\nkiểm tra phiên" as UC02
+  usecase "UC-03\nNhận thông báo\ntài khoản\n[một phần]" as UC03
+  usecase "UC-07\nXem nhật ký\nkiểm toán" as UC07
+}
+
+ADMIN --> UC01
+ADMIN --> UC02
+ADMIN --> UC03
+ADMIN --> UC07
+
+legend bottom
+  [một phần] = triển khai chưa đầy đủ (cơ chế nền)
+  --> Actor đến UC: quyền truy cập RBAC đã kiểm tra
+endlegend
+
+@enduml

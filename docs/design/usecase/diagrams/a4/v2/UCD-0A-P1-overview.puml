@@ -1,0 +1,44 @@
+@startuml UCD-0A-P1-overview
+' UCD-0A Trang 1/4 — Tổng quan nhóm chức năng ADMIN
+' A4 dọc. Thể hiện 6 nhóm chức năng ở mức System Boundary.
+top to bottom direction
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam ArrowColor #2C3E50
+skinparam ArrowFontSize 11
+skinparam ArrowThickness 1.5
+skinparam usecase {
+  BackgroundColor #D6EAF8
+  BorderColor #2471A3
+  FontSize 13
+  FontName "Arial"
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B7770D
+  FontSize 13
+  FontName "Arial"
+}
+
+title UCD-0A (1/4) -- Tong quan vai tro Quan tri vien (ADMIN)
+
+actor "Quan tri vien\n(ADMIN)" as ADMIN
+
+usecase "Xac thuc &\nThong bao &\nGiam sat\n(UC-01, 02, 03, 07)" as GXT
+usecase "Nhom 1: Nhap du lieu\n(UC-08, 08a, 10, 10a)" as G1
+usecase "Nhom 2: Quan ly ho so\n(UC-05, 06, 16, 23)" as G2
+usecase "Nhom 3: Quan ly cong bo\n(UC-13)" as G3
+usecase "Nhom 4: Chuan hoa &\nPhe duyet\n(UC-11, 12, 17, 18, 19)" as G4
+usecase "Nhom 5: Tim kiem &\nXuat du lieu\n(UC-04, 09, 14, 15)" as G5
+
+ADMIN --> GXT
+ADMIN --> G1
+ADMIN --> G2
+ADMIN --> G3
+ADMIN --> G4
+ADMIN --> G5
+
+@enduml

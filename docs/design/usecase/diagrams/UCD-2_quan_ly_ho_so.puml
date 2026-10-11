@@ -1,0 +1,48 @@
+@startuml UCD-2_quan_ly_ho_so
+' Nguồn: docs/design/usecase/usecase_map.json (sinh bởi tools/gen_usecase_assets.py). Không sửa tay phần sinh tự động.
+left to right direction
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 12
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+
+title UCD-2 — Nhóm 2: Quản lý hồ sơ tác giả/giảng viên
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+actor "Giảng viên\n(LECTURER)" as LECTURER
+
+rectangle "Nhóm 2 — Quản lý hồ sơ tác giả/giảng viên" {
+  usecase "UC-05\nQuản lý hồ sơ giảng viên" as UC05
+  usecase "UC-06\nQuản lý tài khoản và phân\nquyền" as UC06
+  usecase "UC-16\nXem tác giả Scopus (danh\nsách, thống kê, chi tiết)\n[một phần]" as UC16
+  usecase "UC-20\nXem hồ sơ cá nhân" as UC20
+  usecase "UC-21\nXem liên kết Scopus đã\nduyệt của tôi" as UC21
+  usecase "UC-23\nQuản trị xem hồ sơ/danh\ntính/công bố Scopus của\nmột giảng viên\n[API]" as UC23
+}
+
+ADMIN --> UC05
+ADMIN --> UC06
+ADMIN --> UC16
+LECTURER --> UC20
+LECTURER --> UC21
+ADMIN --> UC23
+legend bottom right
+  <b>Chú giải</b>
+  Oval = use case có thật trong mã (ID khớp UC_INVENTORY.md)
+  [CLI] chạy bằng script · [API] chỉ có API, chưa có giao diện · [một phần] triển khai chưa đầy đủ
+  Đường nét liền actor—UC = quyền truy cập đã đối chiếu với require_role (RBAC_API_MATRIX)
+endlegend
+
+@enduml

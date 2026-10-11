@@ -1,0 +1,55 @@
+@startuml UCD-4_chuan_hoa_doi_soat_phe_duyet
+' Nguồn: docs/design/usecase/usecase_map.json (sinh bởi tools/gen_usecase_assets.py). Không sửa tay phần sinh tự động.
+left to right direction
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 12
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+
+title UCD-4 — Nhóm 4: Chuẩn hóa, đối soát và phê duyệt
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+actor "Phê duyệt viên\n(REVIEWER)" as REVIEWER
+actor "Kỹ thuật viên\n«CLI — không phải vai trò»" as TECH <<CLI>>
+
+rectangle "Nhóm 4 — Chuẩn hóa, đối soát và phê duyệt" {
+  usecase "UC-11\nChuẩn hóa công bố từ bản\nghi thô" as UC11
+  usecase "UC-12\nBóc tách tác giả Scopus" as UC12
+  usecase "UC-24\nSinh ứng viên đối sánh\n(lưu bền, idempotent)\n[CLI]" as UC24
+  usecase "UC-17\nXem hàng đợi ứng viên và\nbằng chứng" as UC17
+  usecase "UC-18\nDuyệt ứng viên (ACCEPT /\nREJECT)" as UC18
+  usecase "UC-19\nXem lịch sử review" as UC19
+}
+
+ADMIN --> UC11
+ADMIN --> UC12
+TECH --> UC24
+ADMIN --> UC17
+REVIEWER --> UC17
+ADMIN --> UC18
+REVIEWER --> UC18
+ADMIN --> UC19
+REVIEWER --> UC19
+UC18 .> UC17 : <<include>>
+legend bottom right
+  <b>Chú giải</b>
+  Oval = use case có thật trong mã (ID khớp UC_INVENTORY.md)
+  [CLI] chạy bằng script · [API] chỉ có API, chưa có giao diện · [một phần] triển khai chưa đầy đủ
+  Đường nét liền actor—UC = quyền truy cập đã đối chiếu với require_role (RBAC_API_MATRIX)
+  UC-18 «include» UC-17: yêu cầu duyệt bắt buộc observation_id + candidate_version lấy từ chi tiết ứng viên (ReviewDecisionRequest).
+  UC-11 → UC-12 là THỨ TỰ tiền điều kiện (cần công bố đã chuẩn hóa), không vẽ include/extend.
+endlegend
+
+@enduml

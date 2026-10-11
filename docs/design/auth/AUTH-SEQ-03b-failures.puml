@@ -1,0 +1,40 @@
+@startuml AUTH-SEQ-03b-failures
+skinparam dpi 150
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam SequenceArrowThickness 1.5
+skinparam SequenceArrowColor #2C3E50
+skinparam SequenceArrowFontSize 12
+skinparam SequenceArrowFontName "Arial"
+skinparam ParticipantBackgroundColor #D6EAF8
+skinparam ParticipantBorderColor #2471A3
+skinparam ParticipantFontSize 13
+skinparam ParticipantFontName "Arial"
+skinparam ActorBackgroundColor #FDEBD0
+skinparam ActorBorderColor #B7770D
+skinparam LifeLineBorderColor #AAB7B8
+
+title AUTH-SEQ-03b -- That Bai Dang Nhap (AS-IS)
+
+actor User
+participant FE
+participant API
+
+== A: Email ngoai ICTU (chi FE) ==
+User -> FE : email@gmail.com
+FE -> User : "Chi @ictu.edu.vn"
+
+== B/C: User khong ton tai / Sai mat khau ==
+User -> FE : email@ictu.edu.vn + mat khau
+FE -> API : POST /auth/login
+API --> FE : 401 INVALID_CREDENTIALS
+FE --> User : "Email hoac mat khau sai"
+
+== D: Tai khoan bi khoa ==
+User -> FE : dung email + mat khau
+FE -> API : POST /auth/login
+API --> FE : 403 ACCOUNT_LOCKED
+FE --> User : "Tai khoan bi khoa"
+
+@enduml
