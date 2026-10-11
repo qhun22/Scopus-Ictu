@@ -77,3 +77,9 @@ htmlcov/
 # alembic/versions/.gitkeep is intentionally tracked.
 
 data/diagram-skills-package/
+
+# --- Local database backups and per-environment config (never commit) ---
+*.dump
+*.dump.sha256
+.env.*
+!.env.example
