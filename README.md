@@ -5,28 +5,32 @@ Scopus publication records.
 
 ---
 
-## Implemented scope (complete/frozen)
+## Implemented scope
 
 | Milestone | Status | Description |
 |---|---|---|
-| **M0 / M1** | ✅ Frozen | Database foundation: PostgreSQL, Alembic migrations (`f4c8b1a2e9d7`), full schema with CHECK constraints, indexes, and audit contracts |
-| **M2.1** | ✅ Frozen | Cookie-based JWT authentication, role-based authorization (`ADMIN`, `REVIEWER`, `LECTURER`) |
-| **M2.2** | ✅ Frozen | Account administration: profile update, role change, lock/unlock, password reset; per-account audit trail and notifications |
-| **M2.3** | ✅ Frozen | Lecturer master dataset: import, rollback, per-record provenance snapshots, duplicate name detection |
-| **M2.4** | ✅ Frozen | Scopus raw CSV import lifecycle: SHA-256 deduplication, progress, cancellation, history, safe deletion |
-| **M2.5A** | ✅ Frozen | ICTU lecturer dataset build and import pipeline; identity resolution (staff_code → email → name+department) |
-| **M2.6A** | ✅ Frozen | Publication normalization from raw Scopus rows; canonical EID deduplication; `publication_raw_sources` provenance |
+| **M0 / M1** | ✅ | Database foundation: PostgreSQL, Alembic migrations, full schema with CHECK constraints, indexes, and audit contracts |
+| **M2.1** | ✅ | Cookie-based JWT authentication, role-based authorization (`ADMIN`, `REVIEWER`, `LECTURER`) |
+| **M2.2** | ✅ | Account administration: profile update, role change, lock/unlock, password reset; per-account audit trail and notifications |
+| **M2.3** | ✅ | Lecturer master dataset: import, rollback, per-record provenance snapshots, duplicate name detection |
+| **M2.4** | ✅ | Scopus raw CSV import lifecycle: SHA-256 deduplication, progress, cancellation, history, safe deletion |
+| **M2.5A** | ✅ | ICTU lecturer dataset build and import pipeline; identity resolution (staff_code → email → name+department) |
+| **M2.6A** | ✅ | Publication normalization from raw Scopus rows; canonical EID deduplication; `publication_raw_sources` provenance |
+| **M2.7** | ✅ | Author/publication matching candidate generation, confidence scoring, candidate persistence |
+| **M2.8** | ✅ | Lecturer ↔ Scopus publication read projection and API; lecturer-facing "My Publications" UI (read-only) |
+| **M3** | ✅ | Human review workflow for match candidates; author affiliation per-publication data model and import |
+| **M4** | ✅ | Unlinked LECTURER account handling; affiliation reconciliation workflow (ADMIN-driven, evidence-based) |
 
----
+This is an ongoing undergraduate thesis project (đồ án tốt nghiệp). Scope
+above reflects what has corresponding migrations, API endpoints, and tests
+in the current codebase — it is not a final/frozen release.
 
-## Future / incomplete milestones
+### In progress
 
-| Milestone | Description |
-|---|---|
-| **M2.7** | Author normalization: canonical Scopus author identity, name-variant resolution, ORCID matching |
-| **M2.8** | Lecturer ↔ Scopus publication matching: linkage rules, confidence scoring |
-| **M3** | Human review workflow: UI for reviewers to confirm/reject match candidates |
-| **M4** | Complete publications management UI, dashboard, and audit reporting |
+The current focus is the CSV-only ingestion path (no pre-built JSON
+dataset): new Scopus CSV import → online affiliation collection per author →
+ADMIN evidence-based correction → LECTURER read-only lookup. See
+`docs/planning/` for the active task breakdown.
 
 ---
 
@@ -39,9 +43,12 @@ Scopus publication records.
 
 ## Repository data policy
 
-Public ICTU lecturer source artifacts, schemas, reports, and provenance
-snapshots are intentionally versioned for reproducibility. Private or
-runtime-generated Scopus CSV exports remain local-only and are not committed.
+**No real lecturer or Scopus personal data is committed to this repository.**
+Only the dataset *schema* (`data/lecturers/schema/`) and fully synthetic
+test fixtures (using `example.invalid` email domains) are versioned, for
+reproducibility of the import/parsing logic. Real ICTU lecturer records,
+raw crawl snapshots, and Scopus CSV exports are local-only, gitignored, and
+must never be committed — see `.gitignore` for the enforced paths.
 Credentials and local environment files are never committed.
 
 ---
@@ -110,7 +117,7 @@ python -m alembic heads
 python -m alembic upgrade head
 ```
 
-The current migration head is `f4c8b1a2e9d7`.
+The current migration head is `f6a1b2c3d4e5`.
 
 ---
 
@@ -161,4 +168,5 @@ test database URL.
 
 - Credentials, `.env`, and local-only CSV files are never committed.
 - Migrations are append-only.
-- Alembic head: `f4c8b1a2e9d7` (do not rewrite).
+- Alembic head: `f6a1b2c3d4e5` (do not rewrite).
+- Real lecturer/Scopus data must never be committed — see `.gitignore`.
