@@ -42,6 +42,14 @@ data/snapshots/*
 data/test_fixtures/*
 !data/test_fixtures/.gitkeep
 
+# --- Dữ liệu giảng viên thật (không bao giờ commit) ---
+data/lecturers/ictu_lecturers.json
+data/lecturers/ictu_lecturers.example.json
+data/lecturers/raw/*
+!data/lecturers/raw/.gitkeep
+data/lecturers/reports/lecturer_dataset_report.json
+data/matching/evaluation/primary_cohort_source_ids.txt
+
 # --- IDE / OS ---
 .idea/
 .vscode/*
