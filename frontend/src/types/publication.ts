@@ -59,6 +59,18 @@ export interface AffiliationResolutionRead {
   source_work_id: string | null;
 }
 
+/** ADMIN-entered statement, layered on top of the automated resolutions.
+ * Never independently verified by this alone — confidence is always
+ * CORROBORATED or UNRESOLVED, never VERIFIED. */
+export interface AffiliationOverrideRead {
+  affiliation_text: string;
+  confidence: "CORROBORATED" | "UNRESOLVED";
+  evidence_url: string;
+  reason: string;
+  updated_at: string;
+  note: string;
+}
+
 export interface PublicationAuthorRead {
   author_order: number;
   scopus_id: string;
@@ -68,6 +80,7 @@ export interface PublicationAuthorRead {
   source_has_affiliation?: boolean | null;
   affiliations?: AuthorAffiliationRead[];
   affiliation_resolutions?: AffiliationResolutionRead[];
+  affiliation_override?: AffiliationOverrideRead | null;
 }
 
 export interface AffiliationSummaryRead {

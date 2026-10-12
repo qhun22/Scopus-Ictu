@@ -86,6 +86,27 @@ class AffiliationResolutionRead(BaseModel):
     source_work_id: str | None
 
 
+class AffiliationOverrideRead(BaseModel):
+    """ADMIN-entered affiliation statement, layered on top of the automated
+    resolutions — never asserted as independently verified by this alone.
+
+    Public-safe subset shown in the publication detail (read by ADMIN,
+    REVIEWER and LECTURER alike): no internal IDs (publication_author_id,
+    actor user ids). The ADMIN review UI gets those from the dedicated
+    ``/needs-review`` and ``/overrides`` endpoints instead.
+    """
+
+    affiliation_text: str
+    confidence: Literal["CORROBORATED", "UNRESOLVED"]
+    evidence_url: str
+    reason: str
+    updated_at: datetime
+    note: str = (
+        "Entered by an ADMIN after manual review; not an independent identity "
+        "verification. Never counted as VERIFIED."
+    )
+
+
 class PublicationAuthorRead(BaseModel):
     """Ordered, public-safe Scopus author summary."""
 
@@ -98,6 +119,7 @@ class PublicationAuthorRead(BaseModel):
     source_has_affiliation: bool | None = None
     affiliations: list[AuthorAffiliationRead] = Field(default_factory=list)
     affiliation_resolutions: list[AffiliationResolutionRead] = Field(default_factory=list)
+    affiliation_override: AffiliationOverrideRead | None = None
 
 
 class AffiliationSummaryRead(BaseModel):

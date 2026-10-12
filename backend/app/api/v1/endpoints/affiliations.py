@@ -25,6 +25,7 @@ from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import User
 from app.services import affiliation_enrichment_service as enrichment
+from app.services import affiliation_override_service as override_service
 from app.services import affiliation_workflow as workflow
 from app.services.affiliation_sources import BundleFile, BundleStatus, inspect_bundle
 
@@ -256,3 +257,146 @@ def cancel_online_enrichment(job_id: uuid.UUID, admin: AdminUser, db: DatabaseSe
     if job is None:
         raise APIError(status_code=404, detail="Không tìm thấy lượt thu thập này.", code="ENRICHMENT_JOB_NOT_FOUND")
     return _job_read(job)
+
+
+# --------------------------------------------------------------------------- manual review (Priority 2)
+class NeedsReviewItemRead(BaseModel):
+    publication_author_id: uuid.UUID
+    eid: str
+    title: str
+    author_order: int
+    scopus_id: str
+    preferred_name: str
+    reason_kind: str
+    resolution_summaries: list[dict[str, Any]]
+    has_override: bool
+    override: "OverrideRead | None" = None
+
+
+class NeedsReviewListResponse(BaseModel):
+    items: list[NeedsReviewItemRead]
+    total: int
+
+
+class OverrideRead(BaseModel):
+    id: uuid.UUID
+    publication_author_id: uuid.UUID
+    affiliation_text: str
+    confidence: str
+    evidence_url: str
+    reason: str
+    created_by_user_id: uuid.UUID
+    updated_by_user_id: uuid.UUID
+    version: int
+    created_at: str
+    updated_at: str
+
+
+class UpsertOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    affiliation_text: str = Field(min_length=1, max_length=2000)
+    confidence: str
+    evidence_url: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=1, max_length=2000)
+    expected_version: int | None = None
+
+
+def _override_read(row: override_service.PublicationAuthorAffiliationOverride) -> OverrideRead:
+    return OverrideRead(
+        id=row.id,
+        publication_author_id=row.publication_author_id,
+        affiliation_text=row.affiliation_text,
+        confidence=row.confidence,
+        evidence_url=row.evidence_url,
+        reason=row.reason,
+        created_by_user_id=row.created_by_user_id,
+        updated_by_user_id=row.updated_by_user_id,
+        version=row.version,
+        created_at=row.created_at.isoformat(),
+        updated_at=row.updated_at.isoformat(),
+    )
+
+
+@router.get(
+    "/needs-review",
+    response_model=NeedsReviewListResponse,
+    summary="Author positions that are UNRESOLVED, conflicting, or only CORROBORATED",
+)
+def needs_review(
+    _admin: AdminUser, db: DatabaseSession, limit: Annotated[int, Field(ge=1, le=500)] = 100, offset: int = 0
+) -> NeedsReviewListResponse:
+    try:
+        items, total = override_service.list_needs_review(db, limit=limit, offset=offset)
+    except SQLAlchemyError as exc:
+        raise _db_error(exc) from exc
+    return NeedsReviewListResponse(
+        items=[
+            NeedsReviewItemRead(
+                publication_author_id=i.publication_author_id,
+                eid=i.eid,
+                title=i.title,
+                author_order=i.author_order,
+                scopus_id=i.scopus_id,
+                preferred_name=i.preferred_name,
+                reason_kind=i.reason_kind,
+                resolution_summaries=i.resolution_summaries,
+                has_override=i.has_override,
+                override=_override_read(i.override) if i.override is not None else None,
+            )
+            for i in items
+        ],
+        total=total,
+    )
+
+
+@router.put(
+    "/overrides/{publication_author_id}",
+    response_model=OverrideRead,
+    summary="Create or update the ADMIN override for one author position",
+)
+def put_override(
+    publication_author_id: uuid.UUID, body: UpsertOverrideRequest, admin: AdminUser, db: DatabaseSession
+) -> OverrideRead:
+    try:
+        row = override_service.upsert_override(
+            db,
+            override_service.UpsertOverrideCommand(
+                publication_author_id=publication_author_id,
+                affiliation_text=body.affiliation_text,
+                confidence=body.confidence,
+                evidence_url=body.evidence_url,
+                reason=body.reason,
+                actor_user_id=admin.id,
+                expected_version=body.expected_version,
+            ),
+        )
+    except override_service.AffiliationOverrideError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    return _override_read(row)
+
+
+@router.delete(
+    "/overrides/{publication_author_id}",
+    response_model=dict,
+    summary="Remove the ADMIN override for one author position (not the automated resolutions)",
+)
+def remove_override(
+    publication_author_id: uuid.UUID, expected_version: int, admin: AdminUser, db: DatabaseSession
+) -> dict[str, bool]:
+    try:
+        override_service.delete_override(
+            db,
+            publication_author_id=publication_author_id,
+            expected_version=expected_version,
+            actor_user_id=admin.id,
+        )
+    except override_service.AffiliationOverrideError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    return {"deleted": True}

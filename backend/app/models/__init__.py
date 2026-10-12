@@ -29,6 +29,7 @@ from app.models.base import Base
 from app.models import (  # noqa: F401  (registration side effect)
     affiliation,
     affiliation_enrichment,
+    affiliation_override,
     candidate,
     governance,
     identity,

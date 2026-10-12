@@ -15,6 +15,7 @@ from app.models.affiliation import (
     PublicationAuthorAffiliation,
     PublicationAuthorAffiliationResolution,
 )
+from app.models.affiliation_override import PublicationAuthorAffiliationOverride
 from app.models.identity import LecturerScopusIdentity
 from app.models.master_lecturer import Lecturer
 from app.models.publication import (
@@ -26,6 +27,7 @@ from app.models.publication import (
 from app.models.scopus_raw import RawScopusRecord, ScopusImport
 from app.schemas.publication_api import (
     AffiliationOrganizationRead,
+    AffiliationOverrideRead,
     AffiliationProvenanceRead,
     AffiliationResolutionRead,
     AffiliationSummaryRead,
@@ -187,9 +189,10 @@ def list_publications(
 
 def _author_rows(
     session: Session, publication_id: uuid.UUID
-) -> Sequence[tuple[int, str, str]]:
+) -> Sequence[tuple[uuid.UUID, int, str, str]]:
     return session.execute(
         select(
+            PublicationAuthor.id,
             PublicationAuthor.author_order,
             ScopusAuthor.scopus_id,
             ScopusAuthor.preferred_name,
@@ -201,6 +204,29 @@ def _author_rows(
             ScopusAuthor.scopus_id.asc(),
         )
     ).all()
+
+
+def _override_rows(
+    session: Session, publication_author_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, PublicationAuthorAffiliationOverride]:
+    if not publication_author_ids:
+        return {}
+    rows = session.scalars(
+        select(PublicationAuthorAffiliationOverride).where(
+            PublicationAuthorAffiliationOverride.publication_author_id.in_(publication_author_ids)
+        )
+    ).all()
+    return {r.publication_author_id: r for r in rows}
+
+
+def _override_read(row: PublicationAuthorAffiliationOverride) -> AffiliationOverrideRead:
+    return AffiliationOverrideRead(
+        affiliation_text=row.affiliation_text,
+        confidence=row.confidence,
+        evidence_url=row.evidence_url,
+        reason=row.reason,
+        updated_at=row.updated_at,
+    )
 
 
 def _approved_lecturer_link_rows(
@@ -399,15 +425,18 @@ def get_publication_detail(
     if publication is None:
         return None
 
+    author_rows = _author_rows(session, publication.id)
+    overrides = _override_rows(session, [row[0] for row in author_rows])
     authors = [
         PublicationAuthorRead(
             author_order=author_order,
             scopus_id=scopus_id,
             preferred_name=preferred_name,
+            affiliation_override=_override_read(overrides[publication_author_id])
+            if publication_author_id in overrides
+            else None,
         )
-        for author_order, scopus_id, preferred_name in _author_rows(
-            session, publication.id
-        )
+        for publication_author_id, author_order, scopus_id, preferred_name in author_rows
     ]
     affiliation_summary = _apply_affiliations(authors, _affiliation_blocks(session, publication.id))
     lecturer_links = [

@@ -1,5 +1,6 @@
 import type {
   AffiliationLinkStatus,
+  AffiliationOverrideRead,
   AuthorAffiliationRead,
   PublicationAuthorRead,
 } from "../../types/publication";
@@ -185,6 +186,35 @@ export function AffiliationSummaryBar({
   );
 }
 
+function OverrideNote({ override, locale }: { override: AffiliationOverrideRead; locale: Locale }) {
+  const vi = locale === "vi";
+  return (
+    <div
+      className="mt-1.5 rounded-lg border border-violet-200 bg-violet-50/60 p-2 text-[11px] leading-snug"
+      data-testid="aff-override"
+    >
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">
+          {vi ? "ADMIN rà soát thủ công" : "ADMIN manual review"}
+        </span>
+        <AffiliationBadge status={override.confidence} locale={locale} small />
+      </div>
+      <p className="mt-1 font-medium text-slate-700">{override.affiliation_text}</p>
+      <p className="mt-0.5 text-slate-500">
+        {vi ? "Nguồn: " : "Source: "}
+        <a href={override.evidence_url} target="_blank" rel="noreferrer" className="text-sky-700 underline">
+          {override.evidence_url}
+        </a>
+      </p>
+      <p className="mt-0.5 text-slate-500">
+        {vi ? "Lý do: " : "Reason: "}
+        {override.reason}
+      </p>
+      <p className="mt-1 text-[10px] text-violet-600">{override.note}</p>
+    </div>
+  );
+}
+
 export function AuthorAffiliationCell({
   author,
   locale,
@@ -212,7 +242,12 @@ export function AuthorAffiliationCell({
   );
 
   if (status === "NOT_RECONCILED") {
-    return <AffiliationBadge status={status} locale={locale} />;
+    return (
+      <div>
+        <AffiliationBadge status={status} locale={locale} />
+        {author.affiliation_override && <OverrideNote override={author.affiliation_override} locale={locale} />}
+      </div>
+    );
   }
 
   if (status === "UNRESOLVED") {
@@ -223,6 +258,7 @@ export function AuthorAffiliationCell({
           <span className="text-slate-500">{vi ? "Chưa xác định được đơn vị" : "Unit could not be determined"}</span>
         </div>
         {resolutionLine}
+        {author.affiliation_override && <OverrideNote override={author.affiliation_override} locale={locale} />}
       </div>
     );
   }
@@ -278,6 +314,7 @@ export function AuthorAffiliationCell({
         </ul>
       )}
       {resolutionLine}
+      {author.affiliation_override && <OverrideNote override={author.affiliation_override} locale={locale} />}
     </div>
   );
 }

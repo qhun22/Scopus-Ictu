@@ -1,6 +1,6 @@
 /** ADMIN workflow: author-affiliation source status -> preview -> apply. */
 
-import { apiGet, apiPost, ApiRequestOptions } from "./client";
+import { apiDelete, apiGet, apiPost, apiPut, ApiRequestOptions } from "./client";
 
 export interface AffiliationBundleFile {
   name: string;
@@ -139,6 +139,81 @@ export function cancelOnlineEnrichment(jobId: string, options: ApiRequestOptions
   return apiPost<EnrichmentJob, Record<string, never>>(
     `/api/v1/affiliations/enrichment/online/${jobId}/cancel`,
     {},
+    options,
+  );
+}
+
+// --------------------------------------------------------------------------- manual review (Priority 2)
+export interface NeedsReviewItem {
+  publication_author_id: string;
+  eid: string;
+  title: string;
+  author_order: number;
+  scopus_id: string;
+  preferred_name: string;
+  reason_kind: "UNRESOLVED" | "CONFLICTING_SOURCES" | "LOW_CONFIDENCE";
+  resolution_summaries: Array<{ source_system: string; link_status: string; unresolved_reason: string | null }>;
+  has_override: boolean;
+  override: OverrideFull | null;
+}
+
+export interface NeedsReviewListResponse {
+  items: NeedsReviewItem[];
+  total: number;
+}
+
+export interface OverrideFull {
+  id: string;
+  publication_author_id: string;
+  affiliation_text: string;
+  confidence: "CORROBORATED" | "UNRESOLVED";
+  evidence_url: string;
+  reason: string;
+  created_by_user_id: string;
+  updated_by_user_id: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpsertOverrideBody {
+  affiliation_text: string;
+  confidence: "CORROBORATED" | "UNRESOLVED";
+  evidence_url: string;
+  reason: string;
+  expected_version?: number | null;
+}
+
+export function getNeedsReview(
+  params: { limit?: number; offset?: number } = {},
+  options: ApiRequestOptions = {},
+): Promise<NeedsReviewListResponse> {
+  const query = new URLSearchParams();
+  if (params.limit != null) query.set("limit", String(params.limit));
+  if (params.offset != null) query.set("offset", String(params.offset));
+  const qs = query.toString();
+  return apiGet<NeedsReviewListResponse>(`/api/v1/affiliations/needs-review${qs ? `?${qs}` : ""}`, options);
+}
+
+export function putOverride(
+  publicationAuthorId: string,
+  body: UpsertOverrideBody,
+  options: ApiRequestOptions = {},
+): Promise<OverrideFull> {
+  return apiPut<OverrideFull, UpsertOverrideBody>(
+    `/api/v1/affiliations/overrides/${publicationAuthorId}`,
+    body,
+    options,
+  );
+}
+
+export function deleteOverride(
+  publicationAuthorId: string,
+  expectedVersion: number,
+  options: ApiRequestOptions = {},
+): Promise<{ deleted: boolean }> {
+  return apiDelete<{ deleted: boolean }>(
+    `/api/v1/affiliations/overrides/${publicationAuthorId}?expected_version=${expectedVersion}`,
     options,
   );
 }

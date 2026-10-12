@@ -14,6 +14,7 @@ import { ApiError } from "../../api/client";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
+import ManualReviewCard from "./ManualReviewCard";
 
 type Locale = "vi" | "en";
 
@@ -545,6 +546,8 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
           </div>
         )}
       </Card>
+
+      <ManualReviewCard locale={locale} />
     </div>
   );
 }
