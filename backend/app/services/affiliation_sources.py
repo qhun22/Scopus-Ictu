@@ -213,7 +213,8 @@ def build_inputs(
 
     works: dict[str, dict[str, dict]] = {s: {} for s in SOURCES}
     for rec in _jsonl(bundle_dir / "openalex_works.jsonl"):
-        works["openalex"][rec["query_doi"]] = rec
+        if rec.get("work"):
+            works["openalex"][rec["query_doi"]] = rec
     crossref_http: dict[str, int] = {}
     for rec in _jsonl(bundle_dir / "crossref_works.jsonl"):
         crossref_http[rec["query_doi"]] = rec.get("http", 0)

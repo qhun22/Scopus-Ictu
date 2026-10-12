@@ -28,6 +28,7 @@ from app.models.base import Base
 # module alongside the frozen M1 tables.
 from app.models import (  # noqa: F401  (registration side effect)
     affiliation,
+    affiliation_enrichment,
     candidate,
     governance,
     identity,

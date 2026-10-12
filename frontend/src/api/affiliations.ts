@@ -85,21 +85,60 @@ export interface AffiliationApplyResult {
   result: Partial<AffiliationReport>;
 }
 
+export type EnrichmentJobStatus = "RECEIVED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED";
+
+export interface EnrichmentJob {
+  id: string;
+  status: EnrichmentJobStatus;
+  total_dois: number;
+  processed_dois: number;
+  openalex_found: number;
+  crossref_found: number;
+  orcid_fetched: number;
+  bundle_dir: string | null;
+  error_summary: { code?: string; message?: string } | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export function getAffiliationOverview(options: ApiRequestOptions = {}): Promise<AffiliationOverview> {
   return apiGet<AffiliationOverview>("/api/v1/affiliations/overview", options);
 }
 
-export function previewAffiliations(options: ApiRequestOptions = {}): Promise<AffiliationPreview> {
-  return apiPost<AffiliationPreview, Record<string, never>>("/api/v1/affiliations/preview", {}, options);
+export function previewAffiliations(
+  jobId?: string,
+  options: ApiRequestOptions = {},
+): Promise<AffiliationPreview> {
+  const path = jobId
+    ? `/api/v1/affiliations/preview?job_id=${encodeURIComponent(jobId)}`
+    : "/api/v1/affiliations/preview";
+  return apiPost<AffiliationPreview, Record<string, never>>(path, {}, options);
 }
 
 export function applyAffiliations(
   fingerprint: string,
+  jobId?: string,
   options: ApiRequestOptions = {},
 ): Promise<AffiliationApplyResult> {
-  return apiPost<AffiliationApplyResult, { fingerprint: string; confirm: boolean }>(
+  return apiPost<AffiliationApplyResult, { fingerprint: string; confirm: boolean; job_id?: string }>(
     "/api/v1/affiliations/apply",
-    { fingerprint, confirm: true },
+    jobId ? { fingerprint, confirm: true, job_id: jobId } : { fingerprint, confirm: true },
+    options,
+  );
+}
+
+export function startOnlineEnrichment(options: ApiRequestOptions = {}): Promise<EnrichmentJob> {
+  return apiPost<EnrichmentJob, Record<string, never>>("/api/v1/affiliations/enrichment/online", {}, options);
+}
+
+export function getOnlineEnrichment(jobId: string, options: ApiRequestOptions = {}): Promise<EnrichmentJob> {
+  return apiGet<EnrichmentJob>(`/api/v1/affiliations/enrichment/online/${jobId}`, options);
+}
+
+export function cancelOnlineEnrichment(jobId: string, options: ApiRequestOptions = {}): Promise<EnrichmentJob> {
+  return apiPost<EnrichmentJob, Record<string, never>>(
+    `/api/v1/affiliations/enrichment/online/${jobId}/cancel`,
+    {},
     options,
   );
 }

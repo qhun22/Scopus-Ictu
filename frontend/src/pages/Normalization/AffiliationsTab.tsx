@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AffiliationOverview,
   AffiliationPreview,
   applyAffiliations,
+  cancelOnlineEnrichment,
+  EnrichmentJob,
   getAffiliationOverview,
+  getOnlineEnrichment,
   previewAffiliations,
+  startOnlineEnrichment,
 } from "../../api/affiliations";
 import { ApiError } from "../../api/client";
 import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
@@ -58,7 +62,27 @@ const ERROR_LABEL: Record<string, Record<Locale, string>> = {
     vi: "Áp dụng thất bại; không có dữ liệu nào được ghi.",
     en: "Apply failed; nothing was written.",
   },
+  ONLINE_CACHE_NOT_CONFIGURED: {
+    vi: "Máy chủ chưa cấu hình thư mục lưu kết quả thu thập trực tuyến.",
+    en: "The server has no online-enrichment cache directory configured.",
+  },
+  NO_PUBLICATIONS: {
+    vi: "Chưa có công bố nào. Hãy nhập CSV Scopus trước.",
+    en: "No publications yet. Import a Scopus CSV first.",
+  },
+  ENRICHMENT_ALREADY_RUNNING: {
+    vi: "Một lượt thu thập trực tuyến khác đang chạy.",
+    en: "Another online enrichment run is already in progress.",
+  },
 };
+const ENRICHMENT_STATUS_LABEL: Record<string, Record<Locale, string>> = {
+  RECEIVED: { vi: "Đã nhận, chuẩn bị chạy", en: "Received, about to start" },
+  RUNNING: { vi: "Đang thu thập…", en: "Collecting…" },
+  COMPLETED: { vi: "Hoàn tất", en: "Completed" },
+  FAILED: { vi: "Thất bại", en: "Failed" },
+  CANCELLED: { vi: "Đã hủy", en: "Cancelled" },
+};
+const ENRICHMENT_ACTIVE: EnrichmentJob["status"][] = ["RECEIVED", "RUNNING"];
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("vi-VN");
 const sourceOf = (key: string) => SOURCE_LABEL[key.split("/")[0]] ?? key.split("/")[0];
@@ -83,6 +107,10 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
   const [applying, setApplying] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [job, setJob] = useState<EnrichmentJob | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [sourceMode, setSourceMode] = useState<"offline" | "online">("offline");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -97,6 +125,44 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
     void refresh();
   }, [refresh]);
 
+  // Poll the active online enrichment job every 2s, same pattern as the
+  // Scopus import history page: only while active, pause when the tab is hidden.
+  useEffect(() => {
+    if (!job || !ENRICHMENT_ACTIVE.includes(job.status)) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      return;
+    }
+    const poll = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const updated = await getOnlineEnrichment(job.id);
+        setJob(updated);
+        if (updated.status === "COMPLETED") {
+          setSourceMode("online");
+          setPreview(null);
+          setConfirmed(false);
+          toast.success(
+            vi ? "Thu thập trực tuyến hoàn tất" : "Online collection completed",
+            vi
+              ? `Đã xử lý ${updated.processed_dois}/${updated.total_dois} DOI.`
+              : `Processed ${updated.processed_dois}/${updated.total_dois} DOIs.`,
+          );
+        }
+      } catch {
+        // transient poll failure; try again on the next tick
+      }
+    };
+    pollRef.current = setInterval(poll, 2000);
+    window.addEventListener("focus", poll);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      window.removeEventListener("focus", poll);
+    };
+  }, [job, toast, vi]);
+
   const explain = (error: unknown): string => {
     if (error instanceof ApiError) {
       return (error.code && ERROR_LABEL[error.code]?.[locale]) || error.detail || error.message;
@@ -104,12 +170,34 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
     return vi ? "Có lỗi không xác định." : "Unknown error.";
   };
 
+  const runStartEnrichment = useSingleFlight(async () => {
+    setStarting(true);
+    setMessage(null);
+    try {
+      setJob(await startOnlineEnrichment());
+    } catch (error) {
+      setMessage({ kind: "error", text: explain(error) });
+    } finally {
+      setStarting(false);
+    }
+  });
+
+  const runCancelEnrichment = useSingleFlight(async () => {
+    if (!job) return;
+    try {
+      setJob(await cancelOnlineEnrichment(job.id));
+    } catch (error) {
+      setMessage({ kind: "error", text: explain(error) });
+    }
+  });
+
   const runPreview = useSingleFlight(async () => {
     setPreviewing(true);
     setMessage(null);
     setConfirmed(false);
     try {
-      setPreview(await previewAffiliations());
+      const jobId = sourceMode === "online" && job?.status === "COMPLETED" ? job.id : undefined;
+      setPreview(await previewAffiliations(jobId));
     } catch (error) {
       setPreview(null);
       setMessage({ kind: "error", text: explain(error) });
@@ -123,7 +211,8 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
     setApplying(true);
     setMessage(null);
     try {
-      const done = await applyAffiliations(preview.fingerprint);
+      const jobId = sourceMode === "online" && job?.status === "COMPLETED" ? job.id : undefined;
+      const done = await applyAffiliations(preview.fingerprint, jobId);
       const inserted = done.result.resolutions_to_insert ?? 0;
       const text = vi
         ? `Đã áp dụng: ${fmt(inserted)} kết quả đối chiếu đơn vị được ghi.`
@@ -254,14 +343,91 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
         </Card>
       </div>
 
+      <Card title={vi ? "2. Thu thập đơn vị trực tuyến (tùy chọn)" : "2. Online affiliation collection (optional)"} testId="aff-online-card">
+        <p className="mb-3 text-xs leading-relaxed text-slate-600">
+          {vi
+            ? "ADMIN có thể chủ động tra cứu OpenAlex, Crossref và ORCID công khai cho DOI của các công bố hiện có, thay vì cần chuẩn bị bộ nguồn offline thủ công. Chạy nền; có thể hủy giữa chừng."
+            : "ADMIN may actively query public OpenAlex, Crossref and ORCID for the DOIs of existing publications, instead of preparing an offline bundle by hand. Runs in the background; can be cancelled mid-way."}
+        </p>
+        {!job || !ENRICHMENT_ACTIVE.includes(job.status) ? (
+          <button
+            type="button"
+            className={BUTTON_SECONDARY}
+            onClick={runStartEnrichment}
+            disabled={starting}
+            data-testid="aff-online-start-btn"
+          >
+            {starting ? (vi ? "Đang khởi tạo…" : "Starting…") : vi ? "Bắt đầu thu thập trực tuyến" : "Start online collection"}
+          </button>
+        ) : (
+          <div className="flex items-center gap-2" data-testid="aff-online-running">
+            <span className="text-xs font-medium text-sky-700">
+              {ENRICHMENT_STATUS_LABEL[job.status]?.[locale] ?? job.status} ({fmt(job.processed_dois)}/{fmt(job.total_dois)})
+            </span>
+            <button type="button" className={BUTTON_SECONDARY} onClick={runCancelEnrichment} data-testid="aff-online-cancel-btn">
+              {vi ? "Hủy" : "Cancel"}
+            </button>
+          </div>
+        )}
+        {job && !ENRICHMENT_ACTIVE.includes(job.status) && (
+          <div className="mt-3 text-xs text-slate-700" data-testid="aff-online-result">
+            <p>
+              <span className={job.status === "COMPLETED" ? "font-bold text-emerald-700" : "font-bold text-rose-600"}>
+                {ENRICHMENT_STATUS_LABEL[job.status]?.[locale] ?? job.status}
+              </span>
+              {job.status === "COMPLETED" && (
+                <>
+                  {" · "}
+                  {fmt(job.openalex_found)} {vi ? "bài OpenAlex" : "OpenAlex works"}
+                  {" · "}
+                  {fmt(job.crossref_found)} {vi ? "bài Crossref" : "Crossref works"}
+                  {" · "}
+                  {fmt(job.orcid_fetched)} ORCID
+                </>
+              )}
+              {job.status === "FAILED" && job.error_summary?.message && <> · {job.error_summary.message}</>}
+            </p>
+            {job.status === "COMPLETED" && (
+              <p className="mt-1 text-slate-500">
+                {vi
+                  ? 'Kết quả đã sẵn sàng. Nhấn "Xem trước" bên dưới để dùng kết quả này thay cho bộ nguồn offline.'
+                  : 'Result is ready. Click "Preview" below to use this result instead of the offline bundle.'}
+              </p>
+            )}
+          </div>
+        )}
+      </Card>
+
       <Card title={vi ? "3. Xem trước và áp dụng" : "3. Preview and apply"} testId="aff-preview-card">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <button type="button" className={BUTTON_SECONDARY} onClick={runPreview} disabled={previewing || applying} data-testid="aff-preview-btn">
             {previewing ? (vi ? "Đang tính…" : "Computing…") : vi ? "Xem trước" : "Preview"}
           </button>
-          <span className="text-xs text-slate-500">
-            {vi ? "Xem trước chỉ đọc, không ghi dữ liệu." : "Preview is read-only and writes nothing."}
+          <span className="text-xs text-slate-500" data-testid="aff-preview-source-mode">
+            {sourceMode === "online" && job?.status === "COMPLETED"
+              ? vi
+                ? "Dùng kết quả thu thập trực tuyến vừa chạy."
+                : "Using the result of the online run just completed."
+              : vi
+                ? "Xem trước chỉ đọc, không ghi dữ liệu."
+                : "Preview is read-only and writes nothing."}
           </span>
+          {job?.status === "COMPLETED" && (
+            <button
+              type="button"
+              className="text-xs font-medium text-sky-700 underline"
+              onClick={() => setSourceMode((m) => (m === "online" ? "offline" : "online"))}
+              data-testid="aff-source-mode-toggle"
+            >
+              {sourceMode === "online"
+                ? vi
+                  ? "Chuyển sang bộ nguồn offline"
+                  : "Switch to offline bundle"
+                : vi
+                  ? "Chuyển sang kết quả trực tuyến"
+                  : "Switch to online result"}
+            </button>
+          )}
         </div>
 
         {message && (

@@ -32,6 +32,12 @@ dependencies = [
     # Authentication & security dependencies (M2.2)
     "argon2-cffi>=23.1",
     "PyJWT>=2.8",
+
+    # Outbound HTTP client for the online affiliation enrichment job
+    # (OpenAlex / Crossref / ORCID public APIs). Starlette 1.7+ pins httpx2
+    # instead of httpx; the API surface used here (AsyncClient, timeouts,
+    # exceptions) is identical.
+    "httpx2>=0.8.0",
 ]
 
 [project.optional-dependencies]
@@ -39,8 +45,6 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "ruff>=0.4",
-    # TestClient requires httpx; Starlette 1.7+ requires httpx2.
-    "httpx2>=0.8.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -2,13 +2,20 @@
 
 The source bundle directory is fixed by server configuration; no request field
 names a file or directory.  See ``app.services.affiliation_workflow``.
+
+Preview/apply can target either the fixed offline bundle (default) or the
+bundle an online enrichment job already wrote — selected by ``job_id``, never
+by a path: the server resolves ``job_id`` to the directory it itself
+recorded in ``affiliation_enrichment_jobs.bundle_dir``.
 """
 
 from __future__ import annotations
 
+import uuid
+from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -17,6 +24,7 @@ from app.api.dependencies import require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import User
+from app.services import affiliation_enrichment_service as enrichment
 from app.services import affiliation_workflow as workflow
 from app.services.affiliation_sources import BundleFile, BundleStatus, inspect_bundle
 
@@ -70,6 +78,7 @@ class ApplyRequest(BaseModel):
 
     fingerprint: str = Field(min_length=64, max_length=64)
     confirm: bool
+    job_id: uuid.UUID | None = None
 
 
 class ApplyResponse(BaseModel):
@@ -78,13 +87,59 @@ class ApplyResponse(BaseModel):
     result: dict[str, Any]
 
 
+class EnrichmentJobRead(BaseModel):
+    id: uuid.UUID
+    status: str
+    total_dois: int
+    processed_dois: int
+    openalex_found: int
+    crossref_found: int
+    orcid_fetched: int
+    bundle_dir: str | None
+    error_summary: dict[str, Any] | None
+    created_at: str
+    updated_at: str
+
+
+def _job_read(job: enrichment.AffiliationEnrichmentJob) -> EnrichmentJobRead:
+    return EnrichmentJobRead(
+        id=job.id,
+        status=job.status,
+        total_dois=job.total_dois,
+        processed_dois=job.processed_dois,
+        openalex_found=job.openalex_found,
+        crossref_found=job.crossref_found,
+        orcid_fetched=job.orcid_fetched,
+        bundle_dir=job.bundle_dir,
+        error_summary=job.error_summary,
+        created_at=job.created_at.isoformat(),
+        updated_at=job.updated_at.isoformat(),
+    )
+
+
+def _resolve_directory(db: Session, job_id: uuid.UUID | None) -> Path | None:
+    """``None`` -> the fixed offline bundle. A job id -> that job's own bundle,
+    never a client-supplied path."""
+
+    if job_id is None:
+        return workflow.configured_bundle_dir()
+    job = enrichment.get_job(db, job_id)
+    if job is None or job.status != "COMPLETED" or not job.bundle_dir:
+        raise APIError(
+            status_code=404,
+            detail="Không tìm thấy kết quả thu thập trực tuyến đã hoàn tất cho mã này.",
+            code="ENRICHMENT_JOB_NOT_READY",
+        )
+    return Path(job.bundle_dir)
+
+
 def _file(item: BundleFile) -> BundleFileRead:
     return BundleFileRead(name=item.name, required=item.required, present=item.present,
                           size_bytes=item.size_bytes, sha256=item.sha256)
 
 
-def _bundle(status: BundleStatus) -> BundleStatusRead:
-    directory = workflow.configured_bundle_dir()
+def _bundle(status: BundleStatus, directory: Path | None = None) -> BundleStatusRead:
+    directory = directory if directory is not None else workflow.configured_bundle_dir()
     return BundleStatusRead(
         configured=status.configured,
         ready=status.ready,
@@ -119,9 +174,12 @@ def overview(_admin: AdminUser, db: DatabaseSession) -> OverviewResponse:
 
 
 @router.post("/preview", response_model=PreviewResponse, summary="Read-only preview of what would be written")
-def preview(_admin: AdminUser, db: DatabaseSession) -> PreviewResponse:
+def preview(
+    _admin: AdminUser, db: DatabaseSession, job_id: uuid.UUID | None = None
+) -> PreviewResponse:
+    directory = _resolve_directory(db, job_id)
     try:
-        result = workflow.preview(db)
+        result = workflow.preview(db, directory)
     except SQLAlchemyError as exc:
         raise _db_error(exc) from exc
     return PreviewResponse(
@@ -129,7 +187,7 @@ def preview(_admin: AdminUser, db: DatabaseSession) -> PreviewResponse:
         can_apply=result.can_apply,
         blocked_reason=result.blocked_reason,
         publications=result.publications,
-        source=_bundle(result.bundle),
+        source=_bundle(result.bundle, directory),
         input=result.stats,
         report=result.report,
         source_mismatches=result.source_mismatches,
@@ -141,11 +199,60 @@ def preview(_admin: AdminUser, db: DatabaseSession) -> PreviewResponse:
 def apply(body: ApplyRequest, admin: AdminUser, db: DatabaseSession) -> ApplyResponse:
     if not body.confirm:
         raise APIError(status_code=422, detail="Cần xác nhận rõ ràng trước khi áp dụng.", code="CONFIRMATION_REQUIRED")
+    directory = _resolve_directory(db, body.job_id)
     try:
-        outcome = workflow.apply(db, fingerprint=body.fingerprint, actor_user_id=admin.id)
+        outcome = workflow.apply(db, fingerprint=body.fingerprint, actor_user_id=admin.id, directory=directory)
     except workflow.AffiliationWorkflowError as exc:
         raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
     except SQLAlchemyError as exc:
         db.rollback()
         raise _db_error(exc) from exc
     return ApplyResponse(**outcome)
+
+
+@router.post(
+    "/enrichment/online",
+    response_model=EnrichmentJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="ADMIN-triggered background job: fetch OpenAlex/Crossref/ORCID for all stored publication DOIs",
+)
+def start_online_enrichment(
+    admin: AdminUser, db: DatabaseSession, background_tasks: BackgroundTasks
+) -> EnrichmentJobRead:
+    try:
+        job = enrichment.start_job(db, admin)
+    except enrichment.AffiliationEnrichmentError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    background_tasks.add_task(enrichment.process_enrichment_job, job.id)
+    return _job_read(job)
+
+
+@router.get(
+    "/enrichment/online/{job_id}",
+    response_model=EnrichmentJobRead,
+    summary="Poll the status/progress of an online enrichment job",
+)
+def get_online_enrichment(job_id: uuid.UUID, _admin: AdminUser, db: DatabaseSession) -> EnrichmentJobRead:
+    job = enrichment.get_job(db, job_id)
+    if job is None:
+        raise APIError(status_code=404, detail="Không tìm thấy lượt thu thập này.", code="ENRICHMENT_JOB_NOT_FOUND")
+    return _job_read(job)
+
+
+@router.post(
+    "/enrichment/online/{job_id}/cancel",
+    response_model=EnrichmentJobRead,
+    summary="Cooperatively cancel a running online enrichment job",
+)
+def cancel_online_enrichment(job_id: uuid.UUID, admin: AdminUser, db: DatabaseSession) -> EnrichmentJobRead:
+    try:
+        job = enrichment.cancel_job(db, job_id, admin)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    if job is None:
+        raise APIError(status_code=404, detail="Không tìm thấy lượt thu thập này.", code="ENRICHMENT_JOB_NOT_FOUND")
+    return _job_read(job)

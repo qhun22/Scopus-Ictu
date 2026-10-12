@@ -96,6 +96,17 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     affiliation_source_dir: str | None = Field(None, validation_alias="AFFILIATION_SOURCE_DIR")
 
+    # ------------------------------------------------------------------
+    # Online affiliation enrichment (Priority 1).  Each run writes its own
+    # bundle under this directory (never the offline AFFILIATION_SOURCE_DIR
+    # above, never a path from a request). Optional: without it the
+    # enrichment endpoint reports "not configured".
+    # ------------------------------------------------------------------
+    affiliation_online_cache_dir: str | None = Field(None, validation_alias="AFFILIATION_ONLINE_CACHE_DIR")
+    affiliation_online_max_dois_per_run: int = Field(
+        300, ge=1, le=5000, validation_alias="AFFILIATION_ONLINE_MAX_DOIS_PER_RUN"
+    )
+
     model_config = SettingsConfigDict(
         env_file=str(LOCAL_ENV_FILE),
         env_file_encoding="utf-8",
