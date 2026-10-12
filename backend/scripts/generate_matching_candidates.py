@@ -34,7 +34,9 @@ Exit codes: 0 ok, 2 refused by a safety guard, 3 source data changed,
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
+import os
 import sys
 import uuid
 from collections.abc import Sequence
@@ -78,6 +80,35 @@ FORBIDDEN_PORTS = frozenset({5432})
 # Same databases the test suite refuses to touch.
 FORBIDDEN_DATABASES = frozenset({"scopus_ictu_acceptance_v2", "scopus_ictu_ui_clean"})
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+LOOPBACK_ADDRS = frozenset({"127.0.0.1", "::1"})
+# GitHub Actions service containers reach the test database over the
+# Docker bridge network, so the PostgreSQL server reports its container
+# address instead of a loopback literal even though the CI job connects
+# via "localhost". Accepting that address requires ALL of the following at
+# once — no single flag is trusted on its own:
+#   1. an explicit, narrowly-named opt-in environment variable,
+#   2. ENVIRONMENT=test (never "local" / "prod"),
+#   3. the reported address actually falls inside Docker's default bridge
+#      network range (RFC 1918 172.16.0.0/12) — not just "not loopback".
+_CI_CONTAINER_NETWORK_FLAG = "MATCHING_CLI_CI_CONTAINER_NETWORK"
+_DOCKER_BRIDGE_NETWORK = ipaddress.ip_network("172.16.0.0/12")
+
+
+def _ci_container_loopback_override_active(environment: str) -> bool:
+    return os.environ.get(_CI_CONTAINER_NETWORK_FLAG) == "1" and environment == "test"
+
+
+def _address_allowed(addr: str, *, ci_container_override: bool) -> bool:
+    if addr in LOOPBACK_ADDRS:
+        return True
+    if not ci_container_override:
+        return False
+    try:
+        return ipaddress.ip_address(addr) in _DOCKER_BRIDGE_NETWORK
+    except ValueError:
+        return False
+
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_SCHEMA_VERSION = 1
 
@@ -134,7 +165,11 @@ def validate_target_url(
 
 
 def verify_server_identity(
-    engine: Engine, expected_database: str, expected_port: int | None
+    engine: Engine,
+    expected_database: str,
+    expected_port: int | None,
+    *,
+    environment: str = "local",
 ) -> dict[str, Any]:
     """Ask the server who it is, on a throw-away connection (no Session)."""
     with engine.connect() as conn:
@@ -153,7 +188,8 @@ def verify_server_identity(
         raise CliRefused(f"server port {port} is forbidden for this tool")
     if expected_port is not None and port != expected_port:
         raise CliRefused("server port does not match --expected-port")
-    if addr not in {"127.0.0.1", "::1"}:
+    ci_override = _ci_container_loopback_override_active(environment)
+    if not _address_allowed(addr, ci_container_override=ci_override):
         raise CliRefused("server is not bound to loopback")
     return {"database": database, "port": port, "address": addr, "user": user, "pg_version": version}
 
@@ -427,7 +463,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise CliRefused("--apply requires --manifest (stored outside the repository)")
 
         reader = make_read_only_engine(url)
-        identity = verify_server_identity(reader, args.expected_database, args.expected_port)
+        identity = verify_server_identity(
+            reader, args.expected_database, args.expected_port, environment=settings.environment
+        )
         print(f"target: database={identity['database']} port={identity['port']} addr={identity['address']} user={identity['user']}")
 
         if args.dry_run:
@@ -445,7 +483,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         writer = create_engine(url, pool_pre_ping=True)
         try:
-            verify_server_identity(writer, args.expected_database, args.expected_port)
+            verify_server_identity(
+                writer, args.expected_database, args.expected_port, environment=settings.environment
+            )
             summary = apply_generation(
                 reader,
                 writer,

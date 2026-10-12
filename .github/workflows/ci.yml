@@ -51,6 +51,12 @@ jobs:
       SCOPUS_IMPORT_BATCH_SIZE: "100"
       SCOPUS_NORMALIZATION_BATCH_SIZE: "500"
       TEST_DATABASE_URL: "postgresql+psycopg2://test_user:test_password@localhost:5433/test_db"
+      # Opt-in, narrowly scoped to this CI job: the PostgreSQL service
+      # container reports its Docker bridge address (not a loopback
+      # literal) via inet_server_addr(). See
+      # scripts/generate_matching_candidates.py for the guard this
+      # satisfies (requires ENVIRONMENT=test too; never set elsewhere).
+      MATCHING_CLI_CI_CONTAINER_NETWORK: "1"
 
     steps:
       - uses: actions/checkout@v4

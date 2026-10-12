@@ -232,21 +232,87 @@ def test_guards_reject_wrong_database_port_5432_and_repo_manifest(env, monkeypat
         cli.validate_manifest_path(cli.REPO_ROOT / "backend" / "m.json")
     cli.validate_manifest_path(env["manifest"])
     # server-side identity must also agree with what was requested
+    from app.core.config import settings
+
     real = env["url"]
-    cli.verify_server_identity(env["reader"], real.database, real.port)
+    cli.verify_server_identity(env["reader"], real.database, real.port, environment=settings.environment)
     with pytest.raises(cli.CliRefused):
-        cli.verify_server_identity(env["reader"], "not_this_db", real.port)
+        cli.verify_server_identity(env["reader"], "not_this_db", real.port, environment=settings.environment)
     with pytest.raises(cli.CliRefused):
-        cli.verify_server_identity(env["reader"], real.database, 5432)
+        cli.verify_server_identity(env["reader"], real.database, 5432, environment=settings.environment)
 
     # main(): refuses before any database work
-    from app.core.config import settings
 
     monkeypatch.setattr(settings, "db_port", 5432)
     assert cli.main(["--dry-run", "--expected-database", settings.db_name]) == cli.EXIT_REFUSED
     monkeypatch.setattr(settings, "db_port", real.port)
     assert cli.main(["--dry-run", "--expected-database", "wrong_db"]) == cli.EXIT_REFUSED
     assert cli.main(["--apply", "--expected-database", settings.db_name]) == cli.EXIT_REFUSED  # no manifest
+
+
+class TestCiContainerLoopbackOverride:
+    """``verify_server_identity`` must only accept a non-loopback address when
+    ALL THREE conditions line up at once; no single flag is ever enough on
+    its own, and the override never applies outside ``environment == "test"``.
+    """
+
+    DOCKER_BRIDGE_ADDR = "172.17.0.3"
+    PUBLIC_ADDR = "203.0.113.7"  # TEST-NET-3 (RFC 5737), never a private/bridge address
+
+    def test_plain_loopback_always_allowed(self) -> None:
+        assert cli._address_allowed("127.0.0.1", ci_container_override=False) is True
+        assert cli._address_allowed("::1", ci_container_override=False) is True
+        assert cli._address_allowed("127.0.0.1", ci_container_override=True) is True
+
+    def test_docker_bridge_address_blocked_without_override(self) -> None:
+        assert cli._address_allowed(self.DOCKER_BRIDGE_ADDR, ci_container_override=False) is False
+
+    def test_docker_bridge_address_allowed_with_override(self) -> None:
+        assert cli._address_allowed(self.DOCKER_BRIDGE_ADDR, ci_container_override=True) is True
+
+    def test_public_address_blocked_even_with_override(self) -> None:
+        # the override widens the allowed range to Docker's bridge network,
+        # never to "anything that is not loopback" — a real remote host is
+        # still refused even when the CI flag is set.
+        assert cli._address_allowed(self.PUBLIC_ADDR, ci_container_override=True) is False
+
+    def test_override_requires_both_flag_and_test_environment(self, monkeypatch) -> None:
+        monkeypatch.delenv(cli._CI_CONTAINER_NETWORK_FLAG, raising=False)
+        assert cli._ci_container_loopback_override_active("test") is False
+
+        monkeypatch.setenv(cli._CI_CONTAINER_NETWORK_FLAG, "1")
+        assert cli._ci_container_loopback_override_active("test") is True
+
+    def test_override_never_active_outside_test_environment(self, monkeypatch) -> None:
+        monkeypatch.setenv(cli._CI_CONTAINER_NETWORK_FLAG, "1")
+        assert cli._ci_container_loopback_override_active("local") is False
+        assert cli._ci_container_loopback_override_active("prod") is False
+
+    def test_flag_set_to_non_one_value_does_not_activate_override(self, monkeypatch) -> None:
+        # a forged/loose truthy value (e.g. "true", "yes") must not count —
+        # the opt-in is intentionally strict.
+        monkeypatch.setenv(cli._CI_CONTAINER_NETWORK_FLAG, "true")
+        assert cli._ci_container_loopback_override_active("test") is False
+
+    def test_verify_server_identity_still_enforces_database_port_and_user_with_override(
+        self, env, monkeypatch
+    ) -> None:
+        """Widening the loopback check must not weaken any other guard: a
+        wrong database name or a forbidden port is still refused even when
+        the CI container override is active end-to-end against the real
+        isolated test database.
+        """
+        monkeypatch.setenv(cli._CI_CONTAINER_NETWORK_FLAG, "1")
+        real = env["url"]
+        # database name must still match exactly
+        with pytest.raises(cli.CliRefused):
+            cli.verify_server_identity(env["reader"], "not_this_db", real.port, environment="test")
+        # port 5432 is still refused outright, override or not
+        with pytest.raises(cli.CliRefused):
+            cli.verify_server_identity(env["reader"], real.database, 5432, environment="test")
+        # the isolated test database itself (reached over loopback in this
+        # local run) must still pass with the override active
+        cli.verify_server_identity(env["reader"], real.database, real.port, environment="test")
 
 
 def test_main_dry_run_and_apply_end_to_end(env, monkeypatch, capsys) -> None:
