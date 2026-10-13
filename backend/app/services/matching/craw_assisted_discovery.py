@@ -80,7 +80,7 @@ from app.models.publication import (
     ScopusAuthor,
     ScopusAuthorNameVariant,
 )
-from app.services.matching.candidate_generator import normalize_name_n2
+from app.services.matching.candidate_generator import normalize_name_n2, strip_observed_title_prefix
 from app.services.matching.candidate_types import (
     EnrichedLecturerScopusCandidate,
     PublicationEvidence,
@@ -149,10 +149,11 @@ class _NameSurface:
     tokens: frozenset[str]
 
 
-def _parse_name_surface(value: str) -> _NameSurface:
+def _parse_name_surface(value: str, strip_title: bool = False) -> _NameSurface:
+    raw = strip_observed_title_prefix(value) if strip_title else value
     tokens = tuple(
         token
-        for token in normalize_name_n2(value).replace(",", " ").replace("-", " ").split(" ")
+        for token in normalize_name_n2(raw).replace(",", " ").replace("-", " ").split(" ")
         if len(token) >= _MIN_TOKEN_LENGTH
     )
     return _NameSurface(surname=tokens[0] if tokens else None, tokens=frozenset(tokens))
@@ -180,6 +181,7 @@ def _has_name_correspondence(lecturer_surface: _NameSurface, scopus_surfaces: It
     """Two independent conditions, both required, evaluated against at least
     one Scopus surface for this author:
 
+    PRIMARY PATH (surname-anchored):
     1. Surname agreement — the first token of the lecturer's full_name
        equals the first token of that Scopus surface. This is the
        structural anchor a plain token-set intersection lacks: two
@@ -192,6 +194,18 @@ def _has_name_correspondence(lecturer_surface: _NameSurface, scopus_surfaces: It
        ``_GENERIC_NAME_TOKENS``. A name built entirely from common surname/
        middle-name tokens never corroborates identity by itself.
 
+    FALLBACK PATH (reordered Scopus name):
+    Some real Scopus surfaces have the given name in the first position
+    (e.g. "Canh, Hoang Thi" for lecturer "Hoang Thi Canh", or
+    "Tan, Nguyen Hong" for "Nguyen Hong Tan"). The surname-agreement check
+    fails these even though it is the same person. The fallback allows a
+    match when ALL of the lecturer's distinctive tokens are present in the
+    Scopus token set — i.e. the Scopus surface is a permutation of the
+    same name, not a different person. A single distinctive token is
+    sufficient because co-authors on the same paper who share NO distinctive
+    token with the lecturer cannot pass this check (verified against real
+    co-author pairs in docs/qa/MATCHING_CRAW_CANDIDATE_QUALITY_AUDIT.md §10).
+
     Initials-only Scopus surfaces (e.g. "Nguyen, V.-B.") correctly fail here
     — token length "v"/"b" never reaches ``_MIN_TOKEN_LENGTH``. They are
     recovered through a full-name ``ScopusAuthorNameVariant`` surface
@@ -200,12 +214,32 @@ def _has_name_correspondence(lecturer_surface: _NameSurface, scopus_surfaces: It
 
     if lecturer_surface.surname is None:
         return False
+    lec_distinctive = lecturer_surface.tokens - _GENERIC_NAME_TOKENS
     for surface in scopus_surfaces:
-        if surface.surname != lecturer_surface.surname:
-            continue
-        distinctive = (lecturer_surface.tokens & surface.tokens) - _GENERIC_NAME_TOKENS
-        if distinctive:
-            return True
+        if surface.surname == lecturer_surface.surname:
+            # Primary path: surnames agree — require a DIFFERENT distinctive
+            # token to corroborate (the surname itself is not additional
+            # evidence once we already know it matches).
+            non_surname_lec = lecturer_surface.tokens - {lecturer_surface.surname}
+            non_surname_sco = surface.tokens - {surface.surname}
+            corroboration = (non_surname_lec & non_surname_sco) - _GENERIC_NAME_TOKENS
+            if corroboration:
+                return True
+        else:
+            # Fallback for reordered Scopus name: all of the lecturer's tokens
+            # (including the surname) are present in the Scopus token set, and
+            # there is at least one distinctive token shared. This handles cases
+            # like "Canh, Hoang Thi" for lecturer "Hoang Thi Canh" — same name
+            # reordered, not a different person. Requiring the lecturer's surname
+            # to be present prevents matching when the Scopus surface is a
+            # genuinely different person who happens to share a distinctive
+            # given-name token (e.g. "Nguyen Van Dung" vs "Tran, Van Dung").
+            if (
+                lec_distinctive
+                and lec_distinctive <= surface.tokens
+                and lecturer_surface.surname in surface.tokens
+            ):
+                return True
     return False
 
 
@@ -274,7 +308,7 @@ def discover_craw_assisted_candidates(
         lecturer_id = item.known_publication.lecturer_id
         lecturer = lecturer_by_id.get(lecturer_id)
         lecturer_surface = (
-            _parse_name_surface(lecturer.full_name) if lecturer is not None else _NameSurface(None, frozenset())
+            _parse_name_surface(lecturer.full_name, strip_title=True) if lecturer is not None else _NameSurface(None, frozenset())
         )
 
         for author_row in sorted(

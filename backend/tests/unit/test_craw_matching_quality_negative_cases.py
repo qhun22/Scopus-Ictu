@@ -393,3 +393,107 @@ def test_case_8_idempotency_and_sorting_stability() -> None:
     assert run1.discovered[0].lecturer_id == run2.discovered[0].lecturer_id
     assert run1.discovered[0].scopus_author_id == run2.discovered[0].scopus_author_id
     assert run1.unattributed == run2.unattributed
+
+
+# ---------------------------------------------------------------------------
+# CASE 9: TÊN SCOPUS ĐẢO THỨ TỰ (Reversed Scopus name surface)
+# ---------------------------------------------------------------------------
+def test_case_9_reversed_scopus_name_order_is_attributed() -> None:
+    """Case 9: Lecturer 'Hoàng Thị Cành' — Scopus surface lists given name first:
+    'Canh, Hoang Thi'.  Same tokens, different first-token position.
+    Must be DISCOVERED (not left unattributed).
+    A co-author 'Dung, Nguyen Thi' on the same paper shares ONLY generic
+    tokens with the lecturer and must remain UNATTRIBUTED.
+    """
+    lecturer_id, true_author_id, coauthor_id = uuid4(), uuid4(), uuid4()
+    lecturer = _lecturer("Hoàng Thị Cành", lecturer_id)
+    snapshot = _snapshot(lecturer_id)
+    publication = _publication("Network Security", "10.1000/netsec.2026")
+
+    result = _run(
+        existing_pairs=[],
+        known=[_known(lecturer_id, snapshot.id, "Network Security", "10.1000/netsec.2026")],
+        snapshots=[snapshot],
+        publications=[publication],
+        publication_authors=[
+            _publication_author(publication.id, true_author_id, author_order=1),
+            _publication_author(publication.id, coauthor_id, author_order=2),
+        ],
+        scopus_authors=[
+            _scopus_author(true_author_id, "901", "Canh, Hoang Thi"),
+            _scopus_author(coauthor_id, "902", "Dung, Nguyen Thi"),
+        ],
+        lecturers=[lecturer],
+    )
+
+    assert true_author_id in {c.scopus_author_id for c in result.discovered}, (
+        "Reversed Scopus name 'Canh, Hoang Thi' must match lecturer 'Hoang Thi Canh'"
+    )
+    assert len(result.discovered) == 1
+    assert coauthor_id in {u.scopus_author_id for u in result.unattributed}
+
+
+# ---------------------------------------------------------------------------
+# CASE 10: DANH HIỆU HỌC VỊ (Academic title prefix stripped)
+# ---------------------------------------------------------------------------
+def test_case_10_academic_title_prefix_stripped_correctly() -> None:
+    """Case 10: Lecturer 'PGS.TS. Nguyễn Văn Núi' — the academic prefix must be
+    stripped before name matching so 'pgs.ts.' is not misidentified as the surname.
+    Scopus surface 'Nguyen, Van-Nui' must be DISCOVERED.
+    """
+    lecturer_id, author_id = uuid4(), uuid4()
+    lecturer = _lecturer("PGS.TS. Nguyễn Văn Núi", lecturer_id)
+    snapshot = _snapshot(lecturer_id)
+    publication = _publication("AI Research", "10.1000/ai-research.2026")
+
+    result = _run(
+        existing_pairs=[],
+        known=[_known(lecturer_id, snapshot.id, "AI Research", "10.1000/ai-research.2026")],
+        snapshots=[snapshot],
+        publications=[publication],
+        publication_authors=[_publication_author(publication.id, author_id, author_order=1)],
+        scopus_authors=[_scopus_author(author_id, "1001", "Nguyen, Van-Nui")],
+        lecturers=[lecturer],
+    )
+
+    assert len(result.discovered) == 1, (
+        f"Academic title prefix caused surname mismatch: {[c.preferred_name for c in result.discovered]}"
+    )
+    assert result.discovered[0].scopus_author_id == author_id
+
+
+# ---------------------------------------------------------------------------
+# CASE 11: TÊN CHÍNH GIỐNG NHAU, HỌ KHÁC NHAU — KHÔNG KHỚP (Different surname)
+# ---------------------------------------------------------------------------
+def test_case_11_same_given_name_different_surname_with_reversed_scopus_rejected() -> None:
+    """Case 11: Lecturer 'Nguyễn Văn Dũng' vs Scopus 'Tran, Van Dung'.
+    Even though all of 'dung' (distinctive token) is in Scopus tokens, the
+    lecturer's surname 'nguyen' is NOT in the Scopus token set — so the
+    reversed-name fallback must NOT fire.  Must be UNATTRIBUTED.
+    """
+    lecturer_id, true_author_id, other_id = uuid4(), uuid4(), uuid4()
+    lecturer = _lecturer("Nguyễn Văn Dũng", lecturer_id)
+    snapshot = _snapshot(lecturer_id)
+    publication = _publication("Parallel Computing", "10.1000/par.2026")
+
+    result = _run(
+        existing_pairs=[],
+        known=[_known(lecturer_id, snapshot.id, "Parallel Computing", "10.1000/par.2026")],
+        snapshots=[snapshot],
+        publications=[publication],
+        publication_authors=[
+            _publication_author(publication.id, true_author_id, author_order=1),
+            _publication_author(publication.id, other_id, author_order=2),
+        ],
+        scopus_authors=[
+            _scopus_author(true_author_id, "1101", "Nguyen, Van Dung"),
+            _scopus_author(other_id, "1102", "Tran, Van Dung"),
+        ],
+        lecturers=[lecturer],
+    )
+
+    assert len(result.discovered) == 1
+    assert result.discovered[0].scopus_author_id == true_author_id
+    assert other_id in {u.scopus_author_id for u in result.unattributed}, (
+        "Tran Van Dung must not match Nguyen Van Dung even via reversed-name fallback"
+    )
