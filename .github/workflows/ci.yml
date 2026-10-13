@@ -63,7 +63,6 @@ jobs:
       # other two signals _ci_container_network_allowed() requires — all
       # three together, never just one. Never set this outside CI.
       DB_SAFETY_GUARD_CI_CONTAINER_NETWORK: "1"
-      DB_SAFETY_GUARD_CI_CONTAINER_NETWORK: "1"
 
     steps:
       - uses: actions/checkout@v4

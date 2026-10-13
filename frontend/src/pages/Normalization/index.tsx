@@ -13,6 +13,7 @@ import ModalPortal from "../../components/common/ModalPortal";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import AffiliationsTab from "./AffiliationsTab";
 import AuthorsTab from "./AuthorsTab";
+import MatchingTab from "./MatchingTab";
 
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
@@ -50,7 +51,7 @@ export default function NormalizationPage() {
   const [searchParams] = useSearchParams();
   const requestedImportId = searchParams.get("import");
 
-  const [activeTab, setActiveTab] = useState<"publications" | "authors" | "affiliations">("publications");
+  const [activeTab, setActiveTab] = useState<"publications" | "authors" | "affiliations" | "matching">("publications");
   const [history, setHistory] = useState<ScopusImport[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -312,12 +313,34 @@ export default function NormalizationPage() {
             </svg>
             <span className="truncate">{locale === "vi" ? "Đơn vị tác giả" : "Author affiliations"}</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("matching")}
+            data-testid="tab-matching"
+            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+              activeTab === "matching"
+                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
+                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
+            }`}
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+            <span className="truncate">{locale === "vi" ? "Đối sánh" : "Matching"}</span>
+          </button>
         </div>
       </div>
 
       {activeTab === "affiliations" && (
         <div className="tab-fade-in">
           <AffiliationsTab locale={locale} />
+        </div>
+      )}
+
+      {activeTab === "matching" && (
+        <div className="tab-fade-in">
+          <MatchingTab locale={locale} />
         </div>
       )}
 

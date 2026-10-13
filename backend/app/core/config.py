@@ -97,6 +97,13 @@ class Settings(BaseSettings):
     affiliation_source_dir: str | None = Field(None, validation_alias="AFFILIATION_SOURCE_DIR")
 
     # ------------------------------------------------------------------
+    # ICTU Craw known-publication source bundle (offline).  Fixed by the
+    # operator; the ADMIN workflow never accepts a path from a request.
+    # Optional: without it the ingestion endpoint reports "not configured".
+    # ------------------------------------------------------------------
+    craw_source_dir: str | None = Field(None, validation_alias="CRAW_SOURCE_DIR")
+
+    # ------------------------------------------------------------------
     # Online affiliation enrichment (Priority 1).  Each run writes its own
     # bundle under this directory (never the offline AFFILIATION_SOURCE_DIR
     # above, never a path from a request). Optional: without it the

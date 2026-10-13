@@ -521,7 +521,17 @@ export default function ApprovalQueuePage() {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 align-middle">
-                        {item.publication_support_count > 0 ? (
+                        {item.publication_support_count > 0 && item.name_evidence_count === 0 ? (
+                          <div>
+                            <span
+                              className="inline-flex h-5 items-center rounded-full border border-violet-200 bg-violet-50 px-2 text-[10px] font-bold text-violet-700"
+                              title="Ứng viên này không khớp tên theo quy tắc chuẩn — được tìm thấy vì công bố Craw của giảng viên trùng DOI/tiêu đề với Scopus Author này ở đúng vị trí tác giả có liên quan tên. Chưa phải xác nhận danh tính."
+                            >
+                              Chỉ từ Craw (không khớp tên)
+                            </span>
+                            <div className="mt-1 text-[10px] text-slate-400">{item.publication_support_count} công bố Craw</div>
+                          </div>
+                        ) : item.publication_support_count > 0 ? (
                           <div>
                             <span className="inline-flex h-5 items-center rounded-full border border-cyan-200 bg-cyan-50 px-2 text-[10px] font-bold text-cyan-700">
                               Có công bố hỗ trợ
@@ -686,6 +696,13 @@ export default function ApprovalQueuePage() {
             <Divider orientation="left">C. Bằng chứng tên</Divider>
             {detail.name_evidence.length > 0 ? (
               <div className="space-y-3">{detail.name_evidence.map((evidence) => <NameEvidenceCard key={evidence.evidence_id} evidence={evidence} />)}</div>
+            ) : detail.publication_evidence.length > 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="Ứng viên này KHÔNG khớp tên theo 4 quy tắc chuẩn"
+                description="Được đề xuất vì công bố Craw của giảng viên trùng DOI/tiêu đề với công bố Scopus này, ở đúng vị trí tác giả có tương quan tên (xem mục D). Đây chưa phải xác nhận danh tính — hãy tự đối chiếu tên/ngữ cảnh trước khi quyết định."
+              />
             ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Không có bằng chứng tên." />}
 
             <Divider orientation="left">D. Bằng chứng công bố</Divider>
