@@ -1,6 +1,6 @@
 /** ADMIN workflow: author-affiliation source status -> preview -> apply. */
 
-import { apiDelete, apiGet, apiPost, apiPut, ApiRequestOptions } from "./client";
+import { apiGet, apiPost, apiPut, ApiRequestOptions } from "./client";
 
 export interface AffiliationBundleFile {
   name: string;
@@ -143,7 +143,7 @@ export function cancelOnlineEnrichment(jobId: string, options: ApiRequestOptions
   );
 }
 
-// --------------------------------------------------------------------------- manual review (Priority 2)
+// --------------------------------------------------------------------------- manual review (Priority 2 / NO-JSON closure)
 export interface NeedsReviewItem {
   publication_author_id: string;
   eid: string;
@@ -154,7 +154,8 @@ export interface NeedsReviewItem {
   reason_kind: "UNRESOLVED" | "CONFLICTING_SOURCES" | "LOW_CONFIDENCE";
   resolution_summaries: Array<{ source_system: string; link_status: string; unresolved_reason: string | null }>;
   has_override: boolean;
-  override: OverrideFull | null;
+  /** ALL overrides for this position — active and revoked, newest first. */
+  overrides: OverrideFull[];
 }
 
 export interface NeedsReviewListResponse {
@@ -167,21 +168,37 @@ export interface OverrideFull {
   publication_author_id: string;
   affiliation_text: string;
   confidence: "CORROBORATED" | "UNRESOLVED";
+  status: "ACTIVE" | "REVOKED";
   evidence_url: string;
   reason: string;
   created_by_user_id: string;
   updated_by_user_id: string;
+  revoked_by_user_id: string | null;
+  revoked_at: string | null;
   version: number;
   created_at: string;
   updated_at: string;
 }
 
-export interface UpsertOverrideBody {
+export interface AddOverrideBody {
+  publication_author_id: string;
   affiliation_text: string;
   confidence: "CORROBORATED" | "UNRESOLVED";
   evidence_url: string;
   reason: string;
-  expected_version?: number | null;
+}
+
+export interface UpdateOverrideBody {
+  affiliation_text: string;
+  confidence: "CORROBORATED" | "UNRESOLVED";
+  evidence_url: string;
+  reason: string;
+  expected_version: number;
+}
+
+export interface RevokeOverrideBody {
+  reason: string;
+  expected_version: number;
 }
 
 export function getNeedsReview(
@@ -195,25 +212,29 @@ export function getNeedsReview(
   return apiGet<NeedsReviewListResponse>(`/api/v1/affiliations/needs-review${qs ? `?${qs}` : ""}`, options);
 }
 
-export function putOverride(
-  publicationAuthorId: string,
-  body: UpsertOverrideBody,
-  options: ApiRequestOptions = {},
-): Promise<OverrideFull> {
-  return apiPut<OverrideFull, UpsertOverrideBody>(
-    `/api/v1/affiliations/overrides/${publicationAuthorId}`,
-    body,
-    options,
-  );
+/** Add a new active unit statement for a position. Does not touch any other override already on it. */
+export function addOverride(body: AddOverrideBody, options: ApiRequestOptions = {}): Promise<OverrideFull> {
+  return apiPost<OverrideFull, AddOverrideBody>("/api/v1/affiliations/overrides", body, options);
 }
 
-export function deleteOverride(
-  publicationAuthorId: string,
-  expectedVersion: number,
+/** Edit exactly one override by its own id. */
+export function updateOverride(
+  overrideId: string,
+  body: UpdateOverrideBody,
   options: ApiRequestOptions = {},
-): Promise<{ deleted: boolean }> {
-  return apiDelete<{ deleted: boolean }>(
-    `/api/v1/affiliations/overrides/${publicationAuthorId}?expected_version=${expectedVersion}`,
+): Promise<OverrideFull> {
+  return apiPut<OverrideFull, UpdateOverrideBody>(`/api/v1/affiliations/overrides/${overrideId}`, body, options);
+}
+
+/** Revoke one override (kept, not deleted, for audit); other overrides on the position are unaffected. */
+export function revokeOverride(
+  overrideId: string,
+  body: RevokeOverrideBody,
+  options: ApiRequestOptions = {},
+): Promise<OverrideFull> {
+  return apiPost<OverrideFull, RevokeOverrideBody>(
+    `/api/v1/affiliations/overrides/${overrideId}/revoke`,
+    body,
     options,
   );
 }

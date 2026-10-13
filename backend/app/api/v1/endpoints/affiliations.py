@@ -259,7 +259,7 @@ def cancel_online_enrichment(job_id: uuid.UUID, admin: AdminUser, db: DatabaseSe
     return _job_read(job)
 
 
-# --------------------------------------------------------------------------- manual review (Priority 2)
+# --------------------------------------------------------------------------- manual review (Priority 2 / NO-JSON closure)
 class NeedsReviewItemRead(BaseModel):
     publication_author_id: uuid.UUID
     eid: str
@@ -270,7 +270,8 @@ class NeedsReviewItemRead(BaseModel):
     reason_kind: str
     resolution_summaries: list[dict[str, Any]]
     has_override: bool
-    override: "OverrideRead | None" = None
+    # ALL overrides for this position — active and revoked, newest first.
+    overrides: list["OverrideRead"] = Field(default_factory=list)
 
 
 class NeedsReviewListResponse(BaseModel):
@@ -283,23 +284,43 @@ class OverrideRead(BaseModel):
     publication_author_id: uuid.UUID
     affiliation_text: str
     confidence: str
+    status: str
     evidence_url: str
     reason: str
     created_by_user_id: uuid.UUID
     updated_by_user_id: uuid.UUID
+    revoked_by_user_id: uuid.UUID | None
+    revoked_at: str | None
     version: int
     created_at: str
     updated_at: str
 
 
-class UpsertOverrideRequest(BaseModel):
+class AddOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    publication_author_id: uuid.UUID
+    affiliation_text: str = Field(min_length=1, max_length=2000)
+    confidence: str
+    evidence_url: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class UpdateOverrideRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     affiliation_text: str = Field(min_length=1, max_length=2000)
     confidence: str
     evidence_url: str = Field(min_length=1, max_length=2000)
     reason: str = Field(min_length=1, max_length=2000)
-    expected_version: int | None = None
+    expected_version: int
+
+
+class RevokeOverrideRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(min_length=1, max_length=2000)
+    expected_version: int
 
 
 def _override_read(row: override_service.PublicationAuthorAffiliationOverride) -> OverrideRead:
@@ -308,10 +329,13 @@ def _override_read(row: override_service.PublicationAuthorAffiliationOverride) -
         publication_author_id=row.publication_author_id,
         affiliation_text=row.affiliation_text,
         confidence=row.confidence,
+        status=row.status,
         evidence_url=row.evidence_url,
         reason=row.reason,
         created_by_user_id=row.created_by_user_id,
         updated_by_user_id=row.updated_by_user_id,
+        revoked_by_user_id=row.revoked_by_user_id,
+        revoked_at=row.revoked_at.isoformat() if row.revoked_at else None,
         version=row.version,
         created_at=row.created_at.isoformat(),
         updated_at=row.updated_at.isoformat(),
@@ -342,7 +366,7 @@ def needs_review(
                 reason_kind=i.reason_kind,
                 resolution_summaries=i.resolution_summaries,
                 has_override=i.has_override,
-                override=_override_read(i.override) if i.override is not None else None,
+                overrides=[_override_read(o) for o in i.overrides],
             )
             for i in items
         ],
@@ -350,19 +374,44 @@ def needs_review(
     )
 
 
-@router.put(
-    "/overrides/{publication_author_id}",
+@router.post(
+    "/overrides",
     response_model=OverrideRead,
-    summary="Create or update the ADMIN override for one author position",
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a new active unit statement for one author position (does not touch other overrides on it)",
 )
-def put_override(
-    publication_author_id: uuid.UUID, body: UpsertOverrideRequest, admin: AdminUser, db: DatabaseSession
-) -> OverrideRead:
+def add_override(body: AddOverrideRequest, admin: AdminUser, db: DatabaseSession) -> OverrideRead:
     try:
-        row = override_service.upsert_override(
+        row = override_service.add_override(
             db,
-            override_service.UpsertOverrideCommand(
-                publication_author_id=publication_author_id,
+            override_service.AddOverrideCommand(
+                publication_author_id=body.publication_author_id,
+                affiliation_text=body.affiliation_text,
+                confidence=body.confidence,
+                evidence_url=body.evidence_url,
+                reason=body.reason,
+                actor_user_id=admin.id,
+            ),
+        )
+    except override_service.AffiliationOverrideError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    return _override_read(row)
+
+
+@router.put(
+    "/overrides/{override_id}",
+    response_model=OverrideRead,
+    summary="Edit exactly one override by its own id (other overrides on the same position are unaffected)",
+)
+def put_override(override_id: uuid.UUID, body: UpdateOverrideRequest, admin: AdminUser, db: DatabaseSession) -> OverrideRead:
+    try:
+        row = override_service.update_override(
+            db,
+            override_service.UpdateOverrideCommand(
+                override_id=override_id,
                 affiliation_text=body.affiliation_text,
                 confidence=body.confidence,
                 evidence_url=body.evidence_url,
@@ -379,19 +428,20 @@ def put_override(
     return _override_read(row)
 
 
-@router.delete(
-    "/overrides/{publication_author_id}",
-    response_model=dict,
-    summary="Remove the ADMIN override for one author position (not the automated resolutions)",
+@router.post(
+    "/overrides/{override_id}/revoke",
+    response_model=OverrideRead,
+    summary="Revoke one override (kept, not deleted, for audit) without affecting other overrides on the position",
 )
-def remove_override(
-    publication_author_id: uuid.UUID, expected_version: int, admin: AdminUser, db: DatabaseSession
-) -> dict[str, bool]:
+def revoke_override_endpoint(
+    override_id: uuid.UUID, body: RevokeOverrideRequest, admin: AdminUser, db: DatabaseSession
+) -> OverrideRead:
     try:
-        override_service.delete_override(
+        row = override_service.revoke_override(
             db,
-            publication_author_id=publication_author_id,
-            expected_version=expected_version,
+            override_id=override_id,
+            expected_version=body.expected_version,
+            reason=body.reason,
             actor_user_id=admin.id,
         )
     except override_service.AffiliationOverrideError as exc:
@@ -399,4 +449,4 @@ def remove_override(
     except SQLAlchemyError as exc:
         db.rollback()
         raise _db_error(exc) from exc
-    return {"deleted": True}
+    return _override_read(row)

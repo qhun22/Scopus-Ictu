@@ -241,11 +241,15 @@ export function AuthorAffiliationCell({
     </div>
   );
 
+  const overrides = author.affiliation_overrides ?? [];
+
   if (status === "NOT_RECONCILED") {
     return (
       <div>
         <AffiliationBadge status={status} locale={locale} />
-        {author.affiliation_override && <OverrideNote override={author.affiliation_override} locale={locale} />}
+        {overrides.map((o, i) => (
+          <OverrideNote key={i} override={o} locale={locale} />
+        ))}
       </div>
     );
   }
@@ -258,7 +262,9 @@ export function AuthorAffiliationCell({
           <span className="text-slate-500">{vi ? "Chưa xác định được đơn vị" : "Unit could not be determined"}</span>
         </div>
         {resolutionLine}
-        {author.affiliation_override && <OverrideNote override={author.affiliation_override} locale={locale} />}
+        {overrides.map((o, i) => (
+          <OverrideNote key={i} override={o} locale={locale} />
+        ))}
       </div>
     );
   }
@@ -314,7 +320,9 @@ export function AuthorAffiliationCell({
         </ul>
       )}
       {resolutionLine}
-      {author.affiliation_override && <OverrideNote override={author.affiliation_override} locale={locale} />}
+      {overrides.map((o, i) => (
+        <OverrideNote key={i} override={o} locale={locale} />
+      ))}
     </div>
   );
 }

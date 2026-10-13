@@ -89,11 +89,14 @@ class AffiliationResolutionRead(BaseModel):
 class AffiliationOverrideRead(BaseModel):
     """ADMIN-entered affiliation statement, layered on top of the automated
     resolutions — never asserted as independently verified by this alone.
+    A position may have several of these at once (e.g. a dual appointment).
 
     Public-safe subset shown in the publication detail (read by ADMIN,
     REVIEWER and LECTURER alike): no internal IDs (publication_author_id,
-    actor user ids). The ADMIN review UI gets those from the dedicated
-    ``/needs-review`` and ``/overrides`` endpoints instead.
+    actor user ids). Only ACTIVE overrides are ever included here — a
+    REVOKED one is history, visible only through the ADMIN-only
+    ``/needs-review`` and ``/overrides`` endpoints. The ADMIN review UI
+    also gets per-row ids/actor ids from those dedicated endpoints.
     """
 
     affiliation_text: str
@@ -119,7 +122,8 @@ class PublicationAuthorRead(BaseModel):
     source_has_affiliation: bool | None = None
     affiliations: list[AuthorAffiliationRead] = Field(default_factory=list)
     affiliation_resolutions: list[AffiliationResolutionRead] = Field(default_factory=list)
-    affiliation_override: AffiliationOverrideRead | None = None
+    # ALL currently-active ADMIN overrides for this position (0, 1, or many).
+    affiliation_overrides: list[AffiliationOverrideRead] = Field(default_factory=list)
 
 
 class AffiliationSummaryRead(BaseModel):

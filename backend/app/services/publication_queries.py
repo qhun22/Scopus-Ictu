@@ -228,15 +228,22 @@ def _author_rows(
 
 def _override_rows(
     session: Session, publication_author_ids: Sequence[uuid.UUID]
-) -> dict[uuid.UUID, PublicationAuthorAffiliationOverride]:
+) -> dict[uuid.UUID, list[PublicationAuthorAffiliationOverride]]:
+    """ACTIVE overrides only, grouped by position — a REVOKED row is
+    ADMIN-only history, never shown in the public-safe publication detail."""
+
     if not publication_author_ids:
         return {}
     rows = session.scalars(
         select(PublicationAuthorAffiliationOverride).where(
-            PublicationAuthorAffiliationOverride.publication_author_id.in_(publication_author_ids)
+            PublicationAuthorAffiliationOverride.publication_author_id.in_(publication_author_ids),
+            PublicationAuthorAffiliationOverride.status == "ACTIVE",
         )
     ).all()
-    return {r.publication_author_id: r for r in rows}
+    grouped: dict[uuid.UUID, list[PublicationAuthorAffiliationOverride]] = {}
+    for r in rows:
+        grouped.setdefault(r.publication_author_id, []).append(r)
+    return grouped
 
 
 def _override_read(row: PublicationAuthorAffiliationOverride) -> AffiliationOverrideRead:
@@ -452,9 +459,7 @@ def get_publication_detail(
             author_order=author_order,
             scopus_id=scopus_id,
             preferred_name=preferred_name,
-            affiliation_override=_override_read(overrides[publication_author_id])
-            if publication_author_id in overrides
-            else None,
+            affiliation_overrides=[_override_read(o) for o in overrides.get(publication_author_id, [])],
         )
         for publication_author_id, author_order, scopus_id, preferred_name in author_rows
     ]

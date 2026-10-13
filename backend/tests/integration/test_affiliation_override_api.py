@@ -1,10 +1,12 @@
-"""Priority 2: ADMIN manual affiliation review (needs-review list, create/update/
-delete an override), isolated schema per test.
+"""NO-JSON closure: ADMIN manual affiliation review with MULTIPLE independent
+overrides per author position (add/update/revoke), isolated schema per test.
 
 An override never writes to publication_author_affiliation(_resolutions) or
 touches raw Scopus data — only its own additive table. CORROBORATED/UNRESOLVED
 are the only confidence levels an override can carry; it can never assert
-VERIFIED.
+VERIFIED. A position may carry several ACTIVE overrides at once (dual
+appointment); each has its own add/update/revoke lifecycle, scoped to that
+one row only.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from app.models.publication import Publication, PublicationAuthor, ScopusAuthor
 from app.services import affiliation_override_service as override_service
 from app.services.affiliation_import import AffiliationImportService, ResolutionInput
 
-NOW = datetime(2026, 10, 12, 8, 0, tzinfo=UTC)
+NOW = datetime(2026, 10, 13, 8, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -40,7 +42,7 @@ def db() -> Generator[Session, None, None]:
         pytest.skip("TEST_DATABASE_URL is required")
     if make_url(url).database in {"scopus_ictu_acceptance_v2", "scopus_ictu_ui_clean"}:
         pytest.fail("never target an acceptance database")
-    schema = f"test_t2_override_{uuid.uuid4().hex}"
+    schema = f"test_nojson_override_{uuid.uuid4().hex}"
     admin_engine = create_engine(url, future=True)
     with admin_engine.begin() as conn:
         conn.execute(text(f'CREATE SCHEMA "{schema}"'))
@@ -131,13 +133,25 @@ def world(db: Session) -> dict:
     return {"p1": p1, "p2": p2, "pa1": pa1, "pa2": pa2, "pa4": pa4}
 
 
+def _add(client, publication_author_id, **overrides) -> dict:
+    body = {
+        "publication_author_id": str(publication_author_id),
+        "affiliation_text": "X",
+        "confidence": "CORROBORATED",
+        "evidence_url": "https://x",
+        "reason": "r",
+    }
+    body.update(overrides)
+    resp = client.post("/api/v1/affiliations/overrides", json=body)
+    return resp
+
+
 # --------------------------------------------------------------------------- RBAC
 @pytest.mark.parametrize("role", ["LECTURER", "REVIEWER"])
 def test_only_admin_can_use_needs_review_and_overrides(client, as_role, role, world) -> None:
     as_role(role)
     assert client.get("/api/v1/affiliations/needs-review").status_code == 403
-    body = {"affiliation_text": "X", "confidence": "CORROBORATED", "evidence_url": "https://x", "reason": "r"}
-    assert client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=body).status_code == 403
+    assert _add(client, world["pa1"].id).status_code == 403
 
 
 def test_anonymous_is_unauthenticated(client) -> None:
@@ -150,9 +164,6 @@ def test_needs_review_lists_unresolved_and_corroborated_not_not_reconciled(clien
     resp = client.get("/api/v1/affiliations/needs-review")
     assert resp.status_code == 200
     body = resp.json()
-    kinds = {item["eid"]: item["reason_kind"] for item in body["items"]}
-    assert kinds == {"E1": "UNRESOLVED"} or set(kinds) == {"E1"}
-    # both E1 authors appear (111 UNRESOLVED, 222 CORROBORATED-only); E2/444 never reconciled -> absent
     eids_orders = {(item["eid"], item["author_order"]) for item in body["items"]}
     assert ("E1", 1) in eids_orders  # 111, UNRESOLVED
     assert ("E1", 2) in eids_orders  # 222, CORROBORATED only -> LOW_CONFIDENCE
@@ -162,81 +173,192 @@ def test_needs_review_lists_unresolved_and_corroborated_not_not_reconciled(clien
     assert item_111["reason_kind"] == "UNRESOLVED"
     assert item_222["reason_kind"] == "LOW_CONFIDENCE"
     assert item_111["has_override"] is False
+    assert item_111["overrides"] == []
 
 
-# --------------------------------------------------------------------------- create / update
-def test_admin_creates_override_with_evidence_and_reason(client, as_role, db, world) -> None:
+# --------------------------------------------------------------------------- add
+def test_admin_adds_override_with_evidence_and_reason(client, as_role, db, world) -> None:
     admin = as_role("ADMIN")
-    body = {
-        "affiliation_text": "Khoa Công nghệ Thông tin, Đại học X",
-        "confidence": "CORROBORATED",
-        "evidence_url": "https://example.edu.vn/staff/111",
-        "reason": "Trang nhân sự chính thức của trường liệt kê đúng tên và chức danh.",
-    }
-    resp = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=body)
-    assert resp.status_code == 200, resp.text
+    resp = _add(
+        client, world["pa1"].id,
+        affiliation_text="Khoa Công nghệ Thông tin, Đại học X",
+        confidence="CORROBORATED",
+        evidence_url="https://example.edu.vn/staff/111",
+        reason="Trang nhân sự chính thức của trường liệt kê đúng tên và chức danh.",
+    )
+    assert resp.status_code == 201, resp.text
     data = resp.json()
     assert data["version"] == 1
+    assert data["status"] == "ACTIVE"
     assert data["created_by_user_id"] == str(admin.id)
 
     row = db.scalar(select(PublicationAuthorAffiliationOverride))
-    assert row.affiliation_text == body["affiliation_text"]
+    assert row.affiliation_text == "Khoa Công nghệ Thông tin, Đại học X"
     assert row.confidence == "CORROBORATED"
+    assert row.status == "ACTIVE"
 
     audits = db.scalars(select(AuditEvent).where(AuditEvent.action == override_service.CREATED_ACTION)).all()
     assert len(audits) == 1
     assert audits[0].actor_user_id == admin.id
     assert audits[0].before_state is None
-    assert audits[0].after_state["affiliation_text"] == body["affiliation_text"]
 
 
 def test_missing_reason_or_evidence_is_rejected(client, as_role, world) -> None:
     as_role("ADMIN")
-    base = {"affiliation_text": "X", "confidence": "CORROBORATED", "evidence_url": "https://x", "reason": "r"}
     for field in ("evidence_url", "reason", "affiliation_text"):
-        body = {**base, field: "   "}
-        resp = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=body)
+        resp = _add(client, world["pa1"].id, **{field: "   "})
         assert resp.status_code == 422, f"{field} should be rejected: {resp.text}"
 
 
 def test_invalid_confidence_is_rejected(client, as_role, world) -> None:
     as_role("ADMIN")
-    body = {"affiliation_text": "X", "confidence": "VERIFIED", "evidence_url": "https://x", "reason": "r"}
-    resp = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=body)
+    resp = _add(client, world["pa1"].id, confidence="VERIFIED")
     assert resp.status_code == 422
     assert resp.json()["code"] == "INVALID_CONFIDENCE"
 
 
 def test_unknown_publication_author_is_404(client, as_role) -> None:
     as_role("ADMIN")
-    body = {"affiliation_text": "X", "confidence": "CORROBORATED", "evidence_url": "https://x", "reason": "r"}
-    resp = client.put(f"/api/v1/affiliations/overrides/{uuid.uuid4()}", json=body)
+    resp = _add(client, uuid.uuid4())
     assert resp.status_code == 404
     assert resp.json()["code"] == "PUBLICATION_AUTHOR_NOT_FOUND"
 
 
+# --------------------------------------------------------------------------- MULTIPLE overrides per position
+def test_one_position_can_have_two_independent_active_overrides(client, as_role, db, world) -> None:
+    """Dual appointment: the same author position gets two ACTIVE overrides
+    with different unit text. Both must coexist."""
+
+    as_role("ADMIN")
+    first = _add(client, world["pa1"].id, affiliation_text="University A", reason="Primary appointment")
+    second = _add(client, world["pa1"].id, affiliation_text="Institute B", reason="Secondary appointment")
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["id"] != second.json()["id"]
+
+    rows = db.scalars(select(PublicationAuthorAffiliationOverride)).all()
+    assert len(rows) == 2
+    assert {r.affiliation_text for r in rows} == {"University A", "Institute B"}
+    assert all(r.status == "ACTIVE" for r in rows)
+
+    detail = client.get("/api/v1/publications/E1").json()
+    author_1 = next(a for a in detail["authors"] if a["author_order"] == 1)
+    assert {o["affiliation_text"] for o in author_1["affiliation_overrides"]} == {"University A", "Institute B"}
+
+
+def test_duplicate_active_text_on_same_position_is_rejected(client, as_role, world) -> None:
+    as_role("ADMIN")
+    first = _add(client, world["pa1"].id, affiliation_text="University A")
+    assert first.status_code == 201
+    second = _add(client, world["pa1"].id, affiliation_text="University A")
+    assert second.status_code == 409
+    assert second.json()["code"] == "DUPLICATE_ACTIVE_OVERRIDE"
+
+
+def test_revoke_then_readd_identical_text_is_allowed(client, as_role, world) -> None:
+    as_role("ADMIN")
+    created = _add(client, world["pa1"].id, affiliation_text="University A").json()
+    revoke_resp = client.post(
+        f"/api/v1/affiliations/overrides/{created['id']}/revoke",
+        json={"reason": "No longer accurate", "expected_version": created["version"]},
+    )
+    assert revoke_resp.status_code == 200
+    assert revoke_resp.json()["status"] == "REVOKED"
+
+    readd = _add(client, world["pa1"].id, affiliation_text="University A")
+    assert readd.status_code == 201, readd.text
+
+
+def test_editing_one_override_never_touches_a_sibling_override(client, as_role, db, world) -> None:
+    as_role("ADMIN")
+    a = _add(client, world["pa1"].id, affiliation_text="University A").json()
+    b = _add(client, world["pa1"].id, affiliation_text="Institute B").json()
+
+    update_resp = client.put(
+        f"/api/v1/affiliations/overrides/{a['id']}",
+        json={
+            "affiliation_text": "University A (renamed)",
+            "confidence": "CORROBORATED",
+            "evidence_url": "https://x/new",
+            "reason": "typo fix",
+            "expected_version": a["version"],
+        },
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["affiliation_text"] == "University A (renamed)"
+
+    b_unchanged = db.get(PublicationAuthorAffiliationOverride, uuid.UUID(b["id"]))
+    assert b_unchanged.affiliation_text == "Institute B"
+    assert b_unchanged.version == 1
+
+
+def test_revoking_one_override_never_touches_a_sibling_override(client, as_role, db, world) -> None:
+    as_role("ADMIN")
+    a = _add(client, world["pa1"].id, affiliation_text="University A").json()
+    b = _add(client, world["pa1"].id, affiliation_text="Institute B").json()
+
+    revoke_resp = client.post(
+        f"/api/v1/affiliations/overrides/{a['id']}/revoke",
+        json={"reason": "Ended appointment", "expected_version": a["version"]},
+    )
+    assert revoke_resp.status_code == 200
+
+    a_row = db.get(PublicationAuthorAffiliationOverride, uuid.UUID(a["id"]))
+    b_row = db.get(PublicationAuthorAffiliationOverride, uuid.UUID(b["id"]))
+    assert a_row.status == "REVOKED"
+    assert b_row.status == "ACTIVE"  # sibling untouched
+
+    # revoked row is kept for audit, not deleted
+    assert db.scalar(select(PublicationAuthorAffiliationOverride).where(PublicationAuthorAffiliationOverride.id == a_row.id)) is not None
+
+    # the public-safe publication detail only shows the still-active one
+    detail = client.get("/api/v1/publications/E1").json()
+    author_1 = next(a for a in detail["authors"] if a["author_order"] == 1)
+    assert [o["affiliation_text"] for o in author_1["affiliation_overrides"]] == ["Institute B"]
+
+
+def test_revoked_override_history_survives_in_audit_and_admin_view(client, as_role, db, world) -> None:
+    as_role("ADMIN")
+    a = _add(client, world["pa1"].id, affiliation_text="University A").json()
+    client.post(
+        f"/api/v1/affiliations/overrides/{a['id']}/revoke",
+        json={"reason": "Ended appointment", "expected_version": a["version"]},
+    )
+
+    audits = db.scalars(
+        select(AuditEvent).where(AuditEvent.action == override_service.REVOKED_ACTION)
+    ).all()
+    assert len(audits) == 1
+    assert audits[0].before_state["status"] == "ACTIVE"
+    assert audits[0].after_state["status"] == "REVOKED"
+
+    resp = client.get("/api/v1/affiliations/needs-review")
+    item_1 = next(i for i in resp.json()["items"] if i["author_order"] == 1)
+    statuses = {o["status"] for o in item_1["overrides"]}
+    assert statuses == {"REVOKED"}
+    assert item_1["has_override"] is False  # no ACTIVE override remains
+
+
+# --------------------------------------------------------------------------- update / revoke errors
 def test_update_requires_correct_expected_version_and_records_before_after(client, as_role, db, world) -> None:
-    admin = as_role("ADMIN")
-    create_body = {"affiliation_text": "V1", "confidence": "UNRESOLVED", "evidence_url": "https://x/1", "reason": "r1"}
-    created = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=create_body).json()
+    as_role("ADMIN")
+    created = _add(client, world["pa1"].id, affiliation_text="V1", confidence="UNRESOLVED", evidence_url="https://x/1", reason="r1").json()
     assert created["version"] == 1
 
-    update_body = {
-        "affiliation_text": "V2 updated",
-        "confidence": "CORROBORATED",
-        "evidence_url": "https://x/2",
-        "reason": "r2 - sửa theo bằng chứng mới",
-        "expected_version": 1,
-    }
-    resp = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=update_body)
+    resp = client.put(
+        f"/api/v1/affiliations/overrides/{created['id']}",
+        json={
+            "affiliation_text": "V2 updated", "confidence": "CORROBORATED",
+            "evidence_url": "https://x/2", "reason": "r2 - sửa theo bằng chứng mới",
+            "expected_version": 1,
+        },
+    )
     assert resp.status_code == 200, resp.text
     updated = resp.json()
     assert updated["version"] == 2
     assert updated["affiliation_text"] == "V2 updated"
 
-    audits = db.scalars(
-        select(AuditEvent).where(AuditEvent.action == override_service.UPDATED_ACTION)
-    ).all()
+    audits = db.scalars(select(AuditEvent).where(AuditEvent.action == override_service.UPDATED_ACTION)).all()
     assert len(audits) == 1
     assert audits[0].before_state["affiliation_text"] == "V1"
     assert audits[0].after_state["affiliation_text"] == "V2 updated"
@@ -244,117 +366,99 @@ def test_update_requires_correct_expected_version_and_records_before_after(clien
 
 def test_update_with_stale_version_is_refused(client, as_role, world) -> None:
     as_role("ADMIN")
-    create_body = {"affiliation_text": "V1", "confidence": "UNRESOLVED", "evidence_url": "https://x", "reason": "r"}
-    client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=create_body)
-
-    stale_body = {
-        "affiliation_text": "V2",
-        "confidence": "CORROBORATED",
-        "evidence_url": "https://x/2",
-        "reason": "r2",
-        "expected_version": 99,  # wrong
-    }
-    resp = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=stale_body)
+    created = _add(client, world["pa1"].id, affiliation_text="V1", confidence="UNRESOLVED").json()
+    resp = client.put(
+        f"/api/v1/affiliations/overrides/{created['id']}",
+        json={
+            "affiliation_text": "V2", "confidence": "CORROBORATED",
+            "evidence_url": "https://x/2", "reason": "r2", "expected_version": 99,
+        },
+    )
     assert resp.status_code == 409
     assert resp.json()["code"] == "STALE_OVERRIDE_VERSION"
 
 
-def test_two_admins_editing_same_position_concurrently_second_commit_is_refused(client, as_role, db, world) -> None:
+def test_two_admins_editing_same_override_concurrently_second_commit_is_refused(client, as_role, db, world) -> None:
     """Simulates sequential-but-stale edits: both load version 1, ADMIN A
     commits first, ADMIN B's commit (still believing version=1) must be refused,
     never silently overwriting A's edit."""
 
-    admin_a = as_role("ADMIN")
-    create_body = {"affiliation_text": "Base", "confidence": "UNRESOLVED", "evidence_url": "https://x", "reason": "r0"}
-    client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=create_body)
+    as_role("ADMIN")
+    created = _add(client, world["pa1"].id, affiliation_text="Base", confidence="UNRESOLVED").json()
 
-    a_body = {
-        "affiliation_text": "A's edit",
-        "confidence": "CORROBORATED",
-        "evidence_url": "https://x/a",
-        "reason": "A reviewed first",
-        "expected_version": 1,
-    }
-    resp_a = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=a_body)
+    resp_a = client.put(
+        f"/api/v1/affiliations/overrides/{created['id']}",
+        json={
+            "affiliation_text": "A's edit", "confidence": "CORROBORATED",
+            "evidence_url": "https://x/a", "reason": "A reviewed first", "expected_version": 1,
+        },
+    )
     assert resp_a.status_code == 200
     assert resp_a.json()["version"] == 2
 
-    b_body = {
-        "affiliation_text": "B's edit (stale)",
-        "confidence": "CORROBORATED",
-        "evidence_url": "https://x/b",
-        "reason": "B reviewed, unaware of A",
-        "expected_version": 1,  # B still thinks it's version 1
-    }
-    resp_b = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=b_body)
+    resp_b = client.put(
+        f"/api/v1/affiliations/overrides/{created['id']}",
+        json={
+            "affiliation_text": "B's edit (stale)", "confidence": "CORROBORATED",
+            "evidence_url": "https://x/b", "reason": "B reviewed, unaware of A", "expected_version": 1,
+        },
+    )
     assert resp_b.status_code == 409
     assert resp_b.json()["code"] == "STALE_OVERRIDE_VERSION"
 
-    row = db.scalar(select(PublicationAuthorAffiliationOverride))
+    row = db.get(PublicationAuthorAffiliationOverride, uuid.UUID(created["id"]))
     assert row.affiliation_text == "A's edit"  # B's write never applied
 
 
-# --------------------------------------------------------------------------- delete
-def test_delete_override_removes_row_and_audits_without_touching_automated_resolution(
-    client, as_role, db, world
-) -> None:
-    from app.models.affiliation import PublicationAuthorAffiliationResolution
-
-    admin = as_role("ADMIN")
-    before_resolution = db.scalar(select(PublicationAuthorAffiliationResolution)).unresolved_reason
-    create_body = {"affiliation_text": "V1", "confidence": "UNRESOLVED", "evidence_url": "https://x", "reason": "r"}
-    client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=create_body)
-
-    resp = client.request(
-        "DELETE", f"/api/v1/affiliations/overrides/{world['pa1'].id}?expected_version=1"
-    )
-    assert resp.status_code == 200
-    assert resp.json()["deleted"] is True
-    assert db.scalar(select(PublicationAuthorAffiliationOverride)) is None
-
-    # the automated (system) resolution underneath is untouched
-    after_resolution = db.scalar(select(PublicationAuthorAffiliationResolution)).unresolved_reason
-    assert after_resolution == before_resolution == "NAME_MISMATCH"
-
-    audits = db.scalars(select(AuditEvent).where(AuditEvent.action == override_service.DELETED_ACTION)).all()
-    assert len(audits) == 1
-
-
-def test_delete_with_wrong_version_is_refused(client, as_role, world) -> None:
+def test_revoking_already_revoked_override_is_rejected(client, as_role, world) -> None:
     as_role("ADMIN")
-    create_body = {"affiliation_text": "V1", "confidence": "UNRESOLVED", "evidence_url": "https://x", "reason": "r"}
-    client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=create_body)
-    resp = client.request(
-        "DELETE", f"/api/v1/affiliations/overrides/{world['pa1'].id}?expected_version=99"
+    created = _add(client, world["pa1"].id, affiliation_text="V1").json()
+    first = client.post(
+        f"/api/v1/affiliations/overrides/{created['id']}/revoke",
+        json={"reason": "r", "expected_version": created["version"]},
     )
-    assert resp.status_code == 409
+    assert first.status_code == 200
+    second = client.post(
+        f"/api/v1/affiliations/overrides/{created['id']}/revoke",
+        json={"reason": "r2", "expected_version": first.json()["version"]},
+    )
+    assert second.status_code == 409
+    assert second.json()["code"] == "OVERRIDE_ALREADY_REVOKED"
 
 
-def test_delete_unknown_override_is_404(client, as_role, world) -> None:
+def test_revoke_missing_reason_is_rejected(client, as_role, world) -> None:
     as_role("ADMIN")
-    resp = client.request(
-        "DELETE", f"/api/v1/affiliations/overrides/{world['pa1'].id}?expected_version=1"
+    created = _add(client, world["pa1"].id, affiliation_text="V1").json()
+    resp = client.post(
+        f"/api/v1/affiliations/overrides/{created['id']}/revoke",
+        json={"reason": "   ", "expected_version": created["version"]},
+    )
+    assert resp.status_code == 422
+
+
+def test_update_unknown_override_is_404(client, as_role, world) -> None:
+    as_role("ADMIN")
+    resp = client.put(
+        f"/api/v1/affiliations/overrides/{uuid.uuid4()}",
+        json={"affiliation_text": "X", "confidence": "CORROBORATED", "evidence_url": "https://x", "reason": "r", "expected_version": 1},
     )
     assert resp.status_code == 404
     assert resp.json()["code"] == "OVERRIDE_NOT_FOUND"
 
 
-# --------------------------------------------------------------------------- publication detail surfaces the override, public-safe
-def test_publication_detail_shows_override_without_leaking_internal_ids(client, as_role, world) -> None:
+# --------------------------------------------------------------------------- publication detail surfaces overrides, public-safe
+def test_publication_detail_shows_overrides_without_leaking_internal_ids(client, as_role, world) -> None:
     admin = as_role("ADMIN")
-    body = {
-        "affiliation_text": "Khoa CNTT",
-        "confidence": "CORROBORATED",
-        "evidence_url": "https://example.edu.vn/111",
-        "reason": "Xác nhận qua trang nhân sự",
-    }
-    client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=body)
+    _add(
+        client, world["pa1"].id, affiliation_text="Khoa CNTT", confidence="CORROBORATED",
+        evidence_url="https://example.edu.vn/111", reason="Xác nhận qua trang nhân sự",
+    )
 
     detail = client.get("/api/v1/publications/E1").json()
     author_1 = next(a for a in detail["authors"] if a["author_order"] == 1)
-    assert author_1["affiliation_override"] is not None
-    assert author_1["affiliation_override"]["affiliation_text"] == "Khoa CNTT"
-    assert author_1["affiliation_override"]["confidence"] == "CORROBORATED"
+    assert len(author_1["affiliation_overrides"]) == 1
+    assert author_1["affiliation_overrides"][0]["affiliation_text"] == "Khoa CNTT"
+    assert author_1["affiliation_overrides"][0]["confidence"] == "CORROBORATED"
     blob = str(detail)
     assert "publication_author_id" not in blob
     assert str(world["pa1"].id) not in blob
@@ -362,17 +466,15 @@ def test_publication_detail_shows_override_without_leaking_internal_ids(client, 
 
 
 def test_override_never_appears_as_verified_in_affiliation_status(client, as_role, world) -> None:
-    """Creating an override must not change author.affiliation_status computed
+    """Adding an override must not change author.affiliation_status computed
     from the automated resolutions — it is a parallel, clearly-labeled layer,
     never promoted into the VERIFIED/CORROBORATED pipeline status itself."""
 
     as_role("ADMIN")
-    body = {"affiliation_text": "X", "confidence": "CORROBORATED", "evidence_url": "https://x", "reason": "r"}
-    client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=body)
+    _add(client, world["pa1"].id, confidence="CORROBORATED")
 
     detail = client.get("/api/v1/publications/E1").json()
     author_1 = next(a for a in detail["authors"] if a["author_order"] == 1)
-    # the automated resolution for author 1 is UNRESOLVED; an override must not change that
     assert author_1["affiliation_status"] == "UNRESOLVED"
 
 
@@ -388,7 +490,7 @@ def test_db_check_constraint_rejects_verified_confidence_bypassing_the_service(d
     bad = PublicationAuthorAffiliationOverride(
         publication_author_id=world["pa1"].id,
         affiliation_text="X",
-        confidence="VERIFIED",  # bypasses override_service._validate entirely
+        confidence="VERIFIED",  # bypasses override_service._validate_text entirely
         evidence_url="https://x",
         reason="r",
         created_by_user_id=admin.id,
@@ -401,26 +503,44 @@ def test_db_check_constraint_rejects_verified_confidence_bypassing_the_service(d
     assert db.scalar(select(PublicationAuthorAffiliationOverride)) is None  # no partial row left behind
 
 
+def test_db_check_constraint_rejects_inconsistent_revoked_state(db, world, as_role) -> None:
+    """Defense in depth: status=REVOKED without revoked_at/revoked_by, or
+    status=ACTIVE with them set, must be rejected by the DB directly."""
+
+    from sqlalchemy.exc import IntegrityError
+
+    admin = as_role("ADMIN")
+    bad = PublicationAuthorAffiliationOverride(
+        publication_author_id=world["pa1"].id,
+        affiliation_text="X",
+        confidence="CORROBORATED",
+        status="REVOKED",  # but revoked_at/revoked_by_user_id left NULL
+        evidence_url="https://x",
+        reason="r",
+        created_by_user_id=admin.id,
+        updated_by_user_id=admin.id,
+    )
+    db.add(bad)
+    with pytest.raises(IntegrityError):
+        db.flush()
+    db.rollback()
+
+
 # --------------------------------------------------------------------------- compatibility with re-collection
-def test_re_applying_automated_resolutions_never_touches_an_existing_override(client, as_role, db, world) -> None:
+def test_re_applying_automated_resolutions_never_touches_existing_overrides(client, as_role, db, world) -> None:
     """A later online-enrichment or offline-bundle apply() run (simulated here
     by calling AffiliationImportService().apply again with a new payload for
-    the same author position) must leave the ADMIN's override completely
+    the same author position) must leave the ADMIN's overrides completely
     untouched — the two layers are stored in different tables and the
     automated writer never references publication_author_affiliation_overrides."""
 
-    admin = as_role("ADMIN")
-    override_body = {
-        "affiliation_text": "Khoa CNTT (ADMIN xác nhận thủ công)",
-        "confidence": "CORROBORATED",
-        "evidence_url": "https://example.edu.vn/111",
-        "reason": "Xác nhận qua hồ sơ nhân sự trước khi có nguồn tự động mới",
-    }
-    created = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=override_body)
-    assert created.status_code == 200
+    as_role("ADMIN")
+    _add(
+        client, world["pa1"].id, affiliation_text="Khoa CNTT (ADMIN xác nhận thủ công)",
+        confidence="CORROBORATED", evidence_url="https://example.edu.vn/111",
+        reason="Xác nhận qua hồ sơ nhân sự trước khi có nguồn tự động mới",
+    )
 
-    # Simulate a new automated collection run (e.g. the online enrichment job
-    # from Priority 1) producing a DIFFERENT payload for the same author/source.
     H_NEW = "9" * 64
     AffiliationImportService().apply(
         db,
@@ -439,28 +559,20 @@ def test_re_applying_automated_resolutions_never_touches_an_existing_override(cl
     assert override_after.version == 1  # untouched — still exactly what the ADMIN entered
     assert override_after.affiliation_text == "Khoa CNTT (ADMIN xác nhận thủ công)"
 
-    # the publication detail still shows BOTH layers side by side, not merged/overwritten
     detail = client.get("/api/v1/publications/E1").json()
     author_1 = next(a for a in detail["authors"] if a["author_order"] == 1)
-    assert author_1["affiliation_override"]["affiliation_text"] == "Khoa CNTT (ADMIN xác nhận thủ công)"
-    # the new automated resolution is visible too, as a separate resolution entry
+    assert author_1["affiliation_overrides"][0]["affiliation_text"] == "Khoa CNTT (ADMIN xác nhận thủ công)"
     sources = {r["source_system"] for r in author_1["affiliation_resolutions"]}
     assert "crossref" in sources
 
 
-# --------------------------------------------------------------------------- regression: needs-review AFTER an override exists
-def test_needs_review_still_works_after_an_override_was_created(client, as_role, world) -> None:
-    """Regression test: list_needs_review must correctly read back the set of
-    publication_author_ids that already have an override (has_override=True),
-    without crashing, once at least one override row exists in the table."""
+# --------------------------------------------------------------------------- needs-review AFTER overrides exist
+def test_needs_review_still_works_after_overrides_exist(client, as_role, world) -> None:
+    """Regression test: list_needs_review must correctly read back overrides
+    grouped by publication_author_id, without crashing, once rows exist."""
 
     as_role("ADMIN")
-    create_body = {
-        "affiliation_text": "Khoa CNTT", "confidence": "CORROBORATED",
-        "evidence_url": "https://x", "reason": "r",
-    }
-    created = client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=create_body)
-    assert created.status_code == 200
+    _add(client, world["pa1"].id, affiliation_text="Khoa CNTT", confidence="CORROBORATED")
 
     resp = client.get("/api/v1/affiliations/needs-review")
     assert resp.status_code == 200, resp.text
@@ -471,24 +583,23 @@ def test_needs_review_still_works_after_an_override_was_created(client, as_role,
     assert item_2["has_override"] is False
 
 
-def test_needs_review_returns_full_override_for_prefilling_the_edit_form(client, as_role, world) -> None:
-    """The ADMIN review UI needs the full override (text/confidence/evidence/
-    reason/version) to pre-fill the edit form without a second round-trip."""
+def test_needs_review_returns_full_overrides_for_prefilling_the_edit_form(client, as_role, world) -> None:
+    """The ADMIN review UI needs the full override list (text/confidence/
+    evidence/reason/version/status per row) to pre-fill edit forms without a
+    second round-trip."""
 
     as_role("ADMIN")
-    create_body = {
-        "affiliation_text": "Khoa CNTT", "confidence": "UNRESOLVED",
-        "evidence_url": "https://x/evidence", "reason": "ly do ban dau",
-    }
-    client.put(f"/api/v1/affiliations/overrides/{world['pa1'].id}", json=create_body)
+    _add(client, world["pa1"].id, affiliation_text="Khoa CNTT", confidence="UNRESOLVED", evidence_url="https://x/evidence", reason="ly do ban dau")
 
     resp = client.get("/api/v1/affiliations/needs-review")
     item_1 = next(i for i in resp.json()["items"] if i["author_order"] == 1)
-    assert item_1["override"] is not None
-    assert item_1["override"]["affiliation_text"] == "Khoa CNTT"
-    assert item_1["override"]["confidence"] == "UNRESOLVED"
-    assert item_1["override"]["evidence_url"] == "https://x/evidence"
-    assert item_1["override"]["version"] == 1
+    assert len(item_1["overrides"]) == 1
+    o = item_1["overrides"][0]
+    assert o["affiliation_text"] == "Khoa CNTT"
+    assert o["confidence"] == "UNRESOLVED"
+    assert o["evidence_url"] == "https://x/evidence"
+    assert o["version"] == 1
+    assert o["status"] == "ACTIVE"
 
     item_2 = next(i for i in resp.json()["items"] if i["author_order"] == 2)
-    assert item_2["override"] is None
+    assert item_2["overrides"] == []

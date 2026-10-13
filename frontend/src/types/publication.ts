@@ -80,7 +80,8 @@ export interface PublicationAuthorRead {
   source_has_affiliation?: boolean | null;
   affiliations?: AuthorAffiliationRead[];
   affiliation_resolutions?: AffiliationResolutionRead[];
-  affiliation_override?: AffiliationOverrideRead | null;
+  /** All currently-active ADMIN overrides for this position (0, 1, or many). */
+  affiliation_overrides?: AffiliationOverrideRead[];
 }
 
 export interface AffiliationSummaryRead {
