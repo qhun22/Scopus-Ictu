@@ -17,68 +17,86 @@ from contextlib import contextmanager
 from typing import Generator
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import Settings
 from app.core.database import get_session_factory
 from app.main import app
+from tests.db_safety_guard import (
+    DatabaseSafetyRefused,
+    assert_safe_for_destructive_test,
+)
 
 
 # ── Isolation guard ────────────────────────────────────────────────────────────
+# db_safety_guard.assert_safe_for_destructive_test() is the single source of
+# truth for "is this database safe to TRUNCATE/DELETE/DROP against" — see
+# that module's docstring for the full rationale. There is deliberately NO
+# environment-variable escape hatch here (the old TEST_ALLOW_LOCAL=1 flag
+# bypassed isolation entirely and has been removed): every destructive
+# fixture re-verifies the live server through that one function, every time,
+# and a missing/unreachable/unverifiable target fails closed.
 def _build_isolated_test_engine() -> Engine | None:
-    """Build an isolated test engine using a disposable schema.
+    """Build the shared engine for destructive-fixture tests, pre-verified
+    against the explicit pytest allowlist. Returns None (never raises) if
+    TEST_DATABASE_URL is absent or the server is unreachable; the caller
+    turns that into a hard pytest.exit so a silent `None` can never let a
+    destructive fixture quietly skip verification and proceed anyway."""
 
-    Strategy B (isolated schema): create a unique schema per test session.
-    Falls back gracefully if PostgreSQL is unavailable.
-    """
+    base_url = os.environ.get("TEST_DATABASE_URL")
+    if not base_url:
+        return None
     try:
-        # Read the base URL from .env, replace DB name with {name}_test_schema
-        base_url = os.environ.get("TEST_DATABASE_URL")
-        if not base_url:
-            return None
-        _assert_test_database_url(base_url)
-
         test_engine = create_engine(base_url, pool_pre_ping=True, future=True)
-
-        # Test the connection is live
-        with test_engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-
+        assert_safe_for_destructive_test(test_engine)
         return test_engine
+    except DatabaseSafetyRefused:
+        raise
     except Exception:
         return None
 
 
-def _assert_test_database_url(base_url: str) -> None:
-    database = make_url(base_url).database
-    if database in {"scopus_ictu_acceptance_v2", "scopus_ictu_ui_clean"}:
-        raise RuntimeError(
-            "TEST_DATABASE_URL must not target an acceptance or forensic database"
-        )
-
-
 ISOLATION_ENGINE: Engine | None = None
 
-# Guard: refuse to run against ENVIRONMENT=local unless TEST_ALLOW_LOCAL=1
-_env = os.environ.get("ENVIRONMENT", "local").lower()
-_can_override = os.environ.get("TEST_ALLOW_LOCAL", "0") == "1"
-
-if not _can_override:
+try:
     ISOLATION_ENGINE = _build_isolated_test_engine()
-    if ISOLATION_ENGINE is None:
-        pytest.exit(
-            "TEST ISOLATION BLOCKER: TEST_DATABASE_URL must point to an available "
-            "isolated PostgreSQL database.\n"
-            "Options:\n"
-            "  1. Set TEST_DATABASE_URL to an isolated PostgreSQL URL, OR\n"
-            "  2. Set TEST_ALLOW_LOCAL=1 if you intentionally want to run tests "
-            "against the local DB (DANGEROUS — will mutate data).\n"
-            "  3. For CI: set ENVIRONMENT=test in the CI environment.",
-            returncode=1,
-        )
+except DatabaseSafetyRefused as exc:
+    pytest.exit(f"DATABASE SAFETY GUARD REFUSED: {exc}", returncode=1)
+
+if ISOLATION_ENGINE is None:
+    pytest.exit(
+        "TEST ISOLATION BLOCKER: TEST_DATABASE_URL must point to an available, "
+        "allowlisted PostgreSQL test database (see tests/db_safety_guard.py). "
+        "There is no override — add the exact database name to "
+        "ALLOWED_TEST_DATABASE_NAMES only after confirming it is disposable "
+        "and never used for manual UI/E2E testing.",
+        returncode=1,
+    )
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Re-verify the live target before any per-test or module fixture runs.
+
+    A wrong TEST_DATABASE_URL therefore aborts before fixtures can create or
+    drop schemas, truncate tables, or execute cleanup. Fixtures using the
+    shared engine still re-check immediately before their own cleanup too.
+    """
+
+    try:
+        assert_safe_for_destructive_test(ISOLATION_ENGINE)
+    except DatabaseSafetyRefused as exc:
+        pytest.fail(f"DATABASE SAFETY GUARD REFUSED: {exc}", pytrace=False)
+
+
+def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
+    """Re-verify before function-scoped fixture finalizers perform cleanup."""
+
+    try:
+        assert_safe_for_destructive_test(ISOLATION_ENGINE)
+    except DatabaseSafetyRefused as exc:
+        pytest.fail(f"DATABASE SAFETY GUARD REFUSED BEFORE FIXTURE CLEANUP: {exc}", pytrace=False)
 
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
@@ -96,7 +114,16 @@ def disable_runtime_recovery_during_tests():
 
 @pytest.fixture
 def isolated_db_engine() -> Engine | None:
-    """Return the isolated test engine if available; None otherwise."""
+    """Return the isolated test engine, RE-VERIFIED against the destructive-
+    test safety guard on every single use (not just once at import time) —
+    a test using this fixture is trusted to TRUNCATE/DELETE against it."""
+
+    if ISOLATION_ENGINE is None:
+        return None
+    try:
+        assert_safe_for_destructive_test(ISOLATION_ENGINE)
+    except DatabaseSafetyRefused as exc:
+        pytest.fail(f"DATABASE SAFETY GUARD REFUSED: {exc}", pytrace=False)
     return ISOLATION_ENGINE
 
 

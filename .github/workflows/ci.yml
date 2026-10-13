@@ -57,6 +57,13 @@ jobs:
       # scripts/generate_matching_candidates.py for the guard this
       # satisfies (requires ENVIRONMENT=test too; never set elsewhere).
       MATCHING_CLI_CI_CONTAINER_NETWORK: "1"
+      # Same allowance, for tests/db_safety_guard.py (the pytest
+      # destructive-fixture guard). GITHUB_ACTIONS=true is already set by
+      # the runner itself; this flag plus ENVIRONMENT=test above are the
+      # other two signals _ci_container_network_allowed() requires — all
+      # three together, never just one. Never set this outside CI.
+      DB_SAFETY_GUARD_CI_CONTAINER_NETWORK: "1"
+      DB_SAFETY_GUARD_CI_CONTAINER_NETWORK: "1"
 
     steps:
       - uses: actions/checkout@v4

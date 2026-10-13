@@ -52,6 +52,7 @@ from app.services.candidate_review_service import (
     StaleCandidateObservationError,
     StaleCandidateVersionError,
 )
+from tests.db_safety_guard import assert_safe_for_destructive_test
 
 
 # ---------------------------------------------------------------------------
@@ -66,6 +67,7 @@ def review_engine() -> Engine:
     if not url:
         pytest.fail("TEST_DATABASE_URL must point to an isolated PostgreSQL database")
     engine = create_engine(url, pool_pre_ping=True, future=True)
+    assert_safe_for_destructive_test(engine)
     Base.metadata.create_all(bind=engine)
     try:
         yield engine
@@ -83,11 +85,13 @@ def session_factory(review_engine: Engine) -> sessionmaker:
 
 @pytest.fixture
 def review_session(
+    review_engine: Engine,
     session_factory: sessionmaker,
 ) -> Generator[Session, None, None]:
     """Yield a session with all relevant tables truncated."""
     session = session_factory()
     try:
+        assert_safe_for_destructive_test(review_engine)
         # Truncate in dependency order.  Use TRUNCATE ... CASCADE to safely
         # handle cross-table FK references (user_notifications, etc).
         from sqlalchemy import text as _text
@@ -115,6 +119,7 @@ def review_session(
         yield session
     finally:
         session.rollback()
+        assert_safe_for_destructive_test(review_engine)
         for model in (
             LecturerScopusCandidateReview,
             IdentityEvidence,

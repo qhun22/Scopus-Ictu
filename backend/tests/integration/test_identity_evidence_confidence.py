@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.identity import IdentityEvidence, LecturerScopusIdentity
 from app.models.master_lecturer import Lecturer
 from app.models.publication import ScopusAuthor
+from tests.db_safety_guard import assert_safe_for_destructive_test
 
 
 @pytest.fixture(scope="module")
@@ -24,6 +25,7 @@ def confidence_engine() -> Engine:
     if not database_url:
         pytest.fail("TEST_DATABASE_URL must point to an isolated PostgreSQL database")
     engine = create_engine(database_url, pool_pre_ping=True, future=True)
+    assert_safe_for_destructive_test(engine)
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
