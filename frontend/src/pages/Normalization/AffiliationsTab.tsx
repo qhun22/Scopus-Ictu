@@ -6,6 +6,7 @@ import {
   cancelOnlineEnrichment,
   EnrichmentJob,
   getAffiliationOverview,
+  getLatestOnlineEnrichment,
   getOnlineEnrichment,
   previewAffiliations,
   startOnlineEnrichment,
@@ -83,6 +84,16 @@ const ENRICHMENT_STATUS_LABEL: Record<string, Record<Locale, string>> = {
   FAILED: { vi: "Thất bại", en: "Failed" },
   CANCELLED: { vi: "Đã hủy", en: "Cancelled" },
 };
+const ENRICHMENT_FAILURE_CODE_LABEL: Record<string, Record<Locale, string>> = {
+  ENRICHMENT_INTERRUPTED: {
+    vi: "Tiến trình bị gián đoạn khi máy chủ khởi động lại. Dữ liệu đã thu thập trước đó (nếu có) không bị mất, nhưng lượt chạy này đã dừng — hãy bắt đầu một lượt thu thập mới.",
+    en: "The run was interrupted by a server restart. Any data collected earlier is not lost, but this run has stopped — start a new collection.",
+  },
+  ENRICHMENT_PROCESSING_FAILED: {
+    vi: "Không thể hoàn tất thu thập dữ liệu trực tuyến. Hãy thử lại; nếu lỗi lặp lại, kiểm tra kết nối mạng của máy chủ.",
+    en: "Could not complete the online collection. Try again; if it keeps failing, check the server's network connection.",
+  },
+};
 const ENRICHMENT_ACTIVE: EnrichmentJob["status"][] = ["RECEIVED", "RUNNING"];
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("vi-VN");
@@ -125,6 +136,29 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // On mount (first load, page reload, or switching back to this tab), ask
+  // the server which job — if any — is the most recent one and show its
+  // real state. This never starts a new job; it only looks up what already
+  // exists in the database, so a reload can never spawn a duplicate run.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const latest = await getLatestOnlineEnrichment();
+        if (!cancelled && latest) {
+          setJob(latest);
+          if (latest.status === "COMPLETED") setSourceMode("online");
+        }
+      } catch {
+        // No job yet, or a transient error — the "Start" button stays the
+        // default state; the ADMIN can still trigger a fresh run.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Poll the active online enrichment job every 2s, same pattern as the
   // Scopus import history page: only while active, pause when the tab is hidden.
@@ -178,6 +212,17 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
       setJob(await startOnlineEnrichment());
     } catch (error) {
       setMessage({ kind: "error", text: explain(error) });
+      // Another tab/ADMIN may have started the already-running job this
+      // request collided with — sync the UI to the real job in the
+      // database instead of leaving a stale "no job" state on screen.
+      if (error instanceof ApiError && error.code === "ENRICHMENT_ALREADY_RUNNING") {
+        try {
+          const latest = await getLatestOnlineEnrichment();
+          if (latest) setJob(latest);
+        } catch {
+          // best-effort sync; the error message already explains the conflict
+        }
+      }
     } finally {
       setStarting(false);
     }
@@ -386,8 +431,19 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                   {fmt(job.orcid_fetched)} ORCID
                 </>
               )}
-              {job.status === "FAILED" && job.error_summary?.message && <> · {job.error_summary.message}</>}
             </p>
+            {job.status === "FAILED" && job.error_summary?.code && (
+              <p className="mt-1 rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-800" data-testid="aff-online-failure-reason">
+                {ENRICHMENT_FAILURE_CODE_LABEL[job.error_summary.code]?.[locale] ?? job.error_summary.message}
+              </p>
+            )}
+            {job.status === "CANCELLED" && (
+              <p className="mt-1 text-slate-500">
+                {vi
+                  ? "Lượt thu thập này đã bị hủy theo yêu cầu. Bắt đầu một lượt mới nếu cần."
+                  : "This run was cancelled on request. Start a new one if needed."}
+              </p>
+            )}
             {job.status === "COMPLETED" && (
               <p className="mt-1 text-slate-500">
                 {vi

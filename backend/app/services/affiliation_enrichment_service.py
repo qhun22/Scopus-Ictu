@@ -18,17 +18,20 @@ module never touches ``publication_author_affiliation*`` tables.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import threading
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import select, text
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.core.config import settings
-from app.core.database import get_session_factory
+from app.core.database import get_engine, get_session_factory
 from app.models.affiliation_enrichment import (
     AFFILIATION_ENRICHMENT_ACTIVE_STATUSES,
     AffiliationEnrichmentJob,
@@ -51,6 +54,56 @@ CANCELLED_ACTION = "AFFILIATION_ONLINE_FETCH_CANCELLED"
 # both pass the SELECT check before either commits (TOCTOU), starting two
 # jobs at once. "AFF2" distinguishes it from affiliation_workflow's "AFF1".
 _START_LOCK_KEY = 0x41464632
+_pending_worker_leases: dict[uuid.UUID, Connection] = {}
+_pending_worker_leases_lock = threading.Lock()
+
+
+def _job_lock_key(job_id: uuid.UUID) -> int:
+    """Map a UUID to PostgreSQL's signed 64-bit advisory-lock key space."""
+
+    digest = hashlib.blake2b(job_id.bytes, digest_size=8, person=b"aff-enrich").digest()
+    return int.from_bytes(digest, byteorder="big", signed=True)
+
+
+def _acquire_worker_lease(job_id: uuid.UUID, engine: Engine) -> Connection | None:
+    """Hold a session advisory lock for the full lifetime of one worker."""
+
+    connection = engine.connect()
+    try:
+        acquired = connection.execute(
+            text("select pg_try_advisory_lock(:lock_key)"),
+            {"lock_key": _job_lock_key(job_id)},
+        ).scalar_one()
+        connection.commit()
+        if acquired:
+            return connection
+        connection.close()
+        return None
+    except Exception:
+        connection.close()
+        raise
+
+
+def _release_worker_lease(job_id: uuid.UUID, connection: Connection) -> None:
+    try:
+        connection.execute(
+            text("select pg_advisory_unlock(:lock_key)"),
+            {"lock_key": _job_lock_key(job_id)},
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def _take_pending_worker_lease(job_id: uuid.UUID) -> Connection | None:
+    with _pending_worker_leases_lock:
+        return _pending_worker_leases.pop(job_id, None)
+
+
+def _release_pending_worker_lease(job_id: uuid.UUID) -> None:
+    lease = _take_pending_worker_lease(job_id)
+    if lease is not None:
+        _release_worker_lease(job_id, lease)
 
 
 class AffiliationEnrichmentError(Exception):
@@ -97,7 +150,9 @@ def _dois_to_enrich(db: Session) -> list[str]:
     return list(seen)[: settings.affiliation_online_max_dois_per_run]
 
 
-def start_job(db: Session, actor: User) -> AffiliationEnrichmentJob:
+def start_job(
+    db: Session, actor: User, *, reserve_worker_lease: bool = False
+) -> AffiliationEnrichmentJob:
     root = cache_root()
     if root is None:
         raise OnlineCacheNotConfigured
@@ -120,6 +175,12 @@ def start_job(db: Session, actor: User) -> AffiliationEnrichmentJob:
     job = AffiliationEnrichmentJob(requested_by_user_id=actor.id, total_dois=len(dois))
     db.add(job)
     db.flush()
+    worker_lease = None
+    if reserve_worker_lease:
+        worker_lease = _acquire_worker_lease(job.id, db.get_bind())
+        if worker_lease is None:
+            db.rollback()
+            raise EnrichmentAlreadyRunning
     db.add(
         AuditEvent(
             entity_type="affiliation_enrichment_job",
@@ -130,13 +191,87 @@ def start_job(db: Session, actor: User) -> AffiliationEnrichmentJob:
             event_metadata={"total_dois": len(dois)},
         )
     )
-    db.commit()
-    db.refresh(job)
+    try:
+        db.commit()
+        db.refresh(job)
+    except Exception:
+        db.rollback()
+        if worker_lease is not None:
+            _release_worker_lease(job.id, worker_lease)
+        raise
+    if worker_lease is not None:
+        with _pending_worker_leases_lock:
+            _pending_worker_leases[job.id] = worker_lease
     return job
 
 
 def get_job(db: Session, job_id: uuid.UUID) -> AffiliationEnrichmentJob | None:
     return db.query(AffiliationEnrichmentJob).filter(AffiliationEnrichmentJob.id == job_id).first()
+
+
+def get_latest_job(db: Session) -> AffiliationEnrichmentJob | None:
+    """Most recently created job, regardless of status — lets the ADMIN UI
+    find and display the right job after a reload/tab switch without
+    remembering its id client-side, and without starting a new one just
+    because the page reloaded."""
+
+    return (
+        db.query(AffiliationEnrichmentJob)
+        .order_by(AffiliationEnrichmentJob.created_at.desc())
+        .first()
+    )
+
+
+def recover_interrupted_enrichment_jobs() -> int:
+    """Fail active jobs whose in-process background task disappeared when the
+    server restarted — same pattern as
+    ``scopus_import_service.recover_interrupted_imports``. A RECEIVED/RUNNING
+    row left over from a prior process is never silently resumed (there is
+    no mechanism to re-attach to the old asyncio task, and claiming otherwise
+    without implementing and testing real resumption would be a false
+    promise to the ADMIN); it is explicitly marked FAILED with a reason the
+    UI can show, so the ADMIN sees a clear, actionable state instead of a
+    progress bar that never moves again."""
+
+    with get_session_factory()() as db:
+        items = db.query(AffiliationEnrichmentJob).filter(
+            AffiliationEnrichmentJob.status.in_(AFFILIATION_ENRICHMENT_ACTIVE_STATUSES)
+        ).with_for_update(skip_locked=True).all()
+        now = datetime.now(UTC)
+        recovered = 0
+        for item in items:
+            # A live worker in this or another API process holds the matching
+            # session-level advisory lock. The transaction lock prevents a
+            # worker from claiming the same job while it is being marked.
+            owns_lease = db.execute(
+                text("select pg_try_advisory_xact_lock(:lock_key)"),
+                {"lock_key": _job_lock_key(item.id)},
+            ).scalar_one()
+            if not owns_lease:
+                continue
+            item.status = "FAILED"
+            item.error_summary = {
+                "code": "ENRICHMENT_INTERRUPTED",
+                "message": "Tiến trình thu thập đơn vị trực tuyến bị gián đoạn khi dịch vụ khởi động lại.",
+            }
+            item.updated_at = now
+            db.add(
+                AuditEvent(
+                    entity_type="affiliation_enrichment_job",
+                    entity_id=item.id,
+                    action=FAILED_ACTION,
+                    actor_type="SYSTEM",
+                    actor_user_id=None,
+                    actor_service="affiliation_enrichment_worker",
+                    event_metadata={"code": "ENRICHMENT_INTERRUPTED"},
+                )
+            )
+            recovered += 1
+        if recovered:
+            db.commit()
+        else:
+            db.rollback()
+        return recovered
 
 
 def cancel_job(db: Session, job_id: uuid.UUID, actor: User) -> AffiliationEnrichmentJob | None:
@@ -261,28 +396,36 @@ def _fail(job_id: uuid.UUID, code: str, message: str) -> None:
 
 
 def process_enrichment_job(job_id: uuid.UUID) -> None:
-    """Run after the response. Mirrors ``process_import_job``'s per-step session pattern."""
+    """Run after the response while holding a lease visible to every process."""
 
-    setup = _dois_for_job(job_id)
-    if setup is None:
-        return
-    dois, bundle_dir = setup
-
-    async def progress_cb(progress: FetchProgress) -> None:
-        _save_progress(job_id, progress)
-
-    def should_continue() -> bool:
-        return _is_active(job_id)
-
+    lease = _take_pending_worker_lease(job_id)
+    if lease is None:
+        lease = _acquire_worker_lease(job_id, get_engine())
+    if lease is None:
+        return  # A worker in another process already owns this job.
     try:
-        asyncio.run(
-            run_enrichment(bundle_dir, dois, progress_cb=progress_cb, should_continue=should_continue)
-        )
-        _finish(job_id, bundle_dir)
-    except AffiliationFetchCancelled:
-        pass  # status already CANCELLED by the caller; nothing more to record
-    except Exception:
-        _fail(job_id, "ENRICHMENT_PROCESSING_FAILED", "Không thể hoàn tất thu thập dữ liệu trực tuyến.")
+        setup = _dois_for_job(job_id)
+        if setup is None:
+            return
+        dois, bundle_dir = setup
+
+        async def progress_cb(progress: FetchProgress) -> None:
+            _save_progress(job_id, progress)
+
+        def should_continue() -> bool:
+            return _is_active(job_id)
+
+        try:
+            asyncio.run(
+                run_enrichment(bundle_dir, dois, progress_cb=progress_cb, should_continue=should_continue)
+            )
+            _finish(job_id, bundle_dir)
+        except AffiliationFetchCancelled:
+            pass  # status already CANCELLED by the caller; nothing more to record
+        except Exception:
+            _fail(job_id, "ENRICHMENT_PROCESSING_FAILED", "Không thể hoàn tất thu thập dữ liệu trực tuyến.")
+    finally:
+        _release_worker_lease(job_id, lease)
 
 
 __all__ = [
@@ -297,6 +440,8 @@ __all__ = [
     "cache_root",
     "cancel_job",
     "get_job",
+    "get_latest_job",
     "process_enrichment_job",
+    "recover_interrupted_enrichment_jobs",
     "start_job",
 ]

@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router as v1_router
 from app.core.config import settings
 from app.core.exceptions import APIError, api_error_handler
+from app.services.affiliation_enrichment_service import recover_interrupted_enrichment_jobs
 from app.services.scopus_import_service import recover_interrupted_imports
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,15 @@ def create_app() -> FastAPI:
                     logger.warning("Recovered %s interrupted Scopus import job(s).", recovered)
             except Exception:
                 logger.exception("Could not recover interrupted Scopus imports at startup.")
+            try:
+                recovered_enrichment = recover_interrupted_enrichment_jobs()
+                if recovered_enrichment:
+                    logger.warning(
+                        "Marked %s interrupted affiliation enrichment job(s) as FAILED.",
+                        recovered_enrichment,
+                    )
+            except Exception:
+                logger.exception("Could not recover interrupted affiliation enrichment jobs at startup.")
         yield
 
     app = FastAPI(

@@ -221,7 +221,7 @@ def start_online_enrichment(
     admin: AdminUser, db: DatabaseSession, background_tasks: BackgroundTasks
 ) -> EnrichmentJobRead:
     try:
-        job = enrichment.start_job(db, admin)
+        job = enrichment.start_job(db, admin, reserve_worker_lease=True)
     except enrichment.AffiliationEnrichmentError as exc:
         raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
     except SQLAlchemyError as exc:
@@ -229,6 +229,23 @@ def start_online_enrichment(
         raise _db_error(exc) from exc
     background_tasks.add_task(enrichment.process_enrichment_job, job.id)
     return _job_read(job)
+
+
+@router.get(
+    "/enrichment/online/latest",
+    response_model=EnrichmentJobRead | None,
+    summary="Most recently created online enrichment job, regardless of status",
+)
+def get_latest_online_enrichment(_admin: AdminUser, db: DatabaseSession) -> EnrichmentJobRead | None:
+    """Lets the ADMIN UI find and display the right job after a page reload
+    or tab switch, without remembering a job_id client-side, and without
+    starting a new job just because the page reloaded. MUST be declared
+    before /enrichment/online/{job_id} so FastAPI matches this static path
+    first — a job_id path parameter would otherwise try (and fail) to parse
+    the literal "latest" as a UUID."""
+
+    job = enrichment.get_latest_job(db)
+    return _job_read(job) if job is not None else None
 
 
 @router.get(

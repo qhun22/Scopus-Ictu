@@ -265,8 +265,13 @@ def test_trigger_creates_a_received_job_and_schedules_processing(
     import app.api.v1.endpoints.affiliations as affiliations_endpoint
 
     scheduled: list[uuid.UUID] = []
+
+    def capture_and_release_lease(job_id: uuid.UUID) -> None:
+        scheduled.append(job_id)
+        enrichment._release_pending_worker_lease(job_id)
+
     monkeypatch.setattr(
-        affiliations_endpoint.enrichment, "process_enrichment_job", lambda job_id: scheduled.append(job_id)
+        affiliations_endpoint.enrichment, "process_enrichment_job", capture_and_release_lease
     )
     as_role("ADMIN")
     resp = client.post("/api/v1/affiliations/enrichment/online")
@@ -362,3 +367,139 @@ def test_preview_by_job_id_reads_that_jobs_bundle_not_the_offline_one(
     body = resp.json()
     assert body["source"]["configured"] is True
     assert body["source"]["ready"] is True
+
+
+# --------------------------------------------------------------------------- latest job lookup (NO-JSON closure)
+def test_latest_returns_null_when_no_job_exists(client, as_role) -> None:
+    as_role("ADMIN")
+    resp = client.get("/api/v1/affiliations/enrichment/online/latest")
+    assert resp.status_code == 200
+    assert resp.json() is None
+
+
+def test_latest_finds_the_job_after_a_simulated_page_reload(
+    client, as_role, db_session, one_publication, online_cache_dir
+) -> None:
+    """Simulates exactly the reload/tab-switch gap: nothing on the client
+    remembers the job id, so the UI must look it up purely from what the
+    trigger call wrote to the database."""
+
+    admin = as_role("ADMIN")
+    created = client.post("/api/v1/affiliations/enrichment/online")
+    assert created.status_code == 202, created.text
+    job_id = created.json()["id"]
+
+    latest = client.get("/api/v1/affiliations/enrichment/online/latest")
+    assert latest.status_code == 200
+    assert latest.json()["id"] == job_id
+
+
+def test_latest_is_most_recently_created_not_most_recently_updated(
+    client, as_role, db_session, one_publication, online_cache_dir
+) -> None:
+    admin = as_role("ADMIN")
+    first = enrichment.start_job(db_session, admin)
+    enrichment.cancel_job(db_session, first.id, admin)  # updated_at now newer than its created_at
+    db_session.execute(
+        text("select pg_sleep(0.05)")
+    )  # ensure strictly later created_at for the second job
+    second_dois = enrichment._dois_to_enrich(db_session)
+    assert second_dois  # sanity: fixture still has the DOI
+    # cancel_job left no ACTIVE job, so starting a second one is allowed
+    second = enrichment.start_job(db_session, admin)
+
+    resp = client.get("/api/v1/affiliations/enrichment/online/latest")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == str(second.id)
+
+
+def test_latest_is_admin_only(client, as_role) -> None:
+    as_role("LECTURER")
+    assert client.get("/api/v1/affiliations/enrichment/online/latest").status_code == 403
+
+
+# --------------------------------------------------------------------------- startup recovery after an interrupted job
+def test_recover_marks_active_jobs_failed_with_a_clear_reason(db_session, as_role, one_publication, online_cache_dir, monkeypatch) -> None:
+    """Simulates a backend restart while a job was RECEIVED/RUNNING: no
+    in-process task survives, so the job must never be silently resumed —
+    it is marked FAILED with a reason the ADMIN UI can show, not left
+    spinning forever."""
+
+    import sqlalchemy.orm as orm_module
+
+    admin = as_role("ADMIN")
+    job = enrichment.start_job(db_session, admin)
+    assert job.status == "RECEIVED"
+
+    fake_factory = orm_module.sessionmaker(
+        autocommit=False, autoflush=False, bind=db_session.get_bind(), expire_on_commit=False
+    )
+    monkeypatch.setattr(enrichment, "get_session_factory", lambda: fake_factory)
+
+    recovered_count = enrichment.recover_interrupted_enrichment_jobs()
+    assert recovered_count == 1
+
+    db_session.expire_all()
+    reloaded = enrichment.get_job(db_session, job.id)
+    assert reloaded.status == "FAILED"
+    assert reloaded.error_summary["code"] == "ENRICHMENT_INTERRUPTED"
+
+
+def test_recover_does_not_fail_a_job_with_a_live_worker_lease(
+    db_session, as_role, one_publication, online_cache_dir, monkeypatch
+) -> None:
+    """A different backend process must not mark this process's live job failed."""
+
+    import sqlalchemy.orm as orm_module
+
+    admin = as_role("ADMIN")
+    job = enrichment.start_job(db_session, admin, reserve_worker_lease=True)
+    fake_factory = orm_module.sessionmaker(
+        autocommit=False, autoflush=False, bind=db_session.get_bind(), expire_on_commit=False
+    )
+    monkeypatch.setattr(enrichment, "get_session_factory", lambda: fake_factory)
+
+    try:
+        assert enrichment.recover_interrupted_enrichment_jobs() == 0
+        db_session.expire_all()
+        assert enrichment.get_job(db_session, job.id).status == "RECEIVED"
+    finally:
+        enrichment._release_pending_worker_lease(job.id)
+
+    assert enrichment.recover_interrupted_enrichment_jobs() == 1
+    db_session.expire_all()
+    reloaded = enrichment.get_job(db_session, job.id)
+    assert reloaded.status == "FAILED"
+    assert reloaded.error_summary["code"] == "ENRICHMENT_INTERRUPTED"
+
+
+def test_recover_leaves_completed_and_failed_jobs_untouched(db_session, as_role, one_publication, online_cache_dir, monkeypatch) -> None:
+    import sqlalchemy.orm as orm_module
+
+    admin = as_role("ADMIN")
+    job = enrichment.start_job(db_session, admin)
+    job.status = "COMPLETED"
+    db_session.commit()
+
+    fake_factory = orm_module.sessionmaker(
+        autocommit=False, autoflush=False, bind=db_session.get_bind(), expire_on_commit=False
+    )
+    monkeypatch.setattr(enrichment, "get_session_factory", lambda: fake_factory)
+
+    recovered_count = enrichment.recover_interrupted_enrichment_jobs()
+    assert recovered_count == 0
+
+    db_session.expire_all()
+    reloaded = enrichment.get_job(db_session, job.id)
+    assert reloaded.status == "COMPLETED"
+
+
+def test_recover_with_no_active_jobs_is_a_no_op(db_session, monkeypatch) -> None:
+    import sqlalchemy.orm as orm_module
+
+    fake_factory = orm_module.sessionmaker(
+        autocommit=False, autoflush=False, bind=db_session.get_bind(), expire_on_commit=False
+    )
+    monkeypatch.setattr(enrichment, "get_session_factory", lambda: fake_factory)
+
+    assert enrichment.recover_interrupted_enrichment_jobs() == 0

@@ -135,6 +135,13 @@ export function getOnlineEnrichment(jobId: string, options: ApiRequestOptions = 
   return apiGet<EnrichmentJob>(`/api/v1/affiliations/enrichment/online/${jobId}`, options);
 }
 
+/** Most recently created job, regardless of status — null if none exists yet.
+ * Used to find and display the right job after a reload/tab switch without
+ * remembering its id client-side, and without starting a new one. */
+export function getLatestOnlineEnrichment(options: ApiRequestOptions = {}): Promise<EnrichmentJob | null> {
+  return apiGet<EnrichmentJob | null>("/api/v1/affiliations/enrichment/online/latest", options);
+}
+
 export function cancelOnlineEnrichment(jobId: string, options: ApiRequestOptions = {}): Promise<EnrichmentJob> {
   return apiPost<EnrichmentJob, Record<string, never>>(
     `/api/v1/affiliations/enrichment/online/${jobId}/cancel`,
