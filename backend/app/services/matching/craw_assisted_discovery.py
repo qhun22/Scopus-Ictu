@@ -31,19 +31,30 @@ once:
        (DOI-exact or title-exact, never ambiguous) to a canonical
        Publication, and the candidate Scopus author holds a real author
        position (a ``publication_authors`` row) on that publication.
-    2. Name correspondence — the lecturer's own name and that specific
-       Scopus author's name surfaces share at least one non-trivial
-       (length >= 2) token after the same Vietnamese-diacritic-folding
-       normalization ``candidate_generator.py`` already uses for
-       RULE_TITLE_STRIPPED_N2. This is deliberately WEAKER than the four
-       strict rules (if it were as strong, the name step would already
-       have found it) but it is independent corroboration that this
-       specific author position is plausibly this lecturer, not merely
-       "someone published this paper and the lecturer claims it too".
+    2. Name correspondence — ``_has_name_correspondence`` requires BOTH of
+       the following against at least one Scopus surface (preferred_name or
+       a ``ScopusAuthorNameVariant``) for that author, after the same
+       Vietnamese-diacritic-folding normalization ``candidate_generator.py``
+       uses for RULE_TITLE_STRIPPED_N2:
+         a. surname agreement — the first token of the lecturer's full_name
+            (the surname position in the Vietnamese "Surname [Middle...]
+            Given" convention every lecturer record uses) equals the first
+            token of that Scopus surface;
+         b. a shared token outside ``_GENERIC_NAME_TOKENS`` — i.e. not just
+            a common surname/middle name like "Nguyen", "Van", "Thi".
+       This is deliberately WEAKER than the four strict rules (if it were
+       as strong, the name step would already have found it) but it is
+       independent, structurally-anchored corroboration — not a bare
+       token-set intersection. An earlier version of this module used plain
+       "share any token >= 2 chars", which wrongly matched co-authors who
+       merely share a common Vietnamese surname or middle name with the
+       lecturer (see docs/qa/MATCHING_CRAW_CANDIDATE_QUALITY_AUDIT.md for
+       the false-positive cases that forced this redesign).
 
 An author position that passes check 1 but fails check 2 — e.g. a 5-author
-paper where 4 authors share no name token with the lecturer — is NEVER
-turned into a candidate. It is surfaced separately as "unattributed
+paper where the other 4 authors only share a common surname or middle name
+with the lecturer, or share a given name but under a different surname — is
+NEVER turned into a candidate. It is surfaced separately as "unattributed
 publication evidence" so ADMIN/REVIEWER can see the known-publication
 reconciled to a real Scopus publication without the system inventing an
 identity claim it cannot support.
@@ -82,6 +93,24 @@ RULE_CRAW_KNOWN_PUBLICATION_AUTHOR_POSITION = "RULE_CRAW_KNOWN_PUBLICATION_AUTHO
 
 _MIN_TOKEN_LENGTH = 2
 
+# Common Vietnamese surname and middle-name tokens (verified against the 410
+# real lecturer names and 1207 real Scopus author surfaces in the WITH-JSON
+# acceptance dataset, docs/qa/MATCHING_CRAW_CANDIDATE_QUALITY_AUDIT.md §4).
+# Sharing ONLY tokens from this set is never sufficient corroboration — see
+# the surname-agreement check in ``_has_name_correspondence`` below for why
+# a plain token-set intersection (the bug this constant exists to close)
+# wrongly matched unrelated co-authors who merely share a common surname or
+# middle name ("Nguyen", "Van", "Thi", ...).
+_GENERIC_NAME_TOKENS: frozenset[str] = frozenset(
+    {
+        "nguyen", "tran", "le", "pham", "hoang", "huynh", "phan", "vu", "vo",
+        "dang", "bui", "do", "ho", "ngo", "duong", "dinh", "ly", "dao", "doan",
+        "luong", "thai", "trinh", "cao", "truong", "ha",
+        "van", "thi", "duc", "thanh", "huu", "ngoc", "quang", "minh",
+        "xuan", "kim", "hai", "tien", "cong", "duy", "anh",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class UnattributedPublicationEvidence:
@@ -109,19 +138,75 @@ class CrawDiscoveryResult:
         return iter(self.discovered)
 
 
-def _name_tokens(value: str) -> frozenset[str]:
-    return frozenset(
-        token for token in normalize_name_n2(value).split(" ") if len(token) >= _MIN_TOKEN_LENGTH
+@dataclass(frozen=True, slots=True)
+class _NameSurface:
+    """One parsed name string: its first token (the surname position in both
+    the Vietnamese ``Surname [Middle...] Given`` convention used by every
+    lecturer full_name, and the Scopus ``Surname, Rest`` convention used by
+    most — not all — real Scopus author surfaces) plus its full token set."""
+
+    surname: str | None
+    tokens: frozenset[str]
+
+
+def _parse_name_surface(value: str) -> _NameSurface:
+    tokens = tuple(
+        token
+        for token in normalize_name_n2(value).replace(",", " ").replace("-", " ").split(" ")
+        if len(token) >= _MIN_TOKEN_LENGTH
     )
+    return _NameSurface(surname=tokens[0] if tokens else None, tokens=frozenset(tokens))
 
 
-def _scopus_author_tokens(
+def _scopus_author_surfaces(
     author: ScopusAuthor, variants: Iterable[ScopusAuthorNameVariant]
-) -> frozenset[str]:
-    tokens: set[str] = set(_name_tokens(author.preferred_name))
-    for variant in variants:
-        tokens |= _name_tokens(variant.variant_name)
-    return frozenset(tokens)
+) -> tuple[_NameSurface, ...]:
+    """One surface per distinct name string on this author — preferred_name
+    plus every variant, each parsed independently (never merged into one
+    token bag) so the surname-agreement check in
+    ``_has_name_correspondence`` can be evaluated per-surface. Merging first
+    would let a surname from one surface pair with a given name from another
+    and wrongly look like one coherent name."""
+
+    seen: dict[str, _NameSurface] = {}
+    for raw in (author.preferred_name, *(variant.variant_name for variant in variants)):
+        surface = _parse_name_surface(raw)
+        if surface.tokens:
+            seen.setdefault(normalize_name_n2(raw), surface)
+    return tuple(seen.values())
+
+
+def _has_name_correspondence(lecturer_surface: _NameSurface, scopus_surfaces: Iterable[_NameSurface]) -> bool:
+    """Two independent conditions, both required, evaluated against at least
+    one Scopus surface for this author:
+
+    1. Surname agreement — the first token of the lecturer's full_name
+       equals the first token of that Scopus surface. This is the
+       structural anchor a plain token-set intersection lacks: two
+       co-authors who share only a common surname or middle name
+       ("Nguyen", "Van", "Thi", ...) have DIFFERENT given names, and without
+       requiring the surname position itself to agree, a shared given-name
+       token alone (e.g. both named "Dung" by coincidence, different
+       surnames) would also wrongly pass.
+    2. Distinctive token — at least one shared token that is NOT in
+       ``_GENERIC_NAME_TOKENS``. A name built entirely from common surname/
+       middle-name tokens never corroborates identity by itself.
+
+    Initials-only Scopus surfaces (e.g. "Nguyen, V.-B.") correctly fail here
+    — token length "v"/"b" never reaches ``_MIN_TOKEN_LENGTH``. They are
+    recovered through a full-name ``ScopusAuthorNameVariant`` surface
+    instead, evaluated as its own independent surface above.
+    """
+
+    if lecturer_surface.surname is None:
+        return False
+    for surface in scopus_surfaces:
+        if surface.surname != lecturer_surface.surname:
+            continue
+        distinctive = (lecturer_surface.tokens & surface.tokens) - _GENERIC_NAME_TOKENS
+        if distinctive:
+            return True
+    return False
 
 
 def discover_craw_assisted_candidates(
@@ -162,18 +247,18 @@ def discover_craw_assisted_candidates(
         variants_by_author[variant.scopus_author_id].append(variant)
     lecturer_by_id = {lecturer.id: lecturer for lecturer in lecturers}
 
-    author_tokens_by_id: dict[UUID, frozenset[str]] = {}
+    author_surfaces_by_id: dict[UUID, tuple[_NameSurface, ...]] = {}
 
-    def _tokens_for_author(scopus_author_id: UUID) -> frozenset[str]:
-        cached = author_tokens_by_id.get(scopus_author_id)
+    def _surfaces_for_author(scopus_author_id: UUID) -> tuple[_NameSurface, ...]:
+        cached = author_surfaces_by_id.get(scopus_author_id)
         if cached is not None:
             return cached
         author = author_by_id.get(scopus_author_id)
         if author is None:
-            return frozenset()
-        tokens = _scopus_author_tokens(author, variants_by_author.get(scopus_author_id, ()))
-        author_tokens_by_id[scopus_author_id] = tokens
-        return tokens
+            return ()
+        surfaces = _scopus_author_surfaces(author, variants_by_author.get(scopus_author_id, ()))
+        author_surfaces_by_id[scopus_author_id] = surfaces
+        return surfaces
 
     # One descriptor per NEW (lecturer, scopus_author) pair discovered via a
     # specific publication. DOI provenance wins over title for the same
@@ -188,7 +273,9 @@ def discover_craw_assisted_candidates(
     for item in reconciled:
         lecturer_id = item.known_publication.lecturer_id
         lecturer = lecturer_by_id.get(lecturer_id)
-        lecturer_tokens = _name_tokens(lecturer.full_name) if lecturer is not None else frozenset()
+        lecturer_surface = (
+            _parse_name_surface(lecturer.full_name) if lecturer is not None else _NameSurface(None, frozenset())
+        )
 
         for author_row in sorted(
             author_rows_by_publication.get(item.publication.id, ()),
@@ -214,8 +301,10 @@ def discover_craw_assisted_candidates(
                 reconciliation=item.reconciliation,
             )
 
-            has_name_overlap = bool(lecturer_tokens & _tokens_for_author(scopus_author_id))
-            if not has_name_overlap:
+            has_name_correspondence = _has_name_correspondence(
+                lecturer_surface, _surfaces_for_author(scopus_author_id)
+            )
+            if not has_name_correspondence:
                 # Author position is real, but nothing ties THIS author
                 # position to THIS lecturer by name — never guess.
                 unattributed.append(

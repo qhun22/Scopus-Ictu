@@ -178,11 +178,13 @@ def test_five_author_publication_with_one_ictu_match_does_not_mass_generate(
         title="Five Author Paper",
         title_normalized="five author paper",
     )
-    # "Mai T.T." shares the "mai" token with the lecturer's full name (so the
-    # weak Craw-discovery overlap check anchors it) but matches NONE of the 4
-    # strict name_generator rules (no reordering/abbreviation handling there)
+    # "Tran, Thi-Mai" shares surname "tran" (the structural anchor the
+    # Craw-discovery name check requires) and the distinctive given-name
+    # token "mai" with the lecturer, but the hyphen between "Thi" and "Mai"
+    # is not folded by any of the 4 strict name_generator rules (none of
+    # them treat a hyphen as a token separator), so the name step misses it
     # — this is exactly the gap Craw-assisted discovery exists to close.
-    matching_author = ScopusAuthor(scopus_id="90000000001", preferred_name="Mai T.T.")
+    matching_author = ScopusAuthor(scopus_id="90000000001", preferred_name="Tran, Thi-Mai")
     unrelated_authors = [
         ScopusAuthor(scopus_id=f"9000000000{i}", preferred_name=name)
         for i, name in enumerate(["John Smith", "Maria Garcia", "Wei Zhang", "Alex Johnson"], start=2)
