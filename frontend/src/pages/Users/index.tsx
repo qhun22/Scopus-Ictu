@@ -1,8 +1,162 @@
 import { useEffect, useState } from "react";
 import { User } from "../../api/auth";
-import { getUsers } from "../../api/users";
+import { ApiError } from "../../api/client";
+import { createUser, getUsers } from "../../api/users";
+import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
+import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
+
+const ERROR_LABEL: Record<string, Record<"vi" | "en", string>> = {
+  EMAIL_ALREADY_EXISTS: {
+    vi: "Email đã được sử dụng bởi tài khoản khác.",
+    en: "This email is already used by another account.",
+  },
+};
+
+function explainCreateError(error: unknown, locale: "vi" | "en"): string {
+  if (error instanceof ApiError) {
+    return (error.code && ERROR_LABEL[error.code]?.[locale]) || error.detail || error.message;
+  }
+  return locale === "vi" ? "Không thể tạo tài khoản." : "Unable to create the account.";
+}
+
+interface CreateUserFormProps {
+  locale: "vi" | "en";
+  onCreated: () => void;
+}
+
+function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
+  const vi = locale === "vi";
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<"LECTURER" | "REVIEWER">("LECTURER");
+  const [error, setError] = useState<string | null>(null);
+
+  const reset = () => {
+    setEmail("");
+    setDisplayName("");
+    setPassword("");
+    setRole("LECTURER");
+    setError(null);
+  };
+
+  const submit = useSingleFlight(async () => {
+    setError(null);
+    try {
+      await createUser({ email: email.trim(), display_name: displayName.trim(), password, role });
+      toast.success(
+        vi ? "Đã tạo tài khoản" : "Account created",
+        vi ? "Tài khoản mới có thể đăng nhập ngay." : "The new account can sign in right away.",
+      );
+      reset();
+      setOpen(false);
+      onCreated();
+    } catch (err) {
+      setError(explainCreateError(err, locale));
+    }
+  });
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#3351AE] cursor-pointer"
+        data-testid="open-create-user"
+      >
+        + {vi ? "Thêm tài khoản" : "Add account"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 shadow-xs space-y-3" data-testid="create-user-form">
+      <h3 className="text-sm font-bold text-slate-800">
+        {vi ? "Tạo tài khoản LECTURER / REVIEWER" : "Create a LECTURER / REVIEWER account"}
+      </h3>
+      <p className="text-xs leading-relaxed text-slate-600">
+        {vi
+          ? "Không cần hồ sơ giảng viên. Tài khoản có thể liên kết hồ sơ giảng viên và Scopus Author ID sau, khi có dữ liệu nhập JSON. Không thể tạo tài khoản ADMIN qua biểu mẫu này."
+          : "No lecturer profile is required. The account can be linked to a lecturer profile and a Scopus Author ID later, once JSON data is imported. An ADMIN account cannot be created through this form."}
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="text-[11px] font-semibold text-slate-600">Email</label>
+          <input
+            type="email"
+            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            data-testid="create-user-email"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-slate-600">{vi ? "Họ và tên" : "Display name"}</label>
+          <input
+            type="text"
+            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            data-testid="create-user-display-name"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-slate-600">{vi ? "Mật khẩu tạm" : "Temporary password"}</label>
+          <input
+            type="password"
+            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={vi ? "Tối thiểu 8 ký tự" : "At least 8 characters"}
+            data-testid="create-user-password"
+          />
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-slate-600">{vi ? "Vai trò" : "Role"}</label>
+          <select
+            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            value={role}
+            onChange={(e) => setRole(e.target.value as "LECTURER" | "REVIEWER")}
+            data-testid="create-user-role"
+          >
+            <option value="LECTURER">{vi ? "Giảng viên" : "Lecturer"}</option>
+            <option value="REVIEWER">{vi ? "Phê duyệt viên" : "Reviewer"}</option>
+          </select>
+        </div>
+      </div>
+      {error && (
+        <p className="text-xs font-medium text-rose-600" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className={BUTTON_PRIMARY}
+          onClick={submit}
+          disabled={!email.trim() || !displayName.trim() || password.length < 8}
+          data-testid="create-user-submit"
+        >
+          {vi ? "Tạo tài khoản" : "Create account"}
+        </button>
+        <button
+          type="button"
+          className={BUTTON_SECONDARY}
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+        >
+          {vi ? "Hủy" : "Cancel"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function UsersPage() {
   const toast = useToast();
@@ -108,6 +262,8 @@ export default function UsersPage() {
           <span>{t.common.refresh}</span>
         </button>
       </div>
+
+      <CreateUserForm locale={locale} onCreated={fetchUsers} />
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">

@@ -113,6 +113,8 @@ function ReviewRow({
     try {
       await deleteOverride(item.publication_author_id, current.version);
       setCurrent(null);
+      setForm(EMPTY_FORM);
+      setEditing(false);
       toast.success(vi ? "Đã xóa hiệu chỉnh" : "Override removed", "");
       onDeleted();
     } catch (err) {

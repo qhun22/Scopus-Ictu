@@ -14,7 +14,7 @@ from app.core.exceptions import APIError
 from app.core.security import password_hasher
 from app.models.governance import AuditEvent, User, UserNotification
 from app.models.master_lecturer import Lecturer
-from app.schemas.user import UserAdminResponse, UserAdminUpdate
+from app.schemas.user import UserAdminCreate, UserAdminResponse, UserAdminUpdate
 
 
 PROFILE_NOTIFICATION = (
@@ -50,6 +50,57 @@ LECTURER_FIELDS = (
     "specialization",
     "gender",
 )
+
+
+def create_user(db: Session, *, payload: UserAdminCreate, actor: User) -> User:
+    """Create a REVIEWER/LECTURER account with no lecturer profile.
+
+    ``role`` is typed ``CreatableUserRole`` (REVIEWER/LECTURER only — see
+    schemas/user.py), so this function can never be asked to create an ADMIN;
+    that is enforced by the type, not by a runtime check here. ``lecturer_id``
+    is never set: the account is strictly read-only (see the dropped
+    ``ck_users_lecturer_account_required`` constraint, migration
+    f6a1b2c3d4e5) until a later JSON import links it to a real lecturer
+    profile and, separately, a Scopus Author ID — neither of which this
+    endpoint does.
+    """
+
+    email = payload.email.strip()
+    duplicate = db.query(User).filter(func.lower(User.email) == email.lower()).first()
+    if duplicate is not None:
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email đã được sử dụng bởi tài khoản khác.",
+            code="EMAIL_ALREADY_EXISTS",
+        )
+
+    display_name = " ".join(payload.display_name.split())
+    if not display_name:
+        raise APIError(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Họ và tên không được để trống.",
+            code="INVALID_USER_CREATE",
+        )
+
+    user = User(
+        email=email,
+        password_hash=password_hasher.hash(payload.password),
+        display_name=display_name,
+        role=payload.role,
+        lecturer_id=None,
+        is_active=True,
+    )
+    db.add(user)
+    db.flush()
+    _add_audit(
+        db,
+        actor_user_id=actor.id,
+        target_user_id=user.id,
+        action="USER_CREATED",
+        before_state=None,
+        after_state={"email": user.email, "display_name": user.display_name, "role": user.role},
+    )
+    return user
 
 
 def get_user_and_lecturer(

@@ -74,6 +74,8 @@ export default function PublicationsPage() {
   // ── Search state ───────────────────────────────────────────────────────
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
+  const [authorName, setAuthorName] = useState("");
+  const [authorNameDebounced, setAuthorNameDebounced] = useState("");
 
   // ── Draft filter state (controlled inputs) ──────────────────────────────
   const [draftYear, setDraftYear] = useState("");
@@ -132,6 +134,7 @@ export default function PublicationsPage() {
             page_size: currentPageSize,
             q: qDebounced || undefined,
             scopus_id: scopusIdFilter,
+            author_name: authorNameDebounced || undefined,
             ...appliedFilters,
           },
           { signal: controller.signal },
@@ -162,7 +165,7 @@ export default function PublicationsPage() {
         setLoadingMore(false);
       }
     },
-    [qDebounced, appliedFilters, scopusIdFilter],
+    [qDebounced, authorNameDebounced, appliedFilters, scopusIdFilter],
   );
 
   // ── Single trigger: appliedFilters + page + pageSize + qDebounced ────────
@@ -178,7 +181,7 @@ export default function PublicationsPage() {
     // closure); we list page + pageSize + appliedFilters + qDebounced to drive
     // the trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, appliedFilters, qDebounced, scopusIdFilter]);
+  }, [page, pageSize, appliedFilters, qDebounced, authorNameDebounced, scopusIdFilter]);
 
   // ── Debounce free-text search + reset to page 1 when it changes ─────────
   useEffect(() => {
@@ -189,6 +192,16 @@ export default function PublicationsPage() {
     }, FILTER_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [q, qDebounced]);
+
+  // ── Debounce author-name search + reset to page 1 when it changes ───────
+  useEffect(() => {
+    if (authorName === authorNameDebounced) return;
+    const timer = window.setTimeout(() => {
+      setAuthorNameDebounced(authorName);
+      setPage(1);
+    }, FILTER_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [authorName, authorNameDebounced]);
 
   // ── Filter actions ────────────────────────────────────────────────────
   const handleApply = () => {
@@ -202,6 +215,8 @@ export default function PublicationsPage() {
     if (scopusIdFilter) setSearchParams({}, { replace: true });
     setQ("");
     setQDebounced("");
+    setAuthorName("");
+    setAuthorNameDebounced("");
     setDraftYear("");
     setDraftDocType("");
     setDraftStage("");
@@ -233,6 +248,8 @@ export default function PublicationsPage() {
     !!scopusIdFilter ||
     !!q ||
     !!qDebounced ||
+    !!authorName ||
+    !!authorNameDebounced ||
     !!draftYear ||
     !!draftDocType ||
     !!draftStage ||
@@ -388,6 +405,25 @@ export default function PublicationsPage() {
               locale === "vi"
                 ? "Tìm theo tiêu đề, EID, DOI, nguồn tạp chí..."
                 : "Search by title, EID, DOI, journal..."
+            }
+            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+          />
+        </div>
+
+        {/* Author-name search */}
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            aria-label={locale === "vi" ? "Tìm theo tên tác giả" : "Search by author name"}
+            value={authorName}
+            onChange={(e) => setAuthorName(e.target.value)}
+            placeholder={
+              locale === "vi" ? "Tìm theo tên tác giả (Scopus)..." : "Search by author name (Scopus)..."
             }
             className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
           />

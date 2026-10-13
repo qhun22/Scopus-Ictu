@@ -43,6 +43,10 @@ export async function getPublications(
     params.set("scopus_id", query.scopus_id.trim());
   }
 
+  if (query.author_name !== undefined && query.author_name.trim()) {
+    params.set("author_name", query.author_name.trim());
+  }
+
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiGet<PublicationListResponse>(`/api/v1/publications${suffix}`, options);
 }

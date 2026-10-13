@@ -61,6 +61,7 @@ def list_publication_endpoint(
     publication_stage: Annotated[str | None, Query(max_length=50)] = None,
     open_access_status: Annotated[str | None, Query(max_length=50)] = None,
     scopus_id: Annotated[str | None, Query(max_length=32, pattern=r"^\d*$")] = None,
+    author_name: Annotated[str | None, Query(max_length=255)] = None,
 ) -> PublicationListResponse:
     """List canonical publications using server-side filtering and pagination."""
 
@@ -75,6 +76,7 @@ def list_publication_endpoint(
             publication_stage=publication_stage,
             open_access_status=open_access_status,
             scopus_id=scopus_id,
+            author_name=author_name,
         )
     except SQLAlchemyError as exc:
         raise _database_unavailable(exc) from exc

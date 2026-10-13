@@ -6,10 +6,27 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 UserRole = Literal["ADMIN", "REVIEWER", "LECTURER"]
+# An ADMIN creating a new account through this endpoint may only grant these
+# two roles — never ADMIN — so one admin can never mint another admin by
+# calling the account-creation API (see user_admin_service.create_user).
+CreatableUserRole = Literal["REVIEWER", "LECTURER"]
+
+
+class UserAdminCreate(BaseModel):
+    """ADMIN-only account creation. No lecturer profile is required or created:
+    ``lecturer_id`` is never accepted here, so an account may exist strictly
+    read-only until a JSON import later links it (see migration f6a1b2c3d4e5)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: str = Field(..., min_length=3, max_length=255)
+    display_name: str = Field(..., min_length=1, max_length=255)
+    password: str = Field(..., min_length=8, max_length=256)
+    role: CreatableUserRole
 
 
 class UserAdminUpdate(BaseModel):

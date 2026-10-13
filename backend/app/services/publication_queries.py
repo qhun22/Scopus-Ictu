@@ -67,6 +67,7 @@ def publication_filters(
     publication_stage: str | None,
     open_access_status: str | None,
     scopus_id: str | None = None,
+    author_name: str | None = None,
 ) -> list[object]:
     conditions: list[object] = []
     trimmed_q = _trim_optional(q)
@@ -94,6 +95,21 @@ def publication_filters(
             .exists()
         )
 
+    trimmed_author_name = _trim_optional(author_name)
+    if trimmed_author_name is not None:
+        # Publications with a matching author name (diacritic/case-insensitive
+        # substring over the Scopus preferred name — not a lecturer lookup).
+        pattern = _escaped_substring(trimmed_author_name)
+        conditions.append(
+            select(PublicationAuthor.id)
+            .join(ScopusAuthor, ScopusAuthor.id == PublicationAuthor.scopus_author_id)
+            .where(
+                PublicationAuthor.publication_id == Publication.id,
+                folded(ScopusAuthor.preferred_name).like(fold_text(pattern), escape="\\"),
+            )
+            .exists()
+        )
+
     if year is not None:
         conditions.append(Publication.year == year)
 
@@ -117,6 +133,7 @@ def _list_statement(
     publication_stage: str | None,
     open_access_status: str | None,
     scopus_id: str | None = None,
+    author_name: str | None = None,
 ):
     return select(Publication).where(
         *publication_filters(
@@ -126,6 +143,7 @@ def _list_statement(
             publication_stage=publication_stage,
             open_access_status=open_access_status,
             scopus_id=scopus_id,
+            author_name=author_name,
         )
     )
 
@@ -141,6 +159,7 @@ def list_publications(
     publication_stage: str | None = None,
     open_access_status: str | None = None,
     scopus_id: str | None = None,
+    author_name: str | None = None,
 ) -> PublicationListResponse:
     """Return a deterministic page of canonical publications without writes."""
 
@@ -151,6 +170,7 @@ def list_publications(
         publication_stage=publication_stage,
         open_access_status=open_access_status,
         scopus_id=scopus_id,
+        author_name=author_name,
     )
     total = session.scalar(
         select(func.count()).select_from(statement.order_by(None).subquery())

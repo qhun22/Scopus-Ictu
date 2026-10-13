@@ -18,11 +18,13 @@ from app.models.master_lecturer import Lecturer
 from app.schemas.user import (
     PasswordResetRequest,
     PasswordResetResponse,
+    UserAdminCreate,
     UserAdminResponse,
     UserAdminUpdate,
     VersionedUserAction,
 )
 from app.services.user_admin_service import (
+    create_user,
     get_user_and_lecturer,
     lock_user,
     reset_user_password,
@@ -56,6 +58,29 @@ def _raise_database_mutation_error(db: Session, exc: Exception) -> NoReturn:
         detail="Không thể cập nhật tài khoản người dùng.",
         code="DATABASE_UNAVAILABLE",
     ) from exc
+
+
+@router.post(
+    "",
+    response_model=UserAdminResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a REVIEWER/LECTURER account (no lecturer profile required)",
+)
+def create_user_endpoint(
+    payload: UserAdminCreate,
+    admin: AdminUser,
+    db: DatabaseSession,
+) -> UserAdminResponse:
+    try:
+        user = create_user(db, payload=payload, actor=admin)
+        db.commit()
+        db.refresh(user)
+        return to_admin_response(user, None)
+    except APIError:
+        db.rollback()
+        raise
+    except (IntegrityError, SQLAlchemyError) as exc:
+        _raise_database_mutation_error(db, exc)
 
 
 @router.get("", response_model=list[UserAdminResponse], summary="List user accounts")

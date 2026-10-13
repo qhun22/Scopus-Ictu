@@ -22,6 +22,7 @@ import ProfilePage from "./pages/Profile";
 import IdentityPage from "./pages/Identity";
 import MyPublicationsPage from "./pages/MyPublications";
 import SearchPage from "./pages/Search";
+import UsersPage from "./pages/Users";
 import PlaceholderPage from "./components/common/PlaceholderPage";
 import PageLoadingBar from "./components/PageLoadingBar";
 
@@ -94,7 +95,7 @@ export default function App() {
                 <Route path="/imports" element={<ImportsPage />} />
                 <Route path="/normalization" element={<NormalizationPage />} />
                 <Route path="/lecturers" element={<LecturersPage />} />
-                <Route path="/users" element={<Navigate to="/lecturers" replace />} />
+                <Route path="/users" element={<UsersPage />} />
                 <Route path="/audit-logs" element={<AuditLogsPage />} />
                 <Route
                   path="/tasks"

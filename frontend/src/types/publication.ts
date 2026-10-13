@@ -145,4 +145,6 @@ export interface PublicationListQuery {
   open_access_status?: string;
   /** Only publications in which this Scopus Author ID appears. */
   scopus_id?: string;
+  /** Only publications with an author whose Scopus preferred name matches (substring, diacritic-insensitive). */
+  author_name?: string;
 }

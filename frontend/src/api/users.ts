@@ -8,6 +8,18 @@ export async function getUsers(): Promise<User[]> {
   return users.map((u) => ({ ...u, display_name: safeDisplayName(u.display_name, u.role) }));
 }
 
+export interface CreateUserPayload {
+  email: string;
+  display_name: string;
+  password: string;
+  /** ADMIN is never allowed here — only REVIEWER/LECTURER accounts can be created. */
+  role: "REVIEWER" | "LECTURER";
+}
+
+export function createUser(payload: CreateUserPayload): Promise<LecturerUser> {
+  return apiPost<LecturerUser, CreateUserPayload>("/api/v1/users", payload);
+}
+
 export function getUser(id: string): Promise<LecturerUser> {
   return apiGet<LecturerUser>(`/api/v1/users/${id}`);
 }

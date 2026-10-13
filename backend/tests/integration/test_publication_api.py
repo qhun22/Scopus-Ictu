@@ -571,6 +571,28 @@ def test_list_filters_by_scopus_author_id(client: TestClient, authenticate, cata
     assert _get(client, "LECTURER", "/api/v1/publications?scopus_id=1%27%20OR", authenticate).status_code == 422
 
 
+def test_list_filters_by_author_name(client: TestClient, authenticate, catalog) -> None:
+    """Author-name lookup (Priority 3): diacritic/case-insensitive substring
+    over the Scopus preferred name, independent of the Scopus ID filter."""
+
+    names = {
+        eid: [a["preferred_name"] for a in _get(client, "ADMIN", f"/api/v1/publications/{eid}", authenticate).json()["authors"]]
+        for eid in ("EID-2024-A", "EID-2024-B", "EID-2023-G", "EID-NULL-D", "EID-2022-E")
+    }
+    expected = sorted(eid for eid, ns in names.items() if any("Approved" in n for n in ns))
+    assert expected  # the catalog fixture must contain at least one "Approved*" author
+
+    response = _get(client, "LECTURER", "/api/v1/publications?author_name=approved", authenticate)
+    assert response.status_code == 200
+    assert sorted(item["eid"] for item in response.json()["items"]) == expected
+
+    # Case/diacritic-insensitive: upper-case input still matches.
+    upper = _get(client, "LECTURER", "/api/v1/publications?author_name=APPROVED", authenticate)
+    assert sorted(item["eid"] for item in upper.json()["items"]) == expected
+
+    assert _get(client, "LECTURER", "/api/v1/publications?author_name=NoSuchAuthorXYZ", authenticate).json()["total"] == 0
+
+
 def test_list_empty_catalog(client: TestClient, authenticate) -> None:
     response = _get(client, "ADMIN", "/api/v1/publications", authenticate)
     assert response.status_code == 200
