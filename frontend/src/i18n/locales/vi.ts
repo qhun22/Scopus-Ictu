@@ -53,6 +53,10 @@ export const vi: TranslationSchema = {
     profile: "Hồ sơ cá nhân",
     myPublications: "Công bố của tôi",
     identity: "Liên kết Scopus",
+    search: "Tra cứu tác giả",
+    groupWorkflow: "Quy trình xử lý",
+    groupLookup: "Tra cứu & kết quả",
+    groupAdmin: "Quản trị",
   },
   header: {
     searchTooltip: "Tìm kiếm...",

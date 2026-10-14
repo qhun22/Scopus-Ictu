@@ -53,6 +53,10 @@ export const en: TranslationSchema = {
     profile: "My Profile",
     myPublications: "My Publications",
     identity: "Scopus Identity",
+    search: "Author Lookup",
+    groupWorkflow: "Data Workflow",
+    groupLookup: "Browse & Results",
+    groupAdmin: "Administration",
   },
   header: {
     searchTooltip: "Search...",

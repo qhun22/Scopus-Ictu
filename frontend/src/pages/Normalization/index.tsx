@@ -1,6 +1,6 @@
 import { adminLabel, isCorruptedName } from "../../utils/displayName";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ScopusImport,
   getImportHistory,
@@ -48,10 +48,24 @@ function formatDuration(seconds: number): string {
 export default function NormalizationPage() {
   const { t, locale } = useI18n();
   const toast = useToast();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedImportId = searchParams.get("import");
 
-  const [activeTab, setActiveTab] = useState<"publications" | "authors" | "affiliations" | "matching">("publications");
+  type TabKey = "publications" | "authors" | "affiliations" | "matching";
+  const tabFromUrl = searchParams.get("tab") as TabKey | null;
+  const validTabs: TabKey[] = ["publications", "authors", "affiliations", "matching"];
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "publications"
+  );
+
+  const switchTab = (tab: TabKey) => {
+    setActiveTab(tab);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set("tab", tab);
+      return next;
+    }, { replace: true });
+  };
   const [history, setHistory] = useState<ScopusImport[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -69,12 +83,7 @@ export default function NormalizationPage() {
   const fetchImports = async () => {
     try {
       setLoading(true);
-      const startTime = Date.now();
       const res = await getImportHistory(true);
-      const elapsed = Date.now() - startTime;
-      if (elapsed < 2000) {
-        await new Promise((res) => setTimeout(res, 2000 - elapsed));
-      }
       setHistory(res.items || []);
     } catch (err: unknown) {
       toast.error(
@@ -264,14 +273,15 @@ export default function NormalizationPage() {
           </p>
         </div>
 
-        <div className="page-action-group">
+        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 shrink-0">
           <button
             type="button"
             onClick={() => {
-              setActiveTab("publications");
+              switchTab("publications");
               setHistoryPage(1);
             }}
-            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+            data-testid="tab-publications"
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "publications"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -285,8 +295,9 @@ export default function NormalizationPage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("authors")}
-            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+            onClick={() => switchTab("authors")}
+            data-testid="tab-authors"
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "authors"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -300,9 +311,9 @@ export default function NormalizationPage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("affiliations")}
+            onClick={() => switchTab("affiliations")}
             data-testid="tab-affiliations"
-            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "affiliations"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -316,9 +327,9 @@ export default function NormalizationPage() {
 
           <button
             type="button"
-            onClick={() => setActiveTab("matching")}
+            onClick={() => switchTab("matching")}
             data-testid="tab-matching"
-            className={`h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "matching"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -333,25 +344,78 @@ export default function NormalizationPage() {
       </div>
 
       {activeTab === "affiliations" && (
-        <div className="tab-fade-in">
+        <div className="tab-fade-in space-y-4">
           <AffiliationsTab locale={locale} />
+          {/* Workflow next-step hint */}
+          <div className="flex items-center gap-3 rounded-xl border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+            <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
+            </svg>
+            <span className="text-[#3A5FC3] font-medium">
+              {locale === "vi"
+                ? "Bạn có thể tra cứu công bố. Nếu có JSON Craw, tiếp tục đối sánh — "
+                : "You can browse publications. If you have Craw JSON, continue matching — "}
+            </span>
+            <button
+              type="button"
+              onClick={() => switchTab("matching")}
+              className="underline underline-offset-2 text-[#2F4EA6] font-semibold hover:text-[#3A5FC3] transition-colors cursor-pointer"
+            >
+              {locale === "vi" ? "Chuyển sang tab Đối sánh →" : "Go to Matching tab →"}
+            </button>
+          </div>
         </div>
       )}
 
       {activeTab === "matching" && (
-        <div className="tab-fade-in">
+        <div className="tab-fade-in space-y-4">
           <MatchingTab locale={locale} />
+          {/* Workflow next-step hint */}
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-[#ECFDF5] px-4 py-3 text-sm">
+            <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-emerald-700 font-medium">
+              {locale === "vi"
+                ? "Ứng viên nhận dạng cần REVIEWER kiểm tra — "
+                : "Identity candidates need REVIEWER verification — "}
+            </span>
+            <Link
+              to="/reviews"
+              className="underline underline-offset-2 text-emerald-700 font-semibold hover:text-emerald-800 transition-colors"
+            >
+              {locale === "vi" ? "Tới trang Kiểm duyệt →" : "Go to Reviews page →"}
+            </Link>
+          </div>
         </div>
       )}
 
       {/* Tab Content: Authors Tab (M2.6B) */}
       {activeTab === "authors" && (
-        <div className="tab-fade-in">
+        <div className="tab-fade-in space-y-4">
           <AuthorsTab
             scopusImports={scopusImports}
             locale={locale}
             onRefresh={fetchImports}
           />
+          {/* Workflow next-step hint */}
+          <div className="flex items-center gap-3 rounded-xl border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+            <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
+            </svg>
+            <span className="text-[#3A5FC3] font-medium">
+              {locale === "vi"
+                ? "Bước tiếp theo: Đối chiếu đơn vị tác giả — "
+                : "Next step: Normalize affiliations — "}
+            </span>
+            <button
+              type="button"
+              onClick={() => switchTab("affiliations")}
+              className="underline underline-offset-2 text-[#2F4EA6] font-semibold hover:text-[#3A5FC3] transition-colors cursor-pointer"
+            >
+              {locale === "vi" ? "Chuyển sang tab Đơn vị →" : "Go to Affiliations tab →"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -781,6 +845,25 @@ export default function NormalizationPage() {
               </div>
             </div>
           </section>
+
+          {/* Workflow next-step hint */}
+          <div className="flex items-center gap-3 rounded-xl border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+            <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
+            </svg>
+            <span className="text-[#3A5FC3] font-medium">
+              {locale === "vi"
+                ? "Bước tiếp theo: Bóc tách tác giả — "
+                : "Next step: Extract authors — "}
+            </span>
+            <button
+              type="button"
+              onClick={() => switchTab("authors")}
+              className="underline underline-offset-2 text-[#2F4EA6] font-semibold hover:text-[#3A5FC3] transition-colors cursor-pointer"
+            >
+              {locale === "vi" ? "Chuyển sang tab Tác giả →" : "Go to Authors tab →"}
+            </button>
+          </div>
         </div>
       )}
 

@@ -53,6 +53,11 @@ export interface TranslationSchema {
     profile: string;
     myPublications: string;
     identity: string;
+    search: string;
+    // Group headings
+    groupWorkflow: string;
+    groupLookup: string;
+    groupAdmin: string;
   };
   header: {
     searchTooltip: string;
