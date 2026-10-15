@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/common/Header";
 import Sidebar from "../components/common/Sidebar";
@@ -10,8 +10,12 @@ export default function AppLayout() {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
 
-  // Reset scroll position of the content area on every route change
-  useEffect(() => {
+  // Reset scroll position of the content area on every pathname change
+  // (useLayoutEffect runs synchronously before paint, so the new route
+  // never flashes at the old scroll offset). Deliberately keyed on
+  // pathname only — changing just `?tab=`/search params must not
+  // reset scroll, since that would jump the user while switching tabs.
+  useLayoutEffect(() => {
     mainRef.current?.scrollTo(0, 0);
   }, [location.pathname]);
 
