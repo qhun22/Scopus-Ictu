@@ -1626,7 +1626,7 @@ export default function ImportsPage() {
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
                 <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.common.status}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-56">{t.imports.actions}</th>
+                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-44">{t.imports.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1675,7 +1675,7 @@ export default function ImportsPage() {
                             </svg>
                           )}
                         </div>
-                        <div className="min-w-0 max-w-xs sm:max-w-sm">
+                        <div className="min-w-0 max-w-[180px] sm:max-w-[220px]">
                           <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
                             {item.file_name}
                           </span>
@@ -1714,7 +1714,7 @@ export default function ImportsPage() {
                     </td>
 
                     <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
-                      <div className="mx-auto grid w-52 grid-cols-2 gap-1.5">
+                      <div className="mx-auto grid w-40 grid-cols-2 gap-1.5">
                         <button
                           type="button"
                           onClick={() => openDetail(item)}
