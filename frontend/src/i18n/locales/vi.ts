@@ -496,6 +496,7 @@ export const vi: TranslationSchema = {
     page: "Trang",
     systemFallback: "Hệ thống",
     userFallback: "Người dùng không xác định",
+    retry: "Thử lại",
   },
   approvalQueue: {
     title: "Duyệt đối sánh",

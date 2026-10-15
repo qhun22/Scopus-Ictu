@@ -319,7 +319,7 @@ export default function AuditLogsPage() {
               onClick={handleRefresh}
               className="self-start rounded-[5px] border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
             >
-              {"Thử lại"}
+              {copy.retry}
             </button>
           </div>
         </div>

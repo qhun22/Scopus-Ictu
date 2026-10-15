@@ -518,6 +518,7 @@ export interface TranslationSchema {
     page: string;
     systemFallback: string;
     userFallback: string;
+    retry: string;
   };
   approvalQueue: {
     title: string;

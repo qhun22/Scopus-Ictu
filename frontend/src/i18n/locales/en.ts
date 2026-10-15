@@ -496,6 +496,7 @@ export const en: TranslationSchema = {
     page: "Page",
     systemFallback: "System",
     userFallback: "Unknown user",
+    retry: "Retry",
   },
   approvalQueue: {
     title: "Match Review",
