@@ -99,7 +99,10 @@ function IdentityCard({ identity, copy, locale }: { identity: ApprovedScopusIden
           <h2 className="mt-1 text-lg font-bold text-slate-900">{identity.preferred_name || fallback}</h2>
         </div>
         <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-          {identity.status === "APPROVED" ? copy.approved : identity.status || fallback}
+          {/* This endpoint only ever returns APPROVED identities (see
+              get_approved_identity_summaries) — fallback never shows a raw
+              backend status code. */}
+          {copy.approved}
         </span>
       </div>
 

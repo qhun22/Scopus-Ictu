@@ -10,9 +10,9 @@ import { useI18n } from "../../i18n";
 const DEFAULT_PAGE_SIZE = 20;
 const FILTER_DELAY_MS = 350;
 
-const NULL_YEAR = "Chưa rõ";
-const NULL_CITATION = "Chưa có dữ liệu";
-const NULL_STRING = "Chưa cập nhật";
+const NULL_YEAR: Record<"vi" | "en", string> = { vi: "Chưa rõ", en: "Unknown" };
+const NULL_CITATION: Record<"vi" | "en", string> = { vi: "Chưa có dữ liệu", en: "No data" };
+const NULL_STRING: Record<"vi" | "en", string> = { vi: "Chưa cập nhật", en: "Not available" };
 
 interface AppliedFilters {
   year: number | undefined;
@@ -264,16 +264,16 @@ export default function PublicationsPage() {
 
   // ── Display helpers ────────────────────────────────────────────────────
   const fmtYear = (y: number | null) =>
-    y === null ? NULL_YEAR : String(y);
+    y === null ? NULL_YEAR[locale] : String(y);
 
   const fmtCitations = (c: number | null) => {
-    if (c === null) return NULL_CITATION;
+    if (c === null) return NULL_CITATION[locale];
     if (c === 0) return "0";
     return String(c);
   };
 
   const fmtField = (v: string | null) =>
-    v && v.trim() ? v.trim() : NULL_STRING;
+    v && v.trim() ? v.trim() : NULL_STRING[locale];
 
   // ── Labels ────────────────────────────────────────────────────────────
   const colTitle = locale === "vi" ? "Công bố" : "Publication";

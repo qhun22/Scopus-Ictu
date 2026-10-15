@@ -239,7 +239,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
               isCollapsed ? "justify-center" : "justify-between"
             }`}
           >
-            {!isCollapsed && <span className="font-semibold text-slate-600">Phiên bản</span>}
+            {!isCollapsed && <span className="font-semibold text-slate-600">{t.nav.version}</span>}
             <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
               M2.7
             </span>

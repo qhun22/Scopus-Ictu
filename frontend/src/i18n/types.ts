@@ -58,6 +58,7 @@ export interface TranslationSchema {
     groupWorkflow: string;
     groupLookup: string;
     groupAdmin: string;
+    version: string;
   };
   header: {
     searchTooltip: string;
@@ -447,6 +448,10 @@ export interface TranslationSchema {
     actionAccept: string;
     actionReject: string;
     actionReopen: string;
+    statusPending: string;
+    statusAccepted: string;
+    statusRejected: string;
+    statusSuperseded: string;
     dateFrom: string;
     dateTo: string;
     applyFilters: string;
@@ -549,5 +554,26 @@ export interface TranslationSchema {
     loadError: string;
     entityLabels: Record<string, string>;
     actionLabels: Record<string, string>;
+    resetSystem: string;
+    resetSuccessTitle: string;
+    resetSuccessMessage: string;
+    resetErrorTitle: string;
+    resetErrorMessage: string;
+    resetModalTitle: string;
+    resetModalSubtitle: string;
+    resetModalDescription: string;
+    resetModalConfirmLabel: string;
+    resetModalCancelLabel: string;
+    chartsTitle: string;
+    chartsRetry: string;
+    publicationsByYearTitle: string;
+    publicationsByYearEmptyTitle: string;
+    publicationsByYearEmptySubtitle: string;
+    publicationsWithoutYearNote: string;
+    documentTypeTitle: string;
+    documentTypeEmptyTitle: string;
+    affiliationCoverageTitle: string;
+    affiliationCoverageEmptyTitle: string;
+    affiliationCoverageEmptySubtitle: string;
   };
 }

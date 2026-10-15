@@ -35,29 +35,50 @@ function datetimeLocalToIso(value: string): string | undefined {
   return d.toISOString();
 }
 
-function ActionBadge({ action }: { action: ReviewHistoryAction }) {
+interface RowCopy {
+  noReason: string;
+  actionAccept: string;
+  actionReject: string;
+  actionReopen: string;
+  statusPending: string;
+  statusAccepted: string;
+  statusRejected: string;
+  statusSuperseded: string;
+}
+
+function ActionBadge({ action, copy }: { action: ReviewHistoryAction; copy: RowCopy }) {
   const styles: Record<ReviewHistoryAction, string> = {
     ACCEPT: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200",
     REJECT: "bg-rose-50 text-rose-700 ring-1 ring-rose-200",
     REOPEN: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
   };
+  const labels: Record<ReviewHistoryAction, string> = {
+    ACCEPT: copy.actionAccept.replace(/\s*\(ACCEPT\)$/, ""),
+    REJECT: copy.actionReject.replace(/\s*\(REJECT\)$/, ""),
+    REOPEN: copy.actionReopen.replace(/\s*\(REOPEN\)$/, ""),
+  };
   return (
-    <span className={`inline-block rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold ${styles[action]}`}>
-      {action}
+    <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-semibold ${styles[action]}`}>
+      {labels[action]}
     </span>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+const STATUS_BADGE_LABEL_KEY: Record<string, keyof RowCopy> = {
+  PENDING: "statusPending",
+  ACCEPTED: "statusAccepted",
+  REJECTED: "statusRejected",
+  SUPERSEDED: "statusSuperseded",
+};
+
+function StatusBadge({ status, copy }: { status: string; copy: RowCopy }) {
+  const labelKey = STATUS_BADGE_LABEL_KEY[status];
+  const label = labelKey ? copy[labelKey] : status;
   return (
-    <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 ring-1 ring-slate-200">
-      {status}
+    <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600 ring-1 ring-slate-200">
+      {label}
     </span>
   );
-}
-
-interface RowCopy {
-  noReason: string;
 }
 
 function ReviewHistoryRow({ item, copy }: { item: ReviewHistoryItem; copy: RowCopy }) {
@@ -67,13 +88,13 @@ function ReviewHistoryRow({ item, copy }: { item: ReviewHistoryItem; copy: RowCo
         {formatTimestamp(item.created_at)}
       </td>
       <td className="whitespace-nowrap px-4 py-3">
-        <ActionBadge action={item.action} />
+        <ActionBadge action={item.action} copy={copy} />
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <div className="flex items-center gap-1.5">
-          <StatusBadge status={item.from_status} />
+          <StatusBadge status={item.from_status} copy={copy} />
           <span className="text-slate-400">→</span>
-          <StatusBadge status={item.to_status} />
+          <StatusBadge status={item.to_status} copy={copy} />
         </div>
       </td>
       <td className="px-4 py-3 text-xs text-slate-700">
@@ -360,7 +381,16 @@ export default function ReviewHistoryPage() {
                   <ReviewHistoryRow
                     key={item.id}
                     item={item}
-                    copy={{ noReason: copy.noReason }}
+                    copy={{
+                      noReason: copy.noReason,
+                      actionAccept: copy.actionAccept,
+                      actionReject: copy.actionReject,
+                      actionReopen: copy.actionReopen,
+                      statusPending: copy.statusPending,
+                      statusAccepted: copy.statusAccepted,
+                      statusRejected: copy.statusRejected,
+                      statusSuperseded: copy.statusSuperseded,
+                    }}
                   />
                 ))}
               </tbody>

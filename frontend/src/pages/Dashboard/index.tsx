@@ -81,11 +81,11 @@ export default function DashboardPage() {
     setIsResetting(true);
     try {
       await resetSystem("ICTU");
-      toast.success("Đã reset hệ thống", "Toàn bộ dữ liệu đã được xóa. Chỉ giữ lại tài khoản ADMIN.");
+      toast.success(copy.resetSuccessTitle, copy.resetSuccessMessage);
       setShowResetModal(false);
       fetchSummary();
     } catch (err) {
-      toast.error("Reset thất bại", getApiErrorMessage(err, "Không thể reset hệ thống."));
+      toast.error(copy.resetErrorTitle, getApiErrorMessage(err, copy.resetErrorMessage));
     } finally {
       setIsResetting(false);
     }
@@ -154,12 +154,12 @@ export default function DashboardPage() {
       {/* Reset Confirmation Modal */}
       <TextConfirmModal
         open={showResetModal}
-        title="Reset toàn hệ thống"
-        subtitle="Thao tác này không thể hoàn tác"
-        description="Toàn bộ dữ liệu sẽ bị xóa sạch — giảng viên, lịch sử nhập, chuẩn hóa, danh tính Scopus, bài báo, audit logs… Chỉ giữ lại tài khoản ADMIN."
+        title={copy.resetModalTitle}
+        subtitle={copy.resetModalSubtitle}
+        description={copy.resetModalDescription}
         confirmWord="ICTU"
-        confirmLabel="Xóa toàn bộ"
-        cancelLabel="Hủy"
+        confirmLabel={copy.resetModalConfirmLabel}
+        cancelLabel={copy.resetModalCancelLabel}
         loading={isResetting}
         onConfirm={handleReset}
         onCancel={() => setShowResetModal(false)}
@@ -194,7 +194,7 @@ export default function DashboardPage() {
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="truncate">Reset hệ thống</span>
+              <span className="truncate">{copy.resetSystem}</span>
             </button>
           ) : (
             <div />
@@ -280,7 +280,7 @@ export default function DashboardPage() {
           {/* Charts — publications by year, document type mix, affiliation coverage */}
           <section className="rounded-[5px] border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 text-base font-semibold text-gray-800">
-              {locale === "vi" ? "Thống kê công bố" : "Publication statistics"}
+              {copy.chartsTitle}
             </h2>
 
             {chartsLoading && !charts && (
@@ -297,7 +297,7 @@ export default function DashboardPage() {
                   onClick={fetchCharts}
                   className="ml-3 font-semibold underline underline-offset-2"
                 >
-                  {locale === "vi" ? "Thử lại" : "Retry"}
+                  {copy.chartsRetry}
                 </button>
               </div>
             )}
@@ -308,17 +308,15 @@ export default function DashboardPage() {
                   {/* Publications by year */}
                   <div>
                     <h3 className="mb-1 text-sm font-semibold text-slate-700">
-                      {locale === "vi" ? "Số công bố theo năm" : "Publications by year"}
+                      {copy.publicationsByYearTitle}
                     </h3>
                     {charts.publications_by_year.length === 0 ? (
                       <div className="flex h-64 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
                         <p className="text-sm font-medium text-slate-500">
-                          {locale === "vi" ? "Chưa có công bố nào có năm xuất bản hợp lệ" : "No publications with a valid year yet"}
+                          {copy.publicationsByYearEmptyTitle}
                         </p>
                         <p className="text-xs text-slate-400">
-                          {locale === "vi"
-                            ? "Nhập dữ liệu Scopus CSV và chuẩn hóa công bố để xem biểu đồ này."
-                            : "Import a Scopus CSV and normalize publications to see this chart."}
+                          {copy.publicationsByYearEmptySubtitle}
                         </p>
                       </div>
                     ) : (
@@ -326,9 +324,10 @@ export default function DashboardPage() {
                         <PublicationsByYearChart data={charts.publications_by_year} locale={locale} />
                         {charts.publications_total_without_year > 0 && (
                           <p className="mt-2 text-[11px] text-slate-400">
-                            {locale === "vi"
-                              ? `${charts.publications_total_without_year.toLocaleString("vi-VN")} công bố chưa xác định năm xuất bản, không hiển thị trong biểu đồ này.`
-                              : `${charts.publications_total_without_year.toLocaleString("en-US")} publications have no recorded year and are excluded from this chart.`}
+                            {charts.publications_total_without_year.toLocaleString(
+                              locale === "vi" ? "vi-VN" : "en-US",
+                            )}{" "}
+                            {copy.publicationsWithoutYearNote}
                           </p>
                         )}
                       </>
@@ -338,12 +337,12 @@ export default function DashboardPage() {
                   {/* Document type breakdown */}
                   <div>
                     <h3 className="mb-1 text-sm font-semibold text-slate-700">
-                      {locale === "vi" ? "Cơ cấu loại công bố" : "Document type breakdown"}
+                      {copy.documentTypeTitle}
                     </h3>
                     {charts.publications_by_document_type.length === 0 ? (
                       <div className="flex h-64 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
                         <p className="text-sm font-medium text-slate-500">
-                          {locale === "vi" ? "Chưa có dữ liệu loại công bố" : "No document type data yet"}
+                          {copy.documentTypeEmptyTitle}
                         </p>
                       </div>
                     ) : (
@@ -355,19 +354,15 @@ export default function DashboardPage() {
                 {/* Affiliation coverage */}
                 <div className="border-t border-gray-100 pt-5">
                   <h3 className="mb-1 text-sm font-semibold text-slate-700">
-                    {locale === "vi" ? "Mức độ đầy đủ đơn vị tác giả" : "Author affiliation coverage"}
+                    {copy.affiliationCoverageTitle}
                   </h3>
                   {charts.affiliation_coverage.total_author_positions === 0 ? (
                     <div className="flex h-40 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
                       <p className="text-sm font-medium text-slate-500">
-                        {locale === "vi"
-                          ? "Chưa có vị trí tác giả nào để đối chiếu đơn vị công tác"
-                          : "No author positions to resolve affiliations for yet"}
+                        {copy.affiliationCoverageEmptyTitle}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {locale === "vi"
-                          ? "Bóc tách tác giả từ công bố trước, sau đó chạy đối chiếu đơn vị."
-                          : "Extract authors from publications first, then run affiliation resolution."}
+                        {copy.affiliationCoverageEmptySubtitle}
                       </p>
                     </div>
                   ) : (
@@ -407,7 +402,7 @@ export default function DashboardPage() {
                 <div>
                   <dt className="font-medium text-gray-500">{copy.status}</dt>
                   <dd className="mt-0.5">
-                    <ImportStatusBadge status={summary.latest_scopus_import.status} />
+                    <ImportStatusBadge status={summary.latest_scopus_import.status} locale={locale} />
                   </dd>
                 </div>
                 <div>
@@ -559,19 +554,19 @@ const IMPORT_STATUS_COLORS: Record<string, string> = {
   CANCELLED: "bg-gray-100 text-gray-600",
 };
 
-const IMPORT_STATUS_VI: Record<string, string> = {
-  RECEIVED: "Đã tiếp nhận",
-  PARSING: "Đang phân tích",
-  VALIDATED: "Đã kiểm tra",
-  STAGED: "Chờ áp dụng",
-  APPLIED: "Đã áp dụng",
-  FAILED: "Thất bại",
-  CANCELLED: "Đã hủy",
+const IMPORT_STATUS_LABEL: Record<string, Record<"vi" | "en", string>> = {
+  RECEIVED: { vi: "Đã tiếp nhận", en: "Received" },
+  PARSING: { vi: "Đang phân tích", en: "Parsing" },
+  VALIDATED: { vi: "Đã kiểm tra", en: "Validated" },
+  STAGED: { vi: "Chờ áp dụng", en: "Awaiting apply" },
+  APPLIED: { vi: "Đã áp dụng", en: "Applied" },
+  FAILED: { vi: "Thất bại", en: "Failed" },
+  CANCELLED: { vi: "Đã hủy", en: "Cancelled" },
 };
 
-function ImportStatusBadge({ status }: { status: string }) {
+function ImportStatusBadge({ status, locale }: { status: string; locale: "vi" | "en" }) {
   const color = IMPORT_STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600";
-  const label = IMPORT_STATUS_VI[status] ?? status;
+  const label = IMPORT_STATUS_LABEL[status]?.[locale] ?? status;
   return (
     <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${color}`}>
       {label}
