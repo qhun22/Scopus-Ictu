@@ -25,8 +25,6 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
 
-const LOAD_MIN_MS = 500;
-
 export default function LecturersPage() {
   const toast = useToast();
   const { user: currentUser } = useAuth();
@@ -123,7 +121,6 @@ export default function LecturersPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const startTime = Date.now();
       const isFilterMode = activeFilter && activeFilter !== "all";
       const data = await getLecturers({
         page: isFilterMode ? 1 : page,
@@ -146,10 +143,6 @@ export default function LecturersPage() {
         allItems = [...data.items, ...extras.flatMap((r) => r.items)];
       }
 
-      const elapsed = Date.now() - startTime;
-      if (elapsed < LOAD_MIN_MS) {
-        await new Promise((res) => setTimeout(res, LOAD_MIN_MS - elapsed));
-      }
       setLecturers(allItems);
       setTotalRecords(data.total);
       setStats(data.stats);

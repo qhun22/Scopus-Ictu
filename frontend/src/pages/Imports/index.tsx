@@ -85,26 +85,9 @@ export default function ImportsPage() {
   const [lecturerCancelling, setLecturerCancelling] = useState(false);
   const [activeResultPanel, setActiveResultPanel] = useState<"scopus_checked" | "lecturer_preview" | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
-  const [lecturerProgressPercent, setLecturerProgressPercent] = useState(0);
   const [isScopusFileExiting, setIsScopusFileExiting] = useState(false);
   const [pendingImport, setPendingImport] = useState<ScopusImport | null>(null);
   const [pendingBusy, setPendingBusy] = useState<"confirm" | "cancel" | null>(null);
-
-  useEffect(() => {
-    if (activeResultPanel === "lecturer_preview" && lecturerPreview) {
-      setLecturerProgressPercent(0);
-      const t1 = setTimeout(() => setLecturerProgressPercent(35), 80);
-      const t2 = setTimeout(() => setLecturerProgressPercent(75), 260);
-      const t3 = setTimeout(() => setLecturerProgressPercent(100), 520);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-      };
-    } else {
-      setLecturerProgressPercent(0);
-    }
-  }, [activeResultPanel, lecturerPreview]);
 
   useEffect(() => {
     if (!pendingImport) return;
@@ -600,18 +583,16 @@ export default function ImportsPage() {
   const confirmPendingImport = () => {
     if (!pendingImport || pendingBusy) return;
     setPendingBusy("confirm");
-    window.setTimeout(() => {
-      toast.success(
-        t.imports.successTitle,
-        replaceToken(
-          t.imports.successMessage,
-          "count",
-          numberFormatter.format(pendingImport.total_records),
-        ),
-      );
-      closePendingPanel();
-      setPendingBusy(null);
-    }, 450);
+    toast.success(
+      t.imports.successTitle,
+      replaceToken(
+        t.imports.successMessage,
+        "count",
+        numberFormatter.format(pendingImport.total_records),
+      ),
+    );
+    closePendingPanel();
+    setPendingBusy(null);
   };
 
   const cancelPendingImport = async () => {
@@ -990,6 +971,8 @@ export default function ImportsPage() {
     setPage(1);
   };
 
+  const isApplyDisabled = !searchInput.trim() || searchInput.trim() === appliedSearch.trim();
+
   // Filter & Pagination calculations
   const lecturerPreviewRow: ScopusImport | null = lecturerPreview
     ? {
@@ -1246,29 +1229,32 @@ export default function ImportsPage() {
           ) : (
             <div className={`mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all duration-300 ease-out ${isScopusFileExiting ? "opacity-0 scale-[0.97] -translate-y-1" : "opacity-100 scale-100 translate-y-0 animate-in fade-in slide-in-from-top-2 duration-300"}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="block font-bold text-slate-800 text-sm sm:text-base truncate max-w-[200px] sm:max-w-xs md:max-w-sm" title={selectedFile.name}>
+                    <span
+                      className="block font-semibold text-slate-800 text-xs leading-snug break-all line-clamp-2"
+                      title={selectedFile.name}
+                    >
                       {selectedFile.name}
                     </span>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs sm:text-[13px] text-slate-500">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
                       <span>{locale === "vi" ? "Dung lượng:" : "Size:"} <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong></span>
                       <span>•</span>
                       <span>{locale === "vi" ? "Định dạng:" : "Format:"} <strong className="text-slate-700">CSV</strong></span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
+                <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
                   <button
                     type="button"
                     disabled={uploading}
                     onClick={exitScopusFile}
-                    className="h-9 sm:h-10 rounded-lg border border-slate-200 bg-white px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs"
+                    className="h-9 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs shrink-0"
                   >
                     {t.imports.cancelFile}
                   </button>
@@ -1276,7 +1262,7 @@ export default function ImportsPage() {
                     type="button"
                     disabled={uploading}
                     onClick={() => void startImport()}
-                    className="relative overflow-hidden inline-flex h-9 sm:h-10 w-40 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-[#2f4ea6] hover:shadow-md hover:-translate-y-px transition-all duration-150 active:scale-[0.97] active:shadow-xs disabled:cursor-wait disabled:opacity-80 disabled:hover:translate-y-0 cursor-pointer group"
+                    className="relative overflow-hidden inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] disabled:cursor-wait disabled:opacity-80 cursor-pointer shrink-0"
                   >
                     {uploading ? (
                       <>
@@ -1496,21 +1482,19 @@ export default function ImportsPage() {
           <div className="mt-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3 animate-in fade-in duration-500 delay-300">
             <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500">
               <span>{locale === "vi" ? "Kiểm tra cấu trúc & tính hợp lệ" : "Structure & validity check"}</span>
-              <span className="font-bold text-slate-700">{lecturerProgressPercent}%</span>
+              <span className="font-bold text-slate-700">100%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-white/80 border border-slate-200/60">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[#3A5FC3] to-emerald-500 transition-all duration-500 ease-out"
-                style={{ width: `${lecturerProgressPercent}%` }}
+                style={{ width: "100%" }}
               />
             </div>
-            {lecturerProgressPercent === 100 && (
-              <p className={`mt-1.5 text-[11px] font-semibold animate-in fade-in duration-300 ${summary.valid === 0 ? "text-rose-600" : "text-emerald-600"}`}>
-                {summary.valid === 0
-                  ? (locale === "vi" ? "Không có hồ sơ hợp lệ để nhập" : "No valid records to import")
-                  : (locale === "vi" ? "Tệp hợp lệ, sẵn sàng nhập" : "File valid, ready to import")}
-              </p>
-            )}
+            <p className={`mt-1.5 text-[11px] font-semibold animate-in fade-in duration-300 ${summary.valid === 0 ? "text-rose-600" : "text-emerald-600"}`}>
+              {summary.valid === 0
+                ? (locale === "vi" ? "Không có hồ sơ hợp lệ để nhập" : "No valid records to import")
+                : (locale === "vi" ? "Tệp hợp lệ, sẵn sàng nhập" : "File valid, ready to import")}
+            </p>
           </div>
 
           {lecturerPreview.preview.conflicts.length > 0 && (
@@ -1595,14 +1579,18 @@ export default function ImportsPage() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Nút Áp dụng */}
           <button
             type="button"
+            disabled={isApplyDisabled}
             onClick={handleApplySearch}
-            className="inline-flex h-9 items-center justify-center rounded-lg bg-[#3A5FC3] px-3.5 text-xs font-semibold text-white shadow-2xs transition-all duration-150 active:scale-[0.98] hover:bg-[#2f4ea6] cursor-pointer whitespace-nowrap"
+            className="relative overflow-hidden inline-flex h-9 w-28 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-2.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#3A5FC3] disabled:active:scale-100"
           >
-            {locale === "vi" ? "Áp dụng" : "Apply"}
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span className="truncate">{locale === "vi" ? "Áp dụng" : "Apply"}</span>
           </button>
 
           {/* Nút Đặt lại */}
@@ -1616,14 +1604,13 @@ export default function ImportsPage() {
               setPage(1);
             }}
             disabled={!searchInput && !appliedSearch && statusFilter === "ALL"}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs whitespace-nowrap"
+            className="inline-flex h-9 w-28 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer shadow-2xs shrink-0"
           >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <span>{locale === "vi" ? "Đặt lại" : "Reset"}</span>
+            <span className="truncate">{locale === "vi" ? "Đặt lại" : "Reset"}</span>
           </button>
-
         </div>
       </div>
 

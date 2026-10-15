@@ -3,9 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ToastProvider } from "./contexts/ToastContext";
-import { PageVisitProvider } from "./contexts/PageVisitContext";
 import { I18nProvider } from "./i18n";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRoute from "./components/auth/RoleRoute";
 import AppLayout from "./layouts/AppLayout";
@@ -26,6 +24,7 @@ import MyPublicationsPage from "./pages/MyPublications";
 import SearchPage from "./pages/Search";
 import UsersPage from "./pages/Users";
 import PlaceholderPage from "./components/common/PlaceholderPage";
+import PageLoadingBar from "./components/PageLoadingBar";
 
 function RootRedirect() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -41,13 +40,12 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <ThemeProvider>
     <I18nProvider>
       <ToastProvider>
         <AuthProvider>
           <NotificationProvider>
-            <PageVisitProvider>
-              <Routes>
+            <PageLoadingBar />
+            <Routes>
           {/* Public Routes */}
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
@@ -115,12 +113,10 @@ export default function App() {
 
           {/* Catch-all route */}
           <Route path="*" element={<RootRedirect />} />
-              </Routes>
-            </PageVisitProvider>
+            </Routes>
           </NotificationProvider>
         </AuthProvider>
       </ToastProvider>
     </I18nProvider>
-    </ThemeProvider>
   );
 }

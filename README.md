@@ -117,7 +117,7 @@ python -m alembic heads
 python -m alembic upgrade head
 ```
 
-The current migration head is `f6a1b2c3d4e5`.
+The current migration head is `c7f2a9b1d3e5`.
 
 ---
 
@@ -168,5 +168,5 @@ test database URL.
 
 - Credentials, `.env`, and local-only CSV files are never committed.
 - Migrations are append-only.
-- Alembic head: `f6a1b2c3d4e5` (do not rewrite).
+- Alembic head: `c7f2a9b1d3e5` (do not rewrite).
 - Real lecturer/Scopus data must never be committed — see `.gitignore`.

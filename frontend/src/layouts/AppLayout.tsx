@@ -10,7 +10,7 @@ export default function AppLayout() {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif] dark:bg-slate-950 dark:text-slate-200">
+    <div className="min-h-screen bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">
       {/* Role-aware Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}

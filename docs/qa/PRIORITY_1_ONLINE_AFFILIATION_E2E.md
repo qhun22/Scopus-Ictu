@@ -109,10 +109,16 @@ Thực hiện trên **DB test cô lập** (`scopus_ictu_test_pytest_20261011`, c
 - Dữ liệu test (DOI, tên tác giả thật Hirsch/LeCun/Bengio/Hinton) là thông tin học thuật công khai (bài báo nổi tiếng), không phải giảng viên ICTU — an toàn để tham chiếu trong tài liệu, nhưng **không đưa ảnh chụp UI chứa các tên này vào GitHub PUBLIC** nếu chưa rà soát thêm (đã tuân thủ: không file ảnh nào được tạo/commit trong phiên này).
 - Tài khoản test (`qa.admin@ictu.edu.vn`, `qa.lecturer@ictu.edu.vn`) tồn tại trên DB test cô lập, không phải App DB — không cần dọn vì DB test không phục vụ demo thật.
 
-## 5. GATE 1 — KẾT LUẬN
+## 5. GATE 1 — KẾT LUẬN (đã hiệu chỉnh cho trung thực sau rà soát của người dùng)
 
-**PASS.** ADMIN thực sự thực hiện được trọn vẹn workflow tra cứu đơn vị trực tuyến qua giao diện thật, với dữ liệu mới (3 DOI ngoài cache 660 bài cũ), có bằng chứng hợp lệ (tên tổ chức, nguồn, thời điểm truy xuất lưu đúng trong DB), và hệ thống xử lý trung thực trường hợp không tìm thấy (record `work: null`, không suy đoán). Không có tuyên bố PASS giả — mọi số liệu trong báo cáo lấy trực tiếp từ response API/DB thật trong phiên làm việc, không phải giá trị kỳ vọng.
+Tách rõ từng phần, không gộp chung một kết luận PASS duy nhất:
 
-Giới hạn còn lại (CSV lớn thật, 1440p screenshot, đối chiếu tuyệt đối Bộ A) đã ghi rõ ở mục 4, không chặn Gate 1 vì đều là giới hạn về **quy mô kiểm thử**, không phải lỗi chức năng.
+- **PASS** — kiểm thử kỹ thuật thu thập trực tuyến với 3 DOI thật, trên DB test cô lập: gọi thật OpenAlex/Crossref/ORCID, nhận kết quả dương tính thật, ghi đúng định dạng bundle, không crash với trường hợp không tìm thấy.
+- **PASS** — luồng job nền → API → UI → xem trước → áp dụng, trong phạm vi bộ mẫu thử (3 DOI): trigger, polling, hiển thị tiến độ, preview đúng số liệu, apply ghi DB đúng, chống áp dụng lặp, hủy giữa chừng, RBAC — tất cả xác nhận qua UI thật và API thật.
+- **CHƯA PASS** — nghiệm thu đầy đủ với một CSV Scopus mới **xuất thật** do ADMIN nhập (ví dụ export trực tiếp từ Scopus cho một đợt công bố mới). Bộ thử hiện tại là CSV tối thiểu 3 dòng tự xây dựng thủ công, không phải file xuất thật từ Scopus, nên chưa kiểm chứng được các đặc điểm của file xuất thật (số cột đầy đủ, encoding, số lượng bản ghi lớn, các trường hợp biên của dữ liệu Scopus thật). Giữ hạng mục này lại để nghiệm thu bổ sung trước khi kết luận toàn bộ chế độ NO-JSON hoàn chỉnh.
 
-**Chuyển sang Ưu tiên 2.**
+**Về bản chất affiliation:** hệ thống không tự tuyên bố mọi đơn vị tìm thấy qua OpenAlex/Crossref là đơn vị đã được xác minh tại thời điểm xuất bản — đây là lời khai của nguồn ngoài tại thời điểm *truy vấn* (có `retrieved_at` riêng, không phải ngày xuất bản bài báo), chỉ đạt mức CORROBORATED (đối chiếu vị trí+số lượng+tên) trừ khi có bridge ORCID→Scopus ID thật (VERIFIED). Độ chính xác affiliation có thể lệch so với thời điểm công bố gốc nếu nguồn ngoài cập nhật hồ sơ tác giả sau này — đây là giới hạn nhận biết được, chưa kiểm chứng định lượng, ghi vào mục 4 làm việc cần theo dõi thêm.
+
+Giới hạn khác đã ghi ở mục 4 (CSV lớn thật, 1440p screenshot, đối chiếu tuyệt đối Bộ A qua App DB) không chặn việc tiếp tục Ưu tiên 2, nhưng **vẫn treo lại, chưa đóng**, cần nghiệm thu bổ sung trước khi tuyên bố chế độ NO-JSON (Ưu tiên 1–3) hoàn chỉnh.
+
+**Được phép chuyển sang Ưu tiên 2** (theo quyết định của người dùng ngày 2026-10-12), không chờ CSV mới thật.

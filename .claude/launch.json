@@ -1,0 +1,22 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "p4ui-backend",
+      "runtimeExecutable": "D:\\DataFolder\\ProjectIctu\\DoAn\\_venv_backend_demo_py312\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8199"],
+      "cwd": "D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\backend",
+      "port": 8199
+    },
+    {
+      "name": "p4ui-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5199"],
+      "cwd": "D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\frontend",
+      "port": 5199,
+      "env": {
+        "VITE_API_PROXY_TARGET": "http://127.0.0.1:8199"
+      }
+    }
+  ]
+}

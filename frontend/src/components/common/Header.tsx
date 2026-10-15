@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
-import { useTheme } from "../../contexts/ThemeContext";
 
 interface HeaderProps {
   onToggleMobileMenu: () => void;
@@ -22,7 +21,6 @@ export default function Header({
   const location = useLocation();
   const toast = useToast();
   const { locale, setLocale, t, isLanguageSwitching } = useI18n();
-  const { theme, toggleTheme } = useTheme();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -119,7 +117,7 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white/95 px-3 sm:px-6 backdrop-blur transition-all dark:border-slate-700/80 dark:bg-slate-900/95">
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-slate-200/80 bg-white/95 px-3 sm:px-6 backdrop-blur transition-all">
       {/* Left side: Mobile Hamburger, Desktop Sidebar Collapse, Current Title */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Mobile menu toggle */}
@@ -155,7 +153,7 @@ export default function Header({
 
         {/* Current Page Title */}
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold text-slate-800 sm:text-base md:text-lg dark:text-slate-100">
+          <h2 className="truncate text-sm font-bold text-slate-800 sm:text-base md:text-lg">
             {getPageTitle()}
           </h2>
         </div>
@@ -199,27 +197,6 @@ export default function Header({
             EN
           </button>
         </div>
-
-        {/* Dark mode toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
-          title={theme === "dark" ? (locale === "vi" ? "Chuyển sang sáng" : "Switch to light") : (locale === "vi" ? "Chuyển sang tối" : "Switch to dark")}
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {theme === "dark" ? (
-            /* Sun icon */
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
-            </svg>
-          ) : (
-            /* Moon icon */
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
-          )}
-        </button>
 
         {/* User profile dropdown */}
         <div className="relative" ref={dropdownRef}>

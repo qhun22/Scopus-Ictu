@@ -24,7 +24,7 @@ interface NavGroup {
 // ─── Icon helpers ──────────────────────────────────────────────
 const ic = (active: boolean, path: string) => (
   <svg
-    className={`h-5 w-5 flex-shrink-0 ${active ? "text-[#3A5FC3] dark:text-[#7B9EE8]" : "text-slate-400 dark:text-slate-500"}`}
+    className={`h-5 w-5 flex-shrink-0 ${active ? "text-[#3A5FC3]" : "text-slate-400"}`}
     fill="none"
     stroke="currentColor"
     viewBox="0 0 24 24"
@@ -54,11 +54,11 @@ const ICONS = {
 // ─── Group heading ──────────────────────────────────────────────
 function GroupHeading({ label, collapsed }: { label: string; collapsed: boolean }) {
   if (collapsed) {
-    return <div className="mx-3 my-2 border-t border-slate-100 dark:border-slate-700" />;
+    return <div className="mx-3 my-2 border-t border-slate-100" />;
   }
   return (
     <div className="mx-3 mb-1 mt-4 first:mt-2">
-      <p className="px-1 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+      <p className="px-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
         {label}
       </p>
     </div>
@@ -160,8 +160,8 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
       className={({ isActive }) =>
         `group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
           isActive
-            ? "bg-[#3A5FC3]/10 text-[#3A5FC3] font-semibold shadow-xs dark:bg-[#3A5FC3]/20 dark:text-[#7B9EE8]"
-            : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+            ? "bg-[#3A5FC3]/10 text-[#3A5FC3] font-semibold shadow-xs"
+            : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
         } ${isCollapsed && !isMobile ? "justify-center px-2" : ""}`
       }
     >
@@ -199,12 +199,12 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
     <>
       {/* ── Desktop / Tablet sidebar ─────────────────────────────── */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 hidden flex-col border-r border-slate-200/80 bg-white transition-all duration-200 ease-out md:flex dark:border-slate-700/80 dark:bg-slate-900 ${
+        className={`fixed top-0 bottom-0 left-0 z-40 hidden flex-col border-r border-slate-200/80 bg-white transition-all duration-200 ease-out md:flex ${
           isCollapsed ? "w-20" : "w-64"
         }`}
       >
         {/* Brand */}
-        <div className="flex h-16 items-center border-b border-slate-200/80 px-4 dark:border-slate-700/80">
+        <div className="flex h-16 items-center border-b border-slate-200/80 px-4">
           <div className="flex items-center gap-3 overflow-hidden">
             <img
               src={logoSrc}
@@ -255,7 +255,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
             className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
             aria-hidden="true"
           />
-          <div className="fixed inset-y-0 left-0 flex w-72 flex-col bg-white shadow-2xl transition-transform animate-in slide-in-from-left duration-200 dark:bg-slate-900">
+          <div className="fixed inset-y-0 left-0 flex w-72 flex-col bg-white shadow-2xl transition-transform animate-in slide-in-from-left duration-200">
             {/* Drawer header */}
             <div className="flex h-16 items-center justify-between border-b border-slate-200/80 px-4">
               <div className="flex items-center gap-3">

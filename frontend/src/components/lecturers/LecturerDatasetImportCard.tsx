@@ -155,10 +155,7 @@ const LecturerDatasetImportCard = forwardRef<
     if (!selectedFile || previewing || isImporting) return;
     setPreviewing(true);
     try {
-      const [response] = await Promise.all([
-        previewLecturerDataset(selectedFile, allowDuplicate),
-        new Promise((resolve) => setTimeout(resolve, 350)),
-      ]);
+      const response = await previewLecturerDataset(selectedFile, allowDuplicate);
       setDuplicateWarning(null);
       if (response.conflicts && response.conflicts.length > 0) {
         toast.warning(
@@ -273,9 +270,9 @@ const LecturerDatasetImportCard = forwardRef<
       ) : (
         <div className={`mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all duration-300 ease-out ${isFileExiting ? "opacity-0 scale-[0.97] -translate-y-1" : "opacity-100 scale-100 translate-y-0 animate-in fade-in slide-in-from-top-2 duration-300"}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -285,10 +282,13 @@ const LecturerDatasetImportCard = forwardRef<
                 </svg>
               </div>
               <div className="min-w-0 flex-1">
-                <span className="block font-bold text-slate-800 text-sm sm:text-base truncate max-w-[200px] sm:max-w-xs md:max-w-sm" title={selectedFile.name}>
+                <span
+                  className="block font-semibold text-slate-800 text-xs leading-snug break-all line-clamp-2"
+                  title={selectedFile.name}
+                >
                   {selectedFile.name}
                 </span>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs sm:text-[13px] text-slate-500">
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
                   <span>
                     {locale === "vi" ? "Dung lượng:" : "Size:"}{" "}
                     <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong>
@@ -301,12 +301,12 @@ const LecturerDatasetImportCard = forwardRef<
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
+            <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
               <button
                 type="button"
                 disabled={previewing || isImporting}
                 onClick={exitFile}
-                className="h-9 sm:h-10 rounded-lg border border-slate-200 bg-white px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs"
+                className="h-9 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs shrink-0"
               >
                 {t.imports.cancelFile}
               </button>
@@ -314,7 +314,7 @@ const LecturerDatasetImportCard = forwardRef<
                 type="button"
                 disabled={previewing || isImporting}
                 onClick={() => void handlePreview()}
-                className="inline-flex h-9 sm:h-10 min-w-32 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 cursor-pointer"
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 cursor-pointer shrink-0"
               >
                 {previewing ? (
                   <>

@@ -8,9 +8,9 @@ An toàn:
 * Chạy lần thứ hai không nhân đôi tiến trình: cổng đang do tiến trình CỦA DEMO giữ thì dùng lại.
 * Cổng do tiến trình lạ giữ => DỪNG và báo lỗi, không kill tiến trình đó.
 * Không chứa mật khẩu/DSN: cấu hình đọc từ thư mục secrets NGOÀI Git của thư mục runtime.
-* Không tự chạy migration; chỉ kiểm tra Alembic head.
+* Tự động cập nhật migration lên head nếu database demo chưa ở head của mã nguồn.
 
-Lệnh: ``start [--no-browser]``, ``stop [--keep-db]``, ``status``.
+Lệnh: ``start [--no-browser]``, ``stop [--keep-db]``, ``status``, ``migrate``.
 """
 
 from __future__ import annotations
@@ -207,37 +207,6 @@ def ensure_postgres() -> None:
     say("OK", f"PostgreSQL demo da san sang (cong {PG_PORT}, PID {owner}).")
 
 
-def check_database(values: dict[str, str]) -> None:
-    import psycopg2  # noqa: PLC0415 - chỉ cần khi khởi động
-
-    try:
-        conn = psycopg2.connect(host="127.0.0.1", port=PG_PORT, dbname=values["DB_NAME"], user=values["DB_USER"],
-                                password=values["DB_PASSWORD"], sslmode="disable", connect_timeout=8)
-    except Exception as exc:
-        raise LauncherError(f"Khong ket noi duoc database demo: {type(exc).__name__}") from exc
-    try:
-        cur = conn.cursor()
-        cur.execute("select current_database(), inet_server_port(), host(inet_server_addr())")
-        db, port, addr = cur.fetchone()
-        if (db, port) != (values["DB_NAME"], PG_PORT) or addr not in ("127.0.0.1", "::1"):
-            raise LauncherError(f"May chu bao database/cong khac mong doi: {db}/{port}/{addr}")
-        cur.execute("select version_num from alembic_version")
-        current = cur.fetchone()[0]
-        cur.execute("select count(*) from lecturers")
-        lecturers = cur.fetchone()[0]
-    finally:
-        conn.close()
-    from alembic.config import Config  # noqa: PLC0415
-    from alembic.script import ScriptDirectory  # noqa: PLC0415
-
-    cfg = Config(str(REPO / "backend" / "alembic.ini"))
-    cfg.set_main_option("script_location", str(REPO / "backend" / "alembic"))
-    heads = ScriptDirectory.from_config(cfg).get_heads()
-    if [current] != heads:
-        raise LauncherError(f"Alembic cua database la {current} nhung ma nguon can {heads}. Launcher KHONG tu migrate; can xu ly thu cong.")
-    say("OK", f"Database dung: {db} @ {addr}:{port}, Alembic head {current}, {lecturers} ho so giang vien.")
-
-
 def backend_env(values: dict[str, str]) -> dict[str, str]:
     env = {k: os.environ[k] for k in ("SystemRoot", "TEMP", "TMP", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "COMSPEC") if k in os.environ}
     env.update(values)
@@ -249,6 +218,62 @@ def backend_env(values: dict[str, str]) -> dict[str, str]:
     snap.mkdir(parents=True, exist_ok=True)
     env["SCOPUS_RAW_DIR"], env["DSPACE_SNAPSHOT_PATH"] = str(raw) + os.sep, str(snap) + os.sep
     return env
+
+
+def run_migration(values: dict[str, str]) -> None:
+    env = backend_env(values)
+    say("..", f"Dang chay Alembic upgrade head cho {values['DB_NAME']} ...")
+    res = subprocess.run(
+        [str(VENV_PYTHON), "-m", "alembic", "upgrade", "head"],
+        cwd=REPO / "backend",
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    if res.returncode != 0:
+        err = (res.stderr or res.stdout or "").strip()
+        raise LauncherError(f"Alembic upgrade that bai (ma loi {res.returncode}):\n{err}")
+    say("OK", "Alembic upgrade head thanh cong.")
+
+
+def check_database(values: dict[str, str]) -> None:
+    import psycopg2  # noqa: PLC0415 - chỉ cần khi khởi động
+
+    def _query_db() -> tuple[str, int, str, str, int]:
+        try:
+            conn = psycopg2.connect(host="127.0.0.1", port=PG_PORT, dbname=values["DB_NAME"], user=values["DB_USER"],
+                                    password=values["DB_PASSWORD"], sslmode="disable", connect_timeout=8)
+        except Exception as exc:
+            raise LauncherError(f"Khong ket noi duoc database demo: {type(exc).__name__}") from exc
+        try:
+            cur = conn.cursor()
+            cur.execute("select current_database(), inet_server_port(), host(inet_server_addr())")
+            db, port, addr = cur.fetchone()
+            if (db, port) != (values["DB_NAME"], PG_PORT) or addr not in ("127.0.0.1", "::1"):
+                raise LauncherError(f"May chu bao database/cong khac mong doi: {db}/{port}/{addr}")
+            cur.execute("select version_num from alembic_version")
+            row = cur.fetchone()
+            current = row[0] if row else ""
+            cur.execute("select count(*) from lecturers")
+            lecturers = cur.fetchone()[0]
+            return db, port, addr, current, lecturers
+        finally:
+            conn.close()
+
+    db, port, addr, current, lecturers = _query_db()
+    from alembic.config import Config  # noqa: PLC0415
+    from alembic.script import ScriptDirectory  # noqa: PLC0415
+
+    cfg = Config(str(REPO / "backend" / "alembic.ini"))
+    cfg.set_main_option("script_location", str(REPO / "backend" / "alembic"))
+    heads = ScriptDirectory.from_config(cfg).get_heads()
+    if [current] != heads:
+        say("CHU Y", f"Alembic cua database {db} la {current} nhung ma nguon can {heads}. Tien hanh cap nhat migration...")
+        run_migration(values)
+        db, port, addr, current, lecturers = _query_db()
+        if [current] != heads:
+            raise LauncherError(f"Sau khi migrate, alembic cua database van la {current} (mong doi: {heads}).")
+    say("OK", f"Database dung: {db} @ {addr}:{port}, Alembic head {current}, {lecturers} ho so giang vien.")
 
 
 def service_state(name: str, port: int) -> tuple[str, int | None]:
@@ -371,6 +396,19 @@ def cmd_status(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_migrate(_args: argparse.Namespace) -> int:
+    try:
+        say("..", f"Ma nguon: {REPO}")
+        values = check_environment()
+        ensure_postgres()
+        run_migration(values)
+        check_database(values)
+        return 0
+    except LauncherError as exc:
+        say("LOI", str(exc))
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -381,6 +419,8 @@ def main(argv: list[str] | None = None) -> int:
     stop.add_argument("--keep-db", action="store_true")
     stop.set_defaults(func=cmd_stop)
     sub.add_parser("status").set_defaults(func=cmd_status)
+    migrate = sub.add_parser("migrate")
+    migrate.set_defaults(func=cmd_migrate)
     args = parser.parse_args(argv)
     return args.func(args)
 

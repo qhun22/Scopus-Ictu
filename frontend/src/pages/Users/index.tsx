@@ -35,6 +35,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"LECTURER" | "REVIEWER">("LECTURER");
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const reset = () => {
     setEmail("");
@@ -45,6 +46,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
   };
 
   const submit = useSingleFlight(async () => {
+    setIsSubmitting(true);
     setError(null);
     try {
       await createUser({ email: email.trim(), display_name: displayName.trim(), password, role });
@@ -57,6 +59,8 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
       onCreated();
     } catch (err) {
       setError(explainCreateError(err, locale));
+    } finally {
+      setIsSubmitting(false);
     }
   });
 
@@ -138,10 +142,10 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
           type="button"
           className={BUTTON_PRIMARY}
           onClick={submit}
-          disabled={!email.trim() || !displayName.trim() || password.length < 8}
+          disabled={isSubmitting || !email.trim() || !displayName.trim() || password.length < 8}
           data-testid="create-user-submit"
         >
-          {vi ? "Tạo tài khoản" : "Create account"}
+          {isSubmitting ? (vi ? "Đang tạo..." : "Creating...") : vi ? "Tạo tài khoản" : "Create account"}
         </button>
         <button
           type="button"

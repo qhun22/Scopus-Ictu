@@ -38,6 +38,12 @@ if /i "%~1"=="stop" (
     pause
     exit /b 0
 )
+if /i "%~1"=="migrate" (
+    "%PYTHON%" "%LAUNCHER%" migrate
+    echo.
+    pause
+    exit /b 0
+)
 
 echo ============================================================
 echo  Scopus-Ictu - khoi dong phan mem demo
