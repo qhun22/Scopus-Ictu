@@ -60,8 +60,8 @@ export default function PlaceholderPage({
 
   return (
     <div className="app-page-container max-w-4xl p-4 sm:p-6 lg:p-8">
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-8 sm:p-12 shadow-sm text-center">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-slate-50 shadow-inner border border-slate-100">
+      <div className="rounded-[5px] border border-slate-200/80 bg-white p-8 sm:p-12 shadow-sm text-center">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[5px] bg-slate-50 shadow-inner border border-slate-100">
           {renderIcon()}
         </div>
 
@@ -76,7 +76,7 @@ export default function PlaceholderPage({
         <div className="mt-8 flex items-center justify-center gap-3">
           <Link
             to="/home"
-            className="inline-flex items-center gap-2 rounded-lg bg-[#3A5FC3] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30"
+            className="inline-flex items-center gap-2 rounded-[5px] bg-[#3A5FC3] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />

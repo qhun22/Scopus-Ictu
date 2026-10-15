@@ -396,7 +396,7 @@ export default function HomePage() {
       {/* ====================================================================== */}
       {/* 1. WELCOME BANNER */}
       {/* ====================================================================== */}
-      <section className="relative overflow-hidden rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs sm:p-6">
+      <section className="relative overflow-hidden rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs sm:p-6">
         <div className="relative z-10">
           <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">
             {t.home.welcome},{" "}
@@ -413,7 +413,7 @@ export default function HomePage() {
       {/* ====================================================================== */}
       {/* 2. QUICK SEARCH — read-only lookup is available to every role */}
       {/* ====================================================================== */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
+      <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
         <div className="mb-2.5 flex items-center gap-2">
           <svg className="h-4 w-4 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -436,7 +436,7 @@ export default function HomePage() {
                 value={searchQuery}
                 onChange={handleSearchChange}
                 placeholder={t.home.quickSearchPlaceholder}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-9 text-xs text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+                className="h-10 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-9 text-xs text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
               />
               {searchQuery && (
                 <button
@@ -454,7 +454,7 @@ export default function HomePage() {
 
             <button
               type="submit"
-              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-5 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 sm:text-sm"
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-5 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 sm:text-sm"
             >
               <span>{t.home.searchBtn}</span>
             </button>
@@ -481,12 +481,12 @@ export default function HomePage() {
             <Link
               key={card.to + card.title}
               to={card.to}
-              className="group relative flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm cursor-pointer"
+              className="group relative flex flex-col justify-between rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm cursor-pointer"
             >
               <div>
                 <div className="flex items-center justify-between">
                   <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-lg border ${card.iconBg} ${card.iconColor}`}
+                    className={`flex h-9 w-9 items-center justify-center rounded-[5px] border ${card.iconBg} ${card.iconColor}`}
                   >
                     {card.icon}
                   </div>
@@ -519,7 +519,7 @@ export default function HomePage() {
       {/* ====================================================================== */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Visual Summary / Small Chart Container */}
-        <div className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
+        <div className="flex flex-col justify-between rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
           <div>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-800 sm:text-base">
@@ -535,7 +535,7 @@ export default function HomePage() {
           </div>
 
           {/* Academic Chart Skeleton Frame & Empty State */}
-          <div className="relative my-4 flex h-36 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
+          <div className="relative my-4 flex h-36 flex-col items-center justify-center rounded-[5px] border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
             {/* Background grid skeleton lines */}
             <div className="pointer-events-none absolute inset-x-4 top-4 bottom-4 flex flex-col justify-between opacity-30" aria-hidden="true">
               <div className="border-b border-slate-300 w-full" />
@@ -565,7 +565,7 @@ export default function HomePage() {
         </div>
 
         {/* Recent Information Container */}
-        <div className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
+        <div className="flex flex-col justify-between rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
           <div>
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-800 sm:text-base">
@@ -581,7 +581,7 @@ export default function HomePage() {
           </div>
 
           {/* Empty State Box */}
-          <div className="my-4 flex h-36 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
+          <div className="my-4 flex h-36 flex-col items-center justify-center rounded-[5px] border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 shadow-xs border border-slate-200">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -624,10 +624,10 @@ export default function HomePage() {
             <Link
               key={action.to}
               to={action.to}
-              className="group flex items-center justify-between rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/60 hover:shadow-xs cursor-pointer"
+              className="group flex items-center justify-between rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs transition-all duration-150 hover:border-slate-300 hover:bg-slate-50/60 hover:shadow-xs cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${action.iconBg}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-[5px] ${action.iconBg}`}>
                   {action.icon}
                 </div>
                 <div>
@@ -640,7 +640,7 @@ export default function HomePage() {
                 </div>
               </div>
 
-              <div className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors group-hover:bg-[#3A5FC3]/10 group-hover:text-[#3A5FC3]">
+              <div className="flex h-6 w-6 items-center justify-center rounded-[5px] text-slate-400 transition-colors group-hover:bg-[#3A5FC3]/10 group-hover:text-[#3A5FC3]">
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                 </svg>
@@ -653,9 +653,9 @@ export default function HomePage() {
       {/* ====================================================================== */}
       {/* 7. ACADEMIC GUIDELINES NOTE */}
       {/* ====================================================================== */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+      <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
         <div className="flex items-start gap-3">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50 text-[#3A5FC3]">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[5px] bg-blue-50 text-[#3A5FC3]">
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>

@@ -163,7 +163,7 @@ export function AffiliationSummaryBar({
   ];
   const items = all.filter((i) => counts[i.key] > 0);
   return (
-    <div className="mb-3 space-y-2 rounded-lg border border-slate-100 bg-slate-50/60 p-3" data-testid="aff-summary">
+    <div className="mb-3 space-y-2 rounded-[5px] border border-slate-100 bg-slate-50/60 p-3" data-testid="aff-summary">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600">
         <span className="font-semibold">
           {vi ? `Đơn vị theo ${authors.length} tác giả:` : `Units across ${authors.length} authors:`}
@@ -190,7 +190,7 @@ function OverrideNote({ override, locale }: { override: AffiliationOverrideRead;
   const vi = locale === "vi";
   return (
     <div
-      className="mt-1.5 rounded-lg border border-violet-200 bg-violet-50/60 p-2 text-[11px] leading-snug"
+      className="mt-1.5 rounded-[5px] border border-violet-200 bg-violet-50/60 p-2 text-[11px] leading-snug"
       data-testid="aff-override"
     >
       <div className="flex flex-wrap items-center gap-1.5">

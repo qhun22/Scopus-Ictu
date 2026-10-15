@@ -351,7 +351,7 @@ export default function PublicationsPage() {
               type="button"
               onClick={() => { void handleExport(); }}
               disabled={isExporting}
-              className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-xs transition-all hover:border-[#3A5FC3] hover:text-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[5px] border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-xs transition-all hover:border-[#3A5FC3] hover:text-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -367,7 +367,7 @@ export default function PublicationsPage() {
 
       {scopusIdFilter && (
         <div
-          className="flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900"
+          className="flex flex-wrap items-center gap-2 rounded-[5px] border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900"
           data-testid="scopus-id-chip"
         >
           <span>
@@ -388,7 +388,7 @@ export default function PublicationsPage() {
       )}
 
       {/* ── Filter Bar ──────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs space-y-3">
+      <div className="rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs space-y-3">
         {/* Free-text search */}
         <div className="relative">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
@@ -406,7 +406,7 @@ export default function PublicationsPage() {
                 ? "Tìm theo tiêu đề, EID, DOI, nguồn tạp chí..."
                 : "Search by title, EID, DOI, journal..."
             }
-            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+            className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
           />
         </div>
 
@@ -425,7 +425,7 @@ export default function PublicationsPage() {
             placeholder={
               locale === "vi" ? "Tìm theo tên tác giả (Scopus)..." : "Search by author name (Scopus)..."
             }
-            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+            className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
           />
         </div>
 
@@ -444,7 +444,7 @@ export default function PublicationsPage() {
               value={draftYear}
               onChange={(e) => setDraftYear(e.target.value)}
               placeholder="VD: 2023"
-              className="h-8 w-24 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+              className="h-8 w-24 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
           </div>
 
@@ -459,7 +459,7 @@ export default function PublicationsPage() {
               value={draftDocType}
               onChange={(e) => setDraftDocType(e.target.value)}
               placeholder={locale === "vi" ? "VD: Article" : "e.g. Article"}
-              className="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+              className="h-8 w-28 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
           </div>
 
@@ -474,7 +474,7 @@ export default function PublicationsPage() {
               value={draftStage}
               onChange={(e) => setDraftStage(e.target.value)}
               placeholder={locale === "vi" ? "VD: Published" : "e.g. Published"}
-              className="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+              className="h-8 w-28 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
           </div>
 
@@ -489,7 +489,7 @@ export default function PublicationsPage() {
               value={draftOa}
               onChange={(e) => setDraftOa(e.target.value)}
               placeholder={locale === "vi" ? "VD: Open Access" : "e.g. Open Access"}
-              className="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+              className="h-8 w-28 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
           </div>
 
@@ -499,7 +499,7 @@ export default function PublicationsPage() {
               type="button"
               onClick={handleApply}
               disabled={!isApplyDirty}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -511,7 +511,7 @@ export default function PublicationsPage() {
               type="button"
               onClick={handleClear}
               disabled={!hasAnyInput}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50/50 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
+              className="inline-flex h-8 items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:border-rose-300 hover:text-rose-600 hover:bg-rose-50/50 disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -524,7 +524,7 @@ export default function PublicationsPage() {
 
       {/* ── Error state ─────────────────────────────────────────────────── */}
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-2.5">
+        <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-2.5">
           <svg className="h-5 w-5 shrink-0 text-rose-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
@@ -533,7 +533,7 @@ export default function PublicationsPage() {
             <button
               type="button"
               onClick={() => { genRef.current += 1; fetchPublications(page, pageSize, genRef.current); }}
-              className="self-start rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+              className="self-start rounded-[5px] border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
             >
               {locale === "vi" ? "Thử lại" : "Retry"}
             </button>
@@ -542,7 +542,7 @@ export default function PublicationsPage() {
       )}
 
       {/* ── Table ───────────────────────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+      <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
           <table className="w-full text-left text-xs" aria-busy={isFiltering}>
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
@@ -620,7 +620,7 @@ export default function PublicationsPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/publications/${encodeURIComponent(pub.eid)}`)}
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                        className="inline-flex items-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
                       >
                         {viewDetailLabel}
                       </button>
@@ -633,7 +633,7 @@ export default function PublicationsPage() {
           {/* Loading overlay for filter/page transitions */}
           {loadingMore && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-[1px]">
-              <div role="status" className="flex items-center gap-2 rounded-lg border border-slate-100 bg-white px-4 py-2.5 text-xs font-medium text-slate-600 shadow-sm">
+              <div role="status" className="flex items-center gap-2 rounded-[5px] border border-slate-100 bg-white px-4 py-2.5 text-xs font-medium text-slate-600 shadow-sm">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
                 {loadingLabel}
               </div>
@@ -658,7 +658,7 @@ export default function PublicationsPage() {
               <select
                 value={pageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="h-6.5 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
@@ -674,7 +674,7 @@ export default function PublicationsPage() {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={isFiltering || page <= 1}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
             >
               {prevLabel}
             </button>
@@ -685,7 +685,7 @@ export default function PublicationsPage() {
               type="button"
               onClick={() => setPage((p) => p + 1)}
               disabled={isFiltering || page >= totalPages}
-              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
             >
               {nextLabel}
             </button>

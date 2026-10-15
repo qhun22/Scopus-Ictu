@@ -137,7 +137,7 @@ export default function DashboardPage() {
           <button
             onClick={fetchSummary}
             disabled={loading}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-slate-50 disabled:opacity-50"
+            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-slate-50 disabled:opacity-50"
           >
             {loading ? (
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
@@ -151,7 +151,7 @@ export default function DashboardPage() {
           {currentUser?.role === "ADMIN" ? (
             <button
               onClick={() => setShowResetModal(true)}
-              className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-red-100"
+              className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-red-100"
             >
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -166,7 +166,7 @@ export default function DashboardPage() {
 
       {/* Error state */}
       {error && !loading && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-[5px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </div>
       )}
@@ -178,7 +178,7 @@ export default function DashboardPage() {
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                className="h-24 animate-pulse rounded-lg border border-gray-200 bg-gray-100"
+                className="h-24 animate-pulse rounded-[5px] border border-gray-200 bg-gray-100"
               />
             ))}
           </div>
@@ -218,7 +218,7 @@ export default function DashboardPage() {
           </section>
 
           {/* Identity status counts — always all 4 statuses */}
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <section className="rounded-[5px] border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="mb-4 text-base font-semibold text-gray-800">
               {copy.identityTitle}
             </h2>
@@ -226,7 +226,7 @@ export default function DashboardPage() {
               {IDENTITY_STATUSES.map((status) => (
                 <div
                   key={status}
-                  className={`rounded-md border px-4 py-3 ${IDENTITY_COLORS[status]}`}
+                  className={`rounded-[5px] border px-4 py-3 ${IDENTITY_COLORS[status]}`}
                 >
                   <div className="text-xs font-medium uppercase tracking-wide opacity-75">
                     {copy[IDENTITY_LABEL_KEYS[status]]}
@@ -240,7 +240,7 @@ export default function DashboardPage() {
           </section>
 
           {/* Latest Scopus import */}
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <section className="rounded-[5px] border border-gray-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-800">
                 {copy.latestImportTitle}
@@ -306,7 +306,7 @@ export default function DashboardPage() {
           </section>
 
           {/* Recent audit actions */}
-          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <section className="rounded-[5px] border border-gray-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-800">
                 {copy.recentAuditTitle}
@@ -383,7 +383,7 @@ function SummaryCard({
 }) {
   const inner = (
     <div
-      className={`rounded-lg border p-4 shadow-sm transition ${
+      className={`rounded-[5px] border p-4 shadow-sm transition ${
         highlight
           ? "border-amber-300 bg-amber-50"
           : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50"

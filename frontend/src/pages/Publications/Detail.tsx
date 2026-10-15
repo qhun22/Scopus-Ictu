@@ -168,14 +168,14 @@ export default function PublicationDetailPage() {
           <button
             type="button"
             onClick={() => navigate("/publications")}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
           >
             {backLabel}
           </button>
           <button
             type="button"
             onClick={fetchDetail}
-            className="rounded-lg bg-[#3A5FC3] px-4 py-2 text-sm font-bold text-white hover:bg-[#2f4ea6] transition-colors cursor-pointer"
+            className="rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-sm font-bold text-white hover:bg-[#2f4ea6] transition-colors cursor-pointer"
           >
             {retryLabel}
           </button>
@@ -202,7 +202,7 @@ export default function PublicationDetailPage() {
       <button
         type="button"
         onClick={() => navigate("/publications")}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
@@ -211,7 +211,7 @@ export default function PublicationDetailPage() {
       </button>
 
       {/* ── Section A: Canonical Metadata ─────────────────────────────── */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
           {sectionMeta}
         </h2>
@@ -240,7 +240,7 @@ export default function PublicationDetailPage() {
       </section>
 
       {/* ── Section B: Ordered Scopus Authors (always visible) ─────────── */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
           {sectionAuthors}
         </h2>
@@ -291,7 +291,7 @@ export default function PublicationDetailPage() {
       {!isLecturer && (
         <>
       {/* ── Section C: Approved Lecturer Links (always visible) ─────────── */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
           {sectionLinks}
         </h2>
@@ -331,7 +331,7 @@ export default function PublicationDetailPage() {
       </section>
 
       {/* ── Section D: Safe Provenance (always visible) ────────────────── */}
-      <section className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs">
+      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
           {sectionProvenance}
         </h2>
@@ -372,7 +372,7 @@ export default function PublicationDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowAllProvenance((v) => !v)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                  className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
                 >
                   {showAllProvenance
                     ? (locale === "vi" ? "Thu gọn" : "Show less")

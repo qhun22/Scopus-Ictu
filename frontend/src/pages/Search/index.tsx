@@ -123,7 +123,7 @@ export default function SearchPage() {
 
   return (
     <div className="app-page-container space-y-4 p-4 sm:p-6 lg:p-8">
-      <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
+      <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
         <h1 className="text-lg font-bold text-slate-800 sm:text-xl">
           {t.search.title}
         </h1>
@@ -144,13 +144,13 @@ export default function SearchPage() {
                 value={inputValue}
                 onChange={handleChange}
                 placeholder={t.search.placeholder}
-                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+                className="h-10 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
               />
             </div>
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-5 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
+              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-5 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
             >
               <span>{t.search.button}</span>
             </button>
@@ -162,18 +162,18 @@ export default function SearchPage() {
       </section>
 
       {isLoading && (
-        <div className="rounded-xl border border-slate-200/80 bg-white p-6 text-center text-sm text-slate-500">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-6 text-center text-sm text-slate-500">
           {t.search.loading}
         </div>
       )}
 
       {!isLoading && errorMessage && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
+        <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-6 text-center">
           <p className="text-sm font-medium text-rose-600">{errorMessage}</p>
           <button
             type="button"
             onClick={handleRetry}
-            className="mt-3 inline-flex cursor-pointer items-center justify-center rounded-lg border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-600 transition-all hover:bg-rose-100"
+            className="mt-3 inline-flex cursor-pointer items-center justify-center rounded-[5px] border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-600 transition-all hover:bg-rose-100"
           >
             {t.search.errorRetry}
           </button>
@@ -181,14 +181,14 @@ export default function SearchPage() {
       )}
 
       {!isLoading && !errorMessage && !activeQuery && (
-        <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-center">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-8 text-center">
           <h2 className="text-sm font-bold text-slate-700">{t.search.promptTitle}</h2>
           <p className="mt-1 text-xs text-slate-500">{t.search.promptSubtitle}</p>
         </div>
       )}
 
       {!isLoading && !errorMessage && activeQuery && results && !hasAnyResult && (
-        <div className="rounded-xl border border-slate-200/80 bg-white p-8 text-center">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-8 text-center">
           <h2 className="text-sm font-bold text-slate-700">{t.search.emptyTitle}</h2>
           <p className="mt-1 text-xs text-slate-500">{t.search.emptySubtitle}</p>
         </div>
@@ -289,7 +289,7 @@ function ResultSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
+    <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
       <div className="mb-1 flex items-center justify-between">
         <h2 className="text-sm font-bold text-slate-800">{title}</h2>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
