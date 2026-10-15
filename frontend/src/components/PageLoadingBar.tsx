@@ -1,42 +1,61 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { usePageVisit } from "../contexts/PageVisitContext";
 
-const COMPLETE_DELAY_MS = 180;
+const PROGRESS_COMPLETE_AT_MS = 450;
+const HIDE_AFTER_MS = 650;
 
-export default function PageLoadingBar() {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface PageLoadingBarProps {
+  isSidebarCollapsed?: boolean;
+}
+
+export default function PageLoadingBar(_props: PageLoadingBarProps) {
   const location = useLocation();
-  const [progress, setProgress] = useState(8);
-  const [visible, setVisible] = useState(true);
+  const { hasVisited, markVisited } = usePageVisit();
+  const [progress, setProgress] = useState(0);
+  const [phase, setPhase] = useState<"idle" | "running" | "done">("idle");
+  const pageKey = location.pathname;
+  const isVisited = hasVisited(pageKey);
 
   useEffect(() => {
-    setVisible(true);
-    setProgress(8);
+    if (isVisited) return;
 
-    const progressTimer = window.setTimeout(() => setProgress(72), 120);
-    const completeTimer = window.setTimeout(() => setProgress(100), 280);
-    const hideTimer = window.setTimeout(
-      () => setVisible(false),
-      280 + COMPLETE_DELAY_MS,
-    );
+    let isActive = true;
+    setProgress(0);
+    setPhase("running");
+
+    const t1 = window.setTimeout(() => { if (isActive) setProgress(30); }, 30);
+    const t2 = window.setTimeout(() => { if (isActive) setProgress(60); }, 150);
+    const t3 = window.setTimeout(() => { if (isActive) setProgress(85); }, 280);
+    const t4 = window.setTimeout(() => { if (isActive) setProgress(100); setPhase("done"); }, PROGRESS_COMPLETE_AT_MS);
+    const t5 = window.setTimeout(() => {
+      if (!isActive) return;
+      setPhase("idle");
+      markVisited(pageKey);
+    }, HIDE_AFTER_MS);
 
     return () => {
-      window.clearTimeout(progressTimer);
-      window.clearTimeout(completeTimer);
-      window.clearTimeout(hideTimer);
+      isActive = false;
+      [t1, t2, t3, t4, t5].forEach(window.clearTimeout);
     };
-  }, [location.pathname, location.search]);
+  }, [isVisited, markVisited, pageKey]);
 
-  if (!visible) return null;
+  if (isVisited || phase === "idle") return null;
 
   return (
     <div
-      aria-label="Đang tải trang"
+      aria-label="Loading"
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-1 bg-[#3A5FC3]/10"
+      data-testid="page-loading-bar"
+      className="pointer-events-none fixed top-0 left-0 right-0 z-50 h-[3px]"
     >
       <div
-        className="h-full bg-[#3A5FC3] transition-[width] duration-300 ease-out"
-        style={{ width: `${progress}%` }}
+        className="h-full bg-[#3A5FC3] shadow-[0_0_8px_rgba(58,95,195,0.6)] transition-[width] ease-out"
+        style={{
+          width: `${progress}%`,
+          transitionDuration: phase === "done" ? "150ms" : "300ms",
+        }}
       />
     </div>
   );
