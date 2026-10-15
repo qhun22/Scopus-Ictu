@@ -1517,7 +1517,7 @@ export default function LecturersPage() {
                       <div className="space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div className="rounded-[5px] bg-slate-50 p-3">
-                            <span className="font-semibold text-slate-500 block text-[11px]">Email đăng nhập</span>
+                            <span className="font-semibold text-slate-500 block text-[11px]">{locale === "vi" ? "Email đăng nhập" : "Login email"}</span>
                             <span className="font-bold text-slate-800 mt-0.5 block">{selectedLecturer.account.email}</span>
                           </div>
                           <div className="rounded-[5px] bg-slate-50 p-3">
@@ -1539,7 +1539,7 @@ export default function LecturersPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
-                          <span className="font-semibold text-slate-600">Trạng thái tài khoản</span>
+                          <span className="font-semibold text-slate-600">{locale === "vi" ? "Trạng thái tài khoản" : "Account status"}</span>
                           {/* Same status label as the "Trạng thái" column of the list. */}
                           <span
                             className={`inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-bold ${
@@ -1548,13 +1548,15 @@ export default function LecturersPage() {
                                 : "border-rose-200 bg-rose-50 text-rose-700"
                             }`}
                           >
-                            {selectedLecturer.account.is_active ? "Hoạt động" : "Đã khóa"}
+                            {selectedLecturer.account.is_active
+                              ? (locale === "vi" ? "Hoạt động" : "Active")
+                              : (locale === "vi" ? "Đã khóa" : "Locked")}
                           </span>
                         </div>
 
                         <div>
                           <label htmlFor="new-password" className="mb-1 block font-semibold text-slate-700">
-                            Mật khẩu mới
+                            {locale === "vi" ? "Mật khẩu mới" : "New password"}
                           </label>
                           <div className="relative">
                             <input
@@ -1579,7 +1581,11 @@ export default function LecturersPage() {
                               type="button"
                               disabled={isDetailBusy || isCurrentAccount}
                               onClick={() => setShowNewPassword((visible) => !visible)}
-                              aria-label={showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                              aria-label={
+                                showNewPassword
+                                  ? (locale === "vi" ? "Ẩn mật khẩu" : "Hide password")
+                                  : (locale === "vi" ? "Hiện mật khẩu" : "Show password")
+                              }
                               className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                             >
                               {showNewPassword ? (
@@ -1612,7 +1618,7 @@ export default function LecturersPage() {
                             onClick={requestPasswordReset}
                             className={BUTTON_SECONDARY}
                           >
-                            Đặt lại mật khẩu
+                            {locale === "vi" ? "Đặt lại mật khẩu" : "Reset password"}
                           </button>
                           <button
                             type="button"
@@ -1622,7 +1628,9 @@ export default function LecturersPage() {
                             }
                             className={selectedLecturer.account.is_active ? BUTTON_DANGER : BUTTON_PRIMARY}
                           >
-                            {selectedLecturer.account.is_active ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                            {selectedLecturer.account.is_active
+                              ? (locale === "vi" ? "Khóa tài khoản" : "Lock account")
+                              : (locale === "vi" ? "Mở khóa tài khoản" : "Unlock account")}
                           </button>
                         </div>
                       </div>
@@ -1679,9 +1687,9 @@ export default function LecturersPage() {
                                   onChange={(e) => setGrantRole(e.target.value)}
                                   className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
                                 >
-                                  <option value="LECTURER">Giảng viên</option>
-                                  <option value="ADMIN">Quản trị viên</option>
-                                  <option value="REVIEWER">Phê duyệt viên</option>
+                                  <option value="LECTURER">{locale === "vi" ? "Giảng viên" : "Lecturer"}</option>
+                                  <option value="ADMIN">{locale === "vi" ? "Quản trị viên" : "Administrator"}</option>
+                                  <option value="REVIEWER">{locale === "vi" ? "Phê duyệt viên" : "Reviewer"}</option>
                                 </select>
                               </div>
                             </div>
@@ -1717,7 +1725,7 @@ export default function LecturersPage() {
                     {detailAction === "save" && (
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                     )}
-                    <span>{detailAction === "save" ? "Đang lưu..." : "Lưu thay đổi"}</span>
+                    <span>{detailAction === "save" ? t.common.processing : (locale === "vi" ? "Lưu thay đổi" : "Save changes")}</span>
                   </button>
                 </div>
               </form>
@@ -1730,24 +1738,30 @@ export default function LecturersPage() {
         open={confirmAction !== null}
         title={
           confirmAction === "lock"
-            ? "Khóa tài khoản?"
+            ? (locale === "vi" ? "Khóa tài khoản?" : "Lock account?")
             : confirmAction === "unlock"
-              ? "Mở khóa tài khoản?"
-              : "Đặt lại mật khẩu?"
+              ? (locale === "vi" ? "Mở khóa tài khoản?" : "Unlock account?")
+              : (locale === "vi" ? "Đặt lại mật khẩu?" : "Reset password?")
         }
         description={
           confirmAction === "lock"
-            ? "Người dùng sẽ không thể đăng nhập cho đến khi tài khoản được mở khóa."
+            ? (locale === "vi"
+                ? "Người dùng sẽ không thể đăng nhập cho đến khi tài khoản được mở khóa."
+                : "The user will not be able to sign in until the account is unlocked.")
             : confirmAction === "unlock"
-              ? "Người dùng sẽ có thể đăng nhập lại bằng thông tin đăng nhập hiện tại."
-              : "Mật khẩu đăng nhập hiện tại của người dùng sẽ không còn hiệu lực."
+              ? (locale === "vi"
+                  ? "Người dùng sẽ có thể đăng nhập lại bằng thông tin đăng nhập hiện tại."
+                  : "The user will be able to sign in again with their current credentials.")
+              : (locale === "vi"
+                  ? "Mật khẩu đăng nhập hiện tại của người dùng sẽ không còn hiệu lực."
+                  : "The user's current login password will no longer be valid.")
         }
         confirmLabel={
           confirmAction === "lock"
-            ? "Khóa tài khoản"
+            ? (locale === "vi" ? "Khóa tài khoản" : "Lock account")
             : confirmAction === "unlock"
-              ? "Mở khóa tài khoản"
-              : "Đặt lại mật khẩu"
+              ? (locale === "vi" ? "Mở khóa tài khoản" : "Unlock account")
+              : (locale === "vi" ? "Đặt lại mật khẩu" : "Reset password")
         }
         variant={confirmAction === "unlock" ? "primary" : "danger"}
         loading={isDetailBusy && detailAction !== "save"}
