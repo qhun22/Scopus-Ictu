@@ -951,21 +951,6 @@ export default function ImportsPage() {
     inputRef.current?.click();
   };
 
-  // KPI Calculations
-  const countTotal = history.length;
-  const countWarning = history.filter((item) => isWarningStatus(item)).length;
-  const countSuccess = history.filter(
-    (item) =>
-      (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
-      !isWarningStatus(item),
-  ).length;
-  const countProcessing = history.filter((item) =>
-    ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status),
-  ).length;
-  const countFailed = history.filter(
-    (item) => item.status === "FAILED" || item.status === "CANCELLED",
-  ).length;
-
   const handleApplySearch = () => {
     setAppliedSearch(searchInput);
     setPage(1);
@@ -1000,6 +985,23 @@ export default function ImportsPage() {
       }
     : null;
   const tableHistory = lecturerPreviewRow ? [lecturerPreviewRow, ...history] : history;
+
+  // KPI Calculations — must include the in-progress lecturer preview row
+  // (tableHistory), not just confirmed server-side history, otherwise the
+  // "Total Imports" card undercounts by 1 while a JSON preview is pending.
+  const countTotal = tableHistory.length;
+  const countWarning = tableHistory.filter((item) => isWarningStatus(item)).length;
+  const countSuccess = tableHistory.filter(
+    (item) =>
+      (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
+      !isWarningStatus(item),
+  ).length;
+  const countProcessing = tableHistory.filter((item) =>
+    ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status),
+  ).length;
+  const countFailed = tableHistory.filter(
+    (item) => item.status === "FAILED" || item.status === "CANCELLED",
+  ).length;
 
   const filteredHistory = tableHistory.filter((item) => {
     const q = appliedSearch.trim().toLowerCase();
