@@ -1,62 +1,102 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { usePageVisit } from "../contexts/PageVisitContext";
+import { useI18n } from "../i18n";
 
-const PROGRESS_COMPLETE_AT_MS = 450;
-const HIDE_AFTER_MS = 650;
+const OVERLAY_HIDE_MS = 700;
+const OVERLAY_COMPLETE_MS = 500;
+const TOP_BAR_COMPLETE_MS = 280;
+const TOP_BAR_HIDE_MS = 460;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface PageLoadingBarProps {
   isSidebarCollapsed?: boolean;
 }
 
-export default function PageLoadingBar(_props: PageLoadingBarProps) {
+export default function PageLoadingBar({ isSidebarCollapsed = false }: PageLoadingBarProps) {
   const location = useLocation();
   const { hasVisited, markVisited } = usePageVisit();
-  const [progress, setProgress] = useState(0);
-  const [phase, setPhase] = useState<"idle" | "running" | "done">("idle");
+  const { t } = useI18n();
+
+  // ── top bar state (every route change) ──────────────────────────
+  const [barProgress, setBarProgress] = useState(8);
+  const [barVisible, setBarVisible] = useState(true);
+
+  // ── overlay state (first visit only) ────────────────────────────
+  const [overlayProgress, setOverlayProgress] = useState(8);
+  const [overlayVisible, setOverlayVisible] = useState(true);
+
   const pageKey = location.pathname;
-  const isVisited = hasVisited(pageKey);
+  const isFirstVisit = !hasVisited(pageKey);
 
+  // Top bar — triggers on every route change (pathname + search)
   useEffect(() => {
-    if (isVisited) return;
+    setBarVisible(true);
+    setBarProgress(8);
+    const t1 = window.setTimeout(() => setBarProgress(72), 120);
+    const t2 = window.setTimeout(() => setBarProgress(100), TOP_BAR_COMPLETE_MS);
+    const t3 = window.setTimeout(() => setBarVisible(false), TOP_BAR_HIDE_MS);
+    return () => { [t1, t2, t3].forEach(window.clearTimeout); };
+  }, [location.pathname, location.search]);
 
+  // Overlay — triggers only on first visit to each route
+  useEffect(() => {
+    if (!isFirstVisit) {
+      setOverlayVisible(false);
+      return;
+    }
     let isActive = true;
-    setProgress(0);
-    setPhase("running");
-
-    const t1 = window.setTimeout(() => { if (isActive) setProgress(30); }, 30);
-    const t2 = window.setTimeout(() => { if (isActive) setProgress(60); }, 150);
-    const t3 = window.setTimeout(() => { if (isActive) setProgress(85); }, 280);
-    const t4 = window.setTimeout(() => { if (isActive) setProgress(100); setPhase("done"); }, PROGRESS_COMPLETE_AT_MS);
-    const t5 = window.setTimeout(() => {
+    setOverlayVisible(true);
+    setOverlayProgress(8);
+    const t1 = window.setTimeout(() => { if (isActive) setOverlayProgress(72); }, 120);
+    const t2 = window.setTimeout(() => { if (isActive) setOverlayProgress(100); }, OVERLAY_COMPLETE_MS);
+    const t3 = window.setTimeout(() => {
       if (!isActive) return;
-      setPhase("idle");
+      setOverlayVisible(false);
       markVisited(pageKey);
-    }, HIDE_AFTER_MS);
-
-    return () => {
-      isActive = false;
-      [t1, t2, t3, t4, t5].forEach(window.clearTimeout);
-    };
-  }, [isVisited, markVisited, pageKey]);
-
-  if (isVisited || phase === "idle") return null;
+    }, OVERLAY_HIDE_MS);
+    return () => { isActive = false; [t1, t2, t3].forEach(window.clearTimeout); };
+  }, [isFirstVisit, markVisited, pageKey]);
 
   return (
-    <div
-      aria-label="Loading"
-      aria-live="polite"
-      data-testid="page-loading-bar"
-      className="pointer-events-none fixed top-0 left-0 right-0 z-50 h-[3px]"
-    >
-      <div
-        className="h-full bg-[#3A5FC3] shadow-[0_0_8px_rgba(58,95,195,0.6)] transition-[width] ease-out"
-        style={{
-          width: `${progress}%`,
-          transitionDuration: phase === "done" ? "150ms" : "300ms",
-        }}
-      />
-    </div>
+    <>
+      {/* ── Thin top bar — every navigation ── */}
+      {barVisible && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-[3px] bg-[#3A5FC3]/10"
+        >
+          <div
+            className="h-full bg-[#3A5FC3] transition-[width] duration-300 ease-out"
+            style={{ width: `${barProgress}%` }}
+          />
+        </div>
+      )}
+
+      {/* ── Full-page overlay — first visit only ── */}
+      {overlayVisible && (
+        <div
+          aria-label={t.common.loading}
+          aria-live="polite"
+          aria-busy="true"
+          data-testid="first-visit-loading"
+          className={`pointer-events-none fixed top-16 bottom-0 right-0 z-30 flex items-center justify-center bg-[#f4f6fb]/80 px-4 backdrop-blur-[1px] transition-all duration-200 ease-out dark:bg-slate-950/80 ${
+            isSidebarCollapsed ? "left-0 md:left-20" : "left-0 md:left-64"
+          }`}
+        >
+          <div className="w-full max-w-sm text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#3A5FC3]" />
+            <p className="mt-4 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {t.common.loading}
+            </p>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-[#3A5FC3]/10">
+              <div
+                className="h-full bg-[#3A5FC3] transition-[width] duration-300 ease-out"
+                style={{ width: `${overlayProgress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
