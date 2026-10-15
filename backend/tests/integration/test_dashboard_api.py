@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.dependencies import get_current_user
 from app.core.database import get_session
 from app.main import app
+from app.models.affiliation import PublicationAuthorAffiliationResolution
 from app.models.base import Base
 from app.models.candidate import (
     CandidateGenerationRun,
@@ -33,10 +34,11 @@ from app.models.candidate import (
 from app.models.governance import AuditEvent, User
 from app.models.identity import LecturerScopusIdentity
 from app.models.master_lecturer import Lecturer
-from app.models.publication import Publication, ScopusAuthor
+from app.models.publication import Publication, PublicationAuthor, ScopusAuthor
 from app.models.scopus_raw import ScopusImport
 
 DASHBOARD_URL = "/api/v1/dashboard/summary"
+CHARTS_URL = "/api/v1/dashboard/charts"
 
 _SAFE_IMPORT_KEYS = frozenset(
     {
@@ -215,7 +217,9 @@ def _make_scopus_author(db: Session) -> ScopusAuthor:
     return a
 
 
-def _make_publication(db: Session) -> Publication:
+def _make_publication(
+    db: Session, *, year: int | None = None, document_type: str | None = None
+) -> Publication:
     uid = uuid.uuid4().hex[:6]
     p = Publication(
         id=uuid.uuid4(),
@@ -223,10 +227,59 @@ def _make_publication(db: Session) -> Publication:
         title=f"Publication {uid}",
         title_normalized=f"publication {uid}",
         source_title=f"Journal {uid}",
+        year=year,
+        document_type=document_type,
     )
     db.add(p)
     db.flush()
     return p
+
+
+def _make_publication_author(
+    db: Session, publication: Publication, author: ScopusAuthor, *, author_order: int = 1
+) -> PublicationAuthor:
+    pa = PublicationAuthor(
+        id=uuid.uuid4(),
+        publication_id=publication.id,
+        scopus_author_id=author.id,
+        author_order=author_order,
+    )
+    db.add(pa)
+    db.flush()
+    return pa
+
+
+def _make_affiliation_resolution(
+    db: Session,
+    publication_author: PublicationAuthor,
+    *,
+    link_status: str = "CORROBORATED",
+    affiliation_presence: str | None = "PRESENT",
+    source_system: str = "openalex",
+) -> PublicationAuthorAffiliationResolution:
+    is_unresolved = link_status == "UNRESOLVED"
+    res = PublicationAuthorAffiliationResolution(
+        id=uuid.uuid4(),
+        publication_author_id=publication_author.id,
+        source_system=source_system,
+        source_payload_sha256="a" * 64,
+        link_status=link_status,
+        link_method=None if is_unresolved else (
+            "ORCID_SCOPUS_ID_BRIDGE" if link_status == "VERIFIED" else "POSITION_COUNT_NAME"
+        ),
+        unresolved_reason="NOT_FOUND" if is_unresolved else None,
+        affiliation_presence=None if is_unresolved else affiliation_presence,
+        evidence={},
+        external_position=None if is_unresolved else 1,
+        external_author_orcid=(
+            "0000-0001-2345-6789" if link_status == "VERIFIED" else None
+        ),
+        retrieved_at=None if is_unresolved else datetime.now(timezone.utc),
+        importer_version="test-1.0",
+    )
+    db.add(res)
+    db.flush()
+    return res
 
 
 def _make_identity(
@@ -787,3 +840,355 @@ class TestDatabaseFailure:
         assert resp.status_code == 503
         assert "password=secret" not in resp.text
         assert "host=db" not in resp.text
+
+
+# ---------------------------------------------------------------------------
+# K. GET /api/v1/dashboard/charts — RBAC
+# ---------------------------------------------------------------------------
+
+
+class TestChartsAuthEnforcement:
+    def test_anonymous_returns_401(self, client: TestClient):
+        resp = client.get(CHARTS_URL)
+        assert resp.status_code == 401
+
+    def test_reviewer_returns_403(self, client: TestClient, make_user):
+        reviewer = make_user("REVIEWER")
+        app.dependency_overrides[get_current_user] = lambda: reviewer
+        try:
+            resp = client.get(CHARTS_URL)
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+    def test_lecturer_returns_403(self, client: TestClient):
+        fake = User(
+            id=uuid.uuid4(),
+            email="lecturer-charts@dash.test",
+            password_hash="x",
+            display_name="Lecturer User",
+            role="LECTURER",
+            is_active=True,
+        )
+        app.dependency_overrides[get_current_user] = lambda: fake
+        try:
+            resp = client.get(CHARTS_URL)
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+    def test_admin_returns_200(self, admin_client):
+        c, _ = admin_client
+        resp = c.get(CHARTS_URL)
+        assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# L. Empty database contract — charts
+# ---------------------------------------------------------------------------
+
+
+class TestChartsEmptyDatabase:
+    def test_empty_db_returns_zero_and_empty_lists(self, admin_client):
+        c, _ = admin_client
+        resp = c.get(CHARTS_URL)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["publications_total_with_year"] == 0
+        assert body["publications_total_without_year"] == 0
+        assert body["publications_by_year"] == []
+        assert body["publications_by_document_type"] == []
+        cov = body["affiliation_coverage"]
+        assert cov["total_author_positions"] == 0
+        assert cov["positions_with_affiliation"] == 0
+        assert cov["positions_without_affiliation"] == 0
+        assert cov["by_link_status"] == {
+            "VERIFIED": 0,
+            "CORROBORATED": 0,
+            "UNRESOLVED": 0,
+        }
+
+
+# ---------------------------------------------------------------------------
+# M. publications_by_year
+# ---------------------------------------------------------------------------
+
+
+class TestChartsPublicationsByYear:
+    def test_groups_by_year_ascending(self, db_session: Session, admin_client):
+        c, _ = admin_client
+        _make_publication(db_session, year=2024)
+        _make_publication(db_session, year=2022)
+        _make_publication(db_session, year=2024)
+        _make_publication(db_session, year=2023)
+        resp = c.get(CHARTS_URL)
+        items = resp.json()["publications_by_year"]
+        assert [i["year"] for i in items] == [2022, 2023, 2024]
+        assert {i["year"]: i["count"] for i in items} == {2022: 1, 2023: 1, 2024: 2}
+
+    def test_null_year_excluded_from_by_year_but_counted_separately(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        _make_publication(db_session, year=2024)
+        _make_publication(db_session, year=None)
+        _make_publication(db_session, year=None)
+        resp = c.get(CHARTS_URL)
+        body = resp.json()
+        assert body["publications_total_with_year"] == 1
+        assert body["publications_total_without_year"] == 2
+        assert all(i["year"] is not None for i in body["publications_by_year"])
+
+    def test_future_year_in_source_data_is_not_filtered(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        _make_publication(db_session, year=2099)
+        resp = c.get(CHARTS_URL)
+        items = resp.json()["publications_by_year"]
+        assert {i["year"]: i["count"] for i in items} == {2099: 1}
+
+    def test_sum_of_groups_matches_total_publications_count(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        _make_publication(db_session, year=2020)
+        _make_publication(db_session, year=2021)
+        _make_publication(db_session, year=2021)
+        resp = c.get(CHARTS_URL)
+        body = resp.json()
+        total_from_groups = sum(i["count"] for i in body["publications_by_year"])
+        assert total_from_groups == body["publications_total_with_year"] == 3
+
+
+# ---------------------------------------------------------------------------
+# N. publications_by_document_type
+# ---------------------------------------------------------------------------
+
+
+class TestChartsPublicationsByDocumentType:
+    def test_groups_by_document_type(self, db_session: Session, admin_client):
+        c, _ = admin_client
+        _make_publication(db_session, document_type="Article")
+        _make_publication(db_session, document_type="Article")
+        _make_publication(db_session, document_type="Conference Paper")
+        resp = c.get(CHARTS_URL)
+        items = resp.json()["publications_by_document_type"]
+        by_type = {i["document_type"]: i["count"] for i in items}
+        assert by_type["Article"] == 2
+        assert by_type["Conference Paper"] == 1
+
+    def test_null_document_type_grouped_as_unspecified(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        _make_publication(db_session, document_type=None)
+        _make_publication(db_session, document_type=None)
+        resp = c.get(CHARTS_URL)
+        items = resp.json()["publications_by_document_type"]
+        by_type = {i["document_type"]: i["count"] for i in items}
+        assert by_type["UNSPECIFIED"] == 2
+
+    def test_does_not_invent_document_types_not_in_db(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        _make_publication(db_session, document_type="Review")
+        resp = c.get(CHARTS_URL)
+        items = resp.json()["publications_by_document_type"]
+        types_present = {i["document_type"] for i in items}
+        assert types_present == {"Review"}
+
+
+# ---------------------------------------------------------------------------
+# O. affiliation_coverage — author *positions*, not unique authors
+# ---------------------------------------------------------------------------
+
+
+class TestChartsAffiliationCoverage:
+    def test_total_author_positions_counts_rows_not_unique_authors(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub1 = _make_publication(db_session)
+        pub2 = _make_publication(db_session)
+        # Same Scopus author appears at a position on two different publications
+        _make_publication_author(db_session, pub1, author, author_order=1)
+        _make_publication_author(db_session, pub2, author, author_order=2)
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["total_author_positions"] == 2
+
+    def test_position_with_resolution_but_absent_affiliation_counts_as_without(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa = _make_publication_author(db_session, pub, author)
+        _make_affiliation_resolution(
+            db_session, pa, link_status="CORROBORATED", affiliation_presence="ABSENT"
+        )
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["total_author_positions"] == 1
+        assert cov["positions_with_affiliation"] == 0
+        assert cov["positions_without_affiliation"] == 1
+
+    def test_position_with_present_affiliation_counts_as_with(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa = _make_publication_author(db_session, pub, author)
+        _make_affiliation_resolution(
+            db_session, pa, link_status="CORROBORATED", affiliation_presence="PRESENT"
+        )
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["positions_with_affiliation"] == 1
+        assert cov["positions_without_affiliation"] == 0
+
+    def test_unresolved_position_counts_as_without_affiliation(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa = _make_publication_author(db_session, pub, author)
+        _make_affiliation_resolution(db_session, pa, link_status="UNRESOLVED")
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["positions_with_affiliation"] == 0
+        assert cov["positions_without_affiliation"] == 1
+        assert cov["by_link_status"]["UNRESOLVED"] == 1
+
+    def test_position_never_attempted_counts_as_without_affiliation(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        _make_publication_author(db_session, pub, author)  # no resolution at all
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["total_author_positions"] == 1
+        assert cov["positions_with_affiliation"] == 0
+        assert cov["positions_without_affiliation"] == 1
+        assert sum(cov["by_link_status"].values()) == 0
+
+    def test_position_counted_once_despite_multiple_source_resolutions(
+        self, db_session: Session, admin_client
+    ):
+        """A position with resolutions from two source systems (e.g. OpenAlex
+        AND Crossref) must still count once in with/without totals."""
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa = _make_publication_author(db_session, pub, author)
+        _make_affiliation_resolution(
+            db_session, pa, link_status="UNRESOLVED", source_system="crossref"
+        )
+        _make_affiliation_resolution(
+            db_session,
+            pa,
+            link_status="CORROBORATED",
+            affiliation_presence="PRESENT",
+            source_system="openalex",
+        )
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["total_author_positions"] == 1
+        assert cov["positions_with_affiliation"] == 1
+        assert cov["positions_without_affiliation"] == 0
+        # Best status wins: CORROBORATED (rank 2) beats UNRESOLVED (rank 1)
+        assert cov["by_link_status"]["CORROBORATED"] == 1
+        assert cov["by_link_status"]["UNRESOLVED"] == 0
+
+    def test_verified_outranks_corroborated_for_same_position(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa = _make_publication_author(db_session, pub, author)
+        _make_affiliation_resolution(
+            db_session,
+            pa,
+            link_status="CORROBORATED",
+            affiliation_presence="PRESENT",
+            source_system="openalex",
+        )
+        _make_affiliation_resolution(
+            db_session,
+            pa,
+            link_status="VERIFIED",
+            affiliation_presence="PRESENT",
+            source_system="orcid",
+        )
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["by_link_status"]["VERIFIED"] == 1
+        assert cov["by_link_status"]["CORROBORATED"] == 0
+
+    def test_without_affiliation_equals_total_minus_with(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa1 = _make_publication_author(db_session, pub, author, author_order=1)
+        author2 = _make_scopus_author(db_session)
+        pa2 = _make_publication_author(db_session, pub, author2, author_order=2)
+        _make_affiliation_resolution(
+            db_session, pa1, link_status="CORROBORATED", affiliation_presence="PRESENT"
+        )
+        # pa2 has no resolution at all
+        resp = c.get(CHARTS_URL)
+        cov = resp.json()["affiliation_coverage"]
+        assert cov["total_author_positions"] == 2
+        assert (
+            cov["positions_with_affiliation"] + cov["positions_without_affiliation"]
+            == cov["total_author_positions"]
+        )
+
+
+# ---------------------------------------------------------------------------
+# P. Charts read-only safety
+# ---------------------------------------------------------------------------
+
+
+class TestChartsReadOnlySafety:
+    def test_get_creates_zero_rows(self, db_session: Session, admin_client):
+        c, _ = admin_client
+        from sqlalchemy import select, func
+
+        before = db_session.execute(
+            select(func.count()).select_from(Publication)
+        ).scalar_one()
+        c.get(CHARTS_URL)
+        after = db_session.execute(
+            select(func.count()).select_from(Publication)
+        ).scalar_one()
+        assert after == before
+
+
+# ---------------------------------------------------------------------------
+# Q. Charts DB failure contract
+# ---------------------------------------------------------------------------
+
+
+class TestChartsDatabaseFailure:
+    def test_db_failure_returns_503_with_code(self, admin_client):
+        c, _ = admin_client
+        from sqlalchemy.exc import OperationalError
+
+        with patch(
+            "app.api.v1.endpoints.dashboard.get_dashboard_charts",
+            side_effect=OperationalError("conn", {}, Exception("down")),
+        ):
+            resp = c.get(CHARTS_URL)
+        assert resp.status_code == 503
+        assert resp.json().get("code") == "DATABASE_UNAVAILABLE"

@@ -33,3 +33,30 @@ export interface DashboardSummary {
   latest_scopus_import: DashboardLatestImport | null;
   recent_audit_actions: AuditListItem[];
 }
+
+export interface PublicationsByYearItem {
+  year: number;
+  count: number;
+}
+
+export interface PublicationsByDocumentTypeItem {
+  document_type: string;
+  count: number;
+}
+
+export type AffiliationLinkStatus = "VERIFIED" | "CORROBORATED" | "UNRESOLVED";
+
+export interface AffiliationCoverage {
+  total_author_positions: number;
+  positions_with_affiliation: number;
+  positions_without_affiliation: number;
+  by_link_status: Record<AffiliationLinkStatus, number>;
+}
+
+export interface DashboardCharts {
+  publications_total_with_year: number;
+  publications_total_without_year: number;
+  publications_by_year: PublicationsByYearItem[];
+  publications_by_document_type: PublicationsByDocumentTypeItem[];
+  affiliation_coverage: AffiliationCoverage;
+}

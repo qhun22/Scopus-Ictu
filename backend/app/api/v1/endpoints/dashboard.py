@@ -12,8 +12,8 @@ from app.api.dependencies import require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import User
-from app.schemas.dashboard import DashboardSummaryResponse
-from app.services.dashboard_queries import get_dashboard_summary
+from app.schemas.dashboard import DashboardChartsResponse, DashboardSummaryResponse
+from app.services.dashboard_queries import get_dashboard_charts, get_dashboard_summary
 
 router = APIRouter()
 DatabaseSession = Annotated[Session, Depends(get_session)]
@@ -35,6 +35,25 @@ def dashboard_summary(
         raise APIError(
             status_code=503,
             detail="Dữ liệu bảng điều khiển tạm thời không khả dụng.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
+
+
+@router.get(
+    "/charts",
+    response_model=DashboardChartsResponse,
+    summary="Số liệu thực cho các biểu đồ Tổng quan (chỉ ADMIN)",
+)
+def dashboard_charts(
+    _user: AdminUser,
+    db: DatabaseSession,
+) -> DashboardChartsResponse:
+    try:
+        return get_dashboard_charts(db)
+    except SQLAlchemyError as exc:
+        raise APIError(
+            status_code=503,
+            detail="Dữ liệu biểu đồ tạm thời không khả dụng.",
             code="DATABASE_UNAVAILABLE",
         ) from exc
 

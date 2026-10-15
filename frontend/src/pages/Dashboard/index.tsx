@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { getDashboardSummary } from "../../api/dashboard";
+import { getDashboardCharts, getDashboardSummary } from "../../api/dashboard";
 import { getApiErrorMessage } from "../../api/errors";
 import { resetSystem } from "../../api/system";
 import { useAuth } from "../../contexts/AuthContext";
@@ -8,11 +8,15 @@ import { useToast } from "../../contexts/ToastContext";
 import TextConfirmModal from "../../components/common/TextConfirmModal";
 import { useI18n } from "../../i18n";
 import {
+  DashboardCharts,
   DashboardIdentityStatus,
   DashboardSummary,
 } from "../../types/dashboard";
 import { AuditListItem } from "../../types/audit";
 import { formatTimestamp } from "../../utils/dateTime";
+import PublicationsByYearChart from "./charts/PublicationsByYearChart";
+import DocumentTypeDonutChart from "./charts/DocumentTypeDonutChart";
+import AffiliationCoverageChart from "./charts/AffiliationCoverageChart";
 
 
 function ActorCell({
@@ -54,7 +58,7 @@ const IDENTITY_LABEL_KEYS: Record<DashboardIdentityStatus, "identityCandidate" |
 };
 
 export default function DashboardPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const copy = t.dashboard;
   const toast = useToast();
   const { user: currentUser } = useAuth();
@@ -63,6 +67,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+
+  const [charts, setCharts] = useState<DashboardCharts | null>(null);
+  const [chartsLoading, setChartsLoading] = useState(true);
+  const [chartsError, setChartsError] = useState<string | null>(null);
+  const chartsControllerRef = useRef<AbortController | null>(null);
 
   // Reset modal state
   const [showResetModal, setShowResetModal] = useState(false);
@@ -110,6 +119,35 @@ export default function DashboardPage() {
       controllerRef.current?.abort();
     };
   }, [fetchSummary]);
+
+  const fetchCharts = useCallback(() => {
+    if (chartsControllerRef.current) {
+      chartsControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    chartsControllerRef.current = controller;
+
+    setChartsLoading(true);
+    setChartsError(null);
+
+    getDashboardCharts({ signal: controller.signal })
+      .then((data) => {
+        setCharts(data);
+        setChartsLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setChartsError(getApiErrorMessage(err, copy.loadError));
+        setChartsLoading(false);
+      });
+  }, [copy.loadError]);
+
+  useEffect(() => {
+    fetchCharts();
+    return () => {
+      chartsControllerRef.current?.abort();
+    };
+  }, [fetchCharts]);
 
   return (
     <div className="app-page-container space-y-6">
@@ -237,6 +275,107 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* Charts — publications by year, document type mix, affiliation coverage */}
+          <section className="rounded-[5px] border border-gray-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-base font-semibold text-gray-800">
+              {locale === "vi" ? "Thống kê công bố" : "Publication statistics"}
+            </h2>
+
+            {chartsLoading && !charts && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="h-64 animate-pulse rounded-[5px] bg-gray-100" />
+                <div className="h-64 animate-pulse rounded-[5px] bg-gray-100" />
+              </div>
+            )}
+
+            {chartsError && !chartsLoading && (
+              <div className="rounded-[5px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {chartsError}
+                <button
+                  onClick={fetchCharts}
+                  className="ml-3 font-semibold underline underline-offset-2"
+                >
+                  {locale === "vi" ? "Thử lại" : "Retry"}
+                </button>
+              </div>
+            )}
+
+            {charts && !chartsLoading && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  {/* Publications by year */}
+                  <div>
+                    <h3 className="mb-1 text-sm font-semibold text-slate-700">
+                      {locale === "vi" ? "Số công bố theo năm" : "Publications by year"}
+                    </h3>
+                    {charts.publications_by_year.length === 0 ? (
+                      <div className="flex h-64 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
+                        <p className="text-sm font-medium text-slate-500">
+                          {locale === "vi" ? "Chưa có công bố nào có năm xuất bản hợp lệ" : "No publications with a valid year yet"}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {locale === "vi"
+                            ? "Nhập dữ liệu Scopus CSV và chuẩn hóa công bố để xem biểu đồ này."
+                            : "Import a Scopus CSV and normalize publications to see this chart."}
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <PublicationsByYearChart data={charts.publications_by_year} locale={locale} />
+                        {charts.publications_total_without_year > 0 && (
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            {locale === "vi"
+                              ? `${charts.publications_total_without_year.toLocaleString("vi-VN")} công bố chưa xác định năm xuất bản, không hiển thị trong biểu đồ này.`
+                              : `${charts.publications_total_without_year.toLocaleString("en-US")} publications have no recorded year and are excluded from this chart.`}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Document type breakdown */}
+                  <div>
+                    <h3 className="mb-1 text-sm font-semibold text-slate-700">
+                      {locale === "vi" ? "Cơ cấu loại công bố" : "Document type breakdown"}
+                    </h3>
+                    {charts.publications_by_document_type.length === 0 ? (
+                      <div className="flex h-64 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
+                        <p className="text-sm font-medium text-slate-500">
+                          {locale === "vi" ? "Chưa có dữ liệu loại công bố" : "No document type data yet"}
+                        </p>
+                      </div>
+                    ) : (
+                      <DocumentTypeDonutChart data={charts.publications_by_document_type} locale={locale} />
+                    )}
+                  </div>
+                </div>
+
+                {/* Affiliation coverage */}
+                <div className="border-t border-gray-100 pt-5">
+                  <h3 className="mb-1 text-sm font-semibold text-slate-700">
+                    {locale === "vi" ? "Mức độ đầy đủ đơn vị tác giả" : "Author affiliation coverage"}
+                  </h3>
+                  {charts.affiliation_coverage.total_author_positions === 0 ? (
+                    <div className="flex h-40 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
+                      <p className="text-sm font-medium text-slate-500">
+                        {locale === "vi"
+                          ? "Chưa có vị trí tác giả nào để đối chiếu đơn vị công tác"
+                          : "No author positions to resolve affiliations for yet"}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {locale === "vi"
+                          ? "Bóc tách tác giả từ công bố trước, sau đó chạy đối chiếu đơn vị."
+                          : "Extract authors from publications first, then run affiliation resolution."}
+                      </p>
+                    </div>
+                  ) : (
+                    <AffiliationCoverageChart data={charts.affiliation_coverage} locale={locale} />
+                  )}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Latest Scopus import */}

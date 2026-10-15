@@ -47,3 +47,34 @@ class DashboardSummaryResponse(BaseModel):
     latest_scopus_import: LatestScopusImportSummary | None
 
     recent_audit_actions: list[AuditListItem]
+
+
+class PublicationsByYearItem(BaseModel):
+    year: int
+    count: int
+
+
+class PublicationsByDocumentTypeItem(BaseModel):
+    document_type: str
+    count: int
+
+
+class AffiliationCoverageResponse(BaseModel):
+    """Coverage of author *positions* (publication_authors rows), not of
+    unique Scopus authors — one position counts once even if it has
+    affiliation resolutions from multiple source systems."""
+
+    total_author_positions: int
+    positions_with_affiliation: int
+    positions_without_affiliation: int
+    # Best (most-trusted) resolution status actually observed per position,
+    # restricted to positions that have at least one resolution row.
+    by_link_status: dict[str, int]
+
+
+class DashboardChartsResponse(BaseModel):
+    publications_total_with_year: int
+    publications_total_without_year: int
+    publications_by_year: list[PublicationsByYearItem]
+    publications_by_document_type: list[PublicationsByDocumentTypeItem]
+    affiliation_coverage: AffiliationCoverageResponse
