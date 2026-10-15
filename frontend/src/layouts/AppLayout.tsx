@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/common/Header";
 import Sidebar from "../components/common/Sidebar";
+import PageLoadingBar from "../components/PageLoadingBar";
 
 export default function AppLayout() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -9,7 +10,7 @@ export default function AppLayout() {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">
+    <div className="min-h-screen bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif] dark:bg-slate-950 dark:text-slate-200">
       {/* Role-aware Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
@@ -31,7 +32,8 @@ export default function AppLayout() {
         />
 
         {/* Dynamic Page Content */}
-        <main className="flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6">
+        <main className="relative flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6">
+          <PageLoadingBar isSidebarCollapsed={isSidebarCollapsed} />
           <div key={location.pathname} className="page-fade-in w-full">
             <Outlet />
           </div>
