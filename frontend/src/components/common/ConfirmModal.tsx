@@ -4,6 +4,7 @@ import ConfirmDialogFrame, {
   dialogCancelButtonClass,
   dialogConfirmButtonClass,
 } from "./ConfirmDialogFrame";
+import { useI18n } from "../../i18n";
 
 export type ConfirmVariant = "danger" | "primary" | "warning";
 
@@ -25,8 +26,8 @@ export default function ConfirmModal({
   open,
   title,
   description,
-  confirmLabel = "Xác nhận",
-  cancelLabel = "Hủy",
+  confirmLabel,
+  cancelLabel,
   showConfirmButton = true,
   variant = "danger",
   confirmClassName,
@@ -34,6 +35,9 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { t } = useI18n();
+  const resolvedConfirmLabel = confirmLabel ?? t.common.confirm;
+  const resolvedCancelLabel = cancelLabel ?? t.common.cancel;
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
 
   // Handle Escape key listener
@@ -79,7 +83,7 @@ export default function ConfirmModal({
               onClick={onCancel}
               className={dialogCancelButtonClass}
             >
-              {cancelLabel}
+              {resolvedCancelLabel}
             </button>
           )}
 
@@ -91,7 +95,7 @@ export default function ConfirmModal({
             className={dialogConfirmButtonClass(variant, confirmClassName)}
           >
             {loading && <DialogSpinner />}
-            <span>{loading ? "Đang xử lý..." : confirmLabel}</span>
+            <span>{loading ? t.common.processing : resolvedConfirmLabel}</span>
           </button>
         </>
       }

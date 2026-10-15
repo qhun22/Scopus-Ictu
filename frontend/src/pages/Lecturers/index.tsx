@@ -545,7 +545,7 @@ export default function LecturersPage() {
         );
       } else {
         const msg = getApiErrorMessage(err, locale === "vi" ? "Không thể xóa giảng viên." : "Could not delete lecturer.");
-        toast.error(locale === "vi" ? "Không thể xóa giảng viên" : "Delete Error", msg);
+        toast.error(locale === "vi" ? "Không thể xóa giảng viên" : "Cannot delete lecturer", msg);
       }
     } finally {
       setIsSubmitting(false);
@@ -1118,7 +1118,7 @@ export default function LecturersPage() {
                         required
                         value={addForm.full_name}
                         onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })}
-                        placeholder="VD: Nguyễn Văn A"
+                        placeholder={locale === "vi" ? "VD: Nguyễn Văn A" : "e.g. Nguyen Van A"}
                         className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                       />
                     </div>
@@ -1169,7 +1169,7 @@ export default function LecturersPage() {
                         type="text"
                         value={addForm.staff_code ?? ""}
                         onChange={(e) => handleAddStaffCodeChange(e.target.value)}
-                        placeholder={addForm.email.split("@")[0] || "VD: CB00123"}
+                        placeholder={addForm.email.split("@")[0] || (locale === "vi" ? "VD: CB00123" : "e.g. CB00123")}
                         className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                         aria-invalid={staffCodeFieldError ? "true" : "false"}
                       />
@@ -1230,7 +1230,7 @@ export default function LecturersPage() {
                       type="text"
                       value={addForm.department}
                       onChange={(e) => setAddForm({ ...addForm, department: e.target.value })}
-                      placeholder="VD: Khoa Công nghệ Thông tin"
+                      placeholder={locale === "vi" ? "VD: Khoa Công nghệ Thông tin" : "e.g. Faculty of Information Technology"}
                       className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                     />
                   </div>
@@ -1363,7 +1363,7 @@ export default function LecturersPage() {
                             setEditForm({ ...editForm, staff_code: e.target.value });
                             setEditStaffCodeFieldError("");
                           }}
-                          placeholder="VD: CB00123"
+                          placeholder={locale === "vi" ? "VD: CB00123" : "e.g. CB00123"}
                           className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                           aria-invalid={editStaffCodeFieldError ? "true" : "false"}
                         />
@@ -1382,7 +1382,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.academic_degree}
                           onChange={(e) => setEditForm({ ...editForm, academic_degree: e.target.value })}
-                          placeholder="VD: Thạc sĩ, Tiến sĩ, Cử nhân"
+                          placeholder={locale === "vi" ? "VD: Thạc sĩ, Tiến sĩ, Cử nhân" : "e.g. Master's, PhD, Bachelor's"}
                           className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
@@ -1397,7 +1397,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.academic_rank}
                           onChange={(e) => setEditForm({ ...editForm, academic_rank: e.target.value })}
-                          placeholder="VD: Giáo sư, Phó Giáo sư"
+                          placeholder={locale === "vi" ? "VD: Giáo sư, Phó Giáo sư" : "e.g. Professor, Associate Professor"}
                           className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
@@ -1412,7 +1412,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.position}
                           onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
-                          placeholder="VD: Hiệu trưởng, Trưởng khoa, Trưởng bộ môn"
+                          placeholder={locale === "vi" ? "VD: Hiệu trưởng, Trưởng khoa, Trưởng bộ môn" : "e.g. Rector, Dean, Department Head"}
                           className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
@@ -1427,7 +1427,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.specialization}
                           onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
-                          placeholder="VD: Khoa học máy tính, Kỹ thuật phần mềm"
+                          placeholder={locale === "vi" ? "VD: Khoa học máy tính, Kỹ thuật phần mềm" : "e.g. Computer Science, Software Engineering"}
                           className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
@@ -1474,7 +1474,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.phone}
                           onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                          placeholder="VD: 0912345678"
+                          placeholder={locale === "vi" ? "VD: 0912345678" : "e.g. 0912345678"}
                           className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
@@ -1568,7 +1568,7 @@ export default function LecturersPage() {
                                 setNewPassword(event.target.value);
                                 if (passwordError) setPasswordError("");
                               }}
-                              placeholder="Nhập mật khẩu mới"
+                              placeholder={locale === "vi" ? "Nhập mật khẩu mới" : "Enter new password"}
                               className={`h-9 w-full rounded-[5px] border px-3 pr-10 text-slate-800 focus:outline-none focus:ring-2 disabled:bg-slate-50 ${
                                 passwordError
                                   ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
@@ -1665,7 +1665,7 @@ export default function LecturersPage() {
                                     minLength={8}
                                     value={grantPassword}
                                     onChange={(e) => setGrantPassword(e.target.value)}
-                                    placeholder="Tối thiểu 8 ký tự"
+                                    placeholder={locale === "vi" ? "Tối thiểu 8 ký tự" : "Minimum 8 characters"}
                                     className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
                                   />
                                 </div>

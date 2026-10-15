@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import ModalPortal from "./ModalPortal";
+import { useI18n } from "../../i18n";
 
 export interface TextConfirmModalProps {
   open: boolean;
@@ -21,11 +22,13 @@ export default function TextConfirmModal({
   description,
   confirmWord,
   confirmLabel,
-  cancelLabel = "Hủy",
+  cancelLabel,
   loading = false,
   onConfirm,
   onCancel,
 }: TextConfirmModalProps) {
+  const { t } = useI18n();
+  const resolvedCancelLabel = cancelLabel ?? t.common.cancel;
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -68,15 +71,15 @@ export default function TextConfirmModal({
           <div className="px-5 py-4 space-y-3">
             <p className="text-sm text-gray-700">{description}</p>
             <p className="text-sm font-medium text-gray-800">
-              Nhập{" "}
+              {t.common.typeToConfirmPrefix}{" "}
               <span
                 className="font-mono font-bold text-red-600 cursor-pointer select-none underline decoration-dotted underline-offset-2 hover:text-red-700"
-                title="Click để điền tự động"
+                title={t.common.clickToAutofill}
                 onClick={() => setInput(confirmWord)}
               >
                 {confirmWord}
               </span>{" "}
-              để xác nhận:
+              {t.common.typeToConfirmSuffix}
             </p>
             <input
               ref={inputRef}
@@ -97,7 +100,7 @@ export default function TextConfirmModal({
               disabled={loading}
               className="rounded-md border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
-              {cancelLabel}
+              {resolvedCancelLabel}
             </button>
             <button
               type="button"

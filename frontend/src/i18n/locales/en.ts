@@ -16,6 +16,7 @@ export const en: TranslationSchema = {
     inactive: "Locked",
     actions: "Actions",
     loading: "Loading data...",
+    processing: "Processing...",
     noData: "No data found",
     noDataSub: "Try another search keyword or filter",
     role: "Role",
@@ -28,6 +29,9 @@ export const en: TranslationSchema = {
     users: "users",
     lecturers: "lecturers",
     close: "Close",
+    typeToConfirmPrefix: "Type",
+    typeToConfirmSuffix: "to confirm:",
+    clickToAutofill: "Click to autofill",
   },
   roles: {
     ADMIN: "Administrator",

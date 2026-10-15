@@ -16,6 +16,7 @@ export interface TranslationSchema {
     inactive: string;
     actions: string;
     loading: string;
+    processing: string;
     noData: string;
     noDataSub: string;
     role: string;
@@ -28,6 +29,9 @@ export interface TranslationSchema {
     users: string;
     lecturers: string;
     close: string;
+    typeToConfirmPrefix: string;
+    typeToConfirmSuffix: string;
+    clickToAutofill: string;
   };
   roles: {
     ADMIN: string;

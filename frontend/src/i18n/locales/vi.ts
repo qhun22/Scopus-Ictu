@@ -16,6 +16,7 @@ export const vi: TranslationSchema = {
     inactive: "Đã khóa",
     actions: "Thao tác",
     loading: "Đang tải dữ liệu...",
+    processing: "Đang xử lý...",
     noData: "Không tìm thấy dữ liệu",
     noDataSub: "Hãy thử từ khóa hoặc bộ lọc khác",
     role: "Vai trò",
@@ -28,6 +29,9 @@ export const vi: TranslationSchema = {
     users: "người dùng",
     lecturers: "giảng viên",
     close: "Đóng",
+    typeToConfirmPrefix: "Nhập",
+    typeToConfirmSuffix: "để xác nhận:",
+    clickToAutofill: "Click để điền tự động",
   },
   roles: {
     ADMIN: "Quản trị viên",
