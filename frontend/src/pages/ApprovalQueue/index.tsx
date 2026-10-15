@@ -101,7 +101,7 @@ function provenanceText(ref: unknown): string {
 
 function NameEvidenceCard({ evidence }: { evidence: ReviewNameEvidence }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
+    <div className="rounded-[5px] border border-slate-200 bg-slate-50/70 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <Tag color="blue">{evidence.rule_id}</Tag>
         <Text type="secondary">Phiên bản quy tắc {evidence.rule_version}</Text>
@@ -384,7 +384,7 @@ export default function ApprovalQueuePage() {
       </div>
 
       {/* ── Filter Bar ──────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-xs">
+      <div className="rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs">
         <div className="flex flex-wrap items-end gap-3">
           {/* Trạng thái */}
           <div className="flex flex-col gap-1">
@@ -392,7 +392,7 @@ export default function ApprovalQueuePage() {
             <select
               value={status}
               onChange={(e) => { setStatus(e.target.value as CandidateStatus); setPage(1); }}
-              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+              className="h-8 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
             >
               {Object.entries(STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
@@ -406,7 +406,7 @@ export default function ApprovalQueuePage() {
             <select
               value={evidenceFilter}
               onChange={(e) => { setEvidenceFilter(e.target.value as EvidenceFilter); setPage(1); }}
-              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+              className="h-8 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
             >
               <option value="all">Tất cả</option>
               <option value="publication-supported">Có công bố hỗ trợ</option>
@@ -420,7 +420,7 @@ export default function ApprovalQueuePage() {
             <select
               value={ambiguityFilter}
               onChange={(e) => { setAmbiguityFilter(e.target.value as AmbiguitySelection); setPage(1); }}
-              className="h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+              className="h-8 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
             >
               <option value="all">Tất cả</option>
               <option value="ambiguous">Có nhiều ứng viên</option>
@@ -433,7 +433,7 @@ export default function ApprovalQueuePage() {
             type="button"
             onClick={() => void loadQueue()}
             disabled={queueLoading}
-            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-60 ml-auto"
+            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-60 ml-auto"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -444,9 +444,9 @@ export default function ApprovalQueuePage() {
       </div>
 
       {/* ── Queue Table ─────────────────────────────────────────────────── */}
-      <section className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
+      <section className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         {queueError ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 m-4 p-4 text-xs text-rose-800 flex items-start gap-2.5">
+          <div className="rounded-[5px] border border-rose-200 bg-rose-50 m-4 p-4 text-xs text-rose-800 flex items-start gap-2.5">
             <svg className="h-5 w-5 shrink-0 text-rose-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -456,7 +456,7 @@ export default function ApprovalQueuePage() {
               <button
                 type="button"
                 onClick={() => void loadQueue()}
-                className="self-start rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                className="self-start rounded-[5px] border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
               >
                 Thử lại
               </button>
@@ -489,7 +489,7 @@ export default function ApprovalQueuePage() {
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-1.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
@@ -569,7 +569,7 @@ export default function ApprovalQueuePage() {
                         <button
                           type="button"
                           onClick={() => openDetail(item.candidate_id)}
-                          className="inline-flex h-7 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                          className="inline-flex h-7 items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                         >
                           <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -599,7 +599,7 @@ export default function ApprovalQueuePage() {
                   value={pageSize}
                   disabled={queueLoading}
                   onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)); }}
-                  className="h-6 rounded-lg border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
+                  className="h-6 rounded-[5px] border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
                 >
                   <option value={10}>10 / trang</option>
                   <option value={20}>20 / trang</option>
@@ -613,7 +613,7 @@ export default function ApprovalQueuePage() {
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1 || queueLoading}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 Trước
               </button>
@@ -624,7 +624,7 @@ export default function ApprovalQueuePage() {
                 type="button"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages || queueLoading}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 Sau
               </button>
@@ -709,7 +709,7 @@ export default function ApprovalQueuePage() {
             {detail.publication_evidence.length > 0 ? (
               <div className="space-y-3">
                 {detail.publication_evidence.map((evidence) => (
-                  <div key={evidence.evidence_id} className="rounded-lg border border-slate-200 p-4">
+                  <div key={evidence.evidence_id} className="rounded-[5px] border border-slate-200 p-4">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <Tag color={evidence.reconciliation === "DOI_EXACT" ? "green" : "blue"}>{evidence.reconciliation ?? "Chưa xác định kiểu đối chiếu"}</Tag>
                       <Text type="secondary">{evidence.rule_id} · phiên bản {evidence.rule_version}</Text>
@@ -751,7 +751,7 @@ export default function ApprovalQueuePage() {
             {detail.ambiguity.other_candidates.length > 0 && (
               <div className="mt-3 space-y-2">
                 {detail.ambiguity.other_candidates.map((candidate) => (
-                  <div key={candidate.candidate_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 px-4 py-3">
+                  <div key={candidate.candidate_id} className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] border border-slate-200 px-4 py-3">
                     <div>
                       <div className="font-medium text-slate-900">{candidate.scopus_author.preferred_name}</div>
                       <div className="font-mono text-xs text-slate-500">{candidate.scopus_author.scopus_id}</div>

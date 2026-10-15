@@ -631,7 +631,7 @@ export default function LecturersPage() {
             type="button"
             disabled={isExporting}
             onClick={handleExportJson}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
           >
             {isExporting ? (
               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -647,7 +647,7 @@ export default function LecturersPage() {
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
+            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
           >
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
@@ -662,7 +662,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("all")}
-          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "all"
               ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300"
               : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"
@@ -679,7 +679,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("linked")}
-          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "linked"
               ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300/50"
               : "border-slate-200/80 bg-white hover:border-emerald-200 hover:shadow-sm"
@@ -696,7 +696,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("not_linked")}
-          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "not_linked"
               ? "border-slate-400 bg-slate-50 ring-2 ring-slate-300/50"
               : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"
@@ -713,7 +713,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("locked")}
-          className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
+          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
             activeFilter === "locked"
               ? "border-rose-500 bg-rose-50 ring-2 ring-rose-300/50"
               : "border-slate-200/80 bg-white hover:border-rose-200 hover:shadow-sm"
@@ -730,7 +730,7 @@ export default function LecturersPage() {
         <button
           type="button"
           onClick={() => handleFilterCard("warning")}
-          className={`rounded-lg border p-4 shadow-xs text-left transition-all cursor-pointer col-span-2 sm:col-span-1 ${
+          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all cursor-pointer col-span-2 sm:col-span-1 ${
             activeFilter === "warning"
               ? "border-amber-500 bg-amber-50 ring-2 ring-amber-300/50"
               : "border-slate-200/80 bg-white hover:border-amber-200 hover:shadow-sm"
@@ -746,7 +746,7 @@ export default function LecturersPage() {
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -760,7 +760,7 @@ export default function LecturersPage() {
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleApplySearch(); }}
             placeholder={t.lecturers.searchPlaceholder}
-            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+            className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
           />
         </div>
 
@@ -770,7 +770,7 @@ export default function LecturersPage() {
             type="button"
             onClick={handleApplySearch}
             disabled={!hasUnappliedSearch || loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#3A5FC3] bg-[#3A5FC3] px-3 text-xs font-semibold text-white hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[5px] border border-[#3A5FC3] bg-[#3A5FC3] px-3 text-xs font-semibold text-white hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -779,7 +779,7 @@ export default function LecturersPage() {
           </button>
 
           {activeFilter && activeFilter !== "all" && (
-            <span className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#3A5FC3]/40 bg-[#3A5FC3]/10 px-3 text-xs font-semibold text-[#3A5FC3]">
+            <span className="inline-flex h-9 items-center gap-1.5 rounded-[5px] border border-[#3A5FC3]/40 bg-[#3A5FC3]/10 px-3 text-xs font-semibold text-[#3A5FC3]">
               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
               </svg>
@@ -808,7 +808,7 @@ export default function LecturersPage() {
               setPage(1);
             }}
             disabled={!search && !appliedSearch && !activeFilter && !hasUnappliedSearch}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
+            className="inline-flex h-9 items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -819,7 +819,7 @@ export default function LecturersPage() {
       </div>
 
       {/* Lecturers Table */}
-      <div className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
+      <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
           <table aria-busy={isTableLoading} className="w-full text-left text-xs">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
@@ -847,7 +847,7 @@ export default function LecturersPage() {
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
@@ -935,7 +935,7 @@ export default function LecturersPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenDetailModal(lec)}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -945,7 +945,7 @@ export default function LecturersPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenDeleteModal(lec)}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-[5px] border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -990,7 +990,7 @@ export default function LecturersPage() {
                     setPageSize(Number(e.target.value));
                     setPage(1);
                   }}
-                  className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                  className="h-7 rounded-[5px] border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
                 >
                   <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                   <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -1008,7 +1008,7 @@ export default function LecturersPage() {
                 type="button"
                 onClick={() => setPage(page - 1)}
                 disabled={isTableLoading || page <= 1}
-                className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {t.lecturers.previousPage}
               </button>
@@ -1038,14 +1038,14 @@ export default function LecturersPage() {
                     (e.target as HTMLInputElement).blur();
                   }
                 }}
-                className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
               <span className="text-slate-400">/ <strong className="text-slate-600">{totalPages}</strong></span>
               <button
                 type="button"
                 onClick={() => setPage(page + 1)}
                 disabled={isTableLoading || page >= totalPages}
-                className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {t.lecturers.nextPage}
               </button>
@@ -1064,12 +1064,12 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-lecturer-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-[5px] bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
                     <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
                     </svg>
@@ -1089,7 +1089,7 @@ export default function LecturersPage() {
                   type="button"
                   disabled={isSubmitting}
                   onClick={() => setIsAddModalOpen(false)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer disabled:opacity-50"
+                  className="rounded-[5px] p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer disabled:opacity-50"
                   aria-label={t.common.cancel}
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1102,7 +1102,7 @@ export default function LecturersPage() {
               <form onSubmit={handleAddSubmit} className="flex min-h-0 flex-1 flex-col text-xs">
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
                   {addError && (
-                    <div className="rounded-lg border border-rose-200 bg-rose-50/90 p-3 text-xs text-rose-700 font-medium">
+                    <div className="rounded-[5px] border border-rose-200 bg-rose-50/90 p-3 text-xs text-rose-700 font-medium">
                       {addError}
                     </div>
                   )}
@@ -1119,7 +1119,7 @@ export default function LecturersPage() {
                         value={addForm.full_name}
                         onChange={(e) => setAddForm({ ...addForm, full_name: e.target.value })}
                         placeholder="VD: Nguyễn Văn A"
-                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                       />
                     </div>
 
@@ -1133,7 +1133,7 @@ export default function LecturersPage() {
                         value={addForm.email}
                         onChange={(e) => handleAddEmailChange(e.target.value)}
                         placeholder="example@ictu.edu.vn"
-                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                       />
                     </div>
                   </div>
@@ -1151,7 +1151,7 @@ export default function LecturersPage() {
                         value={addForm.password}
                         onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
                         placeholder="••••••••"
-                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                       />
                       <p className="mt-1 text-[11px] text-slate-400">
                         {locale === "vi" ? "Tối thiểu 8 ký tự" : "Minimum 8 characters"}
@@ -1170,7 +1170,7 @@ export default function LecturersPage() {
                         value={addForm.staff_code ?? ""}
                         onChange={(e) => handleAddStaffCodeChange(e.target.value)}
                         placeholder={addForm.email.split("@")[0] || "VD: CB00123"}
-                        className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                         aria-invalid={staffCodeFieldError ? "true" : "false"}
                       />
                       {staffCodeFieldError ? (
@@ -1194,7 +1194,7 @@ export default function LecturersPage() {
                       <select
                         value={addForm.role}
                         onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
-                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
+                        className="h-10 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
                       >
                         <option value="LECTURER">{locale === "vi" ? "Giảng viên" : "Lecturer"}</option>
                         <option value="ADMIN">{locale === "vi" ? "Quản trị viên" : "Administrator"}</option>
@@ -1209,7 +1209,7 @@ export default function LecturersPage() {
                       <select
                         value={addForm.academic_degree}
                         onChange={(e) => setAddForm({ ...addForm, academic_degree: e.target.value })}
-                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
+                        className="h-10 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
                       >
                         <option value="Cử nhân">Cử nhân / Kỹ sư</option>
                         <option value="Thạc sĩ">Thạc sĩ</option>
@@ -1231,7 +1231,7 @@ export default function LecturersPage() {
                       value={addForm.department}
                       onChange={(e) => setAddForm({ ...addForm, department: e.target.value })}
                       placeholder="VD: Khoa Công nghệ Thông tin"
-                      className="h-10 w-full rounded-lg border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                     />
                   </div>
                 </div>
@@ -1242,14 +1242,14 @@ export default function LecturersPage() {
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => setIsAddModalOpen(false)}
-                    className="h-9 sm:h-10 rounded-lg border border-slate-200 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs"
+                    className="h-9 sm:h-10 rounded-[5px] border border-slate-200 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs"
                   >
                     {t.common.cancel}
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="inline-flex h-9 sm:h-10 min-w-32 items-center justify-center gap-2 rounded-lg bg-[#3A5FC3] px-5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="inline-flex h-9 sm:h-10 min-w-32 items-center justify-center gap-2 rounded-[5px] bg-[#3A5FC3] px-5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
                     {isSubmitting ? (
                       <>
@@ -1277,7 +1277,7 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="lecturer-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[5px] bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               <div className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
                 <h3 id="lecturer-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
@@ -1292,7 +1292,7 @@ export default function LecturersPage() {
                 <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-6">
                   {/* Warning Notice Banner */}
                   {selectedLecturer.has_warning && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
+                    <div className="rounded-[5px] border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
                       <svg className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
@@ -1328,7 +1328,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.full_name}
                           onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1343,7 +1343,7 @@ export default function LecturersPage() {
                           value={editForm.email}
                           onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                           placeholder={selectedLecturer.institutional_email || "example@ictu.edu.vn"}
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1364,7 +1364,7 @@ export default function LecturersPage() {
                             setEditStaffCodeFieldError("");
                           }}
                           placeholder="VD: CB00123"
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                           aria-invalid={editStaffCodeFieldError ? "true" : "false"}
                         />
                         {editStaffCodeFieldError && (
@@ -1383,7 +1383,7 @@ export default function LecturersPage() {
                           value={editForm.academic_degree}
                           onChange={(e) => setEditForm({ ...editForm, academic_degree: e.target.value })}
                           placeholder="VD: Thạc sĩ, Tiến sĩ, Cử nhân"
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1398,7 +1398,7 @@ export default function LecturersPage() {
                           value={editForm.academic_rank}
                           onChange={(e) => setEditForm({ ...editForm, academic_rank: e.target.value })}
                           placeholder="VD: Giáo sư, Phó Giáo sư"
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1413,7 +1413,7 @@ export default function LecturersPage() {
                           value={editForm.position}
                           onChange={(e) => setEditForm({ ...editForm, position: e.target.value })}
                           placeholder="VD: Hiệu trưởng, Trưởng khoa, Trưởng bộ môn"
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1428,7 +1428,7 @@ export default function LecturersPage() {
                           value={editForm.specialization}
                           onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })}
                           placeholder="VD: Khoa học máy tính, Kỹ thuật phần mềm"
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1441,7 +1441,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.gender}
                           onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
-                          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         >
                           <option value="">{locale === "vi" ? "Chưa cập nhật" : "Not specified"}</option>
                           <option value="Nam">Nam</option>
@@ -1460,7 +1460,7 @@ export default function LecturersPage() {
                           disabled={isDetailBusy}
                           value={editForm.date_of_birth}
                           onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
 
@@ -1475,7 +1475,7 @@ export default function LecturersPage() {
                           value={editForm.phone}
                           onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                           placeholder="VD: 0912345678"
-                          className="h-9 w-full rounded-lg border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
+                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
                       </div>
                     </div>
@@ -1516,11 +1516,11 @@ export default function LecturersPage() {
                     {selectedLecturer.account ? (
                       <div className="space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="rounded-lg bg-slate-50 p-3">
+                          <div className="rounded-[5px] bg-slate-50 p-3">
                             <span className="font-semibold text-slate-500 block text-[11px]">Email đăng nhập</span>
                             <span className="font-bold text-slate-800 mt-0.5 block">{selectedLecturer.account.email}</span>
                           </div>
-                          <div className="rounded-lg bg-slate-50 p-3">
+                          <div className="rounded-[5px] bg-slate-50 p-3">
                             <label htmlFor="edit-account-role" className="font-semibold text-slate-500 block text-[11px]">
                               {locale === "vi" ? "Vai trò" : "Role"}
                             </label>
@@ -1529,7 +1529,7 @@ export default function LecturersPage() {
                               value={grantRole}
                               disabled={isDetailBusy}
                               onChange={(event) => setGrantRole(event.target.value)}
-                              className="mt-1 h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:cursor-not-allowed disabled:bg-slate-100"
+                              className="mt-1 h-8 w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:cursor-not-allowed disabled:bg-slate-100"
                             >
                               <option value="LECTURER">{locale === "vi" ? "Giảng viên" : "Lecturer"}</option>
                               <option value="ADMIN">{locale === "vi" ? "Quản trị viên" : "Administrator"}</option>
@@ -1538,7 +1538,7 @@ export default function LecturersPage() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
                           <span className="font-semibold text-slate-600">Trạng thái tài khoản</span>
                           {/* Same status label as the "Trạng thái" column of the list. */}
                           <span
@@ -1569,7 +1569,7 @@ export default function LecturersPage() {
                                 if (passwordError) setPasswordError("");
                               }}
                               placeholder="Nhập mật khẩu mới"
-                              className={`h-9 w-full rounded-lg border px-3 pr-10 text-slate-800 focus:outline-none focus:ring-2 disabled:bg-slate-50 ${
+                              className={`h-9 w-full rounded-[5px] border px-3 pr-10 text-slate-800 focus:outline-none focus:ring-2 disabled:bg-slate-50 ${
                                 passwordError
                                   ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
                                   : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
@@ -1628,7 +1628,7 @@ export default function LecturersPage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <div className="rounded-lg border border-violet-200/80 bg-violet-50/40 p-4">
+                        <div className="rounded-[5px] border border-violet-200/80 bg-violet-50/40 p-4">
                           <label className="flex items-center gap-2 cursor-pointer font-bold text-violet-900">
                             <input
                               type="checkbox"
@@ -1652,7 +1652,7 @@ export default function LecturersPage() {
                                     value={grantEmail}
                                     onChange={(e) => setGrantEmail(e.target.value)}
                                     placeholder="example@ictu.edu.vn"
-                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                                    className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
                                   />
                                 </div>
                                 <div>
@@ -1666,7 +1666,7 @@ export default function LecturersPage() {
                                     value={grantPassword}
                                     onChange={(e) => setGrantPassword(e.target.value)}
                                     placeholder="Tối thiểu 8 ký tự"
-                                    className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                                    className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
                                   />
                                 </div>
                               </div>
@@ -1677,7 +1677,7 @@ export default function LecturersPage() {
                                 <select
                                   value={grantRole}
                                   onChange={(e) => setGrantRole(e.target.value)}
-                                  className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+                                  className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
                                 >
                                   <option value="LECTURER">Giảng viên</option>
                                   <option value="ADMIN">Quản trị viên</option>
@@ -1705,14 +1705,14 @@ export default function LecturersPage() {
                     type="button"
                     disabled={isDetailBusy}
                     onClick={() => setIsDetailModalOpen(false)}
-                    className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {t.common.cancel}
                   </button>
                   <button
                     type="submit"
                     disabled={isDetailBusy}
-                    className="inline-flex min-w-28 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex min-w-28 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {detailAction === "save" && (
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />

@@ -93,7 +93,7 @@ function OverrideForm({
   });
 
   return (
-    <div className="mt-2 space-y-2 rounded-lg border border-violet-200 bg-violet-50/40 p-2.5">
+    <div className="mt-2 space-y-2 rounded-[5px] border border-violet-200 bg-violet-50/40 p-2.5">
       <p className="text-[11px] font-semibold text-violet-700">{title}</p>
       <div>
         <label className="text-[10px] font-semibold text-slate-600">{vi ? "Tên đơn vị" : "Unit name"}</label>
@@ -267,7 +267,7 @@ function OverrideRow({
       )}
 
       {revoking && (
-        <div className="mt-2 space-y-2 rounded-lg border border-rose-200 bg-rose-50/40 p-2.5">
+        <div className="mt-2 space-y-2 rounded-[5px] border border-rose-200 bg-rose-50/40 p-2.5">
           <label className="text-[10px] font-semibold text-slate-600">
             {vi ? "Lý do thu hồi" : "Revoke reason"}
           </label>
@@ -327,7 +327,7 @@ function ReviewRow({
   const activeCount = item.overrides.filter((o) => o.status === "ACTIVE").length;
 
   return (
-    <li className="rounded-lg border border-slate-200 p-3" data-testid="review-item">
+    <li className="rounded-[5px] border border-slate-200 p-3" data-testid="review-item">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs font-semibold text-slate-800">
@@ -419,7 +419,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   }, [refresh]);
 
   return (
-    <section className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid="aff-manual-review-card">
+    <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid="aff-manual-review-card">
       <h2 className="mb-3 text-sm font-bold text-slate-800">
         {vi ? "4. Rà soát và hiệu chỉnh thủ công" : "4. Manual review and override"}
       </h2>

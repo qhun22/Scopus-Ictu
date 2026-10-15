@@ -281,7 +281,7 @@ export default function NormalizationPage() {
               setHistoryPage(1);
             }}
             data-testid="tab-publications"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "publications"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -297,7 +297,7 @@ export default function NormalizationPage() {
             type="button"
             onClick={() => switchTab("authors")}
             data-testid="tab-authors"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "authors"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -313,7 +313,7 @@ export default function NormalizationPage() {
             type="button"
             onClick={() => switchTab("affiliations")}
             data-testid="tab-affiliations"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "affiliations"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -329,7 +329,7 @@ export default function NormalizationPage() {
             type="button"
             onClick={() => switchTab("matching")}
             data-testid="tab-matching"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
+            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
               activeTab === "matching"
                 ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
                 : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
@@ -347,7 +347,7 @@ export default function NormalizationPage() {
         <div className="tab-fade-in space-y-4">
           <AffiliationsTab locale={locale} />
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-lg border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-[5px] border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
             </svg>
@@ -371,7 +371,7 @@ export default function NormalizationPage() {
         <div className="tab-fade-in space-y-4">
           <MatchingTab locale={locale} />
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-[5px] border border-emerald-200 bg-[#ECFDF5] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -399,7 +399,7 @@ export default function NormalizationPage() {
             onRefresh={fetchImports}
           />
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-lg border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-[5px] border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
             </svg>
@@ -427,7 +427,7 @@ export default function NormalizationPage() {
             <button
               type="button"
               onClick={() => { setHistoryStatusFilter("all"); setHistoryPage(1); }}
-              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "all" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "all" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
             >
               <span className="text-xs font-medium text-slate-500">
                 {locale === "vi" ? "Tổng đợt nhập" : "Total imports"}
@@ -440,7 +440,7 @@ export default function NormalizationPage() {
             <button
               type="button"
               onClick={() => { setHistoryStatusFilter(historyStatusFilter === "pending" ? "all" : "pending"); setHistoryPage(1); }}
-              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "pending" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
+              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "pending" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
             >
               <span className="text-xs font-medium text-slate-500">
                 {t.normalization.summary.pending}
@@ -453,7 +453,7 @@ export default function NormalizationPage() {
             <button
               type="button"
               onClick={() => { setHistoryStatusFilter(historyStatusFilter === "processing" ? "all" : "processing"); setHistoryPage(1); }}
-              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "processing" ? "border-blue-300 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200/80 bg-white hover:border-blue-200 hover:bg-blue-50/40"}`}
+              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "processing" ? "border-blue-300 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200/80 bg-white hover:border-blue-200 hover:bg-blue-50/40"}`}
             >
               <span className="text-xs font-medium text-[#3A5FC3]">
                 {t.normalization.summary.processing}
@@ -466,7 +466,7 @@ export default function NormalizationPage() {
             <button
               type="button"
               onClick={() => { setHistoryStatusFilter(historyStatusFilter === "completed" ? "all" : "completed"); setHistoryPage(1); }}
-              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "completed" ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200/80 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"}`}
+              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "completed" ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200/80 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"}`}
             >
               <span className="text-xs font-medium text-emerald-600">
                 {t.normalization.summary.completed}
@@ -479,7 +479,7 @@ export default function NormalizationPage() {
             <button
               type="button"
               onClick={() => { setHistoryStatusFilter(historyStatusFilter === "failed" ? "all" : "failed"); setHistoryPage(1); }}
-              className={`rounded-lg border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "failed" ? "border-rose-300 bg-rose-50 ring-2 ring-rose-200" : "border-slate-200/80 bg-white hover:border-rose-200 hover:bg-rose-50/40"}`}
+              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "failed" ? "border-rose-300 bg-rose-50 ring-2 ring-rose-200" : "border-slate-200/80 bg-white hover:border-rose-200 hover:bg-rose-50/40"}`}
             >
               <span className="text-xs font-medium text-rose-600">
                 {t.normalization.summary.failed}
@@ -501,7 +501,7 @@ export default function NormalizationPage() {
               </p>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
+            <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
@@ -527,7 +527,7 @@ export default function NormalizationPage() {
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-1.5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
@@ -557,7 +557,7 @@ export default function NormalizationPage() {
                             {/* File Name */}
                             <td className="px-4 py-3.5">
                               <div className="flex items-center gap-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100/80 bg-blue-50 text-[#3A5FC3] shrink-0 shadow-2xs">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-blue-100/80 bg-blue-50 text-[#3A5FC3] shrink-0 shadow-2xs">
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
@@ -598,7 +598,7 @@ export default function NormalizationPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenDetailModal(item)}
-                                  className="inline-flex h-7 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                                  className="inline-flex h-7 items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                                 >
                                   <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -610,7 +610,7 @@ export default function NormalizationPage() {
                                   type="button"
                                   disabled={isBusy}
                                   onClick={() => void handleNormalize(item)}
-                                  className="inline-flex h-7 min-w-32 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3 text-[11px] font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                                  className="inline-flex h-7 min-w-32 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 text-[11px] font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer disabled:opacity-50 whitespace-nowrap"
                                 >
                                   {isBusy ? (
                                     <>
@@ -647,7 +647,7 @@ export default function NormalizationPage() {
             </div>
 
             {/* Toolbar: Search input only (status filter via KPI cards) */}
-            <div className="flex flex-col gap-3 rounded-lg border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center">
               <div className="relative flex-1">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -659,13 +659,13 @@ export default function NormalizationPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t.normalization.searchPlaceholder}
-                  className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+                  className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
                 />
               </div>
             </div>
 
             {/* Simple History Table */}
-            <div className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
+            <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-600">
@@ -691,7 +691,7 @@ export default function NormalizationPage() {
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-1.5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
@@ -711,7 +711,7 @@ export default function NormalizationPage() {
                             {/* File Name */}
                             <td className="px-4 py-3.5">
                               <div className="flex items-center gap-2.5">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100/80 bg-blue-50 text-[#3A5FC3] shrink-0">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-blue-100/80 bg-blue-50 text-[#3A5FC3] shrink-0">
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
@@ -768,7 +768,7 @@ export default function NormalizationPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetailModal(item)}
-                                className="inline-flex h-7 w-20 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                                className="inline-flex h-7 w-20 items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                               >
                                 <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -800,7 +800,7 @@ export default function NormalizationPage() {
                         setHistoryPageSize(Number(e.target.value));
                         setHistoryPage(1);
                       }}
-                      className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                      className="h-7 rounded-[5px] border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
                     >
                       <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                       <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -815,7 +815,7 @@ export default function NormalizationPage() {
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentHistoryPage <= 1}
-                    className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     {locale === "vi" ? "Trang trước" : "Previous"}
                   </button>
@@ -830,14 +830,14 @@ export default function NormalizationPage() {
                       const val = Math.max(1, Math.min(historyTotalPages, parseInt(e.target.value, 10) || 1));
                       setHistoryPage(val);
                     }}
-                    className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                   <span className="text-slate-400">/ <strong className="text-slate-600">{historyTotalPages}</strong></span>
                   <button
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.min(historyTotalPages, prev + 1))}
                     disabled={currentHistoryPage >= historyTotalPages}
-                    className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     {locale === "vi" ? "Trang sau" : "Next"}
                   </button>
@@ -847,7 +847,7 @@ export default function NormalizationPage() {
           </section>
 
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-lg border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-[5px] border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
             </svg>
@@ -876,11 +876,11 @@ export default function NormalizationPage() {
               onClick={() => setDetailModalItem(null)}
             />
 
-            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-lg bg-white shadow-2xl overflow-hidden z-10 animate-in zoom-in-95 duration-150">
+            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-[5px] bg-white shadow-2xl overflow-hidden z-10 animate-in zoom-in-95 duration-150">
               {/* Modal Header */}
               <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/50">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#3A5FC3] border border-blue-100 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[5px] bg-blue-50 text-[#3A5FC3] border border-blue-100 shrink-0">
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
@@ -897,7 +897,7 @@ export default function NormalizationPage() {
                 <button
                   type="button"
                   onClick={() => setDetailModalItem(null)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+                  className="rounded-[5px] p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                   aria-label={t.common.close}
                 >
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -911,10 +911,10 @@ export default function NormalizationPage() {
                 {/* ROW 1: 2 Equal Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                   {/* CARD 1: THÔNG TIN NGUỒN */}
-                  <div className="flex flex-col rounded-lg border border-blue-100 bg-blue-50/20 p-4 shadow-2xs">
+                  <div className="flex flex-col rounded-[5px] border border-blue-100 bg-blue-50/20 p-4 shadow-2xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-blue-100/70">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                           </svg>
@@ -932,22 +932,22 @@ export default function NormalizationPage() {
 
                     {/* Stats */}
                     <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                      <div className="rounded-lg border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                      <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                         <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
                         <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.total_records)}</p>
                       </div>
-                      <div className="rounded-lg border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
+                      <div className="rounded-[5px] border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
                         <span className="text-[10px] font-medium text-emerald-600 uppercase">{locale === "vi" ? "Hợp lệ" : "Valid"}</span>
                         <p className="mt-0.5 text-base font-black text-emerald-600">{numberFormatter.format(detailModalItem.imported_records)}</p>
                       </div>
-                      <div className="rounded-lg border border-rose-200/80 bg-white p-2.5 shadow-2xs">
+                      <div className="rounded-[5px] border border-rose-200/80 bg-white p-2.5 shadow-2xs">
                         <span className="text-[10px] font-medium text-rose-600 uppercase">{locale === "vi" ? "Lỗi" : "Failed"}</span>
                         <p className="mt-0.5 text-base font-black text-rose-600">{numberFormatter.format(detailModalItem.failed_records)}</p>
                       </div>
                     </div>
 
                     {/* Info */}
-                    <div className="mt-auto space-y-1.5 rounded-lg border border-blue-100/80 bg-white/75 p-3 text-xs text-slate-600">
+                    <div className="mt-auto space-y-1.5 rounded-[5px] border border-blue-100/80 bg-white/75 p-3 text-xs text-slate-600">
                       <div className="flex justify-between gap-2">
                         <span className="text-slate-400 shrink-0">{locale === "vi" ? "Tên tệp:" : "File name:"}</span>
                         <span className="font-semibold text-slate-800 truncate text-right" title={detailModalItem.file_name}>{detailModalItem.file_name}</span>
@@ -964,10 +964,10 @@ export default function NormalizationPage() {
                   </div>
 
                   {/* CARD 2: KẾT QUẢ XỬ LÝ */}
-                  <div className="flex flex-col rounded-lg border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
+                  <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-indigo-100 text-indigo-700">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
@@ -996,39 +996,39 @@ export default function NormalizationPage() {
                     {detailModalItem.normalization ? (
                       <>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
-                          <div className="rounded-lg border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
+                          <div className="rounded-[5px] border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-emerald-700 uppercase">{t.normalization.table.newPublications}</span>
                             <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detailModalItem.normalization.canonical_new)}</p>
                           </div>
-                          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-2xs">
+                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-slate-600 uppercase">{t.normalization.table.existing}</span>
                             <p className="mt-0.5 text-base font-black text-slate-700">{numberFormatter.format(detailModalItem.normalization.canonical_existing)}</p>
                           </div>
-                          <div className="rounded-lg border border-amber-200/80 bg-white p-2.5 shadow-2xs">
+                          <div className="rounded-[5px] border border-amber-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-amber-700 uppercase">{t.normalization.table.metadataChanged}</span>
                             <p className="mt-0.5 text-base font-black text-amber-700">{numberFormatter.format(detailModalItem.normalization.canonical_metadata_changed)}</p>
                           </div>
-                          <div className="rounded-lg border border-rose-200/80 bg-white p-2.5 shadow-2xs">
+                          <div className="rounded-[5px] border border-rose-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-rose-700 uppercase">{t.normalization.table.errors}</span>
                             <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detailModalItem.normalization.canonical_failed)}</p>
                           </div>
                         </div>
 
                         {detailModalItem.normalization.canonical_intra_duplicate > 0 && (
-                          <div className="mb-2 rounded-lg border border-slate-200 bg-white p-2 text-center">
+                          <div className="mb-2 rounded-[5px] border border-slate-200 bg-white p-2 text-center">
                             <span className="text-[10px] font-medium text-slate-600">{locale === "vi" ? "Trùng EID nội tệp:" : "Intra-file Duplicates:"} </span>
                             <strong className="text-slate-800 font-bold">{numberFormatter.format(detailModalItem.normalization.canonical_intra_duplicate)}</strong>
                           </div>
                         )}
 
-                        <div className="mt-auto rounded-lg border border-slate-200/60 bg-white/75 p-2.5 text-[11px] text-slate-500">
+                        <div className="mt-auto rounded-[5px] border border-slate-200/60 bg-white/75 p-2.5 text-[11px] text-slate-500">
                           {locale === "vi"
                             ? "Dữ liệu Scopus đã được chuẩn hóa và ánh xạ vào kho công bố khoa học hợp nhất."
                             : "Scopus data has been normalized and mapped to the canonical publication store."}
                         </div>
                       </>
                     ) : (
-                      <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white/60 p-5 text-center">
+                      <div className="flex flex-1 flex-col items-center justify-center rounded-[5px] border border-dashed border-slate-200 bg-white/60 p-5 text-center">
                         <svg className="h-7 w-7 text-slate-300 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                         </svg>
@@ -1045,7 +1045,7 @@ export default function NormalizationPage() {
 
                 {/* ROW 2: Chi tiết / Lỗi */}
                 {detailModalItem.row_errors && detailModalItem.row_errors.length > 0 && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs">
+                  <div className="rounded-[5px] border border-amber-200 bg-amber-50/60 p-3 text-xs">
                     <h4 className="mb-1.5 font-bold text-amber-800">{locale === "vi" ? "Chi tiết lỗi dòng" : "Row Errors"}</h4>
                     <ul className="max-h-28 space-y-1 overflow-y-auto text-amber-900">
                       {detailModalItem.row_errors.map((rowError, idx) => (
@@ -1058,7 +1058,7 @@ export default function NormalizationPage() {
                 )}
 
                 {/* Collapsible: Technical info & Provenance */}
-                <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3">
+                <div className="rounded-[5px] border border-slate-200/80 bg-slate-50/50 p-3">
                   <button
                     type="button"
                     onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
@@ -1105,7 +1105,7 @@ export default function NormalizationPage() {
                     type="button"
                     disabled={Boolean(normalizingId)}
                     onClick={() => void handleNormalize(detailModalItem)}
-                    className="inline-flex min-w-36 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+                    className="inline-flex min-w-36 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
                   >
                     {normalizingId === detailModalItem.id ? (
                       <>
@@ -1126,7 +1126,7 @@ export default function NormalizationPage() {
                     type="button"
                     disabled={Boolean(normalizingId)}
                     onClick={() => setReNormalizeTarget(detailModalItem)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1138,7 +1138,7 @@ export default function NormalizationPage() {
                 <button
                   type="button"
                   onClick={() => setDetailModalItem(null)}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
+                  className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
                 >
                   {t.common.close}
                 </button>

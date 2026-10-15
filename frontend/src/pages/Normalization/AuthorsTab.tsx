@@ -246,7 +246,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
     <div className="space-y-5">
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-slate-500">
             {t.normalization.authorsTab.summary.pending}
           </span>
@@ -254,7 +254,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
             {formatCount(summaryCards.pending.length)}
           </p>
         </div>
-        <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-emerald-600">
             {t.normalization.authorsTab.summary.processed}
           </span>
@@ -262,7 +262,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
             {formatCount(summaryCards.completed.length)}
           </p>
         </div>
-        <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-amber-600">
             {t.normalization.authorsTab.summary.completedWithErrors}
           </span>
@@ -270,7 +270,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
             {formatCount(summaryCards.completedWithErrors.length)}
           </p>
         </div>
-        <div className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-[#3A5FC3]">
             {t.normalization.authorsTab.summary.scopusAuthors}
           </span>
@@ -292,8 +292,8 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
         </div>
 
         {pendingImports.length === 0 ? (
-          <div className="rounded-lg border border-slate-200/80 bg-white p-8 text-center shadow-xs">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 mb-2.5 border border-emerald-100">
+          <div className="rounded-[5px] border border-slate-200/80 bg-white p-8 text-center shadow-xs">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[5px] bg-emerald-50 text-emerald-600 mb-2.5 border border-emerald-100">
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
               </svg>
@@ -318,12 +318,12 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
               return (
                 <div
                   key={item.id}
-                  className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs"
+                  className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     {/* Info */}
                     <div className="flex items-start gap-3 min-w-0">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-50 text-[#3A5FC3] border border-purple-100/80 shrink-0">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-purple-50 text-[#3A5FC3] border border-purple-100/80 shrink-0">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
@@ -347,7 +347,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                           {authorStatus && authorStatus !== "NORMALIZING" && (
                             <>
                               <span>•</span>
-                              <span className={`inline-flex items-center rounded-lg border px-2 py-0.5 text-[10px] font-bold ${authorStatusColor(authorStatus)}`}>
+                              <span className={`inline-flex items-center rounded-[5px] border px-2 py-0.5 text-[10px] font-bold ${authorStatusColor(authorStatus)}`}>
                                 {authorStatusLabel(authorStatus)}
                               </span>
                             </>
@@ -363,7 +363,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                           type="button"
                           onClick={() => void handleNormalizePublication(item)}
                           disabled={isNorm}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer disabled:opacity-50"
                         >
                           {isNorm ? (
                             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-[#3A5FC3]" />
@@ -379,7 +379,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                           type="button"
                           onClick={() => void handleNormalizeAuthors(item)}
                           disabled={isAuthorNorm}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
                         >
                           {isAuthorNorm ? (
                             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -421,12 +421,12 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
               setAuthorPage(1);
             }}
             placeholder={t.normalization.authorsTab.searchPlaceholder}
-            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-xs placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+            className="w-full rounded-[5px] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-xs placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
           />
         </div>
 
         {/* Table */}
-        <div className="overflow-hidden rounded-lg border border-slate-200/80 bg-white shadow-xs">
+        <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -464,7 +464,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-1.5">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                           </svg>
@@ -503,7 +503,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                         <button
                           type="button"
                           onClick={() => void handleViewAuthorDetail(author)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                          className="inline-flex items-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
                         >
                           <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -536,7 +536,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                     setAuthorPageSize(newSize);
                     setAuthorPage(1);
                   }}
-                  className="h-6.5 rounded-lg border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                  className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
                 >
                   <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                   <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -551,7 +551,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                 type="button"
                 onClick={() => setAuthorPage((prev) => Math.max(1, prev - 1))}
                 disabled={authorPage <= 1}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {locale === "vi" ? "Trang trước" : "Previous"}
               </button>
@@ -562,7 +562,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                 type="button"
                 onClick={() => setAuthorPage((prev) => Math.min(authorTotalPages, prev + 1))}
                 disabled={authorPage >= authorTotalPages}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {locale === "vi" ? "Trang sau" : "Next"}
               </button>
@@ -575,7 +575,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
       {selectedAuthor && (
         <ModalPortal>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white shadow-2xl">
+            <div className="w-full max-w-lg rounded-[5px] border border-slate-200 bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h2 className="text-base font-bold text-slate-800">
                   {t.normalization.authorsTab.detail.title}
@@ -583,7 +583,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                 <button
                   type="button"
                   onClick={() => setSelectedAuthor(null)}
-                  className="inline-flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-[5px] p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -618,7 +618,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                   ) : (
                     <div className="space-y-1.5">
                       {selectedAuthor.variants.map((v) => (
-                        <div key={v.id} className="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                        <div key={v.id} className="flex items-start gap-2 rounded-[5px] border border-slate-100 bg-slate-50 px-3 py-2">
                           <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
                             v.variant_type === "AUTHOR_FULL_NAME"
                               ? "bg-blue-50 text-blue-600 border border-blue-200"
@@ -650,7 +650,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                 <button
                   type="button"
                   onClick={() => setSelectedAuthor(null)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
                 >
                   {t.common.close}
                 </button>

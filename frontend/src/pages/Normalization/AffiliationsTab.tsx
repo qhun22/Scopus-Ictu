@@ -102,7 +102,7 @@ const statusOf = (key: string, locale: Locale) => STATUS_LABEL[key.split("/")[1]
 
 function Card({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
   return (
-    <section className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
+    <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
       <h2 className="mb-3 text-sm font-bold text-slate-800">{title}</h2>
       {children}
     </section>
@@ -282,7 +282,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
 
   return (
     <div className="space-y-4" data-testid="affiliations-tab">
-      <div className="rounded-lg border border-sky-100 bg-sky-50/70 p-3 text-xs leading-relaxed text-sky-900">
+      <div className="rounded-[5px] border border-sky-100 bg-sky-50/70 p-3 text-xs leading-relaxed text-sky-900">
         {vi
           ? "File CSV Scopus không có cột đơn vị theo từng tác giả. Bước này bổ sung đơn vị từ metadata công khai đã tải sẵn (OpenAlex, Crossref, ORCID). Hệ thống không tự kết nối mạng. Đơn vị là lời khai của nguồn ngoài, không phải xác nhận của Scopus; tác giả không đủ bằng chứng sẽ hiển thị “Chưa xác định” và không bị gán đơn vị."
           : "The Scopus CSV carries no per-author affiliation. This step adds affiliations from pre-downloaded public metadata (OpenAlex, Crossref, ORCID). The system never goes online by itself. Units are statements of external sources, not asserted by Scopus; authors without enough evidence stay “Unresolved” and get no unit."}
@@ -433,7 +433,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               )}
             </p>
             {job.status === "FAILED" && job.error_summary?.code && (
-              <p className="mt-1 rounded-lg border border-rose-200 bg-rose-50 p-2 text-rose-800" data-testid="aff-online-failure-reason">
+              <p className="mt-1 rounded-[5px] border border-rose-200 bg-rose-50 p-2 text-rose-800" data-testid="aff-online-failure-reason">
                 {ENRICHMENT_FAILURE_CODE_LABEL[job.error_summary.code]?.[locale] ?? job.error_summary.message}
               </p>
             )}
@@ -496,7 +496,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
         {preview && (
           <div className="space-y-3 text-xs text-slate-700" data-testid="aff-preview">
             {preview.blocked_reason && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 font-medium text-amber-800" data-testid="aff-blocked">
+              <p className="rounded-[5px] border border-amber-200 bg-amber-50 p-2 font-medium text-amber-800" data-testid="aff-blocked">
                 {BLOCKED_LABEL[preview.blocked_reason]?.[locale] ?? preview.blocked_reason}
               </p>
             )}
@@ -575,7 +575,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               </div>
             )}
 
-            <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <label className="flex items-start gap-2 rounded-[5px] border border-slate-200 bg-slate-50 p-2.5">
               <input
                 type="checkbox"
                 className="mt-0.5"

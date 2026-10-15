@@ -34,7 +34,7 @@ const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("vi-VN");
 
 function Card({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
   return (
-    <section className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
+    <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
       <h2 className="mb-3 text-sm font-bold text-slate-800">{title}</h2>
       {children}
     </section>
@@ -118,7 +118,7 @@ export default function MatchingTab({ locale }: { locale: Locale }) {
 
   return (
     <div className="space-y-4" data-testid="matching-tab">
-      <div className="rounded-lg border border-sky-100 bg-sky-50/70 p-3 text-xs leading-relaxed text-sky-900">
+      <div className="rounded-[5px] border border-sky-100 bg-sky-50/70 p-3 text-xs leading-relaxed text-sky-900">
         {vi
           ? "Nạp Craw chỉ bổ sung bằng chứng công bố cho giảng viên đã có hồ sơ (qua URL hồ sơ ICTU). Sinh ứng viên chạy đối sánh theo tên VÀ tìm thêm ứng viên từ Craw khi công bố đã biết của giảng viên trùng DOI/tiêu đề với 1 Scopus Author ở đúng vị trí tác giả CÓ tương quan tên — không bao giờ gán hàng loạt cho mọi tác giả trên một công bố nhiều người viết. Mọi ứng viên vẫn ở trạng thái chờ REVIEWER duyệt."
           : "Craw ingestion only adds publication evidence for lecturers who already have a profile (via ICTU profile URL). Candidate generation runs name matching AND finds additional Craw-assisted candidates when a lecturer's known publication matches a Scopus publication by DOI/title at an author position that also has name correspondence — never assigning every author on a multi-author paper. Every candidate still waits for REVIEWER approval."}
@@ -143,7 +143,7 @@ export default function MatchingTab({ locale }: { locale: Locale }) {
         {preview && (
           <div className="space-y-3 text-xs text-slate-700" data-testid="craw-preview">
             {preview.blocked_reason && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 font-medium text-amber-800" data-testid="craw-blocked">
+              <p className="rounded-[5px] border border-amber-200 bg-amber-50 p-2 font-medium text-amber-800" data-testid="craw-blocked">
                 {BLOCKED_LABEL[preview.blocked_reason]?.[locale] ?? preview.blocked_reason}
               </p>
             )}
@@ -165,7 +165,7 @@ export default function MatchingTab({ locale }: { locale: Locale }) {
               </ul>
             )}
 
-            <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+            <label className="flex items-start gap-2 rounded-[5px] border border-slate-200 bg-slate-50 p-2.5">
               <input
                 type="checkbox"
                 className="mt-0.5"
