@@ -989,15 +989,20 @@ export default function ImportsPage() {
   // KPI Calculations — must include the in-progress lecturer preview row
   // (tableHistory), not just confirmed server-side history, otherwise the
   // "Total Imports" card undercounts by 1 while a JSON preview is pending.
+  // A row awaiting user confirmation (isAwaitingConfirmation) must count as
+  // "Processing", not "Success" — it has STAGED status but the user hasn't
+  // clicked "Confirm import" yet, so nothing has actually been imported.
   const countTotal = tableHistory.length;
   const countWarning = tableHistory.filter((item) => isWarningStatus(item)).length;
   const countSuccess = tableHistory.filter(
     (item) =>
       (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
+      !isAwaitingConfirmation(item) &&
       !isWarningStatus(item),
   ).length;
-  const countProcessing = tableHistory.filter((item) =>
-    ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status),
+  const countProcessing = tableHistory.filter(
+    (item) =>
+      ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item),
   ).length;
   const countFailed = tableHistory.filter(
     (item) => item.status === "FAILED" || item.status === "CANCELLED",
@@ -1016,11 +1021,13 @@ export default function ImportsPage() {
     if (statusFilter === "COMPLETED") {
       matchesStatus =
         (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
+        !isAwaitingConfirmation(item) &&
         !isWarningStatus(item);
     } else if (statusFilter === "WARNING") {
       matchesStatus = isWarningStatus(item);
     } else if (statusFilter === "PROCESSING") {
-      matchesStatus = ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status);
+      matchesStatus =
+        ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item);
     } else if (statusFilter === "FAILED") {
       matchesStatus = item.status === "FAILED" || item.status === "CANCELLED";
     }
