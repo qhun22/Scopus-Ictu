@@ -1179,7 +1179,7 @@ export default function ImportsPage() {
       {/* Import Boxes Grid: 1 row, 2 boxes (1:1 ratio) - Left: Scopus CSV, Right: Lecturer JSON */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-stretch">
         {/* Left Box: Tải tệp Scopus */}
-        <section className="flex flex-col h-full rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
+        <section className="flex flex-col h-full rounded-lg border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
           <div className="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1213,13 +1213,13 @@ export default function ImportsPage() {
                 setDragging(false);
                 selectFile(event.dataTransfer.files[0]);
               }}
-              className={`mt-4 group flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
+              className={`mt-4 group flex flex-1 min-h-44 flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
                 dragging
                   ? "border-[#3A5FC3] bg-[#3A5FC3]/10 scale-[0.99]"
                   : "border-slate-200 hover:border-[#3A5FC3]/60 bg-slate-50/40 hover:bg-[#3A5FC3]/5"
               } ${uploading ? "cursor-not-allowed opacity-60" : ""}`}
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3A5FC3]/10 text-[#3A5FC3] mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3] mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4v16m8-8H4" />
                 </svg>
@@ -1236,10 +1236,10 @@ export default function ImportsPage() {
               </p>
             </div>
           ) : (
-            <div className={`mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all duration-300 ease-out ${isScopusFileExiting ? "opacity-0 scale-[0.97] -translate-y-1" : "opacity-100 scale-100 translate-y-0 animate-in fade-in slide-in-from-top-2 duration-300"}`}>
+            <div className={`mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-lg border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all duration-300 ease-out ${isScopusFileExiting ? "opacity-0 scale-[0.97] -translate-y-1" : "opacity-100 scale-100 translate-y-0 animate-in fade-in slide-in-from-top-2 duration-300"}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100/80 text-[#3A5FC3] shrink-0">
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -1366,7 +1366,7 @@ export default function ImportsPage() {
           { label: locale === "vi" ? "Lỗi" : "Errors", value: pendingImport.failed_records, color: "text-rose-600", bg: "bg-rose-50/60", border: "border-rose-100", delay: "delay-[250ms]" },
         ];
         return (
-        <section className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm animate-in fade-in slide-in-from-bottom-3 duration-300">
+        <section className="rounded-lg border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm animate-in fade-in slide-in-from-bottom-3 duration-300">
           <div className="flex items-center gap-2.5 min-w-0 pb-3 border-b border-slate-100">
             <div className={`flex h-7 w-7 items-center justify-center rounded-lg shrink-0 ${isFailed ? "bg-rose-50 text-rose-600" : isActive ? "bg-blue-50 text-[#3A5FC3]" : "bg-emerald-50 text-emerald-600"}`}>
               {isActive ? (
@@ -1464,7 +1464,7 @@ export default function ImportsPage() {
           { label: locale === "vi" ? "Cảnh báo" : "Warnings", value: summary.conflicts, color: "text-rose-600", bg: "bg-rose-50/60", border: "border-rose-100", delay: "delay-[250ms]" },
         ];
         return (
-        <section className="rounded-xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm animate-in fade-in slide-in-from-bottom-3 duration-300">
+        <section className="rounded-lg border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm animate-in fade-in slide-in-from-bottom-3 duration-300">
           <div className="flex items-center gap-2.5 min-w-0 pb-3 border-b border-slate-100">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 shrink-0">
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1652,7 +1652,7 @@ export default function ImportsPage() {
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
@@ -1727,7 +1727,7 @@ export default function ImportsPage() {
                         <button
                           type="button"
                           onClick={() => openDetail(item)}
-                          className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                          className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                         >
                           <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1740,7 +1740,7 @@ export default function ImportsPage() {
                             type="button"
                             onClick={() => handleOpenRestoreModal(item)}
                             title={locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-blue-200 bg-blue-50/80 px-2 text-[11px] font-semibold text-[#3A5FC3] shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-blue-100 cursor-pointer whitespace-nowrap"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50/80 px-2 text-[11px] font-semibold text-[#3A5FC3] shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-blue-100 cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1753,7 +1753,7 @@ export default function ImportsPage() {
                             onClick={() => handleDeleteIntent(item)}
                             disabled={ACTIVE_STATUSES.includes(item.status)}
                             title={locale === "vi" ? "Xóa đợt nhập" : "Delete import"}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1784,7 +1784,7 @@ export default function ImportsPage() {
                 value={pageSize}
                 disabled={isPageLoading}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
+                className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
               >
                 <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                 <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -1799,7 +1799,7 @@ export default function ImportsPage() {
               type="button"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage <= 1 || isPageLoading}
-              className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
             >
               {t.imports.previousPage}
             </button>
@@ -1815,14 +1815,14 @@ export default function ImportsPage() {
                 const val = Math.max(1, Math.min(totalPages, parseInt(e.target.value, 10) || 1));
                 handlePageChange(val);
               }}
-              className="h-8 w-14 rounded-md border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             <span className="text-slate-400">/ <strong className="text-slate-600">{totalPages}</strong></span>
             <button
               type="button"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= totalPages || isPageLoading}
-              className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
             >
               {t.imports.nextPage}
             </button>
@@ -1840,7 +1840,7 @@ export default function ImportsPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="import-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div className="flex items-center gap-2.5">
@@ -1876,23 +1876,23 @@ export default function ImportsPage() {
                   <div className="space-y-4">
                     {/* Summary Stats for Lecturer JSON Import */}
                     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 text-center shadow-2xs">
+                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-slate-500">{t.lecturerImport.totalRecords}</span>
                         <p className="mt-0.5 text-lg font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
                       </div>
-                      <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 text-center shadow-2xs">
+                      <div className="rounded-lg border border-emerald-200/80 bg-emerald-50/40 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-emerald-600">{t.lecturerImport.created}</span>
                         <p className="mt-0.5 text-lg font-black text-emerald-600">
                           {numberFormatter.format(detail.lecturer_summary?.created ?? detail.imported_records)}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-amber-200/80 bg-amber-50/40 p-3 text-center shadow-2xs">
+                      <div className="rounded-lg border border-amber-200/80 bg-amber-50/40 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-amber-600">{t.lecturerImport.updated}</span>
                         <p className="mt-0.5 text-lg font-black text-amber-600">
                           {numberFormatter.format(detail.lecturer_summary?.updated ?? 0)}
                         </p>
                       </div>
-                      <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3 text-center shadow-2xs">
+                      <div className="rounded-lg border border-slate-200/80 bg-slate-50/50 p-3 text-center shadow-2xs">
                         <span className="text-[11px] font-medium text-slate-500">{t.lecturerImport.unchanged}</span>
                         <p className="mt-0.5 text-lg font-black text-slate-700">
                           {numberFormatter.format(detail.lecturer_summary?.unchanged ?? 0)}
@@ -1935,7 +1935,7 @@ export default function ImportsPage() {
                     {/* ROW 1: Two equal cards side-by-side on desktop, stacked on mobile */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
                       {/* CARD 1: TIẾP NHẬN NGUỒN */}
-                      <div className="flex flex-col rounded-xl border border-blue-100 bg-blue-50/20 p-4 shadow-2xs">
+                      <div className="flex flex-col rounded-lg border border-blue-100 bg-blue-50/20 p-4 shadow-2xs">
                         <div className="flex items-center justify-between pb-3 mb-3 border-b border-blue-100/70">
                           <div className="flex items-center gap-2">
                             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
@@ -2001,7 +2001,7 @@ export default function ImportsPage() {
                       {/* CARD 2: CHUẨN HÓA DỮ LIỆU */}
                       {/* Đợt nhập thất bại: không hiển thị phần chuẩn hóa (tránh gợi ý "Đi tới chuẩn hóa") */}
                       {detail.status !== "FAILED" && (
-                      <div className="flex flex-col rounded-xl border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
+                      <div className="flex flex-col rounded-lg border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
                         <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
                           <div className="flex items-center gap-2">
                             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
@@ -2084,7 +2084,7 @@ export default function ImportsPage() {
                     </div>
 
                     {/* ROW 2: TÌNH TRẠNG SỬ DỤNG DỮ LIỆU SPANS FULL WIDTH */}
-                    <div className="rounded-xl border border-violet-200/80 bg-violet-50/20 p-4 shadow-2xs">
+                    <div className="rounded-lg border border-violet-200/80 bg-violet-50/20 p-4 shadow-2xs">
                       <div className="flex items-center gap-2 mb-3">
                         <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
                           <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2101,7 +2101,7 @@ export default function ImportsPage() {
                         )}
                       </div>
                       <dl className="grid grid-cols-1 gap-2.5 text-xs sm:grid-cols-3">
-                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
+                        <div className="rounded-lg border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
                           <dt className="text-[11px] font-medium text-slate-500">
                             {locale === "vi" ? "Được sử dụng" : "In use"}
                           </dt>
@@ -2113,7 +2113,7 @@ export default function ImportsPage() {
                               : (locale === "vi" ? "Không" : "No")}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
+                        <div className="rounded-lg border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
                           <dt className="text-[11px] font-medium text-slate-500">
                             {locale === "vi" ? "Liên kết nguồn công bố" : "Publication source links"}
                           </dt>
@@ -2121,7 +2121,7 @@ export default function ImportsPage() {
                             {numberFormatter.format(detail.usage?.publication_source_links ?? 0)}
                           </dd>
                         </div>
-                        <div className="rounded-xl border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
+                        <div className="rounded-lg border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
                           <dt className="text-[11px] font-medium text-slate-500">
                             {locale === "vi" ? "Biến thể tên tác giả" : "Author name variants"}
                           </dt>

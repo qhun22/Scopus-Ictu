@@ -102,7 +102,7 @@ const statusOf = (key: string, locale: Locale) => STATUS_LABEL[key.split("/")[1]
 
 function Card({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
   return (
-    <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
+    <section className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
       <h2 className="mb-3 text-sm font-bold text-slate-800">{title}</h2>
       {children}
     </section>

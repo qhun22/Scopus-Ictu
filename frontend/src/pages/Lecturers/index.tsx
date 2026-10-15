@@ -847,7 +847,7 @@ export default function LecturersPage() {
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
@@ -935,7 +935,7 @@ export default function LecturersPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenDetailModal(lec)}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -945,7 +945,7 @@ export default function LecturersPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenDeleteModal(lec)}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-md border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -990,7 +990,7 @@ export default function LecturersPage() {
                     setPageSize(Number(e.target.value));
                     setPage(1);
                   }}
-                  className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                  className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
                 >
                   <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                   <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -1008,7 +1008,7 @@ export default function LecturersPage() {
                 type="button"
                 onClick={() => setPage(page - 1)}
                 disabled={isTableLoading || page <= 1}
-                className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {t.lecturers.previousPage}
               </button>
@@ -1038,14 +1038,14 @@ export default function LecturersPage() {
                     (e.target as HTMLInputElement).blur();
                   }
                 }}
-                className="h-8 w-14 rounded-md border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
               <span className="text-slate-400">/ <strong className="text-slate-600">{totalPages}</strong></span>
               <button
                 type="button"
                 onClick={() => setPage(page + 1)}
                 disabled={isTableLoading || page >= totalPages}
-                className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 {t.lecturers.nextPage}
               </button>
@@ -1064,7 +1064,7 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-lecturer-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
@@ -1102,7 +1102,7 @@ export default function LecturersPage() {
               <form onSubmit={handleAddSubmit} className="flex min-h-0 flex-1 flex-col text-xs">
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-5">
                   {addError && (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50/90 p-3 text-xs text-rose-700 font-medium">
+                    <div className="rounded-lg border border-rose-200 bg-rose-50/90 p-3 text-xs text-rose-700 font-medium">
                       {addError}
                     </div>
                   )}
@@ -1277,7 +1277,7 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="lecturer-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               <div className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
                 <h3 id="lecturer-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">

@@ -347,7 +347,7 @@ export default function NormalizationPage() {
         <div className="tab-fade-in space-y-4">
           <AffiliationsTab locale={locale} />
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-xl border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-lg border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
             </svg>
@@ -371,7 +371,7 @@ export default function NormalizationPage() {
         <div className="tab-fade-in space-y-4">
           <MatchingTab locale={locale} />
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-[#ECFDF5] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -399,7 +399,7 @@ export default function NormalizationPage() {
             onRefresh={fetchImports}
           />
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-xl border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-lg border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
             </svg>
@@ -527,7 +527,7 @@ export default function NormalizationPage() {
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-1.5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
@@ -598,7 +598,7 @@ export default function NormalizationPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenDetailModal(item)}
-                                  className="inline-flex h-7 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                                  className="inline-flex h-7 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                                 >
                                   <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -610,7 +610,7 @@ export default function NormalizationPage() {
                                   type="button"
                                   disabled={isBusy}
                                   onClick={() => void handleNormalize(item)}
-                                  className="inline-flex h-7 min-w-32 items-center justify-center gap-1.5 rounded-md bg-[#3A5FC3] px-3 text-[11px] font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                                  className="inline-flex h-7 min-w-32 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3 text-[11px] font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer disabled:opacity-50 whitespace-nowrap"
                                 >
                                   {isBusy ? (
                                     <>
@@ -691,7 +691,7 @@ export default function NormalizationPage() {
                       <tr>
                         <td colSpan={5} className="py-12 text-center text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-1.5">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                               </svg>
@@ -768,7 +768,7 @@ export default function NormalizationPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetailModal(item)}
-                                className="inline-flex h-7 w-20 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                                className="inline-flex h-7 w-20 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
                               >
                                 <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -800,7 +800,7 @@ export default function NormalizationPage() {
                         setHistoryPageSize(Number(e.target.value));
                         setHistoryPage(1);
                       }}
-                      className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                      className="h-7 rounded-lg border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
                     >
                       <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                       <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -815,7 +815,7 @@ export default function NormalizationPage() {
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentHistoryPage <= 1}
-                    className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     {locale === "vi" ? "Trang trước" : "Previous"}
                   </button>
@@ -830,14 +830,14 @@ export default function NormalizationPage() {
                       const val = Math.max(1, Math.min(historyTotalPages, parseInt(e.target.value, 10) || 1));
                       setHistoryPage(val);
                     }}
-                    className="h-8 w-14 rounded-md border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="h-8 w-14 rounded-lg border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                   <span className="text-slate-400">/ <strong className="text-slate-600">{historyTotalPages}</strong></span>
                   <button
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.min(historyTotalPages, prev + 1))}
                     disabled={currentHistoryPage >= historyTotalPages}
-                    className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className="inline-flex h-8 items-center rounded-lg border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                   >
                     {locale === "vi" ? "Trang sau" : "Next"}
                   </button>
@@ -847,7 +847,7 @@ export default function NormalizationPage() {
           </section>
 
           {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-xl border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
+          <div className="flex items-center gap-3 rounded-lg border border-[#3A5FC3]/20 bg-[#EBEFF9] px-4 py-3 text-sm">
             <svg className="h-4 w-4 shrink-0 text-[#3A5FC3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5-5 5M6 12h12" />
             </svg>
@@ -876,11 +876,11 @@ export default function NormalizationPage() {
               onClick={() => setDetailModalItem(null)}
             />
 
-            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white shadow-2xl overflow-hidden z-10 animate-in zoom-in-95 duration-150">
+            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-lg bg-white shadow-2xl overflow-hidden z-10 animate-in zoom-in-95 duration-150">
               {/* Modal Header */}
               <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/50">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#3A5FC3] border border-blue-100 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#3A5FC3] border border-blue-100 shrink-0">
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>

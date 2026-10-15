@@ -419,7 +419,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   }, [refresh]);
 
   return (
-    <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid="aff-manual-review-card">
+    <section className="rounded-lg border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid="aff-manual-review-card">
       <h2 className="mb-3 text-sm font-bold text-slate-800">
         {vi ? "4. Rà soát và hiệu chỉnh thủ công" : "4. Manual review and override"}
       </h2>
