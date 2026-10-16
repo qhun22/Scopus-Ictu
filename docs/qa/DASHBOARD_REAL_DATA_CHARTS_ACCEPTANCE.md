@@ -1,8 +1,8 @@
 # Nghiệm thu Dashboard — Biểu đồ dữ liệu thật
 
-**Ngày:** 2026-10-15
+**Ngày:** 2026-10-15 — cập nhật 2026-10-16
 **Phạm vi:** Trang Tổng quan (`/dashboard`), Trang chủ (`/home`)
-**Trạng thái tổng thể:** ✅ PASS (biểu đồ) · ⚠️ PARTIAL (Home vẫn còn placeholder "Đang phát triển" — xem mục 7)
+**Trạng thái tổng thể:** ✅ PASS (biểu đồ `/dashboard`) · ✅ PASS (`/home` không còn placeholder "Đang phát triển", xem mục 7.1) · ⚠️ PARTIAL còn lại (CSV-only riêng biệt, DB trống qua UI, REVIEWER dashboard — xem mục 7)
 
 ---
 
@@ -28,7 +28,7 @@ Chỉ có 5 KPI card (`SummaryCard`), 4 ô đếm identity status, bảng audit 
 | `/dashboard` — cơ cấu document_type | 1. Chưa triển khai dù có dữ liệu | `Publication.document_type` có sẵn — đã triển khai |
 | `/dashboard` — mức độ đầy đủ đơn vị tác giả | 2. Có component nhưng API chưa nối → nay đã nối | Dữ liệu nguồn (`publication_author_affiliation_resolutions`) đã đầy đủ từ Task 11, chỉ thiếu tầng aggregate — đã viết `get_dashboard_charts` |
 | `/dashboard` — trạng thái đối sánh (PENDING/ACCEPTED/REJECTED) | 3→ đã có sẵn, không triển khai thêm | `GET /api/v1/reviews/context` đã trả `candidates_by_status` từ trước — **không cần sửa**, đủ điều kiện cho REVIEWER dashboard nếu làm riêng (ngoài phạm vi lần này, xem mục 7) |
-| `/home` khối "Thống kê đối sánh & công bố" | 1. Chưa triển khai dù có dữ liệu | **Chưa sửa trong lần này** — xem mục 7, giới hạn phạm vi |
+| `/home` khối "Thống kê đối sánh & công bố" | 5. Thiết kế dự kiến, thay bằng shortcut tới chức năng thật | **Đã sửa 2026-10-16** — thay 2 khối CSS-giả bằng card điều hướng thật theo role, dẫn tới `/dashboard`/`/reviews`/`/my-publications` v.v. — xem mục 7.1 |
 
 ---
 
@@ -116,12 +116,26 @@ Logic đã viết (chưa kiểm thử trên DB rỗng thật trong lần này �
 
 ---
 
-## 7. Giới hạn — chưa làm trong lần này
+## 7. Giới hạn
 
-1. **`/home` khối "Thống kê đối sánh & công bố" vẫn còn placeholder CSS giả** ("Đang phát triển"/"Chưa có dữ liệu để hiển thị biểu đồ"). Phạm vi nhiệm vụ tập trung vào `/dashboard` (ADMIN) trước vì đây là nơi có đủ 5 KPI + audit log làm nền, và `/home` phục vụ cả 3 role nên cần thiết kế lại theo từng role (Phần 11) — việc này lớn hơn, để quyết định riêng.
-2. **Biểu đồ trạng thái đối sánh cho REVIEWER dashboard** (Phần 8.4) — dữ liệu đã có sẵn qua `GET /api/v1/reviews/context` (`candidates_by_status`), nhưng chưa dựng UI riêng cho REVIEWER. Đề xuất: tái dùng data này, không cần endpoint mới.
-3. **KPI bổ sung** (Phần 8.5: top nguồn xuất bản, số tác giả/bài, số giảng viên có hồ sơ nguồn...) — chưa triển khai, cần đánh giá thêm để tránh làm trang quá tải theo đúng nguyên tắc "chỉ chọn biểu đồ hữu ích, có định nghĩa rõ".
-4. Chưa test màn hình thật ở trạng thái **DB hoàn toàn trống** (Kịch bản A, Phần 13.2) — chỉ có bằng chứng ở tầng API (56 test PASS trên schema rỗng). Khuyến nghị bổ sung 1 lượt test UI trên DB trống trước khi coi mục này DONE hoàn toàn.
+### 7.1 `/home` placeholder — ĐÃ SỬA (2026-10-16)
+
+Theo rà soát nghiệm thu (phản hồi ChatGPT, mục ưu tiên cao nhất vì `/home` là trang đầu tiên cả 3 role nhìn thấy), 2 khối CSS-giả "Thống kê đối sánh & công bố" và "Hoạt động gần đây" đã được thay bằng card điều hướng thật, dẫn tới route đã tồn tại theo từng role — không xây tính năng mới:
+
+| Role | Khối "chart" dẫn tới | Khối "recent" dẫn tới |
+|---|---|---|
+| ADMIN | `/dashboard` (3 biểu đồ thật) | `/audit-logs` |
+| REVIEWER | `/reviews` (hàng đợi duyệt) | `/review-history` |
+| LECTURER | `/my-publications` | `/profile` |
+
+Đã kiểm thử qua browser thật (server test 8199/5199), tạo 2 tài khoản test mới (REVIEWER, LECTURER) để xác nhận cả 3 role — không còn "Đang phát triển"/"In development" ở bất kỳ đâu trên `/home`, cả chế độ VI và EN (test đầy đủ cho ADMIN). Commit `731fa8f`.
+
+### 7.2 Còn lại — chưa làm trong lần này
+
+1. **Biểu đồ trạng thái đối sánh cho REVIEWER dashboard** (Phần 8.4) — dữ liệu đã có sẵn qua `GET /api/v1/reviews/context` (`candidates_by_status`), nhưng chưa dựng UI biểu đồ riêng cho REVIEWER (hiện REVIEWER chỉ có shortcut dẫn tới `/reviews`, không có chart). Đề xuất: tái dùng data này, không cần endpoint mới.
+2. **KPI bổ sung** (Phần 8.5: top nguồn xuất bản, số tác giả/bài, số giảng viên có hồ sơ nguồn...) — chưa triển khai, cần đánh giá thêm để tránh làm trang quá tải theo đúng nguyên tắc "chỉ chọn biểu đồ hữu ích, có định nghĩa rõ".
+3. Chưa test màn hình thật ở trạng thái **DB hoàn toàn trống** (Kịch bản A, Phần 13.2) — chỉ có bằng chứng ở tầng API (56 test PASS trên schema rỗng). Khuyến nghị bổ sung 1 lượt test UI trên DB trống trước khi coi mục này DONE hoàn toàn.
+4. Chưa test riêng kịch bản **CSV-only** (Kịch bản B) qua browser — logic không phụ thuộc JSON nên về lý thuyết hoạt động (3 biểu đồ chỉ cần `publications`/`publication_authors`/`affiliation_resolutions`, không đụng `LecturerScopusCandidate`), nhưng chưa có ảnh chụp xác nhận trên DB CSV-only thật.
 
 ---
 
@@ -130,9 +144,10 @@ Logic đã viết (chưa kiểm thử trên DB rỗng thật trong lần này �
 | Tiêu chí nghiệm thu (Phần 16) | Trạng thái |
 |---|---|
 | Trang Tổng quan có biểu đồ hữu ích dựa trên dữ liệu thật | ✅ PASS (3 biểu đồ, `/dashboard`) |
+| Không còn placeholder "Đang phát triển" gây hiểu nhầm | ✅ PASS (`/home`, cả 3 role, VI+EN đã test — mục 7.1) |
 | CSV-only vẫn hiển thị thống kê công bố/tác giả phù hợp | ⚠️ Chưa test riêng kịch bản CSV-only (có test CSV+JSON+Craw) — logic không phụ thuộc JSON nên về lý thuyết hoạt động, cần xác nhận thêm |
 | Số thống kê đối chiếu đúng DB | ✅ PASS (đối chiếu thủ công 660/2751/83% khớp dữ liệu quan sát) |
 | Không giả định năm hiện tại là năm lớn nhất | ✅ PASS (group-by thuần, không hardcode) |
 | Không hardcode 660/410/327 | ✅ PASS (toàn bộ qua API) |
 
-**Không tuyên bố DONE toàn bộ Phần 7-11** — chỉ phần `/dashboard` ADMIN đã hoàn thiện và kiểm thử đầy đủ.
+**Không tuyên bố DONE toàn bộ Phần 7-11** — `/dashboard` ADMIN và `/home` (3 role) đã hoàn thiện và kiểm thử; CSV-only riêng biệt, DB trống qua UI, REVIEWER dashboard chart vẫn PARTIAL.
