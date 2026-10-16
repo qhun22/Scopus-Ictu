@@ -391,6 +391,53 @@ export default function HomePage() {
     return t.home.recentTitleLecturer;
   };
 
+  // Role-aware shortcuts replacing the old "chart coming soon" / "recent
+  // activity coming soon" placeholders — each links to a real, already
+  // built screen instead of faking data that doesn't exist here.
+  const chartShortcut =
+    role === "ADMIN"
+      ? {
+          to: "/dashboard",
+          sectionSubtitle: t.home.chartShortcutSectionSubtitleAdmin,
+          label: t.home.chartShortcutLabelAdmin,
+          sublabel: t.home.chartShortcutSublabelAdmin,
+        }
+      : role === "REVIEWER"
+        ? {
+            to: "/reviews",
+            sectionSubtitle: t.home.chartShortcutSectionSubtitleReviewer,
+            label: t.home.chartShortcutLabelReviewer,
+            sublabel: t.home.chartShortcutSublabelReviewer,
+          }
+        : {
+            to: "/my-publications",
+            sectionSubtitle: t.home.chartShortcutSectionSubtitleLecturer,
+            label: t.home.chartShortcutLabelLecturer,
+            sublabel: t.home.chartShortcutSublabelLecturer,
+          };
+
+  const recentShortcut =
+    role === "ADMIN"
+      ? {
+          to: "/audit-logs",
+          sectionSubtitle: t.home.recentShortcutSectionSubtitleAdmin,
+          label: t.home.recentShortcutLabelAdmin,
+          sublabel: t.home.recentShortcutSublabelAdmin,
+        }
+      : role === "REVIEWER"
+        ? {
+            to: "/review-history",
+            sectionSubtitle: t.home.recentShortcutSectionSubtitleReviewer,
+            label: t.home.recentShortcutLabelReviewer,
+            sublabel: t.home.recentShortcutSublabelReviewer,
+          }
+        : {
+            to: "/profile",
+            sectionSubtitle: t.home.recentShortcutSectionSubtitleLecturer,
+            label: t.home.recentShortcutLabelLecturer,
+            sublabel: t.home.recentShortcutSublabelLecturer,
+          };
+
   return (
     <div className="app-page-container space-y-4 sm:space-y-5">
       {/* ====================================================================== */}
@@ -521,86 +568,73 @@ export default function HomePage() {
         {/* Visual Summary / Small Chart Container */}
         <div className="flex flex-col justify-between rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
           <div>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800 sm:text-base">
-                {getChartTitle()}
-              </h3>
-              <span className="text-[10px] font-medium text-slate-400">
-                {t.home.chartPeriodicSync}
-              </span>
-            </div>
+            <h3 className="text-sm font-bold text-slate-800 sm:text-base">
+              {getChartTitle()}
+            </h3>
             <p className="mt-0.5 text-[11px] text-slate-500">
-              {t.home.chartSubtitle}
+              {chartShortcut.sectionSubtitle}
             </p>
           </div>
 
-          {/* Academic Chart Skeleton Frame & Empty State */}
-          <div className="relative my-4 flex h-36 flex-col items-center justify-center rounded-[5px] border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
-            {/* Background grid skeleton lines */}
-            <div className="pointer-events-none absolute inset-x-4 top-4 bottom-4 flex flex-col justify-between opacity-30" aria-hidden="true">
-              <div className="border-b border-slate-300 w-full" />
-              <div className="border-b border-slate-300 w-full" />
-              <div className="border-b border-slate-300 w-full" />
+          {/* Role-aware shortcut to the real statistics/workflow screen */}
+          <Link
+            to={chartShortcut.to}
+            className="group relative my-4 flex h-36 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-slate-200/80 bg-[#EBEFF9]/40 p-4 text-center transition-colors hover:bg-[#EBEFF9]/70 hover:border-[#3A5FC3]/30"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#3A5FC3] shadow-xs border border-[#3A5FC3]/20 transition-transform group-hover:scale-105">
+              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
             </div>
-
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 shadow-xs border border-slate-200">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <p className="mt-2 text-xs font-semibold text-slate-700">
-                {t.home.chartEmpty}
-              </p>
-              <p className="mt-0.5 max-w-xs text-[10px] text-slate-400">
-                {t.home.chartEmptySub}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2.5">
-            <span>{t.home.chartSource}</span>
-            <span>{t.home.chartStatusReady}</span>
-          </div>
+            <p className="text-xs font-semibold text-slate-800">
+              {chartShortcut.label}
+            </p>
+            <p className="max-w-xs text-[10px] text-slate-500">
+              {chartShortcut.sublabel}
+            </p>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#3A5FC3]">
+              {t.common.viewDetails}
+              <svg className="h-3 w-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </span>
+          </Link>
         </div>
 
         {/* Recent Information Container */}
         <div className="flex flex-col justify-between rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
           <div>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800 sm:text-base">
-                {getRecentTitle()}
-              </h3>
-              <span className="text-[10px] font-medium text-slate-400">
-                {t.home.recentRealtime}
-              </span>
-            </div>
+            <h3 className="text-sm font-bold text-slate-800 sm:text-base">
+              {getRecentTitle()}
+            </h3>
             <p className="mt-0.5 text-[11px] text-slate-500">
-              {t.home.recentSubtitle}
+              {recentShortcut.sectionSubtitle}
             </p>
           </div>
 
-          {/* Empty State Box */}
-          <div className="my-4 flex h-36 flex-col items-center justify-center rounded-[5px] border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 shadow-xs border border-slate-200">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* Role-aware shortcut to the real history/profile screen */}
+          <Link
+            to={recentShortcut.to}
+            className="group my-4 flex h-36 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-slate-200/80 bg-[#EBEFF9]/40 p-4 text-center transition-colors hover:bg-[#EBEFF9]/70 hover:border-[#3A5FC3]/30"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#3A5FC3] shadow-xs border border-[#3A5FC3]/20 transition-transform group-hover:scale-105">
+              <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </div>
-            <p className="mt-2 text-xs font-semibold text-slate-700">
-              {t.home.recentEmpty}
+            <p className="text-xs font-semibold text-slate-800">
+              {recentShortcut.label}
             </p>
-            <p className="mt-0.5 max-w-xs text-[10px] text-slate-400">
-              {t.home.recentEmptySub}
+            <p className="max-w-xs text-[10px] text-slate-500">
+              {recentShortcut.sublabel}
             </p>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100 pt-2.5">
-            <span>{t.home.autoUpdate}</span>
-            <Link to="/publications" className="font-medium text-[#3A5FC3] hover:underline">
-              {t.home.viewAll}
-            </Link>
-          </div>
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[#3A5FC3]">
+              {t.common.viewDetails}
+              <svg className="h-3 w-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </span>
+          </Link>
         </div>
       </section>
 
