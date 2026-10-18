@@ -8,14 +8,18 @@ An toàn:
 * Chạy lần thứ hai không nhân đôi tiến trình: cổng đang do tiến trình CỦA DEMO giữ thì dùng lại.
 * Cổng do tiến trình lạ giữ => DỪNG và báo lỗi, không kill tiến trình đó.
 * Không chứa mật khẩu/DSN: cấu hình đọc từ thư mục secrets NGOÀI Git của thư mục runtime.
-* Tự động cập nhật migration lên head nếu database demo chưa ở head của mã nguồn.
+* ``start`` KHÔNG tự migrate: nếu Alembic của database lệch head của mã nguồn thì dừng và hướng dẫn.
+* ``migrate`` là thao tác chủ đích: kiểm đúng database, chặn DB được bảo vệ, bỏ qua nếu đã ở head,
+  yêu cầu gõ đúng tên database, sao lưu trước (sao lưu lỗi => dừng), rồi mới migrate.
+* Giá trị bí mật đọc từ tệp cấu hình được che (***) trong mọi dòng in ra màn hình và nhật ký.
 
-Lệnh: ``start [--no-browser]``, ``stop [--keep-db]``, ``status``, ``migrate``.
+Lệnh: ``start [--no-browser]``, ``stop [--keep-db]``, ``status``, ``migrate [--confirm <ten_database>]``.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -39,6 +43,8 @@ PG_BIN = Path(os.environ.get("SCOPUS_DEMO_PG_BIN", r"C:\Program Files\PostgreSQL
 EXPECTED_DB = os.environ.get("SCOPUS_DEMO_DB", "scopus_ictu_app")
 PG_PORT, BACKEND_PORT, FRONTEND_PORT = 55432, 8001, 5173
 FORBIDDEN_PORTS = {5432}
+# Frozen defence-demo snapshot: its schema must never be upgraded by this launcher.
+MIGRATION_PROTECTED_DBS = frozenset({"scopus_ictu_demo_teacher_20261014"})
 WEB_URL = f"http://127.0.0.1:{FRONTEND_PORT}"
 
 _DETACHED = 0x00000008 | 0x00000200 | 0x08000000  # DETACHED_PROCESS | NEW_PROCESS_GROUP | NO_WINDOW
@@ -84,6 +90,27 @@ def validate_config(values: dict[str, str], expected_db: str = EXPECTED_DB) -> l
     return errors
 
 
+def needs_migration(current: str, heads: list[str]) -> bool:
+    return [current] != list(heads)
+
+
+def migration_block_reason(db_name: str) -> str | None:
+    if db_name in MIGRATION_PROTECTED_DBS:
+        return f"Database {db_name} duoc bao ve (ban dong bang) - khong duoc migrate."
+    return None
+
+
+def confirmation_matches(typed: str | None, db_name: str) -> bool:
+    """The operator must type the exact target database name (no prefix / case folding)."""
+    return (typed or "").strip() == db_name
+
+
+def redact(text: str, secrets: set[str]) -> str:
+    for value in sorted((v for v in secrets if v and len(v) >= 4), key=len, reverse=True):
+        text = text.replace(value, "***")
+    return text
+
+
 def descends_from(pid: int, root_pid: int, table: dict[int, int]) -> bool:
     """pid có phải root_pid hoặc hậu duệ của nó (pid -> ppid)."""
     seen = set()
@@ -103,14 +130,17 @@ def port_owner(listener_pid: int | None, owned_root_pids: list[int], table: dict
 
 
 # ----------------------------------------------------------------------------- hệ thống
+_SECRETS: set[str] = set()  # values read from the env file; never printed or logged
+
+
 def log(message: str) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     with (LOG_DIR / "launcher.log").open("a", encoding="utf-8") as fh:
-        fh.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {message}\n")
+        fh.write(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {redact(message, _SECRETS)}\n")
 
 
 def say(tag: str, message: str) -> None:
-    print(f"[{tag}] {message}", flush=True)
+    print(f"[{tag}] {redact(message, _SECRETS)}", flush=True)
     log(f"{tag} {message}")
 
 
@@ -160,11 +190,14 @@ def http_status(url: str, timeout: float = 3.0) -> int:
         return 0
 
 
-def wait_for(url: str, ok: set[int], seconds: int) -> bool:
+def wait_for(url: str, ok: set[int], seconds: int, stopped=None) -> bool:
+    """Poll url; give up early when ``stopped()`` reports that the process we started has exited."""
     deadline = time.time() + seconds
     while time.time() < deadline:
         if http_status(url) in ok:
             return True
+        if stopped is not None and stopped():
+            return False
         time.sleep(1)
     return False
 
@@ -184,6 +217,7 @@ def check_environment() -> dict[str, str]:
     if not shutil.which("node"):
         raise LauncherError("Khong tim thay Node.js (lenh 'node') trong PATH")
     values = read_env_file(ENV_FILE)
+    _SECRETS.update(values[k] for k in ("DB_PASSWORD", "SECRET_KEY") if values.get(k))
     errors = validate_config(values)
     if errors:
         raise LauncherError("Cau hinh demo khong hop le: " + "; ".join(errors))
@@ -220,6 +254,32 @@ def backend_env(values: dict[str, str]) -> dict[str, str]:
     return env
 
 
+def backup_database(values: dict[str, str]) -> Path:
+    backup_dir = RUNTIME / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    out = backup_dir / f"{values['DB_NAME']}_pre_migrate_{datetime.now().strftime('%Y%m%d_%H%M%S')}.dump"
+    env = dict(os.environ)
+    env["PGPASSWORD"] = values["DB_PASSWORD"]  # via environment only, never on the command line
+    say("..", f"Sao luu truoc khi migrate: {out.name} ...")
+    try:
+        res = subprocess.run(
+            [str(PG_BIN / "pg_dump.exe"), "-h", "127.0.0.1", "-p", str(PG_PORT), "-U", values["DB_USER"],
+             "-d", values["DB_NAME"], "-Fc", "--no-password", "-f", str(out)],
+            env=env, capture_output=True,
+        )
+    except OSError as exc:
+        out.unlink(missing_ok=True)
+        raise LauncherError(f"Khong chay duoc pg_dump ({type(exc).__name__}) - KHONG migrate.") from exc
+    if res.returncode != 0 or not out.exists() or out.stat().st_size == 0:
+        out.unlink(missing_ok=True)
+        raise LauncherError(f"Sao luu that bai (ma loi {res.returncode}) - KHONG migrate.")
+    digest = hashlib.sha256(out.read_bytes()).hexdigest()
+    out.with_name(out.name + ".sha256").write_bytes(f"{digest} *{out.name}\n".encode("ascii"))
+    say("OK", f"Da sao luu: {out} (sha256 {digest[:12]}...)")
+    say("CHU Y", "Ban sao luu DA TAO nhung CHUA kiem chung restore. Can thu restore ra DB rieng neu muon dung ban sao luu nay.")
+    return out
+
+
 def run_migration(values: dict[str, str]) -> None:
     env = backend_env(values)
     say("..", f"Dang chay Alembic upgrade head cho {values['DB_NAME']} ...")
@@ -236,43 +296,49 @@ def run_migration(values: dict[str, str]) -> None:
     say("OK", "Alembic upgrade head thanh cong.")
 
 
-def check_database(values: dict[str, str]) -> None:
+def query_database(values: dict[str, str]) -> tuple[str, int, str, str, int]:
+    """(database, port, address, alembic revision, lecturers) as reported by the server itself."""
     import psycopg2  # noqa: PLC0415 - chỉ cần khi khởi động
 
-    def _query_db() -> tuple[str, int, str, str, int]:
-        try:
-            conn = psycopg2.connect(host="127.0.0.1", port=PG_PORT, dbname=values["DB_NAME"], user=values["DB_USER"],
-                                    password=values["DB_PASSWORD"], sslmode="disable", connect_timeout=8)
-        except Exception as exc:
-            raise LauncherError(f"Khong ket noi duoc database demo: {type(exc).__name__}") from exc
-        try:
-            cur = conn.cursor()
-            cur.execute("select current_database(), inet_server_port(), host(inet_server_addr())")
-            db, port, addr = cur.fetchone()
-            if (db, port) != (values["DB_NAME"], PG_PORT) or addr not in ("127.0.0.1", "::1"):
-                raise LauncherError(f"May chu bao database/cong khac mong doi: {db}/{port}/{addr}")
-            cur.execute("select version_num from alembic_version")
-            row = cur.fetchone()
-            current = row[0] if row else ""
-            cur.execute("select count(*) from lecturers")
-            lecturers = cur.fetchone()[0]
-            return db, port, addr, current, lecturers
-        finally:
-            conn.close()
+    try:
+        conn = psycopg2.connect(host="127.0.0.1", port=PG_PORT, dbname=values["DB_NAME"], user=values["DB_USER"],
+                                password=values["DB_PASSWORD"], sslmode="disable", connect_timeout=8)
+    except Exception as exc:
+        raise LauncherError(f"Khong ket noi duoc database demo: {type(exc).__name__}") from exc
+    try:
+        cur = conn.cursor()
+        cur.execute("select current_database(), inet_server_port(), host(inet_server_addr())")
+        db, port, addr = cur.fetchone()
+        if (db, port) != (values["DB_NAME"], PG_PORT) or addr not in ("127.0.0.1", "::1"):
+            raise LauncherError(f"May chu bao database/cong khac mong doi: {db}/{port}/{addr}")
+        cur.execute("select version_num from alembic_version")
+        row = cur.fetchone()
+        current = row[0] if row else ""
+        cur.execute("select count(*) from lecturers")
+        lecturers = cur.fetchone()[0]
+        return db, port, addr, current, lecturers
+    finally:
+        conn.close()
 
-    db, port, addr, current, lecturers = _query_db()
+
+def alembic_heads() -> list[str]:
     from alembic.config import Config  # noqa: PLC0415
     from alembic.script import ScriptDirectory  # noqa: PLC0415
 
     cfg = Config(str(REPO / "backend" / "alembic.ini"))
     cfg.set_main_option("script_location", str(REPO / "backend" / "alembic"))
-    heads = ScriptDirectory.from_config(cfg).get_heads()
-    if [current] != heads:
-        say("CHU Y", f"Alembic cua database {db} la {current} nhung ma nguon can {heads}. Tien hanh cap nhat migration...")
-        run_migration(values)
-        db, port, addr, current, lecturers = _query_db()
-        if [current] != heads:
-            raise LauncherError(f"Sau khi migrate, alembic cua database van la {current} (mong doi: {heads}).")
+    return list(ScriptDirectory.from_config(cfg).get_heads())
+
+
+def check_database(values: dict[str, str]) -> None:
+    """START check: right database and schema revision; never migrates."""
+    db, port, addr, current, lecturers = query_database(values)
+    heads = alembic_heads()
+    if needs_migration(current, heads):
+        raise LauncherError(
+            f"Alembic cua database {db} la {current} nhung ma nguon can {heads}. "
+            "Khong tu migrate khi khoi dong. Neu chac chan, chay: scopus-ictu-qhun22.bat migrate (se sao luu truoc)."
+        )
     say("OK", f"Database dung: {db} @ {addr}:{port}, Alembic head {current}, {lecturers} ho so giang vien.")
 
 
@@ -285,6 +351,7 @@ def service_state(name: str, port: int) -> tuple[str, int | None]:
 
 def ensure_backend(values: dict[str, str]) -> None:
     state, pid = service_state("backend", BACKEND_PORT)
+    stopped = None  # set only when this run starts the process
     if state == "foreign":
         raise LauncherError(f"Cong backend {BACKEND_PORT} dang duoc tien trinh khac (PID {pid}) su dung. Khong tu dong dung.")
     if state == "ours":
@@ -301,13 +368,17 @@ def ensure_backend(values: dict[str, str]) -> None:
             proc = subprocess.Popen([str(VENV_PYTHON), "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(BACKEND_PORT)],
                                     cwd=REPO / "backend", env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, creationflags=_DETACHED)
         pidfile("backend").write_text(str(proc.pid))
-    if not wait_for(f"http://127.0.0.1:{BACKEND_PORT}/health", {200}, 60):
+        stopped = lambda: proc.poll() is not None  # noqa: E731
+    if not wait_for(f"http://127.0.0.1:{BACKEND_PORT}/health", {200}, 60, stopped):
+        if stopped is not None and stopped():
+            raise LauncherError(f"Tien trinh Backend da dung (ma thoat {proc.returncode}) truoc khi san sang. Xem {LOG_DIR / 'backend.log'}")
         raise LauncherError(f"Backend khong tra loi /health trong 60 giay. Xem {LOG_DIR / 'backend.log'}")
     say("OK", f"Backend san sang: http://127.0.0.1:{BACKEND_PORT}/docs (nguon: {REPO / 'backend'}).")
 
 
 def ensure_frontend() -> None:
     state, pid = service_state("frontend", FRONTEND_PORT)
+    stopped = None  # set only when this run starts the process
     if state == "foreign":
         raise LauncherError(f"Cong frontend {FRONTEND_PORT} dang duoc tien trinh khac (PID {pid}) su dung. Khong tu dong dung.")
     if state == "ours":
@@ -321,7 +392,10 @@ def ensure_frontend() -> None:
                                      "--host", "127.0.0.1", "--port", str(FRONTEND_PORT), "--strictPort"],
                                     cwd=REPO / "frontend", env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, creationflags=_DETACHED)
         pidfile("frontend").write_text(str(proc.pid))
-    if not wait_for(WEB_URL + "/", {200}, 60):
+        stopped = lambda: proc.poll() is not None  # noqa: E731
+    if not wait_for(WEB_URL + "/", {200}, 60, stopped):
+        if stopped is not None and stopped():
+            raise LauncherError(f"Tien trinh Frontend da dung (ma thoat {proc.returncode}) truoc khi san sang. Xem {LOG_DIR / 'frontend.log'}")
         raise LauncherError(f"Frontend khong tra loi trong 60 giay. Xem {LOG_DIR / 'frontend.log'}")
     if http_status(f"{WEB_URL}/api/v1/auth/me") not in (200, 401):
         raise LauncherError("Frontend chay nhung khong chuyen tiep duoc /api sang Backend (proxy).")
@@ -396,13 +470,29 @@ def cmd_status(_args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_migrate(_args: argparse.Namespace) -> int:
+def cmd_migrate(args: argparse.Namespace) -> int:
     try:
         say("..", f"Ma nguon: {REPO}")
-        values = check_environment()
+        values = check_environment()  # DB_HOST/DB_PORT/DB_NAME validated against the demo setup
+        reason = migration_block_reason(values["DB_NAME"])
+        if reason:
+            raise LauncherError(reason)
         ensure_postgres()
+        db, port, addr, current, _lecturers = query_database(values)  # server-reported target
+        heads = alembic_heads()
+        if not needs_migration(current, heads):
+            say("OK", f"Database {db} @ {addr}:{port} da o Alembic head {current}. Khong sao luu, khong migrate.")
+            return 0
+        say("CHU Y", f"Se nang cap schema: database {db} @ {addr}:{port}, Alembic {current or '(trong)'} -> {heads}.")
+        typed = args.confirm if getattr(args, "confirm", None) is not None else input(f"Go dung ten database ({db}) de xac nhan: ")
+        if not confirmation_matches(typed, db):
+            raise LauncherError("Ten database xac nhan khong khop - huy migrate, khong thay doi gi.")
+        backup_database(values)
         run_migration(values)
-        check_database(values)
+        db, port, addr, current, _lecturers = query_database(values)
+        if needs_migration(current, heads):
+            raise LauncherError(f"Sau khi migrate, alembic cua database van la {current} (mong doi: {heads}).")
+        say("OK", f"Database {db} da o Alembic head {current}.")
         return 0
     except LauncherError as exc:
         say("LOI", str(exc))
@@ -420,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
     stop.set_defaults(func=cmd_stop)
     sub.add_parser("status").set_defaults(func=cmd_status)
     migrate = sub.add_parser("migrate")
+    migrate.add_argument("--confirm", metavar="TEN_DATABASE", help="xac nhan khong tuong tac (phai dung ten database)")
     migrate.set_defaults(func=cmd_migrate)
     args = parser.parse_args(argv)
     return args.func(args)
