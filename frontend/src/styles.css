@@ -78,7 +78,8 @@ body {
 
 @media (min-width: 640px) {
   .page-action-group {
-    width: 320px;
+    /* 2 x 172px: fits the Figma md button (13px, px-16) labels with an icon, e.g. "Thêm tệp Scopus" */
+    width: 352px;
     flex-shrink: 0;
   }
 }
