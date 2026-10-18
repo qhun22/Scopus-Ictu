@@ -17,47 +17,6 @@
       "env": {
         "VITE_API_PROXY_TARGET": "http://127.0.0.1:8199"
       }
-    },
-    {
-      "name": "csvonly-backend",
-      "runtimeExecutable": "D:\\DataFolder\\ProjectIctu\\DoAn\\_venv_backend_demo_py312\\Scripts\\python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8299"],
-      "cwd": "D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\backend",
-      "port": 8299,
-      "env": {
-        "DB_NAME": "scopus_ictu_test_csvonly_20261011",
-        "AFFILIATION_ONLINE_CACHE_DIR": "D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\backend\\.tmp_csvonly_affiliation_cache"
-      }
-    },
-    {
-      "name": "csvonly-frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5299"],
-      "cwd": "D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\frontend",
-      "port": 5299,
-      "env": {
-        "VITE_API_PROXY_TARGET": "http://127.0.0.1:8299"
-      }
-    },
-    {
-      "name": "restoreA-backend",
-      "runtimeExecutable": "D:\\DataFolder\\ProjectIctu\\DoAn\\_venv_backend_demo_py312\\Scripts\\python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8399"],
-      "cwd": "D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\backend",
-      "port": 8399,
-      "env": {
-        "DB_NAME": "scopus_ictu_test_restore_demoA_20261017"
-      }
-    },
-    {
-      "name": "restoreA-frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5399"],
-      "cwd": "D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\frontend",
-      "port": 5399,
-      "env": {
-        "VITE_API_PROXY_TARGET": "http://127.0.0.1:8399"
-      }
     }
   ]
 }
