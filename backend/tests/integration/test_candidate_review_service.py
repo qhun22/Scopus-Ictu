@@ -920,6 +920,7 @@ def test_lecturer_can_have_multiple_approved_authors(
             observation_id=obs_a.id,
             candidate_version=cand_a.version,
             reviewer_user_id=reviewer.id,
+            reason="Lecturer has two candidates; both checked",  # D-2 requires a reason here
         )
     )
     r_b = service.accept_candidate(
@@ -928,6 +929,7 @@ def test_lecturer_can_have_multiple_approved_authors(
             observation_id=obs_b.id,
             candidate_version=cand_b.version,
             reviewer_user_id=reviewer.id,
+            reason="Lecturer has two candidates; both checked",  # D-2 requires a reason here
         )
     )
 
@@ -1424,6 +1426,7 @@ def test_concurrent_accept_same_author_has_one_winner(
                 observation_id=observation.id,
                 candidate_version=candidate.version,
                 reviewer_user_id=reviewer.id,
+                reason="Shared Scopus author checked",  # D-2 requires a reason here
             ),
         )
         for candidate, observation in candidates
