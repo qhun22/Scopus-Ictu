@@ -63,6 +63,7 @@ Thumbs.db
 *.log
 *.bak
 *.tmp
+backend/.tmp_*/
 
 # --- Local backups ---
 local_backups/
