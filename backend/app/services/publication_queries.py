@@ -16,7 +16,9 @@ from app.models.affiliation import (
     PublicationAuthorAffiliationResolution,
 )
 from app.models.affiliation_override import PublicationAuthorAffiliationOverride
+from app.models.candidate import LecturerScopusCandidateReview
 from app.models.identity import LecturerScopusIdentity
+from app.services.identity_evidence_basis import evidence_basis_by_identity
 from app.models.master_lecturer import Lecturer
 from app.models.publication import (
     Publication,
@@ -36,6 +38,8 @@ from app.schemas.publication_api import (
     PublicationDetailResponse,
     PublicationListItem,
     PublicationListResponse,
+    LinkEvidenceBasisRead,
+    LinkReviewDecisionRead,
     PublicationLecturerLinkRead,
     PublicationProvenanceRead,
 )
@@ -258,9 +262,10 @@ def _override_read(row: PublicationAuthorAffiliationOverride) -> AffiliationOver
 
 def _approved_lecturer_link_rows(
     session: Session, publication_id: uuid.UUID
-) -> Sequence[tuple[int, str, str, str | None, str | None, str | None, str | None]]:
+) -> Sequence[tuple[uuid.UUID, int, str, str, str | None, str | None, str | None, str | None]]:
     return session.execute(
         select(
+            LecturerScopusIdentity.id,
             PublicationAuthor.author_order,
             ScopusAuthor.scopus_id,
             Lecturer.full_name,
@@ -285,6 +290,30 @@ def _approved_lecturer_link_rows(
             Lecturer.full_name.asc(),
         )
     ).all()
+
+
+def _accept_decisions_by_identity(
+    session: Session, identity_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, LinkReviewDecisionRead]:
+    """The ACCEPT review that created each identity (earliest if ever more than one)."""
+
+    if not identity_ids:
+        return {}
+    decisions: dict[uuid.UUID, LinkReviewDecisionRead] = {}
+    for identity_id, created_at, reason in session.execute(
+        select(
+            LecturerScopusCandidateReview.resulting_identity_id,
+            LecturerScopusCandidateReview.created_at,
+            LecturerScopusCandidateReview.reason,
+        )
+        .where(
+            LecturerScopusCandidateReview.resulting_identity_id.in_(set(identity_ids)),
+            LecturerScopusCandidateReview.action == "ACCEPT",
+        )
+        .order_by(LecturerScopusCandidateReview.created_at.asc(), LecturerScopusCandidateReview.id.asc())
+    ).all():
+        decisions.setdefault(identity_id, LinkReviewDecisionRead(decided_at=created_at, reason=reason))
+    return decisions
 
 
 def _provenance_rows(
@@ -464,6 +493,10 @@ def get_publication_detail(
         for publication_author_id, author_order, scopus_id, preferred_name in author_rows
     ]
     affiliation_summary = _apply_affiliations(authors, _affiliation_blocks(session, publication.id))
+    link_rows = _approved_lecturer_link_rows(session, publication.id)
+    identity_ids = [row[0] for row in link_rows]
+    basis_by_identity = evidence_basis_by_identity(session, identity_ids)
+    decision_by_identity = _accept_decisions_by_identity(session, identity_ids)
     lecturer_links = [
         PublicationLecturerLinkRead(
             author_order=author_order,
@@ -473,8 +506,11 @@ def get_publication_detail(
             department=department,
             faculty=faculty,
             orcid=orcid,
+            evidence_basis=LinkEvidenceBasisRead(**basis_by_identity[identity_id]),
+            review_decision=decision_by_identity.get(identity_id),
         )
         for (
+            identity_id,
             author_order,
             scopus_id,
             full_name,
@@ -482,7 +518,7 @@ def get_publication_detail(
             department,
             faculty,
             orcid,
-        ) in _approved_lecturer_link_rows(session, publication.id)
+        ) in link_rows
     ]
     provenance = [
         PublicationProvenanceRead(

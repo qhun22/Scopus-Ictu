@@ -34,6 +34,7 @@ from app.models.governance import User
 from app.models.identity import IdentityEvidence, LecturerScopusIdentity
 from app.models.publication import ScopusAuthor
 from app.services.candidate_review_queries import current_reviewable_observation
+from app.services.review_reason_policy import accept_reason_policy, normalize_reason
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +183,19 @@ class InvalidReviewReasonError(CandidateReviewError):
     """The review reason is blank or missing when required."""
 
     code = "INVALID_REVIEW_REASON"
+
+
+class ReviewReasonRequiredForWeakEvidenceError(InvalidReviewReasonError):
+    """ACCEPT on weak or ambiguous evidence was submitted without a real reason."""
+
+    code = "REVIEW_REASON_REQUIRED_FOR_WEAK_EVIDENCE"
+
+    def __init__(self, triggers: tuple[str, ...]) -> None:
+        self.triggers = triggers
+        super().__init__(
+            "A non-blank reason is required to accept this candidate: "
+            + ", ".join(triggers)
+        )
 
 
 class EvidencePromotionUnsupportedError(CandidateReviewError):
@@ -608,6 +622,7 @@ class CandidateReviewService:
         # 8. Load immutable observation evidence
         evidence_rows = self._load_observation_evidence(cmd.observation_id)
 
+
         # Load generation run for version info
         run = self._session.get(CandidateGenerationRun, observation.generation_run_id)
         run_version = run.rule_set_version if run else "unknown"
@@ -644,6 +659,21 @@ class CandidateReviewService:
                     f"but has no CandidateReview provenance from this candidate. "
                     f"Cannot falsely attribute to this review."
                 )
+
+        # 10b. D-2: a reason is required when the evidence is weak or ambiguous.
+        # Decided from server rows only. Checked after the idempotency branch (a
+        # replay of a recorded decision returns the same result) and after the
+        # identity conflict checks (a conflict is reported as such, not as a
+        # missing reason), but before anything is written.
+        reason = normalize_reason(cmd.reason)
+        policy = accept_reason_policy(
+            self._session,
+            lecturer_id=candidate.lecturer_id,
+            scopus_author_id=candidate.scopus_author_id,
+            evidence_kinds=(ev.evidence_kind for ev in evidence_rows),
+        )
+        if policy.required and reason is None:
+            raise ReviewReasonRequiredForWeakEvidenceError(policy.triggers)
 
         # Build evidence snapshot BEFORE creating the identity (decision-time)
         snapshot = self._build_evidence_snapshot(
@@ -701,7 +731,7 @@ class CandidateReviewService:
             from_status="PENDING",
             to_status="ACCEPTED",
             candidate_version=candidate.version,
-            reason=cmd.reason,
+            reason=reason,
             evidence_snapshot=snapshot,
             resulting_identity_id=identity.id,
             created_at=now,
@@ -732,11 +762,13 @@ class CandidateReviewService:
                 "review_id": str(review.id),
                 "resulting_identity_id": str(identity.id),
                 "evidence_count": len(evidence_rows),
+                "reason_required": policy.required,
+                "reason_triggers": list(policy.triggers),
                 "idempotent": False,
             },
             before_state=candidate_before,
             after_state=candidate_after,
-            reason=cmd.reason,
+            reason=reason,
         )
         self._record_audit_events(
             reviewer_user_id=reviewer.id,
@@ -943,6 +975,7 @@ __all__ = [
     "PreexistingIdentityConflictError",
     "RejectCandidateCommand",
     "RejectResult",
+    "ReviewReasonRequiredForWeakEvidenceError",
     "ReviewResult",
     "ReviewerNotAuthorizedError",
     "ReviewerNotFoundError",

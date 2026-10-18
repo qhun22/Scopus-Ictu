@@ -146,6 +146,22 @@ class ReviewAmbiguityContext(BaseModel):
     other_candidates: list[ReviewOtherCandidateSummary] = Field(default_factory=list)
 
 
+ReasonTrigger = Literal[
+    "NAME_EVIDENCE_ONLY",
+    "SHARED_SCOPUS_AUTHOR",
+    "MULTIPLE_CANDIDATES_FOR_LECTURER",
+]
+
+
+class ReviewDecisionPolicy(BaseModel):
+    """Server-computed reason requirements (D-2). Informational for clients;
+    the decision endpoint re-checks them and is the final authority."""
+
+    accept_reason_required: bool = False
+    accept_reason_triggers: list[ReasonTrigger] = Field(default_factory=list)
+    reject_reason_required: bool = True
+
+
 class ReviewCandidateDetailResponse(BaseModel):
     candidate_id: uuid.UUID
     candidate_status: CandidateStatus
@@ -161,6 +177,7 @@ class ReviewCandidateDetailResponse(BaseModel):
         default_factory=list
     )
     ambiguity: ReviewAmbiguityContext
+    review_policy: ReviewDecisionPolicy = Field(default_factory=ReviewDecisionPolicy)
 
 
 class ReviewDecisionResponse(BaseModel):

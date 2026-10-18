@@ -35,6 +35,7 @@ from app.schemas.review_api import (
     ReviewAuthorSummary,
     ReviewCandidateDetailResponse,
     ReviewContextResponse,
+    ReviewDecisionPolicy,
     ReviewDecisionRequest,
     ReviewDecisionResponse,
     ReviewLecturerDetail,
@@ -63,12 +64,14 @@ from app.services.candidate_review_service import (
     ObservationNotFoundError,
     PreexistingIdentityConflictError,
     RejectCandidateCommand,
+    ReviewReasonRequiredForWeakEvidenceError,
     ReviewerNotAuthorizedError,
     ReviewerNotFoundError,
     ScopusAuthorAlreadyApprovedError,
     StaleCandidateObservationError,
     StaleCandidateVersionError,
 )
+from app.services.review_reason_policy import accept_reason_policy
 
 router = APIRouter()
 DatabaseSession = Annotated[Session, Depends(get_session)]
@@ -216,12 +219,17 @@ def _domain_error_response(exc: CandidateReviewError) -> APIError:
         ScopusAuthorAlreadyApprovedError: 409,
         PreexistingIdentityConflictError: 409,
         InvalidReviewReasonError: 422,
+        ReviewReasonRequiredForWeakEvidenceError: 422,
         EvidencePromotionUnsupportedError: 409,
     }
+    data: dict[str, object] = {}
+    if isinstance(exc, ReviewReasonRequiredForWeakEvidenceError):
+        data["reason_triggers"] = list(exc.triggers)
     return APIError(
         status_code=status_by_type.get(type(exc), 409),
         detail="Review operation could not be completed.",
         code=exc.code,
+        data=data,
     )
 
 
@@ -498,6 +506,12 @@ def review_candidate_detail(
         )
 
     candidate_count = len(other_candidates) + 1
+    reason_policy = accept_reason_policy(
+        db,
+        lecturer_id=lecturer.id,
+        scopus_author_id=author.id,
+        evidence_kinds=(ev.evidence_kind for ev in evidence_rows),
+    )
     author_candidate_count = int(
         db.scalar(
             select(func.count(LecturerScopusCandidate.id)).where(
@@ -553,6 +567,10 @@ def review_candidate_detail(
                 )
                 for row in other_candidates
             ],
+        ),
+        review_policy=ReviewDecisionPolicy(
+            accept_reason_required=reason_policy.required,
+            accept_reason_triggers=list(reason_policy.triggers),
         ),
     )
 

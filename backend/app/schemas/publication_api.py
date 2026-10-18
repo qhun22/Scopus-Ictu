@@ -146,6 +146,39 @@ class AffiliationSummaryRead(BaseModel):
     )
 
 
+EvidenceLevel = Literal[
+    "IDENTIFIER_SUPPORT",
+    "PUBLICATION_SUPPORT",
+    "NAME_ONLY",
+    "NO_RECORDED_EVIDENCE",
+]
+
+
+class LinkEvidenceBasisRead(BaseModel):
+    """D-3: what the approved link rests on, derived from identity_evidence rows only.
+
+    A reviewer's ACCEPT is never evidence; ``independently_verified`` is true only
+    for an exact independent identifier match with no contradicting evidence.
+    """
+
+    level: EvidenceLevel
+    supporting_evidence_types: list[str] = Field(default_factory=list)
+    contradicting_evidence_types: list[str] = Field(default_factory=list)
+    identifier_evidence_count: int = 0
+    publication_evidence_count: int = 0
+    name_evidence_count: int = 0
+    affiliation_evidence_count: int = 0
+    independently_verified: bool = False
+
+
+class LinkReviewDecisionRead(BaseModel):
+    """The human review decision that created the link (provenance, not evidence)."""
+
+    action: Literal["ACCEPT"] = "ACCEPT"
+    decided_at: datetime
+    reason: str | None = None
+
+
 class PublicationLecturerLinkRead(BaseModel):
     """Approved lecturer link at a concrete publication author position."""
 
@@ -156,6 +189,10 @@ class PublicationLecturerLinkRead(BaseModel):
     department: str | None
     faculty: str | None
     orcid: str | None
+    # Additive (D-3); older clients ignore these fields.
+    link_status: Literal["APPROVED"] = "APPROVED"
+    evidence_basis: LinkEvidenceBasisRead | None = None
+    review_decision: LinkReviewDecisionRead | None = None
 
 
 class PublicationProvenanceRead(BaseModel):
