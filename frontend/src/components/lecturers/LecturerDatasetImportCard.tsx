@@ -4,6 +4,7 @@ import DuplicateImportDialog from "../common/DuplicateImportDialog";
 import { previewLecturerDataset } from "../../api/lecturerImport";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
+import { buttonClass } from "../ui/Button";
 
 export interface DatasetMeta {
   name?: string | null;
@@ -192,9 +193,9 @@ const LecturerDatasetImportCard = forwardRef<
   };
 
   return (
-    <section className="flex flex-col h-full rounded-xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
+    <section className="flex flex-col h-full rounded-[5px] border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
       <div className="flex items-center gap-2.5 pb-3.5 border-b border-slate-100">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3A5FC3]/10 text-[#3A5FC3]">
+        <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -240,13 +241,13 @@ const LecturerDatasetImportCard = forwardRef<
             setDragging(false);
             selectFile(event.dataTransfer.files[0]);
           }}
-          className={`mt-4 group flex flex-1 min-h-44 flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
+          className={`mt-4 group flex flex-1 min-h-44 flex-col items-center justify-center rounded-[5px] border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-all duration-200 ${
             dragging
               ? "border-[#3A5FC3] bg-[#3A5FC3]/10 scale-[0.99]"
               : "border-slate-200 hover:border-[#3A5FC3]/60 bg-slate-50/40 hover:bg-[#3A5FC3]/5"
           } ${isImporting || previewing ? "cursor-not-allowed opacity-60" : ""}`}
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#3A5FC3]/10 text-[#3A5FC3] mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
+          <div className="flex h-12 w-12 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3] mb-2.5 shadow-2xs group-hover:scale-110 transition-transform">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -268,10 +269,10 @@ const LecturerDatasetImportCard = forwardRef<
           </p>
         </div>
       ) : (
-        <div className={`mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all duration-300 ease-out ${isFileExiting ? "opacity-0 scale-[0.97] -translate-y-1" : "opacity-100 scale-100 translate-y-0 animate-in fade-in slide-in-from-top-2 duration-300"}`}>
+        <div className={`mt-4 flex flex-1 min-h-44 flex-col justify-center rounded-[5px] border border-slate-200/80 bg-slate-50/50 p-4 sm:p-5 transition-all duration-300 ease-out ${isFileExiting ? "opacity-0 scale-[0.97] -translate-y-1" : "opacity-100 scale-100 translate-y-0 animate-in fade-in slide-in-from-top-2 duration-300"}`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100/80 text-[#3A5FC3] shrink-0">
+              <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-blue-100/80 text-[#3A5FC3] shrink-0">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -306,7 +307,7 @@ const LecturerDatasetImportCard = forwardRef<
                 type="button"
                 disabled={previewing || isImporting}
                 onClick={exitFile}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs shrink-0"
+                className={buttonClass("secondary")}
               >
                 {t.imports.cancelFile}
               </button>
@@ -314,7 +315,7 @@ const LecturerDatasetImportCard = forwardRef<
                 type="button"
                 disabled={previewing || isImporting}
                 onClick={() => void handlePreview()}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] disabled:cursor-wait disabled:opacity-70 cursor-pointer shrink-0"
+                className={buttonClass("primary")}
               >
                 {previewing ? (
                   <>
@@ -356,7 +357,7 @@ const LecturerDatasetImportCard = forwardRef<
       {selectionError && (
         <div
           role="alert"
-          className="mt-3 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50/80 p-3 text-xs font-semibold text-rose-700 animate-in fade-in duration-200"
+          className="mt-3 flex items-center gap-2 rounded-[5px] border border-rose-200 bg-rose-50/80 p-3 text-xs font-semibold text-rose-700 animate-in fade-in duration-200"
         >
           <svg
             className="h-4 w-4 shrink-0 text-rose-600"

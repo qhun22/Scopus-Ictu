@@ -6,6 +6,8 @@ import { resetSystem } from "../../api/system";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import TextConfirmModal from "../../components/common/TextConfirmModal";
+import Badge, { type BadgeTone } from "../../components/ui/Badge";
+import Button from "../../components/ui/Button";
 import { useI18n } from "../../i18n";
 import {
   DashboardCharts,
@@ -166,36 +168,38 @@ export default function DashboardPage() {
       />
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">{copy.title}</h1>
           <p className="mt-1 text-sm text-gray-500">{copy.subtitle}</p>
         </div>
         <div className="page-action-group">
-          <button
+          <Button
+            variant="secondary"
+            fullWidth
             onClick={fetchSummary}
-            disabled={loading}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-slate-50 disabled:opacity-50"
-          >
-            {loading ? (
-              <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-            ) : (
-              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            loading={loading}
+            icon={
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-            )}
-            <span className="truncate">{copy.refresh}</span>
-          </button>
+            }
+          >
+            {copy.refresh}
+          </Button>
           {currentUser?.role === "ADMIN" ? (
-            <button
+            <Button
+              variant="danger"
+              fullWidth
               onClick={() => setShowResetModal(true)}
-              className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 shadow-xs transition-all duration-150 active:scale-[0.98] hover:bg-red-100"
+              icon={
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              }
             >
-              <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span className="truncate">{copy.resetSystem}</span>
-            </button>
+              {copy.resetSystem}
+            </Button>
           ) : (
             <div />
           )}
@@ -255,11 +259,12 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          {/* Identity status counts — always all 4 statuses */}
+          {/* Identity link counts (lecturer_scopus_identities.status) — not the candidate review queue */}
           <section className="rounded-[5px] border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-base font-semibold text-gray-800">
+            <h2 className="text-base font-semibold text-gray-800">
               {copy.identityTitle}
             </h2>
+            <p className="mb-4 mt-1 text-xs text-gray-500">{copy.identityHint}</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {IDENTITY_STATUSES.map((status) => (
                 <div
@@ -291,14 +296,11 @@ export default function DashboardPage() {
             )}
 
             {chartsError && !chartsLoading && (
-              <div className="rounded-[5px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {chartsError}
-                <button
-                  onClick={fetchCharts}
-                  className="ml-3 font-semibold underline underline-offset-2"
-                >
+              <div className="flex flex-wrap items-center gap-3 rounded-[5px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <span>{chartsError}</span>
+                <Button variant="secondary" size="sm" onClick={fetchCharts}>
                   {copy.chartsRetry}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -515,9 +517,10 @@ function SummaryCard({
   href?: string;
   highlight?: boolean;
 }) {
+  /* Figma 9:25 Stat Card: r10 (rounded-card), p20 (p-5), value 28px */
   const inner = (
     <div
-      className={`rounded-[5px] border p-4 shadow-sm transition ${
+      className={`rounded-card border p-5 shadow-sm transition ${
         highlight
           ? "border-amber-300 bg-amber-50"
           : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50"
@@ -525,7 +528,7 @@ function SummaryCard({
     >
       <div className="text-xs font-medium text-gray-500">{label}</div>
       <div
-        className={`mt-1 text-3xl font-bold ${
+        className={`mt-1 text-[28px] font-bold leading-none ${
           highlight ? "text-amber-700" : "text-gray-900"
         }`}
       >
@@ -544,14 +547,14 @@ function SummaryCard({
   return inner;
 }
 
-const IMPORT_STATUS_COLORS: Record<string, string> = {
-  RECEIVED: "bg-blue-100 text-blue-700",
-  PARSING: "bg-indigo-100 text-indigo-700",
-  VALIDATED: "bg-cyan-100 text-cyan-700",
-  STAGED: "bg-yellow-100 text-yellow-700",
-  APPLIED: "bg-green-100 text-green-700",
-  FAILED: "bg-red-100 text-red-700",
-  CANCELLED: "bg-gray-100 text-gray-600",
+const IMPORT_STATUS_TONE: Record<string, BadgeTone> = {
+  RECEIVED: "brand",
+  PARSING: "indigo",
+  VALIDATED: "info",
+  STAGED: "warning",
+  APPLIED: "success",
+  FAILED: "danger",
+  CANCELLED: "neutral",
 };
 
 const IMPORT_STATUS_LABEL: Record<string, Record<"vi" | "en", string>> = {
@@ -565,11 +568,6 @@ const IMPORT_STATUS_LABEL: Record<string, Record<"vi" | "en", string>> = {
 };
 
 function ImportStatusBadge({ status, locale }: { status: string; locale: "vi" | "en" }) {
-  const color = IMPORT_STATUS_COLORS[status] ?? "bg-gray-100 text-gray-600";
   const label = IMPORT_STATUS_LABEL[status]?.[locale] ?? status;
-  return (
-    <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${color}`}>
-      {label}
-    </span>
-  );
+  return <Badge tone={IMPORT_STATUS_TONE[status] ?? "neutral"}>{label}</Badge>;
 }

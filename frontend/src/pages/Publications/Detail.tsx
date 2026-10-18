@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { getPublicationByEid } from "../../api/publications";
@@ -7,6 +7,7 @@ import { PublicationDetailResponse } from "../../types/publication";
 import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n";
 import { AffiliationSummaryBar, AuthorAffiliationCell } from "./AuthorAffiliations";
+import { EvidenceBasisCell, LinkStatusBadge, ReviewDecisionCell } from "./LinkEvidence";
 
 const NULL_YEAR = "Chưa rõ";
 const NULL_CITATION = "Chưa có dữ liệu";
@@ -14,7 +15,11 @@ const NULL_STRING = "Chưa cập nhật";
 
 export default function PublicationDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { eid } = useParams<{ eid: string }>();
+  // Opened from "Công bố của tôi" (W-02): go back there instead of the full catalogue.
+  const fromMyPublications = (location.state as { from?: string } | null)?.from === "/my-publications";
+  const backTarget = fromMyPublications ? "/my-publications" : "/publications";
   const { locale } = useI18n();
   const { user } = useAuth();
   // LECTURER gets a read-only academic view: no import trace, no other lecturers' data.
@@ -111,10 +116,12 @@ export default function PublicationDetailPage() {
   };
 
   // ── Labels ────────────────────────────────────────────────────────────────
-  const backLabel = locale === "vi" ? " Quay lại danh sách công bố" : " Back to publications list";
+  const backLabel = fromMyPublications
+    ? (locale === "vi" ? " Quay lại công bố của tôi" : " Back to my publications")
+    : (locale === "vi" ? " Quay lại danh sách công bố" : " Back to publications list");
   const sectionMeta = locale === "vi" ? "Thông tin công bố" : "Publication Metadata";
   const sectionAuthors = locale === "vi" ? "Danh sách tác giả (Scopus)" : "Scopus Authors";
-  const sectionLinks = locale === "vi" ? "Liên kết giảng viên ICTU" : "Approved ICTU Lecturer Links";
+  const sectionLinks = locale === "vi" ? "Liên kết giảng viên ICTU" : "ICTU Lecturer Links";
   const sectionProvenance = locale === "vi" ? "Nguồn dữ liệu & truy vết" : "Data Provenance";
   const loadingLabel = locale === "vi" ? "Đang tải thông tin công bố..." : "Loading publication details...";
   const retryLabel = locale === "vi" ? "Thử lại" : "Retry";
@@ -167,7 +174,7 @@ export default function PublicationDetailPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate("/publications")}
+            onClick={() => navigate(backTarget)}
             className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
           >
             {backLabel}
@@ -201,7 +208,7 @@ export default function PublicationDetailPage() {
       {/* ── Back navigation ────────────────────────────────────────────── */}
       <button
         type="button"
-        onClick={() => navigate("/publications")}
+        onClick={() => navigate(backTarget)}
         className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer"
       >
         <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -295,6 +302,11 @@ export default function PublicationDetailPage() {
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
           {sectionLinks}
         </h2>
+        <p className="-mt-2 mb-3 text-xs leading-relaxed text-slate-500" data-testid="link-evidence-note">
+          {locale === "vi"
+            ? "Liên kết đã duyệt là quyết định của người duyệt. Liên kết chỉ được coi là định danh đã xác minh khi có chứng cứ định danh độc lập (ví dụ ORCID trùng khớp); mức chứng cứ bên dưới lấy từ dữ liệu chứng cứ đã lưu, không từ việc chấp nhận."
+            : "An approved link is a reviewer's decision. It counts as a verified identity only with independent identity evidence (for example a matching ORCID); the evidence level below comes from stored evidence, not from the acceptance."}
+        </p>
 
         {approved_lecturer_links.length === 0 ? (
           <p className="py-6 text-center text-xs text-slate-400">{emptyLinksLabel}</p>
@@ -310,6 +322,9 @@ export default function PublicationDetailPage() {
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colFaculty}</th>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colOrcid}</th>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colScopusId}</th>
+                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{locale === "vi" ? "Trạng thái liên kết" : "Link status"}</th>
+                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{locale === "vi" ? "Mức chứng cứ" : "Evidence level"}</th>
+                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{locale === "vi" ? "Quyết định duyệt" : "Review decision"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -322,6 +337,11 @@ export default function PublicationDetailPage() {
                     <td className="px-3 py-2.5 text-slate-700">{fmtField(link.faculty)}</td>
                     <td className="px-3 py-2.5 font-mono text-slate-500 text-[10px]">{fmtField(link.orcid)}</td>
                     <td className="px-3 py-2.5 font-mono text-slate-500">{link.scopus_id}</td>
+                    <td className="px-3 py-2.5 align-top"><LinkStatusBadge locale={locale} /></td>
+                    <td className="px-3 py-2.5 align-top"><EvidenceBasisCell basis={link.evidence_basis} locale={locale} /></td>
+                    <td className="px-3 py-2.5 align-top">
+                      <ReviewDecisionCell decision={link.review_decision} locale={locale} formatDate={fmtProvenanceDate} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -31,7 +31,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
         role="alert"
         className="flex min-h-screen items-center justify-center bg-slate-50 p-6"
       >
-        <div className="max-w-md rounded-2xl border border-rose-200 bg-white p-8 text-center shadow-sm">
+        <div className="max-w-md rounded-[5px] border border-rose-200 bg-white p-8 text-center shadow-sm">
           <h1 className="text-lg font-bold text-slate-800">Đã xảy ra lỗi hiển thị</h1>
           <p className="mt-2 text-sm text-slate-600">
             Trang không thể hiển thị đúng. Dữ liệu của bạn không bị thay đổi. Vui lòng tải lại trang;
@@ -41,13 +41,13 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-lg bg-[#3A5FC3] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+              className="rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
             >
               Tải lại trang
             </button>
             <a
               href="/"
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-[5px] border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Về trang chủ
             </a>

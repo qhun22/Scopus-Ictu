@@ -8,7 +8,7 @@ import {
   updateOverride,
 } from "../../api/affiliations";
 import { ApiError } from "../../api/client";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
+import Button from "../../components/ui/Button";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 
@@ -144,12 +144,12 @@ function OverrideForm({
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={BUTTON_PRIMARY} onClick={submit} disabled={saving} data-testid="override-submit-btn">
+        <Button type="button" variant="primary" onClick={submit} disabled={saving} data-testid="override-submit-btn">
           {saving ? (vi ? "Đang lưu…" : "Saving…") : submitLabel}
-        </button>
-        <button type="button" className={BUTTON_SECONDARY} onClick={onCancel} disabled={saving}>
+        </Button>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={saving}>
           {vi ? "Hủy" : "Cancel"}
-        </button>
+        </Button>
         {extraActions}
       </div>
     </div>
@@ -230,14 +230,14 @@ function OverrideRow({
         </div>
         {!isRevoked && !editing && !revoking && (
           <div className="flex gap-1.5">
-            <button
+            <Button
               type="button"
-              className={BUTTON_SECONDARY}
+              variant="secondary"
               onClick={() => setEditing(true)}
               data-testid="override-edit-btn"
             >
               {vi ? "Sửa" : "Edit"}
-            </button>
+            </Button>
             <button
               type="button"
               className="rounded border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
@@ -293,9 +293,9 @@ function OverrideRow({
             >
               {revokeSaving ? (vi ? "Đang thu hồi…" : "Revoking…") : vi ? "Xác nhận thu hồi" : "Confirm revoke"}
             </button>
-            <button
+            <Button
               type="button"
-              className={BUTTON_SECONDARY}
+              variant="secondary"
               onClick={() => {
                 setRevoking(false);
                 setRevokeError(null);
@@ -303,7 +303,7 @@ function OverrideRow({
               disabled={revokeSaving}
             >
               {vi ? "Hủy" : "Cancel"}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -346,14 +346,14 @@ function ReviewRow({
           )}
         </div>
         {!adding && (
-          <button
+          <Button
             type="button"
-            className={BUTTON_SECONDARY}
+            variant="secondary"
             onClick={() => setAdding(true)}
             data-testid="review-add-btn"
           >
             {vi ? "Thêm đơn vị" : "Add unit"}
-          </button>
+          </Button>
         )}
       </div>
 

@@ -4,8 +4,25 @@ import type { PublicationsByDocumentTypeItem } from "../../../types/dashboard";
 
 ChartJS.register(ArcElement, Tooltip);
 
-// Cove categorical palette, fixed order — never cycled/generated.
-const PALETTE = ["#3A5FC3", "#D85A30", "#1D9E75", "#BA7517", "#D4537E", "#5F5E5A", "#888780"];
+// Colour is bound to the document type (not to its rank in the data), so a type keeps its colour as counts change.
+// The first seven keep the colours already shown on the Dashboard; the rest are distinct additions.
+const TYPE_COLOR: Record<string, string> = {
+  "conference paper": "#3A5FC3",
+  article: "#D85A30",
+  "book chapter": "#1D9E75",
+  review: "#BA7517",
+  erratum: "#D4537E",
+  retracted: "#5F5E5A",
+  note: "#888780",
+  editorial: "#6D28D9",
+  book: "#0E7490",
+  letter: "#4338CA",
+  "short survey": "#A16207",
+  "conference review": "#0F766E",
+  "data paper": "#9F1239",
+  unspecified: "#CBD5E1",
+};
+const FALLBACK_COLORS = ["#334155", "#7C3AED", "#0369A1", "#B91C1C", "#15803D"];
 
 // Scopus "Document Type" values are not consistently cased in source CSVs
 // (observed both "Conference paper" and "Conference Paper"), so lookup is
@@ -19,9 +36,29 @@ const DOC_TYPE_LABELS_VI: Record<string, string> = {
   note: "Ghi chú khoa học",
   letter: "Thư khoa học",
   erratum: "Đính chính",
+  retracted: "Bài đã bị rút lại",
+  "conference review": "Tổng quan hội nghị",
+  "data paper": "Bài báo dữ liệu",
   editorial: "Bài xã luận",
   "short survey": "Khảo sát ngắn",
   unspecified: "Chưa phân loại",
+};
+
+const DOC_TYPE_LABELS_EN: Record<string, string> = {
+  article: "Article",
+  "conference paper": "Conference paper",
+  review: "Review",
+  "book chapter": "Book chapter",
+  book: "Book",
+  note: "Note",
+  letter: "Letter",
+  erratum: "Erratum",
+  retracted: "Retracted",
+  "conference review": "Conference review",
+  "data paper": "Data paper",
+  editorial: "Editorial",
+  "short survey": "Short survey",
+  unspecified: "Unspecified",
 };
 
 interface Props {
@@ -33,14 +70,17 @@ function displayLabel(docType: string, locale: "vi" | "en"): string {
   if (locale === "vi") {
     return DOC_TYPE_LABELS_VI[docType.toLowerCase()] ?? docType;
   }
-  return docType === "UNSPECIFIED" ? "Unspecified" : docType;
+  return DOC_TYPE_LABELS_EN[docType.toLowerCase()] ?? docType;
 }
 
 export default function DocumentTypeDonutChart({ data, locale }: Props) {
   const total = data.reduce((sum, d) => sum + d.count, 0);
   const labels = data.map((d) => displayLabel(d.document_type, locale));
   const values = data.map((d) => d.count);
-  const colors = data.map((_, i) => PALETTE[i % PALETTE.length]);
+  let unknownIndex = 0;
+  const colors = data.map(
+    (d) => TYPE_COLOR[d.document_type.toLowerCase()] ?? FALLBACK_COLORS[unknownIndex++ % FALLBACK_COLORS.length],
+  );
 
   const chartData = {
     labels,

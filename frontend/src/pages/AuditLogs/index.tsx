@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getAuditLogs } from "../../api/audits";
 import { getApiErrorMessage } from "../../api/errors";
 import { useI18n } from "../../i18n";
+import { buttonClass } from "../../components/ui/Button";
+import { PageHeader } from "../../components/ui/PageHeader";
 import { AuditActorType, AuditListItem, AuditListResponse } from "../../types/audit";
 import { formatTimestamp } from "../../utils/dateTime";
 
@@ -184,24 +186,24 @@ export default function AuditLogsPage() {
 
   return (
     <div className="app-page-container space-y-4 sm:space-y-5">
-      {/* ── Page Header ──────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">{copy.title}</h1>
-          <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">{copy.subtitle}</p>
-        </div>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={loading}
-          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[5px] border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-xs transition-all hover:border-[#3A5FC3] hover:text-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {copy.refresh}
-        </button>
-      </div>
+      {/* ── Page Header — R4-A pilot (P11.5) ────────────────────────────── */}
+      <PageHeader
+        title={copy.title}
+        subtitle={copy.subtitle}
+        action={
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={loading}
+            className={buttonClass("secondary")}
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {copy.refresh}
+          </button>
+        }
+      />
 
       {/* ── Filter Bar ──────────────────────────────────────────────────── */}
       <div className="rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs space-y-3">
@@ -271,7 +273,7 @@ export default function AuditLogsPage() {
             <button
               type="button"
               onClick={handleApply}
-              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3]"
+              className={buttonClass("primary", "sm")}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
@@ -282,7 +284,7 @@ export default function AuditLogsPage() {
               type="button"
               onClick={handleClear}
               disabled={!isFiltered && !hasAnyFormInput}
-              className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-rose-300 hover:bg-rose-50/50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+              className={buttonClass("secondary", "sm")}
             >
               <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -317,7 +319,7 @@ export default function AuditLogsPage() {
             <button
               type="button"
               onClick={handleRefresh}
-              className="self-start rounded-[5px] border border-rose-300 bg-white px-3 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+              className={`${buttonClass("secondary", "sm")} self-start`}
             >
               {copy.retry}
             </button>
@@ -411,7 +413,7 @@ export default function AuditLogsPage() {
                 type="button"
                 onClick={() => handlePage(page - 1)}
                 disabled={atFirstPage || loading}
-                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className={buttonClass("secondary", "sm")}
               >
                 {copy.previousPage}
               </button>
@@ -419,7 +421,7 @@ export default function AuditLogsPage() {
                 type="button"
                 onClick={() => handlePage(page + 1)}
                 disabled={atLastPage || loading}
-                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className={buttonClass("secondary", "sm")}
               >
                 {copy.nextPage}
               </button>

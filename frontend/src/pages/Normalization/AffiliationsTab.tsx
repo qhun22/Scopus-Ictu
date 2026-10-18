@@ -12,7 +12,7 @@ import {
   startOnlineEnrichment,
 } from "../../api/affiliations";
 import { ApiError } from "../../api/client";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
+import Button from "../../components/ui/Button";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 import ManualReviewCard from "./ManualReviewCard";
@@ -295,15 +295,25 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
           {!source ? (
             <p className="text-xs text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
           ) : !source.configured ? (
-            <p className="text-xs font-medium text-amber-700" data-testid="aff-source-missing">
-              {BLOCKED_LABEL.SOURCE_DIR_NOT_CONFIGURED[locale]}
-              <br />
-              <span className="font-normal text-slate-500">
+            <div className="space-y-1 text-xs" data-testid="aff-source-missing">
+              <p className="font-medium text-slate-700">
                 {vi
-                  ? "Người vận hành cần đặt biến môi trường và chép bộ metadata vào thư mục đó. Thu thập trực tuyến chưa được bật."
-                  : "The operator must set the variable and place the metadata bundle there. Online collection is not enabled."}
-              </span>
-            </p>
+                  ? "Chưa gắn bộ nguồn offline với máy chủ, nên chưa thể Xem trước / Áp dụng một lần đối chiếu mới từ nguồn offline."
+                  : "No offline source bundle is attached to the server, so a new offline preview / apply cannot be run."}
+              </p>
+              {db && Object.keys(db.resolutions_by_source_and_status).length > 0 && (
+                <p className="text-emerald-700" data-testid="aff-source-missing-data-kept">
+                  {vi
+                    ? "Dữ liệu đơn vị đã áp dụng trước đó vẫn được giữ nguyên trong hệ thống (xem mục 2)."
+                    : "Affiliation data applied earlier is kept in the system (see section 2)."}
+                </p>
+              )}
+              <p className="text-slate-400">
+                {vi
+                  ? "Dành cho người vận hành: cấu hình AFFILIATION_SOURCE_DIR trỏ tới bộ metadata đã kiểm tra."
+                  : "For operators: set AFFILIATION_SOURCE_DIR to the verified metadata bundle."}
+              </p>
+            </div>
           ) : (
             <div className="space-y-2 text-xs text-slate-700">
               <p>
@@ -396,23 +406,23 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
             : "ADMIN may actively query public OpenAlex, Crossref and ORCID for the DOIs of existing publications, instead of preparing an offline bundle by hand. Runs in the background; can be cancelled mid-way."}
         </p>
         {!job || !ENRICHMENT_ACTIVE.includes(job.status) ? (
-          <button
+          <Button
             type="button"
-            className={BUTTON_SECONDARY}
+            variant="secondary"
             onClick={runStartEnrichment}
             disabled={starting}
             data-testid="aff-online-start-btn"
           >
             {starting ? (vi ? "Đang khởi tạo…" : "Starting…") : vi ? "Bắt đầu thu thập trực tuyến" : "Start online collection"}
-          </button>
+          </Button>
         ) : (
           <div className="flex items-center gap-2" data-testid="aff-online-running">
             <span className="text-xs font-medium text-sky-700">
               {ENRICHMENT_STATUS_LABEL[job.status]?.[locale] ?? job.status} ({fmt(job.processed_dois)}/{fmt(job.total_dois)})
             </span>
-            <button type="button" className={BUTTON_SECONDARY} onClick={runCancelEnrichment} data-testid="aff-online-cancel-btn">
+            <Button type="button" variant="secondary" onClick={runCancelEnrichment} data-testid="aff-online-cancel-btn">
               {vi ? "Hủy" : "Cancel"}
-            </button>
+            </Button>
           </div>
         )}
         {job && !ENRICHMENT_ACTIVE.includes(job.status) && (
@@ -457,9 +467,9 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
 
       <Card title={vi ? "3. Xem trước và áp dụng" : "3. Preview and apply"} testId="aff-preview-card">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button type="button" className={BUTTON_SECONDARY} onClick={runPreview} disabled={previewing || applying} data-testid="aff-preview-btn">
+          <Button type="button" variant="secondary" onClick={runPreview} disabled={previewing || applying} data-testid="aff-preview-btn">
             {previewing ? (vi ? "Đang tính…" : "Computing…") : vi ? "Xem trước" : "Preview"}
-          </button>
+          </Button>
           <span className="text-xs text-slate-500" data-testid="aff-preview-source-mode">
             {sourceMode === "online" && job?.status === "COMPLETED"
               ? vi
@@ -590,15 +600,15 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                   : "I reviewed the result above. Units come from external sources, “Cross-checked” is not “Verified”, and authors without enough evidence stay “Unresolved”."}
               </span>
             </label>
-            <button
+            <Button
               type="button"
-              className={BUTTON_PRIMARY}
+              variant="primary"
               onClick={runApply}
               disabled={!preview.can_apply || !confirmed || applying}
               data-testid="aff-apply-btn"
             >
               {applying ? (vi ? "Đang áp dụng…" : "Applying…") : vi ? "Xác nhận áp dụng" : "Confirm and apply"}
-            </button>
+            </Button>
           </div>
         )}
       </Card>

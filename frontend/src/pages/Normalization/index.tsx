@@ -8,6 +8,7 @@ import {
 } from "../../api/imports";
 import { ApiError } from "../../api/client";
 import { useI18n } from "../../i18n";
+import { buttonClass } from "../../components/ui/Button";
 import { useToast } from "../../contexts/ToastContext";
 import ModalPortal from "../../components/common/ModalPortal";
 import ConfirmModal from "../../components/common/ConfirmModal";
@@ -18,7 +19,7 @@ import MatchingTab from "./MatchingTab";
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
 const badgeClassName =
-  "inline-flex h-6 w-32 items-center justify-center rounded-full border px-2.5 text-xs font-bold whitespace-nowrap";
+  "inline-flex h-badge shrink-0 items-center justify-center whitespace-nowrap rounded-full px-2.5 text-[11px] font-bold leading-none";
 
 function formatDate(isoString?: string | null): string {
   if (!isoString) return "—";
@@ -88,7 +89,7 @@ export default function NormalizationPage() {
     } catch (err: unknown) {
       toast.error(
         locale === "vi" ? "Lỗi tải dữ liệu" : "Data load error",
-        err instanceof ApiError ? err.message : "Không thể tải danh sách đợt nhập.",
+        err instanceof ApiError ? err.message : locale === "vi" ? "Không thể tải danh sách đợt nhập." : "Could not load the import batches.",
       );
     } finally {
       setLoading(false);
@@ -598,7 +599,7 @@ export default function NormalizationPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenDetailModal(item)}
-                                  className="inline-flex h-7 items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                                  className={buttonClass("tonal", "sm")}
                                 >
                                   <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -610,7 +611,7 @@ export default function NormalizationPage() {
                                   type="button"
                                   disabled={isBusy}
                                   onClick={() => void handleNormalize(item)}
-                                  className="inline-flex h-7 min-w-32 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 text-[11px] font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer disabled:opacity-50 whitespace-nowrap"
+                                  className={`${buttonClass("primary", "sm")} min-w-32`}
                                 >
                                   {isBusy ? (
                                     <>
@@ -659,7 +660,7 @@ export default function NormalizationPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={t.normalization.searchPlaceholder}
-                  className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+                  className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
                 />
               </div>
             </div>
@@ -768,7 +769,7 @@ export default function NormalizationPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetailModal(item)}
-                                className="inline-flex h-7 w-20 items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                                className={buttonClass("tonal", "sm")}
                               >
                                 <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -815,7 +816,7 @@ export default function NormalizationPage() {
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.max(1, prev - 1))}
                     disabled={currentHistoryPage <= 1}
-                    className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className={buttonClass("secondary", "sm")}
                   >
                     {locale === "vi" ? "Trang trước" : "Previous"}
                   </button>
@@ -837,7 +838,7 @@ export default function NormalizationPage() {
                     type="button"
                     onClick={() => setHistoryPage((prev) => Math.min(historyTotalPages, prev + 1))}
                     disabled={currentHistoryPage >= historyTotalPages}
-                    className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    className={buttonClass("secondary", "sm")}
                   >
                     {locale === "vi" ? "Trang sau" : "Next"}
                   </button>
@@ -876,7 +877,7 @@ export default function NormalizationPage() {
               onClick={() => setDetailModalItem(null)}
             />
 
-            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-[5px] bg-white shadow-2xl overflow-hidden z-10 animate-in zoom-in-95 duration-150">
+            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-card bg-white shadow-2xl overflow-hidden z-10 animate-in zoom-in-95 duration-150">
               {/* Modal Header */}
               <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/50">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1105,7 +1106,7 @@ export default function NormalizationPage() {
                     type="button"
                     disabled={Boolean(normalizingId)}
                     onClick={() => void handleNormalize(detailModalItem)}
-                    className="inline-flex min-w-36 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+                    className={buttonClass("primary")}
                   >
                     {normalizingId === detailModalItem.id ? (
                       <>
@@ -1126,7 +1127,7 @@ export default function NormalizationPage() {
                     type="button"
                     disabled={Boolean(normalizingId)}
                     onClick={() => setReNormalizeTarget(detailModalItem)}
-                    className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                    className={buttonClass("secondary")}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1138,7 +1139,7 @@ export default function NormalizationPage() {
                 <button
                   type="button"
                   onClick={() => setDetailModalItem(null)}
-                  className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
+                  className={buttonClass("secondary")}
                 >
                   {t.common.close}
                 </button>

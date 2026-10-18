@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { getMyLecturerPublications } from "../../api/lecturerScopus";
 import { useI18n } from "../../i18n";
+import Button, { buttonClass } from "../../components/ui/Button";
 import { LecturerPublication, LecturerPublicationsResponse } from "../../types/lecturerScopus";
 
 const PAGE_SIZE = 20;
@@ -29,6 +31,7 @@ const viCopy = {
   eid: "EID",
   doi: "DOI",
   citations: "Trích dẫn",
+  viewDetail: "Xem chi tiết công bố",
   authorPositions: "Vị trí tác giả",
   citationUnknown: "Chưa có dữ liệu",
   yearUnknown: "Chưa rõ năm",
@@ -66,6 +69,7 @@ const enCopy = {
   eid: "EID",
   doi: "DOI",
   citations: "Citations",
+  viewDetail: "View publication details",
   authorPositions: "Author positions",
   citationUnknown: "No data",
   yearUnknown: "Unknown year",
@@ -106,15 +110,15 @@ function LoadingState({ copy }: { copy: PublicationCopy }) {
     <div className="space-y-6" aria-label={copy.loading}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white shadow-sm" />
+          <div key={item} className="h-28 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="h-72 animate-pulse rounded-2xl border border-slate-200 bg-white shadow-sm" />
-        <div className="h-72 animate-pulse rounded-2xl border border-slate-200 bg-white shadow-sm" />
+        <div className="h-72 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />
+        <div className="h-72 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />
       </div>
       <div className="space-y-4">
-        {[0, 1].map((item) => <div key={item} className="h-44 animate-pulse rounded-2xl border border-slate-200 bg-white shadow-sm" />)}
+        {[0, 1].map((item) => <div key={item} className="h-44 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />)}
       </div>
     </div>
   );
@@ -138,19 +142,19 @@ function StateCard({
     : "border-blue-200 bg-blue-50 text-blue-900";
 
   return (
-    <div className={`rounded-2xl border p-6 shadow-sm ${toneClass}`} role="alert">
+    <div className={`rounded-card border p-6 shadow-sm ${toneClass}`} role="alert">
       <h2 className="text-base font-semibold">{title}</h2>
       <p className="mt-2 text-sm opacity-80">{message}</p>
-      <button type="button" onClick={onRetry} className="mt-5 rounded-lg bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-current/20 transition hover:bg-slate-50">
+      <Button variant="secondary" onClick={onRetry} className="mt-5">
         {retryLabel}
-      </button>
+      </Button>
     </div>
   );
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-card border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
     </section>
@@ -182,8 +186,20 @@ function PublicationCard({
     : formatNumber(publication.cited_by_count, locale);
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <h3 className="text-base font-bold leading-6 text-slate-900">{publication.title || copy.notAvailable}</h3>
+    <article className="rounded-card border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h3 className="text-base font-bold leading-6 text-slate-900">{publication.title || copy.notAvailable}</h3>
+        {/* W-02: the EID from the API is the publication route key (same as /publications). */}
+        <Link
+          to={`/publications/${encodeURIComponent(publication.eid)}`}
+          state={{ from: "/my-publications" }}
+          className={`${buttonClass("tonal", "sm")} self-start`}
+          aria-label={`${copy.viewDetail}: ${publication.title || publication.eid}`}
+          data-testid="my-publication-detail-link"
+        >
+          {copy.viewDetail}
+        </Link>
+      </div>
       <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Detail label={copy.year} value={year} />
         <Detail label={copy.sourceTitle} value={value(publication.source_title)} />
@@ -214,7 +230,7 @@ function YearBreakdown({
   const hasUnknownYear = aggregates.unknown_year_count > 0;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="rounded-card border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-base font-semibold text-slate-900">{copy.yearTitle}</h2>
       {buckets.length === 0 && !hasUnknownYear ? (
         <p className="mt-4 text-sm text-slate-500">{copy.noYearData}</p>
@@ -257,13 +273,13 @@ function PaginationControls({
 }) {
   return (
     <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Publication pagination">
-      <button type="button" onClick={onPrevious} disabled={disabled || currentPage <= 1} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+      <Button variant="secondary" onClick={onPrevious} disabled={disabled || currentPage <= 1}>
         {copy.previous}
-      </button>
+      </Button>
       <span className="text-sm font-medium text-slate-600" aria-live="polite">{copy.pageIndicator(currentPage, totalPages)}</span>
-      <button type="button" onClick={onNext} disabled={disabled || total === 0 || currentPage >= totalPages} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+      <Button variant="secondary" onClick={onNext} disabled={disabled || total === 0 || currentPage >= totalPages}>
         {copy.next}
-      </button>
+      </Button>
     </nav>
   );
 }
@@ -345,7 +361,7 @@ export default function MyPublicationsPage() {
         <StateCard title={copy.loadError} message={error} retryLabel={copy.retry} onRetry={retry} tone="error" />
       ) : null}
       {!loading && !error && !notLinked && paginationLoading ? (
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-900" role="status" aria-live="polite">
+        <div className="rounded-card border border-blue-200 bg-blue-50 p-5 text-sm text-blue-900" role="status" aria-live="polite">
           {copy.paginationLoading}
         </div>
       ) : null}
@@ -363,7 +379,7 @@ export default function MyPublicationsPage() {
           </section>
 
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <section className="rounded-card border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-base font-semibold text-slate-900">{copy.publicationsTitle}</h2>
               {response.items.length === 0 ? (
                 <div className="py-12 text-center">

@@ -128,6 +128,16 @@ export interface ReviewCandidateDetail {
     is_shared_scopus_author?: boolean;
     other_candidates: ReviewOtherCandidate[];
   };
+  /** Server-computed (D-2). Optional so an older backend without it still works; the server re-checks on submit. */
+  review_policy?: ReviewDecisionPolicy;
+}
+
+export type ReviewReasonTrigger = "NAME_EVIDENCE_ONLY" | "SHARED_SCOPUS_AUTHOR" | "MULTIPLE_CANDIDATES_FOR_LECTURER";
+
+export interface ReviewDecisionPolicy {
+  accept_reason_required: boolean;
+  accept_reason_triggers: ReviewReasonTrigger[];
+  reject_reason_required: boolean;
 }
 
 export type ReviewDecisionRequest =

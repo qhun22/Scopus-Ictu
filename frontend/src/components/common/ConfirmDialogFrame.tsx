@@ -1,5 +1,6 @@
 import React from "react";
 import ModalPortal from "./ModalPortal";
+import { buttonClass } from "../ui/Button";
 
 export type DialogTone = "danger" | "warning" | "primary";
 
@@ -25,7 +26,8 @@ const TONES: Record<
     header: "border-amber-100 bg-amber-50",
     title: "text-amber-800",
     subtitle: "text-amber-600",
-    button: "bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-300",
+    // PROPOSED: Figma 5:2 has no warning button; keep the amber colour on the shared button shape.
+    button: "border border-amber-600 bg-amber-600 text-white hover:bg-amber-700 focus-visible:ring-amber-300",
   },
   primary: {
     panel: "border-blue-200",
@@ -36,14 +38,22 @@ const TONES: Record<
   },
 };
 
-const focusRing = "focus-visible:outline-none focus-visible:ring-2";
+// Dialog buttons use the shared Button classes (Figma "Buttons" 5:2): Cancel = Secondary, extra action = Ghost,
+// Confirm = Primary / Danger. Warning has no Figma variant: the shared md shape with the amber colour (PROPOSED).
+export const dialogCancelButtonClass = buttonClass("secondary");
 
-export const dialogCancelButtonClass = `rounded-md border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 ${focusRing} focus-visible:ring-gray-300`;
+export const dialogSecondaryButtonClass = buttonClass("ghost");
 
-export const dialogSecondaryButtonClass = `rounded-md border border-amber-300 bg-white px-4 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50 ${focusRing} focus-visible:ring-amber-300`;
+const WARNING_SHAPE =
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap font-semibold leading-none transition-colors duration-150 cursor-pointer " +
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 " +
+  "h-control min-w-action gap-1.5 rounded-control px-4 text-[13px]";
 
 export function dialogConfirmButtonClass(tone: DialogTone, override?: string): string {
-  return `inline-flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed ${focusRing} ${override ?? TONES[tone].button}`;
+  if (override) return `${WARNING_SHAPE} ${override}`;
+  if (tone === "danger") return buttonClass("danger");
+  if (tone === "primary") return buttonClass("primary");
+  return `${WARNING_SHAPE} ${TONES.warning.button}`;
 }
 
 export function DialogSpinner() {
@@ -88,10 +98,10 @@ export default function ConfirmDialogFrame({
           aria-modal="true"
           aria-labelledby={titleId}
           aria-describedby={descId}
-          className={`max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border bg-white shadow-2xl ${styles.panel}`}
+          className={`max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-card border bg-white shadow-2xl ${styles.panel}`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className={`rounded-t-lg border-b px-5 py-4 ${styles.header}`}>
+          <div className={`rounded-t-card border-b px-5 py-4 ${styles.header}`}>
             <h2 id={titleId} className={`text-base font-semibold ${styles.title}`}>
               {title}
             </h2>
@@ -102,7 +112,7 @@ export default function ConfirmDialogFrame({
             {children}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-3">{footer}</div>
+          <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-5 py-3">{footer}</div>
         </div>
       </div>
     </ModalPortal>

@@ -468,6 +468,7 @@ export interface TranslationSchema {
     applyFilters: string;
     clearFilters: string;
     refresh: string;
+    retry: string;
     colTime: string;
     colAction: string;
     colTransition: string;
@@ -655,6 +656,17 @@ export interface TranslationSchema {
     confirmRejectOk: string;
     rejectReasonLabel: string;
     rejectReasonPlaceholder: string;
+    acceptReasonLabel: string;
+    acceptReasonOptionalLabel: string;
+    acceptReasonPlaceholder: string;
+    acceptReasonRequired: string;
+    acceptReasonRequiredTitle: string;
+    acceptReasonNotEvidence: string;
+    reasonTriggerNameOnly: string;
+    reasonTriggerSharedAuthor: string;
+    reasonTriggerMultipleCandidates: string;
+    decisionAccept: string;
+    decisionReject: string;
   };
   dashboard: {
     title: string;
@@ -666,6 +678,7 @@ export interface TranslationSchema {
     totalScopusAuthors: string;
     pendingReviews: string;
     identityTitle: string;
+    identityHint: string;
     identityCandidate: string;
     identityApproved: string;
     identityRejected: string;

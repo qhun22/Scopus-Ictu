@@ -20,7 +20,7 @@ import {
 } from "../../api/users";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import ModalPortal from "../../components/common/ModalPortal";
-import { BUTTON_DANGER, BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
+import Button, { buttonClass } from "../../components/ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
@@ -199,8 +199,8 @@ export default function LecturersPage() {
 
   const handleVersionConflict = async () => {
     toast.warning(
-      "Dữ liệu đã thay đổi",
-      "Thông tin giảng viên vừa được cập nhật ở nơi khác. Vui lòng tải lại.",
+      locale === "vi" ? "Dữ liệu đã thay đổi" : "Data has changed",
+      locale === "vi" ? "Thông tin giảng viên vừa được cập nhật ở nơi khác. Vui lòng tải lại." : "This lecturer was updated elsewhere. Please reload.",
     );
     setConfirmAction(null);
     setIsDetailModalOpen(false);
@@ -398,10 +398,10 @@ export default function LecturersPage() {
         );
       } else {
         toast.error(
-          "Không thể lưu thay đổi",
+          locale === "vi" ? "Không thể lưu thay đổi" : "Could not save changes",
           error instanceof ApiError
             ? error.message
-            : "Không thể cập nhật thông tin giảng viên. Vui lòng thử lại.",
+            : locale === "vi" ? "Không thể cập nhật thông tin giảng viên. Vui lòng thử lại." : "Could not update the lecturer. Please try again.",
         );
       }
     } finally {
@@ -412,17 +412,17 @@ export default function LecturersPage() {
   const requestPasswordReset = () => {
     const password = newPassword.trim();
     if (!password) {
-      setPasswordError("Vui lòng nhập mật khẩu mới.");
+      setPasswordError(locale === "vi" ? "Vui lòng nhập mật khẩu mới." : "Please enter a new password.");
       return;
     }
     if (password.length < 8) {
-      setPasswordError("Mật khẩu mới phải có ít nhất 8 ký tự.");
+      setPasswordError(locale === "vi" ? "Mật khẩu mới phải có ít nhất 8 ký tự." : "The new password must be at least 8 characters.");
       return;
     }
     if (isCurrentAccount) {
       toast.warning(
-        "Không thể đặt lại mật khẩu",
-        "Không thể đặt lại mật khẩu quản trị viên đang sử dụng từ màn hình quản trị người dùng.",
+        locale === "vi" ? "Không thể đặt lại mật khẩu" : "Cannot reset password",
+        locale === "vi" ? "Không thể đặt lại mật khẩu quản trị viên đang sử dụng từ màn hình quản trị người dùng." : "The password of the administrator currently signed in cannot be reset from user management.",
       );
       return;
     }
@@ -459,8 +459,8 @@ export default function LecturersPage() {
         );
         setNewPassword("");
         toast.success(
-          "Đã đặt lại mật khẩu",
-          `Mật khẩu của ${selectedLecturer.full_name} đã được cập nhật.`,
+          locale === "vi" ? "Đã đặt lại mật khẩu" : "Password reset",
+          locale === "vi" ? `Mật khẩu của ${selectedLecturer.full_name} đã được cập nhật.` : `The password of ${selectedLecturer.full_name} has been updated.`,
         );
       } else {
         const updated =
@@ -481,11 +481,11 @@ export default function LecturersPage() {
         );
         if (action === "lock") {
           toast.success(
-            "Đã khóa tài khoản",
-            `Tài khoản của ${selectedLecturer.full_name} đã bị khóa.`,
+            locale === "vi" ? "Đã khóa tài khoản" : "Account locked",
+            locale === "vi" ? `Tài khoản của ${selectedLecturer.full_name} đã bị khóa.` : `The account of ${selectedLecturer.full_name} has been locked.`,
           );
         } else {
-          toast.success("Đã mở khóa tài khoản", `${selectedLecturer.full_name} có thể đăng nhập lại.`);
+          toast.success(locale === "vi" ? "Đã mở khóa tài khoản" : "Account unlocked", locale === "vi" ? `${selectedLecturer.full_name} có thể đăng nhập lại.` : `${selectedLecturer.full_name} can sign in again.`);
         }
       }
       setConfirmAction(null);
@@ -495,20 +495,20 @@ export default function LecturersPage() {
         await handleVersionConflict();
       } else if (getErrorCode(error) === "CANNOT_LOCK_CURRENT_USER") {
         toast.warning(
-          "Không thể khóa tài khoản",
-          "Không thể khóa tài khoản đang sử dụng.",
+          locale === "vi" ? "Không thể khóa tài khoản" : "Cannot lock account",
+          locale === "vi" ? "Không thể khóa tài khoản đang sử dụng." : "The account currently signed in cannot be locked.",
         );
         setConfirmAction(null);
       } else if (getErrorCode(error) === "CANNOT_RESET_CURRENT_USER") {
         toast.warning(
-          "Không thể đặt lại mật khẩu",
-          "Không thể đặt lại mật khẩu quản trị viên đang sử dụng từ màn hình này.",
+          locale === "vi" ? "Không thể đặt lại mật khẩu" : "Cannot reset password",
+          locale === "vi" ? "Không thể đặt lại mật khẩu quản trị viên đang sử dụng từ màn hình này." : "The password of the administrator currently signed in cannot be reset from this screen.",
         );
         setConfirmAction(null);
       } else {
         toast.error(
-          "Không thể thực hiện thao tác",
-          error instanceof ApiError ? error.message : "Vui lòng thử lại sau.",
+          locale === "vi" ? "Không thể thực hiện thao tác" : "Action failed",
+          error instanceof ApiError ? error.message : locale === "vi" ? "Vui lòng thử lại sau." : "Please try again later.",
         );
       }
     } finally {
@@ -605,7 +605,7 @@ export default function LecturersPage() {
     } catch (err: any) {
       toast.error(
         locale === "vi" ? "Lỗi xuất dữ liệu" : "Export error",
-        err instanceof Error ? err.message : "Không thể xuất tệp JSON.",
+        err instanceof Error ? err.message : locale === "vi" ? "Không thể xuất tệp JSON." : "Could not export the JSON file.",
       );
     } finally {
       setIsExporting(false);
@@ -631,7 +631,7 @@ export default function LecturersPage() {
             type="button"
             disabled={isExporting}
             onClick={handleExportJson}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+            className={buttonClass("secondary", "md", true)}
           >
             {isExporting ? (
               <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -647,7 +647,7 @@ export default function LecturersPage() {
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
+            className={buttonClass("primary", "md", true)}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
@@ -770,7 +770,7 @@ export default function LecturersPage() {
             type="button"
             onClick={handleApplySearch}
             disabled={!hasUnappliedSearch || loading}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[5px] border border-[#3A5FC3] bg-[#3A5FC3] px-3 text-xs font-semibold text-white hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
+            className={buttonClass("primary")}
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -808,7 +808,7 @@ export default function LecturersPage() {
               setPage(1);
             }}
             disabled={!search && !appliedSearch && !activeFilter && !hasUnappliedSearch}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 transition-colors cursor-pointer shadow-2xs"
+            className={buttonClass("secondary")}
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -821,6 +821,11 @@ export default function LecturersPage() {
       {/* Lecturers Table */}
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
+          {/* UI-10 fix (P11.5): action column is now sticky-right so it stays visible when the
+               table overflows horizontally (e.g. sidebar expanded at 1024–1440px). The <table>
+               keeps w-full; overflow-x-auto on the wrapper handles horizontal scroll for the
+               non-sticky columns. A thin separator line is painted via the pseudo-element
+               shadow so the sticky column lifts visually when scrolled. */}
           <table aria-busy={isTableLoading} className="w-full text-left text-xs">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
@@ -830,7 +835,7 @@ export default function LecturersPage() {
                 <th className="px-4 py-3 font-semibold whitespace-nowrap">{locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept"}</th>
                 <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">{locale === "vi" ? "Tài khoản" : "Account"}</th>
                 <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
-                <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">{t.common.actions}</th>
+                <th className="sticky right-0 z-10 bg-slate-50/90 px-4 py-3 text-center font-semibold whitespace-nowrap border-l border-slate-200/80">{t.common.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -929,13 +934,13 @@ export default function LecturersPage() {
                         )}
                       </td>
 
-                      {/* Actions Column: [Chi tiết] [Xóa] */}
-                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                      {/* Actions Column: [Chi tiết] [Xóa] — sticky right (UI-10 fix P11.5) */}
+                      <td className="sticky right-0 z-10 bg-white px-3 py-3.5 text-center align-middle whitespace-nowrap border-l border-slate-100">
                         <div className="mx-auto grid w-52 grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleOpenDetailModal(lec)}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                            className={buttonClass("tonal", "sm", true)}
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -945,7 +950,7 @@ export default function LecturersPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenDeleteModal(lec)}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-[5px] border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap"
+                            className={"inline-flex h-7 w-full items-center justify-center gap-1 rounded-action border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100 cursor-pointer whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 disabled:cursor-not-allowed disabled:opacity-50"}
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1008,7 +1013,7 @@ export default function LecturersPage() {
                 type="button"
                 onClick={() => setPage(page - 1)}
                 disabled={isTableLoading || page <= 1}
-                className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className={buttonClass("secondary", "sm")}
               >
                 {t.lecturers.previousPage}
               </button>
@@ -1045,7 +1050,7 @@ export default function LecturersPage() {
                 type="button"
                 onClick={() => setPage(page + 1)}
                 disabled={isTableLoading || page >= totalPages}
-                className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className={buttonClass("secondary", "sm")}
               >
                 {t.lecturers.nextPage}
               </button>
@@ -1064,7 +1069,7 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-lecturer-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-[5px] bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
@@ -1211,9 +1216,9 @@ export default function LecturersPage() {
                         onChange={(e) => setAddForm({ ...addForm, academic_degree: e.target.value })}
                         className="h-10 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
                       >
-                        <option value="Cử nhân">Cử nhân / Kỹ sư</option>
-                        <option value="Thạc sĩ">Thạc sĩ</option>
-                        <option value="Tiến sĩ">Tiến sĩ</option>
+                        <option value="Cử nhân">{locale === "vi" ? "Cử nhân / Kỹ sư" : "Bachelor / Engineer"}</option>
+                        <option value="Thạc sĩ">{locale === "vi" ? "Thạc sĩ" : "Master"}</option>
+                        <option value="Tiến sĩ">{locale === "vi" ? "Tiến sĩ" : "Doctor (PhD)"}</option>
                         <option value="TS. GVC">TS. GVC</option>
                         <option value="PGS.TS">PGS.TS</option>
                         <option value="GS.TS">GS.TS</option>
@@ -1242,14 +1247,14 @@ export default function LecturersPage() {
                     type="button"
                     disabled={isSubmitting}
                     onClick={() => setIsAddModalOpen(false)}
-                    className="h-9 sm:h-10 rounded-[5px] border border-slate-200 bg-white px-4 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs"
+                    className={buttonClass("secondary")}
                   >
                     {t.common.cancel}
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="inline-flex h-9 sm:h-10 min-w-32 items-center justify-center gap-2 rounded-[5px] bg-[#3A5FC3] px-5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className={buttonClass("primary")}
                   >
                     {isSubmitting ? (
                       <>
@@ -1277,7 +1282,7 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="lecturer-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[5px] bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               <div className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
                 <h3 id="lecturer-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
@@ -1444,9 +1449,9 @@ export default function LecturersPage() {
                           className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         >
                           <option value="">{locale === "vi" ? "Chưa cập nhật" : "Not specified"}</option>
-                          <option value="Nam">Nam</option>
-                          <option value="Nữ">Nữ</option>
-                          <option value="Khác">Khác</option>
+                          <option value="Nam">{locale === "vi" ? "Nam" : "Male"}</option>
+                          <option value="Nữ">{locale === "vi" ? "Nữ" : "Female"}</option>
+                          <option value="Khác">{locale === "vi" ? "Khác" : "Other"}</option>
                         </select>
                       </div>
 
@@ -1607,31 +1612,33 @@ export default function LecturersPage() {
 
                         {isCurrentAccount && (
                           <p className="mt-2 text-[11px] font-medium text-amber-700">
-                            Không thể khóa hoặc đặt lại mật khẩu tài khoản đang sử dụng.
+                            {locale === "vi"
+                              ? "Không thể khóa hoặc đặt lại mật khẩu tài khoản đang sử dụng."
+                              : "The account currently signed in cannot be locked or have its password reset."}
                           </p>
                         )}
 
                         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                          <button
+                          <Button
                             type="button"
                             disabled={isDetailBusy || isCurrentAccount}
                             onClick={requestPasswordReset}
-                            className={BUTTON_SECONDARY}
+                            variant="secondary"
                           >
                             {locale === "vi" ? "Đặt lại mật khẩu" : "Reset password"}
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             disabled={isDetailBusy || isCurrentAccount}
                             onClick={() =>
                               setConfirmAction(selectedLecturer.account?.is_active ? "lock" : "unlock")
                             }
-                            className={selectedLecturer.account.is_active ? BUTTON_DANGER : BUTTON_PRIMARY}
+                            variant={selectedLecturer.account.is_active ? "danger" : "primary"}
                           >
                             {selectedLecturer.account.is_active
                               ? (locale === "vi" ? "Khóa tài khoản" : "Lock account")
                               : (locale === "vi" ? "Mở khóa tài khoản" : "Unlock account")}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     ) : (
@@ -1713,14 +1720,14 @@ export default function LecturersPage() {
                     type="button"
                     disabled={isDetailBusy}
                     onClick={() => setIsDetailModalOpen(false)}
-                    className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={buttonClass("secondary")}
                   >
                     {t.common.cancel}
                   </button>
                   <button
                     type="submit"
                     disabled={isDetailBusy}
-                    className="inline-flex min-w-28 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] disabled:cursor-not-allowed disabled:opacity-50"
+                    className={buttonClass("primary")}
                   >
                     {detailAction === "save" && (
                       <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />

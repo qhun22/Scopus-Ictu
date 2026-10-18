@@ -27,6 +27,7 @@ import LecturerDatasetImportCard, {
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
+import { buttonClass } from "../../components/ui/Button";
 
 const LECTURER_PREVIEW_ID = "__lecturer_preview__";
 
@@ -35,7 +36,7 @@ function replaceToken(template: string, token: string, value: string): string {
 }
 
 const badgeClassName =
-  "inline-flex h-6 w-32 items-center justify-center rounded-full border px-2.5 text-xs font-bold whitespace-nowrap";
+  "inline-flex h-badge shrink-0 items-center justify-center whitespace-nowrap rounded-full px-2.5 text-[11px] font-bold leading-none";
 const ACTIVE_STATUSES: ImportStatus[] = ["RECEIVED", "PARSING", "VALIDATED"];
 
 interface DuplicateWarning {
@@ -1086,7 +1087,7 @@ export default function ImportsPage() {
             type="button"
             disabled={uploading}
             onClick={handleHeaderAddClick}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            className={buttonClass("primary", "md", true)}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
@@ -1098,7 +1099,7 @@ export default function ImportsPage() {
             type="button"
             disabled={uploading}
             onClick={() => lecturerCardRef.current?.openFilePicker()}
-            className="h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.98] cursor-pointer disabled:opacity-50"
+            className={buttonClass("primary", "md", true)}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
@@ -1263,7 +1264,7 @@ export default function ImportsPage() {
                     type="button"
                     disabled={uploading}
                     onClick={exitScopusFile}
-                    className="h-9 rounded-[5px] border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 cursor-pointer shadow-2xs shrink-0"
+                    className={buttonClass("secondary")}
                   >
                     {t.imports.cancelFile}
                   </button>
@@ -1271,7 +1272,7 @@ export default function ImportsPage() {
                     type="button"
                     disabled={uploading}
                     onClick={() => void startImport()}
-                    className="relative overflow-hidden inline-flex h-9 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] disabled:cursor-wait disabled:opacity-80 cursor-pointer shrink-0"
+                    className={buttonClass("primary")}
                   >
                     {uploading ? (
                       <>
@@ -1423,7 +1424,7 @@ export default function ImportsPage() {
               type="button"
               disabled={pendingBusy !== null}
               onClick={() => void cancelPendingImport()}
-              className="inline-flex h-9 sm:h-10 w-40 items-center justify-center gap-2 rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition-all duration-150 active:scale-[0.97] disabled:opacity-60 disabled:cursor-wait cursor-pointer shadow-2xs"
+              className={buttonClass("secondary")}
             >
               {pendingBusy === "cancel" ? (
                 <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
@@ -1434,7 +1435,7 @@ export default function ImportsPage() {
               type="button"
               disabled={pendingBusy !== null || isActive || isFailed}
               onClick={confirmPendingImport}
-              className="relative overflow-hidden inline-flex h-9 sm:h-10 w-44 items-center justify-center gap-2 rounded-[5px] bg-gradient-to-r from-[#3A5FC3] to-[#2f4ea6] px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-sm transition-all duration-200 active:scale-[0.97] hover:from-[#2f4ea6] hover:to-[#243e8a] hover:shadow-md hover:-translate-y-px disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm cursor-pointer"
+              className={buttonClass("primary")}
             >
               {pendingBusy === "confirm" || isActive ? (
                 <>
@@ -1533,7 +1534,7 @@ export default function ImportsPage() {
               type="button"
               disabled={lecturerImporting || lecturerCancelling}
               onClick={() => void cancelLecturerPreview()}
-              className="inline-flex h-9 sm:h-10 w-40 items-center justify-center gap-2 rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition-all duration-150 active:scale-[0.97] disabled:opacity-60 disabled:cursor-wait cursor-pointer shadow-2xs"
+              className={buttonClass("secondary")}
             >
               {lecturerCancelling ? (
                 <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
@@ -1544,7 +1545,7 @@ export default function ImportsPage() {
               type="button"
               disabled={lecturerImporting || lecturerCancelling || summary.valid === 0}
               onClick={() => void handleConfirmLecturerImport()}
-              className="relative overflow-hidden inline-flex h-9 sm:h-10 w-44 items-center justify-center gap-2 rounded-[5px] bg-gradient-to-r from-[#3A5FC3] to-[#2f4ea6] px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-sm transition-all duration-200 active:scale-[0.97] hover:from-[#2f4ea6] hover:to-[#243e8a] hover:shadow-md hover:-translate-y-px disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm cursor-pointer"
+              className={buttonClass("primary")}
             >
               {lecturerImporting ? (
                 <>
@@ -1584,7 +1585,7 @@ export default function ImportsPage() {
               }
             }}
             placeholder={t.imports.searchPlaceholder}
-            className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+            className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
 
@@ -1594,7 +1595,7 @@ export default function ImportsPage() {
             type="button"
             disabled={isApplyDisabled}
             onClick={handleApplySearch}
-            className="relative overflow-hidden inline-flex h-9 w-28 items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-2.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-all duration-150 active:scale-[0.97] cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#3A5FC3] disabled:active:scale-100"
+            className={buttonClass("primary")}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -1613,7 +1614,7 @@ export default function ImportsPage() {
               setPage(1);
             }}
             disabled={!searchInput && !appliedSearch && statusFilter === "ALL"}
-            className="inline-flex h-9 w-28 items-center justify-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3] transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer shadow-2xs shrink-0"
+            className={buttonClass("secondary")}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1629,13 +1630,14 @@ export default function ImportsPage() {
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.imports.fileName}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.time}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
-                <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.common.status}</th>
-                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-44">{t.imports.actions}</th>
+                <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.imports.fileName}</th>
+                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
+                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.time}</th>
+                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
+                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
+                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.common.status}</th>
+                {/* UI-10: keep the actions column visible at every width (sticky right edge) */}
+                <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">{t.imports.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1667,7 +1669,7 @@ export default function ImportsPage() {
               ) : (
                 paginatedHistory.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3.5 align-middle whitespace-nowrap">
+                    <td className="px-3 py-3.5 align-middle whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className={`flex h-8 w-8 items-center justify-center rounded-[5px] border shrink-0 shadow-2xs ${
                           item.type === "LECTURERS"
@@ -1684,7 +1686,7 @@ export default function ImportsPage() {
                             </svg>
                           )}
                         </div>
-                        <div className="min-w-0 max-w-[180px] sm:max-w-[220px]">
+                        <div className="min-w-0 max-w-[180px]">
                           <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
                             {item.file_name}
                           </span>
@@ -1695,15 +1697,15 @@ export default function ImportsPage() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap font-medium">
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium">
                       {renderTypeBadge(item.type)}
                     </td>
 
-                    <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
                       {formatDate(item.created_at)}
                     </td>
 
-                    <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap font-bold text-emerald-600">
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-emerald-600">
                       <span>
                         {`${numberFormatter.format(item.type === "LECTURERS" ? item.imported_records : item.processed_records)} / ${numberFormatter.format(item.total_records)}`}
                       </span>
@@ -1714,20 +1716,20 @@ export default function ImportsPage() {
                       )}
                     </td>
 
-                    <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
                       {renderUserBadge(item.performed_by)}
                     </td>
 
-                    <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
                       {renderTableStatusBadge(item)}
                     </td>
 
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
                       <div className="mx-auto grid w-40 grid-cols-2 gap-1.5">
                         <button
                           type="button"
                           onClick={() => openDetail(item)}
-                          className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                          className={buttonClass("tonal", "sm", true)}
                         >
                           <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1740,7 +1742,7 @@ export default function ImportsPage() {
                             type="button"
                             onClick={() => handleOpenRestoreModal(item)}
                             title={locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility"}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-[5px] border border-blue-200 bg-blue-50/80 px-2 text-[11px] font-semibold text-[#3A5FC3] shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-blue-100 cursor-pointer whitespace-nowrap"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-action border border-blue-200 bg-blue-50/80 px-2 text-[11px] font-semibold text-[#3A5FC3] shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-blue-100 cursor-pointer whitespace-nowrap"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1753,7 +1755,7 @@ export default function ImportsPage() {
                             onClick={() => handleDeleteIntent(item)}
                             disabled={ACTIVE_STATUSES.includes(item.status)}
                             title={locale === "vi" ? "Xóa đợt nhập" : "Delete import"}
-                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-[5px] border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex h-7 w-full items-center justify-center gap-1 rounded-action border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:bg-rose-100 cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1799,7 +1801,7 @@ export default function ImportsPage() {
               type="button"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage <= 1 || isPageLoading}
-              className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className={buttonClass("secondary", "sm")}
             >
               {t.imports.previousPage}
             </button>
@@ -1822,7 +1824,7 @@ export default function ImportsPage() {
               type="button"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= totalPages || isPageLoading}
-              className="inline-flex h-8 items-center rounded-[5px] border border-slate-200 bg-white px-2.5 font-semibold text-slate-700 transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+              className={buttonClass("secondary", "sm")}
             >
               {t.imports.nextPage}
             </button>
@@ -1840,7 +1842,7 @@ export default function ImportsPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="import-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-[5px] bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-card bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
             >
               <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div className="flex items-center gap-2.5">
@@ -2173,7 +2175,7 @@ export default function ImportsPage() {
                     type="button"
                     disabled={detailLoading}
                     onClick={() => handleOpenCancelModal(detail)}
-                    className="inline-flex items-center gap-1.5 rounded-[5px] border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-50 cursor-pointer shadow-2xs"
+                    className={"inline-flex h-control min-w-action items-center justify-center gap-1.5 rounded-control border border-amber-300 bg-amber-50 px-4 text-[13px] font-semibold text-amber-800 hover:bg-amber-100 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"}
                   >
                     <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6L6 18" />
@@ -2185,7 +2187,7 @@ export default function ImportsPage() {
                     type="button"
                     disabled={detailLoading || isRestoring}
                     onClick={() => handleOpenRestoreModal(detail)}
-                    className="inline-flex items-center gap-1.5 rounded-[5px] border border-blue-300 bg-blue-50 px-4 py-2 text-xs font-semibold text-[#3A5FC3] hover:bg-blue-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                    className={buttonClass("secondary")}
                   >
                     <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -2197,7 +2199,7 @@ export default function ImportsPage() {
                     type="button"
                     disabled={detailLoading}
                     onClick={() => handleDeleteIntent(detail)}
-                    className="inline-flex items-center gap-1.5 rounded-[5px] border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                    className={buttonClass("danger")}
                   >
                     <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -2210,7 +2212,7 @@ export default function ImportsPage() {
                   type="button"
                   disabled={detailLoading}
                   onClick={() => setDetailOpen(false)}
-                  className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+                  className={buttonClass("secondary")}
                 >
                   {t.imports.close}
                 </button>

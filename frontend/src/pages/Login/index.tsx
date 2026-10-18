@@ -127,7 +127,7 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#eef2f7] px-4 py-10 sm:px-6">
-      <div className="w-full max-w-[960px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
+      <div className="w-full max-w-[960px] overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Cột trái: Branding ICTU */}
           <section className="flex flex-col items-center justify-center bg-[#fbfcfe] p-10 text-center md:border-r md:border-slate-200/80 md:p-14">
@@ -162,7 +162,7 @@ export default function LoginPage() {
             </h2>
 
             {googleNotice && (
-              <div className="mt-4 flex items-center justify-between rounded-lg border border-blue-100 bg-blue-50/80 px-4 py-3 text-xs text-blue-800">
+              <div className="mt-4 flex items-center justify-between rounded-[5px] border border-blue-100 bg-blue-50/80 px-4 py-3 text-xs text-blue-800">
                 <span>Tính năng Đăng nhập bằng Google sẽ khả dụng trong phiên bản M2.2.</span>
                 <button
                   type="button"
@@ -212,7 +212,7 @@ export default function LoginPage() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="Nhập địa chỉ email"
-                    className={`h-12 w-full rounded-lg border ${
+                    className={`h-12 w-full rounded-[5px] border ${
                       errors.email
                         ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
                         : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
@@ -266,7 +266,7 @@ export default function LoginPage() {
                     value={form.password}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    className={`h-12 w-full rounded-lg border ${
+                    className={`h-12 w-full rounded-[5px] border ${
                       errors.password
                         ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
                         : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
@@ -335,7 +335,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#3A5FC3] text-base font-bold text-white shadow-sm transition-all duration-200 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/40 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[5px] bg-[#3A5FC3] text-base font-bold text-white shadow-sm transition-all duration-200 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/40 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {loading && (
                     <svg
@@ -378,7 +378,7 @@ export default function LoginPage() {
                 type="button"
                 disabled
                 onClick={handleGoogleClick}
-                className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-medium text-slate-400 shadow-sm transition-all duration-200 opacity-80 sm:text-base"
+                className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-[5px] border border-slate-200 bg-slate-50 text-sm font-medium text-slate-400 shadow-sm transition-all duration-200 opacity-80 sm:text-base"
               >
                 {/* Google Multi-Color SVG Icon */}
                 <svg className="h-5 w-5 opacity-60" viewBox="0 0 24 24">

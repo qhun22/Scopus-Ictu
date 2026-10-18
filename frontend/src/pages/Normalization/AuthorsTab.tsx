@@ -14,6 +14,7 @@ import {
   ScopusImport,
 } from "../../api/imports";
 import { useI18n } from "../../i18n";
+import { buttonClass } from "../../components/ui/Button";
 import { useToast } from "../../contexts/ToastContext";
 import ModalPortal from "../../components/common/ModalPortal";
 
@@ -363,7 +364,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                           type="button"
                           onClick={() => void handleNormalizePublication(item)}
                           disabled={isNorm}
-                          className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer disabled:opacity-50"
+                          className={buttonClass("secondary", "sm")}
                         >
                           {isNorm ? (
                             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-[#3A5FC3]" />
@@ -379,7 +380,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                           type="button"
                           onClick={() => void handleNormalizeAuthors(item)}
                           disabled={isAuthorNorm}
-                          className="inline-flex items-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer disabled:opacity-50"
+                          className={buttonClass("primary", "sm")}
                         >
                           {isAuthorNorm ? (
                             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -503,7 +504,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                         <button
                           type="button"
                           onClick={() => void handleViewAuthorDetail(author)}
-                          className="inline-flex items-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                          className={buttonClass("tonal", "sm")}
                         >
                           <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -551,7 +552,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                 type="button"
                 onClick={() => setAuthorPage((prev) => Math.max(1, prev - 1))}
                 disabled={authorPage <= 1}
-                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className={buttonClass("secondary", "sm")}
               >
                 {locale === "vi" ? "Trang trước" : "Previous"}
               </button>
@@ -562,7 +563,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                 type="button"
                 onClick={() => setAuthorPage((prev) => Math.min(authorTotalPages, prev + 1))}
                 disabled={authorPage >= authorTotalPages}
-                className="rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 font-semibold text-slate-700 transition-colors hover:border-[#3A5FC3] hover:text-[#3A5FC3] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                className={buttonClass("secondary", "sm")}
               >
                 {locale === "vi" ? "Trang sau" : "Next"}
               </button>
@@ -575,7 +576,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
       {selectedAuthor && (
         <ModalPortal>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-lg rounded-[5px] border border-slate-200 bg-white shadow-2xl">
+            <div className="w-full max-w-lg rounded-card border border-slate-200 bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h2 className="text-base font-bold text-slate-800">
                   {t.normalization.authorsTab.detail.title}
@@ -650,7 +651,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                 <button
                   type="button"
                   onClick={() => setSelectedAuthor(null)}
-                  className="inline-flex items-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#2f4ea6] transition-colors cursor-pointer"
+                  className={buttonClass("secondary")}
                 >
                   {t.common.close}
                 </button>

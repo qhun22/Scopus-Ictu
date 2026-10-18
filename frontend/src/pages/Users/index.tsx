@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { User } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { createUser, getUsers } from "../../api/users";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
+import Button, { buttonClass } from "../../components/ui/Button";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
@@ -69,7 +69,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-[#3A5FC3] px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-[#3351AE] cursor-pointer"
+        className={buttonClass("primary")}
         data-testid="open-create-user"
       >
         + {vi ? "Thêm tài khoản" : "Add account"}
@@ -78,7 +78,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
   }
 
   return (
-    <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4 shadow-xs space-y-3" data-testid="create-user-form">
+    <div className="rounded-[5px] border border-violet-200 bg-violet-50/40 p-4 shadow-xs space-y-3" data-testid="create-user-form">
       <h3 className="text-sm font-bold text-slate-800">
         {vi ? "Tạo tài khoản LECTURER / REVIEWER" : "Create a LECTURER / REVIEWER account"}
       </h3>
@@ -92,7 +92,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
           <label className="text-[11px] font-semibold text-slate-600">Email</label>
           <input
             type="email"
-            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            className="mt-0.5 h-9 w-full rounded-[5px] border border-slate-300 px-2.5 text-xs"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             data-testid="create-user-email"
@@ -102,7 +102,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
           <label className="text-[11px] font-semibold text-slate-600">{vi ? "Họ và tên" : "Display name"}</label>
           <input
             type="text"
-            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            className="mt-0.5 h-9 w-full rounded-[5px] border border-slate-300 px-2.5 text-xs"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             data-testid="create-user-display-name"
@@ -112,7 +112,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
           <label className="text-[11px] font-semibold text-slate-600">{vi ? "Mật khẩu tạm" : "Temporary password"}</label>
           <input
             type="password"
-            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            className="mt-0.5 h-9 w-full rounded-[5px] border border-slate-300 px-2.5 text-xs"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={vi ? "Tối thiểu 8 ký tự" : "At least 8 characters"}
@@ -122,7 +122,7 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
         <div>
           <label className="text-[11px] font-semibold text-slate-600">{vi ? "Vai trò" : "Role"}</label>
           <select
-            className="mt-0.5 h-9 w-full rounded-lg border border-slate-300 px-2.5 text-xs"
+            className="mt-0.5 h-9 w-full rounded-[5px] border border-slate-300 px-2.5 text-xs"
             value={role}
             onChange={(e) => setRole(e.target.value as "LECTURER" | "REVIEWER")}
             data-testid="create-user-role"
@@ -138,25 +138,25 @@ function CreateUserForm({ locale, onCreated }: CreateUserFormProps) {
         </p>
       )}
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
-          className={BUTTON_PRIMARY}
+          variant="primary"
           onClick={submit}
           disabled={isSubmitting || !email.trim() || !displayName.trim() || password.length < 8}
           data-testid="create-user-submit"
         >
           {isSubmitting ? (vi ? "Đang tạo..." : "Creating...") : vi ? "Tạo tài khoản" : "Create account"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className={BUTTON_SECONDARY}
+          variant="secondary"
           onClick={() => {
             reset();
             setOpen(false);
           }}
         >
           {vi ? "Hủy" : "Cancel"}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -248,7 +248,7 @@ export default function UsersPage() {
           type="button"
           onClick={fetchUsers}
           disabled={loading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-50 cursor-pointer"
+          className={buttonClass("secondary")}
         >
           <svg
             className={`h-4 w-4 text-slate-500 ${loading ? "animate-spin" : ""}`}
@@ -271,29 +271,29 @@ export default function UsersPage() {
 
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-slate-500">{t.users.totalUsers}</span>
           <p className="mt-1 text-2xl font-black text-slate-800">{users.length}</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-blue-600">{t.roles.ADMIN_WITH_CODE}</span>
           <p className="mt-1 text-2xl font-black text-[#3A5FC3]">{countByRole("ADMIN")}</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-emerald-600">{t.roles.LECTURER_WITH_CODE}</span>
           <p className="mt-1 text-2xl font-black text-emerald-600">{countByRole("LECTURER")}</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-amber-600">{t.roles.REVIEWER_WITH_CODE}</span>
           <p className="mt-1 text-2xl font-black text-amber-600">{countByRole("REVIEWER")}</p>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1">
           <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,7 +305,7 @@ export default function UsersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.users.searchPlaceholder}
-            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+            className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
           />
         </div>
 
@@ -314,7 +314,7 @@ export default function UsersPage() {
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            className="h-9 rounded-[5px] border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
           >
             <option value="ALL">{t.roles.ALL}</option>
             <option value="ADMIN">{t.roles.ADMIN}</option>
@@ -325,7 +325,7 @@ export default function UsersPage() {
       </div>
 
       {/* Users Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xs">
+      <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
@@ -409,7 +409,7 @@ export default function UsersPage() {
           <span>
             {t.common.showingCount} <strong>{filteredUsers.length}</strong> {t.common.of} {users.length} {t.common.users}
           </span>
-          <span>Dữ liệu từ bảng quản trị <code>users</code></span>
+          <span>{locale === "vi" ? "Dữ liệu từ bảng quản trị" : "Data from the admin table"} <code>users</code></span>
         </div>
       </div>
     </div>

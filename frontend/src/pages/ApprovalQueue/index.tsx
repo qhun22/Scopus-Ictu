@@ -3,6 +3,7 @@ import {
   Alert,
   Button,
   Card,
+  ConfigProvider,
   Descriptions,
   Divider,
   Empty,
@@ -10,9 +11,14 @@ import {
   Modal,
   Space,
   Spin,
-  Tag,
   Typography,
 } from "antd";
+// Brand / danger colours and button radius from the design tokens (Figma 5:2), scoped to this page —
+// the only AntD consumer — so AntD primary/danger buttons (modal OK, Accept/Reject) match the Design System.
+const ANTD_THEME = {
+  token: { colorPrimary: "#3A5FC3", colorError: "#E11D48" },
+  components: { Button: { borderRadius: 6 } },
+};
 
 import {
   decideReviewCandidate,
@@ -24,6 +30,9 @@ import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n/I18nContext";
+import Badge from "../../components/ui/Badge";
+import { CANDIDATE_STATUS_TONE } from "../../components/ui/reviewTones";
+import { reconciliationLabel, ruleLabel, surfaceLabel } from "./ruleLabels";
 import type { TranslationSchema } from "../../i18n/types";
 import type {
   AmbiguityFilter,
@@ -34,6 +43,7 @@ import type {
   ReviewCandidateDetail,
   ReviewNameEvidence,
   ReviewQueueItem,
+  ReviewReasonTrigger,
 } from "../../types/review";
 
 const { Paragraph, Text } = Typography;
@@ -42,22 +52,19 @@ type EvidenceFilter = EvidenceCategory | "all";
 type AmbiguitySelection = AmbiguityFilter | "all";
 type T = TranslationSchema["approvalQueue"];
 
-const STATUS_COLORS: Record<CandidateStatus, string> = {
-  PENDING: "gold",
-  ACCEPTED: "green",
-  REJECTED: "red",
-  SUPERSEDED: "default",
-};
 
-const STATUS_BADGE_CLASS: Record<CandidateStatus, string> = {
-  PENDING: "border-amber-300 bg-amber-50 text-amber-700",
-  ACCEPTED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  REJECTED: "border-rose-200 bg-rose-50 text-rose-700",
-  SUPERSEDED: "border-slate-200 bg-slate-100 text-slate-600",
-};
-
-const badgeClassName =
-  "inline-flex h-6 items-center justify-center rounded-full border px-2.5 text-[11px] font-bold whitespace-nowrap";
+function reasonTriggerText(t: T, trigger: ReviewReasonTrigger): string {
+  switch (trigger) {
+    case "NAME_EVIDENCE_ONLY":
+      return t.reasonTriggerNameOnly;
+    case "SHARED_SCOPUS_AUTHOR":
+      return t.reasonTriggerSharedAuthor;
+    case "MULTIPLE_CANDIDATES_FOR_LECTURER":
+      return t.reasonTriggerMultipleCandidates;
+    default:
+      return trigger;
+  }
+}
 
 function statusLabels(t: T): Record<CandidateStatus, string> {
   return {
@@ -108,11 +115,13 @@ function provenanceText(t: T, ref: unknown): string {
   return values.length > 0 ? values.join(" · ") : t.sourceNoDescription;
 }
 
-function NameEvidenceCard({ t, evidence }: { t: T; evidence: ReviewNameEvidence }) {
+function NameEvidenceCard({ t, locale, evidence }: { t: T; locale: "vi" | "en"; evidence: ReviewNameEvidence }) {
   return (
     <div className="rounded-[5px] border border-slate-200 bg-slate-50/70 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Tag color="blue">{evidence.rule_id}</Tag>
+        <span className="text-sm font-semibold text-slate-800" title={evidence.rule_id} data-testid="name-rule-label">
+          {ruleLabel(evidence.rule_id, locale)}
+        </span>
         <Text type="secondary">{format(t.ruleVersionLabel, { version: evidence.rule_version })}</Text>
       </div>
       <Paragraph className="!mb-3 !mt-2 !text-slate-600">
@@ -136,7 +145,7 @@ function NameEvidenceCard({ t, evidence }: { t: T; evidence: ReviewNameEvidence 
             {displayValue(t, evidence.scopus_surface_value)}
           </div>
           <div className="mt-1 text-xs text-slate-500">
-            {evidence.scopus_surface_type && `${t.typeLabel}: ${evidence.scopus_surface_type}`}
+            {evidence.scopus_surface_type && `${t.typeLabel}: ${surfaceLabel(evidence.scopus_surface_type, locale)}`}
             {evidence.scopus_comparison_value &&
               `${evidence.scopus_surface_type ? " · " : ""}${t.comparisonValueLabel}: ${evidence.scopus_comparison_value}`}
           </div>
@@ -201,7 +210,7 @@ function emptyQueueCopy(
       const by = context.candidates_by_status;
       const others = Object.entries(by)
         .filter(([, count]) => count > 0)
-        .map(([name, count]) => `${name}: ${n(count)}`)
+        .map(([name, count]) => `${statusLabels(t)[name as CandidateStatus] ?? name}: ${n(count)}`)
         .join(" · ");
       return {
         title: t.emptyFilteredTitle,
@@ -233,8 +242,10 @@ export default function ApprovalQueuePage() {
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
 
   const [decisionAction, setDecisionAction] = useState<ReviewAction | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
+  const [decisionReason, setDecisionReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
+  // Triggers returned by the server on a 422; the server is the final authority even if the detail policy was stale.
+  const [serverReasonTriggers, setServerReasonTriggers] = useState<ReviewReasonTrigger[]>([]);
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
 
   const loadQueue = useCallback(async () => {
@@ -314,8 +325,9 @@ export default function ApprovalQueuePage() {
   const closeDecision = () => {
     if (decisionSubmitting) return;
     setDecisionAction(null);
-    setRejectReason("");
+    setDecisionReason("");
     setReasonError(null);
+    setServerReasonTriggers([]);
   };
 
   const refreshQueueAndDetail = useCallback(async () => {
@@ -339,12 +351,21 @@ export default function ApprovalQueuePage() {
     }
   };
 
-  const submitDecision = async () => {
-    if (!detail || !decisionAction) return;
+  const acceptReasonTriggers: ReviewReasonTrigger[] = Array.from(
+    new Set([...(detail?.review_policy?.accept_reason_triggers ?? []), ...serverReasonTriggers]),
+  );
+  const acceptReasonRequired = Boolean(detail?.review_policy?.accept_reason_required) || serverReasonTriggers.length > 0;
 
-    const trimmedReason = rejectReason.trim();
+  const submitDecision = async () => {
+    if (!detail || !decisionAction || decisionSubmitting) return;
+
+    const trimmedReason = decisionReason.trim();
     if (decisionAction === "REJECT" && !trimmedReason) {
       setReasonError(t.rejectReasonRequired);
+      return;
+    }
+    if (decisionAction === "ACCEPT" && acceptReasonRequired && !trimmedReason) {
+      setReasonError(t.acceptReasonRequired);
       return;
     }
 
@@ -357,6 +378,7 @@ export default function ApprovalQueuePage() {
           observation_id: detail.current_observation.observation_id,
           candidate_version: detail.candidate_version,
           action: "ACCEPT",
+          ...(trimmedReason ? { reason: trimmedReason } : {}),
         });
         toast.success(t.acceptSuccessTitle, t.acceptSuccessMessage);
       } else {
@@ -369,10 +391,18 @@ export default function ApprovalQueuePage() {
         toast.success(t.rejectSuccessTitle, t.rejectSuccessMessage);
       }
       setDecisionAction(null);
-      setRejectReason("");
+      setDecisionReason("");
+      setServerReasonTriggers([]);
       await refreshQueueAndDetail();
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError && error.status === 422 && error.code === "REVIEW_REASON_REQUIRED_FOR_WEAK_EVIDENCE") {
+        // Keep the modal open with the reviewer's input and show which conditions the server applied.
+        const body = error.body as { reason_triggers?: ReviewReasonTrigger[] } | null;
+        setServerReasonTriggers(Array.isArray(body?.reason_triggers) ? body.reason_triggers : []);
+        setReasonError(t.acceptReasonRequired);
+      } else if (error instanceof ApiError && error.status === 422 && error.code === "INVALID_REVIEW_REASON") {
+        setReasonError(decisionAction === "REJECT" ? t.rejectReasonRequired : t.acceptReasonRequired);
+      } else if (error instanceof ApiError && error.status === 409) {
         setDecisionAction(null);
         await handleConflict(error);
       } else {
@@ -387,6 +417,7 @@ export default function ApprovalQueuePage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
+    <ConfigProvider theme={ANTD_THEME}>
     <div className="app-page-container space-y-4 sm:space-y-5">
       {/* ── Page Header ──────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
@@ -534,52 +565,51 @@ export default function ApprovalQueuePage() {
                         <div className="mt-0.5 font-mono text-[10px] text-slate-400">{item.scopus_author.scopus_id}</div>
                       </td>
                       <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
-                        <span className={`${badgeClassName} ${STATUS_BADGE_CLASS[item.candidate_status]}`}>
+                        <Badge tone={CANDIDATE_STATUS_TONE[item.candidate_status]}>
                           {statusLabels(t)[item.candidate_status]}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-4 py-3.5 align-middle">
                         {item.publication_support_count > 0 && item.name_evidence_count === 0 ? (
                           <div>
-                            <span
-                              className="inline-flex h-5 items-center rounded-full border border-violet-200 bg-violet-50 px-2 text-[10px] font-bold text-violet-700"
-                              title={t.craweOnlyBadgeTooltip}
-                            >
+                            <Badge tone="violet" appearance="outline" title={t.craweOnlyBadgeTooltip}>
                               {t.craweOnlyBadge}
-                            </span>
+                            </Badge>
                             <div className="mt-1 text-[10px] text-slate-400">{format(t.craweOnlyCount, { count: item.publication_support_count })}</div>
                           </div>
                         ) : item.publication_support_count > 0 ? (
                           <div>
-                            <span className="inline-flex h-5 items-center rounded-full border border-cyan-200 bg-cyan-50 px-2 text-[10px] font-bold text-cyan-700">
+                            <Badge tone="info" appearance="outline">
                               {t.publicationSupportedBadge}
-                            </span>
+                            </Badge>
                             <div className="mt-1 text-[10px] text-slate-400">
                               {format(t.publicationSupportedCount, { publications: item.publication_support_count, names: item.name_evidence_count })}
                             </div>
                           </div>
                         ) : (
                           <div>
-                            <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-100 px-2 text-[10px] font-bold text-slate-600">
+                            <Badge tone="neutral" appearance="outline">
                               {t.nameOnlyBadge}
-                            </span>
+                            </Badge>
                             <div className="mt-1 text-[10px] text-slate-400">{format(t.nameOnlyCount, { count: item.name_evidence_count })}</div>
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-3.5 align-middle">
                         <div className="flex flex-col gap-1">
-                          <span className={`inline-flex h-5 w-fit items-center rounded-full border px-2 text-[10px] font-bold ${item.is_ambiguous ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-100 text-slate-600"}`}>
+                          <Badge tone={item.is_ambiguous ? "warning" : "neutral"} appearance="outline" className="w-fit">
                             {ambiguityText(t, item.candidate_count_for_lecturer)}
-                          </span>
+                          </Badge>
                           {item.is_shared_scopus_author && (
-                            <span
+                            <Badge
+                              tone="danger"
+                              appearance="outline"
+                              className="w-fit"
                               data-testid="shared-author-tag"
                               title={sharedAuthorText(t, item.candidate_count_for_scopus_author)}
-                              className="inline-flex h-5 w-fit items-center rounded-full border border-rose-200 bg-rose-50 px-2 text-[10px] font-bold text-rose-700"
                             >
                               {format(t.sharedBadge, { count: item.candidate_count_for_scopus_author ?? "?" })}
-                            </span>
+                            </Badge>
                           )}
                         </div>
                       </td>
@@ -702,7 +732,7 @@ export default function ApprovalQueuePage() {
                   <Descriptions.Item label={t.fieldScopusId}><Text code>{detail.scopus_author.scopus_id}</Text></Descriptions.Item>
                   <Descriptions.Item label={t.fieldNameVariants}>
                     {detail.scopus_author.name_variants.length > 0 ? (
-                      <Space wrap>{detail.scopus_author.name_variants.map((variant) => <Tag key={variant}>{variant}</Tag>)}</Space>
+                      <Space wrap>{detail.scopus_author.name_variants.map((variant) => <Badge key={variant} tone="neutral">{variant}</Badge>)}</Space>
                     ) : t.noNameVariants}
                   </Descriptions.Item>
                 </Descriptions>
@@ -711,7 +741,7 @@ export default function ApprovalQueuePage() {
 
             <Divider orientation="left">{t.sectionNameEvidence}</Divider>
             {detail.name_evidence.length > 0 ? (
-              <div className="space-y-3">{detail.name_evidence.map((evidence) => <NameEvidenceCard key={evidence.evidence_id} t={t} evidence={evidence} />)}</div>
+              <div className="space-y-3">{detail.name_evidence.map((evidence) => <NameEvidenceCard key={evidence.evidence_id} t={t} locale={locale} evidence={evidence} />)}</div>
             ) : detail.publication_evidence.length > 0 ? (
               <Alert
                 type="warning"
@@ -727,8 +757,10 @@ export default function ApprovalQueuePage() {
                 {detail.publication_evidence.map((evidence) => (
                   <div key={evidence.evidence_id} className="rounded-[5px] border border-slate-200 p-4">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Tag color={evidence.reconciliation === "DOI_EXACT" ? "green" : "blue"}>{evidence.reconciliation ?? t.reconciliationUnknown}</Tag>
-                      <Text type="secondary">{evidence.rule_id} · {format(t.ruleVersionLabel, { version: evidence.rule_version })}</Text>
+                      <Badge tone={evidence.reconciliation === "DOI_EXACT" ? "success" : "brand"} title={evidence.reconciliation ?? undefined}>
+                        {reconciliationLabel(evidence.reconciliation, locale, t.reconciliationUnknown)}
+                      </Badge>
+                      <Text type="secondary" title={evidence.rule_id}>{ruleLabel(evidence.rule_id, locale)} · {format(t.ruleVersionLabel, { version: evidence.rule_version })}</Text>
                     </div>
                     <div className="text-base font-semibold text-slate-900">{displayValue(t, evidence.title)}</div>
                     <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
@@ -772,7 +804,7 @@ export default function ApprovalQueuePage() {
                       <div className="font-medium text-slate-900">{candidate.scopus_author.preferred_name}</div>
                       <div className="font-mono text-xs text-slate-500">{candidate.scopus_author.scopus_id}</div>
                     </div>
-                    <Tag color={STATUS_COLORS[candidate.candidate_status]}>{statusLabels(t)[candidate.candidate_status]}</Tag>
+                    <Badge tone={CANDIDATE_STATUS_TONE[candidate.candidate_status]}>{statusLabels(t)[candidate.candidate_status]}</Badge>
                   </div>
                 ))}
               </div>
@@ -781,7 +813,7 @@ export default function ApprovalQueuePage() {
             <Divider />
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-slate-500">
-                {t.currentStatusLabel}: <Tag color={STATUS_COLORS[detail.candidate_status]}>{statusLabels(t)[detail.candidate_status]}</Tag>
+                {t.currentStatusLabel}: <Badge tone={CANDIDATE_STATUS_TONE[detail.candidate_status]}>{statusLabels(t)[detail.candidate_status]}</Badge>
               </div>
               {detail.candidate_status === "PENDING" && (
                 <Space wrap>
@@ -798,6 +830,7 @@ export default function ApprovalQueuePage() {
         open={decisionAction === "ACCEPT" && detail !== null}
         title={t.confirmAcceptTitle}
         okText={t.confirmAcceptOk}
+        okButtonProps={{ disabled: acceptReasonRequired && decisionReason.trim().length === 0 }}
         cancelText={t.cancel}
         confirmLoading={decisionSubmitting}
         closable={!decisionSubmitting}
@@ -812,8 +845,52 @@ export default function ApprovalQueuePage() {
               <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
               <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name}</Descriptions.Item>
               <Descriptions.Item label={t.fieldScopusId}><Text code>{detail.scopus_author.scopus_id}</Text></Descriptions.Item>
-              <Descriptions.Item label={t.fieldAction}><Tag color="green">ACCEPT</Tag></Descriptions.Item>
+              <Descriptions.Item label={t.fieldAction}><Badge tone="success">{t.decisionAccept}</Badge></Descriptions.Item>
             </Descriptions>
+            {acceptReasonRequired && (
+              <Alert
+                showIcon
+                type="warning"
+                data-testid="accept-reason-required"
+                message={t.acceptReasonRequiredTitle}
+                description={
+                  <ul className="m-0 list-disc pl-4">
+                    {acceptReasonTriggers.map((trigger) => (
+                      <li key={trigger}>{reasonTriggerText(t, trigger)}</li>
+                    ))}
+                  </ul>
+                }
+              />
+            )}
+            <div>
+              <label htmlFor="review-accept-reason" className="mb-1.5 block font-semibold text-slate-700">
+                {acceptReasonRequired ? (
+                  <>
+                    {t.acceptReasonLabel} <span className="text-rose-600">*</span>
+                  </>
+                ) : (
+                  t.acceptReasonOptionalLabel
+                )}
+              </label>
+              <Input.TextArea
+                id="review-accept-reason"
+                className="mb-5"
+                value={decisionReason}
+                rows={3}
+                maxLength={4000}
+                showCount
+                aria-required={acceptReasonRequired}
+                aria-invalid={Boolean(reasonError)}
+                status={reasonError ? "error" : undefined}
+                placeholder={t.acceptReasonPlaceholder}
+                onChange={(event) => {
+                  setDecisionReason(event.target.value);
+                  if (event.target.value.trim()) setReasonError(null);
+                }}
+              />
+              {reasonError && <div className="mt-1 text-sm text-rose-600" role="alert">{reasonError}</div>}
+              <div className="mt-1 text-xs text-slate-500">{t.acceptReasonNotEvidence}</div>
+            </div>
           </div>
         )}
       </Modal>
@@ -822,7 +899,7 @@ export default function ApprovalQueuePage() {
         open={decisionAction === "REJECT" && detail !== null}
         title={t.rejectModalTitle}
         okText={t.confirmRejectOk}
-        okButtonProps={{ danger: true, disabled: rejectReason.trim().length === 0 }}
+        okButtonProps={{ danger: true, disabled: decisionReason.trim().length === 0 }}
         cancelText={t.cancel}
         confirmLoading={decisionSubmitting}
         closable={!decisionSubmitting}
@@ -835,7 +912,7 @@ export default function ApprovalQueuePage() {
             <Descriptions size="small" column={1} colon={false}>
               <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
               <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name} ({detail.scopus_author.scopus_id})</Descriptions.Item>
-              <Descriptions.Item label={t.fieldAction}><Tag color="red">REJECT</Tag></Descriptions.Item>
+              <Descriptions.Item label={t.fieldAction}><Badge tone="danger">{t.decisionReject}</Badge></Descriptions.Item>
             </Descriptions>
             <div>
               <label htmlFor="review-reject-reason" className="mb-1.5 block font-semibold text-slate-700">
@@ -843,22 +920,24 @@ export default function ApprovalQueuePage() {
               </label>
               <Input.TextArea
                 id="review-reject-reason"
-                value={rejectReason}
+                className="mb-5"
+                value={decisionReason}
                 rows={4}
                 maxLength={4000}
                 showCount
                 status={reasonError ? "error" : undefined}
                 placeholder={t.rejectReasonPlaceholder}
                 onChange={(event) => {
-                  setRejectReason(event.target.value);
+                  setDecisionReason(event.target.value);
                   if (event.target.value.trim()) setReasonError(null);
                 }}
               />
-              {reasonError && <div className="mt-1 text-sm text-rose-600">{reasonError}</div>}
+              {reasonError && <div className="mt-1 text-sm text-rose-600" role="alert">{reasonError}</div>}
             </div>
           </div>
         )}
       </Modal>
     </div>
+    </ConfigProvider>
   );
 }

@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n";
+import Button from "../../components/ui/Button";
 
 interface OverviewCard {
   title: string;
@@ -483,7 +484,7 @@ export default function HomePage() {
                 value={searchQuery}
                 onChange={handleSearchChange}
                 placeholder={t.home.quickSearchPlaceholder}
-                className="h-10 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-9 text-xs text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+                className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-9 text-[13px] text-ink placeholder:text-ink-faint transition-all focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
               {searchQuery && (
                 <button
@@ -499,12 +500,9 @@ export default function HomePage() {
               )}
             </div>
 
-            <button
-              type="submit"
-              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-5 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 sm:text-sm"
-            >
-              <span>{t.home.searchBtn}</span>
-            </button>
+            <Button type="submit" variant="primary">
+              {t.home.searchBtn}
+            </Button>
           </div>
 
           {searchError && (

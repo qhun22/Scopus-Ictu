@@ -66,7 +66,7 @@ function IdentitySkeleton({ copy }: { copy: IdentityCopy }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2" aria-label={copy.loading}>
       {[0, 1].map((item) => (
-        <div key={item} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div key={item} className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="h-5 w-48 animate-pulse rounded bg-slate-100" />
           <div className="mt-5 space-y-4">
             {[0, 1, 2, 3].map((line) => <div key={line} className="h-4 w-full animate-pulse rounded bg-slate-100" />)}
@@ -79,10 +79,10 @@ function IdentitySkeleton({ copy }: { copy: IdentityCopy }) {
 
 function StateCard({ copy, message, onRetry, title }: { copy: IdentityCopy; message: string; onRetry: () => void; title: string }) {
   return (
-    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-900 shadow-sm" role="alert">
+    <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-6 text-rose-900 shadow-sm" role="alert">
       <h2 className="text-base font-semibold">{title}</h2>
       <p className="mt-2 text-sm text-rose-800">{message}</p>
-      <button type="button" onClick={onRetry} className="mt-5 rounded-lg bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-rose-300 transition hover:bg-rose-50">
+      <button type="button" onClick={onRetry} className="mt-5 rounded-[5px] bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-rose-300 transition hover:bg-rose-50">
         {copy.retry}
       </button>
     </div>
@@ -92,7 +92,7 @@ function StateCard({ copy, message, onRetry, title }: { copy: IdentityCopy; mess
 function IdentityCard({ identity, copy, locale }: { identity: ApprovedScopusIdentity; copy: IdentityCopy; locale: string }) {
   const fallback = "—";
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <article className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{copy.identity}</p>
@@ -124,7 +124,7 @@ function IdentityCard({ identity, copy, locale }: { identity: ApprovedScopusIden
         {identity.evidence.length > 0 ? (
           <div className="mt-3 space-y-3">
             {identity.evidence.map((item, index) => (
-              <dl key={`${item.evidence_type}-${item.created_at}-${index}`} className="grid gap-2 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-3">
+              <dl key={`${item.evidence_type}-${item.created_at}-${index}`} className="grid gap-2 rounded-[5px] bg-slate-50 p-3 text-sm sm:grid-cols-3">
                 <div><dt className="text-xs text-slate-400">{copy.evidenceType}</dt><dd className="mt-1 font-medium text-slate-700">{item.evidence_type || fallback}</dd></div>
                 <div><dt className="text-xs text-slate-400">{copy.direction}</dt><dd className="mt-1 font-medium text-slate-700">{item.direction || fallback}</dd></div>
                 <div><dt className="text-xs text-slate-400">{copy.recordedAt}</dt><dd className="mt-1 font-medium text-slate-700">{formatDate(item.created_at, locale)}</dd></div>
@@ -189,7 +189,7 @@ export default function IdentityPage() {
       {loading ? <IdentitySkeleton copy={copy} /> : null}
       {!loading && error ? <StateCard copy={copy} title={copy.loadError} message={error} onRetry={loadIdentities} /> : null}
       {!loading && !error && identities.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
+        <div className="rounded-[5px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">{copy.emptyTitle}</h2>
           <p className="mt-2 text-sm text-slate-500">{copy.emptyMessage}</p>
         </div>

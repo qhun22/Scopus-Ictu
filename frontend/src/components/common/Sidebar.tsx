@@ -158,7 +158,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
       onClick={isMobile ? onCloseMobile : undefined}
       title={isCollapsed && !isMobile ? item.label : undefined}
       className={({ isActive }) =>
-        `group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-all ${
+        `group relative flex items-center gap-3 rounded-[5px] px-3.5 py-2.5 text-sm font-medium transition-all ${
           isActive
             ? "bg-[#3A5FC3]/10 text-[#3A5FC3] font-semibold shadow-xs"
             : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900"
@@ -235,7 +235,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
         {/* Footer */}
         <div className="border-t border-slate-200/80 p-3">
           <div
-            className={`flex items-center rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500 ${
+            className={`flex items-center rounded-[5px] bg-slate-50 px-3 py-2 text-xs text-slate-500 ${
               isCollapsed ? "justify-center" : "justify-between"
             }`}
           >
@@ -272,7 +272,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
               <button
                 type="button"
                 onClick={onCloseMobile}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus:outline-none"
+                className="flex h-8 w-8 items-center justify-center rounded-[5px] text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus:outline-none"
                 aria-label="Đóng menu"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

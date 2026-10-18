@@ -7,7 +7,7 @@ import {
   previewCrawIngestion,
 } from "../../api/matching";
 import { ApiError } from "../../api/client";
-import { BUTTON_PRIMARY, BUTTON_SECONDARY } from "../../components/common/buttonStyles";
+import Button from "../../components/ui/Button";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 
@@ -150,9 +150,9 @@ export default function MatchingTab({ locale }: { locale: Locale }) {
             : "The system uses publication data already collected from the university's archive to add information for lecturers who already have a profile (matched through each person's ICTU profile page). This does not confirm a Scopus author identity on its own — that happens later, during review."}
         </p>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button type="button" className={BUTTON_SECONDARY} onClick={runPreview} disabled={previewing || applying} data-testid="craw-preview-btn">
+          <Button type="button" variant="secondary" onClick={runPreview} disabled={previewing || applying} data-testid="craw-preview-btn">
             {previewing ? (vi ? "Đang tính toán…" : "Computing…") : vi ? "Xem trước dữ liệu" : "Preview data"}
-          </button>
+          </Button>
           <span className="text-xs text-slate-500">
             {vi ? "Chỉ xem trước, chưa ghi dữ liệu nào vào hệ thống." : "Preview only — nothing is saved yet."}
           </span>
@@ -220,15 +220,15 @@ export default function MatchingTab({ locale }: { locale: Locale }) {
                   : "I have reviewed the result above. I understand this does not create or confirm any link between a lecturer and a Scopus author."}
               </span>
             </label>
-            <button
+            <Button
               type="button"
-              className={BUTTON_PRIMARY}
+              variant="primary"
               onClick={runApply}
               disabled={!preview.can_apply || !confirmed || applying}
               data-testid="craw-apply-btn"
             >
               {applying ? (vi ? "Đang bổ sung dữ liệu…" : "Adding data…") : vi ? "Xác nhận bổ sung dữ liệu" : "Confirm and add data"}
-            </button>
+            </Button>
           </div>
         )}
       </Card>
@@ -242,9 +242,9 @@ export default function MatchingTab({ locale }: { locale: Locale }) {
             ? "Hệ thống so sánh tên giảng viên với tên tác giả trên Scopus, kết hợp thông tin công bố đã biết (nếu có từ bước 1), để tạo ra danh sách các cặp giảng viên – tác giả Scopus cần người xét duyệt kiểm tra. Đây chỉ là đề xuất, chưa phải danh tính đã được xác nhận. Có thể chạy lại nhiều lần một cách an toàn: không ghi đè quyết định mà REVIEWER đã duyệt hoặc từ chối trước đó, không tự động nâng một đề xuất lên trạng thái đã xác nhận."
             : "The system compares lecturer names with Scopus author names, combined with known publication evidence (from step 1, if any), to produce a list of lecturer–Scopus author pairs for a reviewer to check. These are proposals only, not confirmed identities. It is safe to re-run at any time: it never overwrites a REVIEWER's prior accept/reject decision, and never auto-promotes a proposal to confirmed."}
         </p>
-        <button type="button" className={BUTTON_PRIMARY} onClick={runGenerate} disabled={generating} data-testid="generate-candidates-btn">
+        <Button type="button" variant="primary" onClick={runGenerate} disabled={generating} data-testid="generate-candidates-btn">
           {generating ? (vi ? "Đang tìm kiếm…" : "Searching…") : vi ? "Tạo danh sách đề xuất" : "Create proposed pairs"}
-        </button>
+        </Button>
 
         {generationMessage && (
           <p className={`mt-3 text-xs font-medium ${generationMessage.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="generate-message">

@@ -79,6 +79,8 @@ export default function Header({
 
 
   const getPageTitle = () => {
+    // Publication detail (/publications/:eid) belongs to the "Công bố" section, not the generic "Hệ thống" fallback.
+    if (location.pathname.startsWith("/publications/")) return t.nav.publications;
     switch (location.pathname) {
       case "/home":
         return t.nav.home;
@@ -124,7 +126,7 @@ export default function Header({
         <button
           type="button"
           onClick={onToggleMobileMenu}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:hidden focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[5px] border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:hidden focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
           aria-label={t.header.openMenu}
         >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,7 +138,7 @@ export default function Header({
         <button
           type="button"
           onClick={onToggleSidebarCollapse}
-          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:flex focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-[5px] border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 md:flex focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
           title={isSidebarCollapsed ? t.header.expandSidebar : t.header.collapseSidebar}
           aria-label={isSidebarCollapsed ? t.header.expandSidebar : t.header.collapseSidebar}
         >
@@ -163,7 +165,7 @@ export default function Header({
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Language Switcher: VI | EN */}
         <div
-          className="flex h-10 items-center gap-0.5 sm:gap-1 rounded-lg border border-slate-200 bg-white p-0.5 sm:p-1 shadow-2xs"
+          className="flex h-10 items-center gap-0.5 sm:gap-1 rounded-[5px] border border-slate-200 bg-white p-0.5 sm:p-1 shadow-2xs"
           role="group"
           aria-label="Language selector"
         >
@@ -171,7 +173,7 @@ export default function Header({
             type="button"
             disabled={isLanguageSwitching || locale === "vi"}
             onClick={() => setLocale("vi")}
-            className={`flex h-full items-center justify-center rounded-md px-2.5 sm:px-3 text-xs transition-all ${
+            className={`flex h-full items-center justify-center rounded-[5px] px-2.5 sm:px-3 text-xs transition-all ${
               locale === "vi"
                 ? "bg-[#3A5FC3] text-white font-bold shadow-xs cursor-default"
                 : "text-slate-600 hover:text-slate-900 font-semibold hover:bg-slate-50 cursor-pointer"
@@ -186,7 +188,7 @@ export default function Header({
             type="button"
             disabled={isLanguageSwitching || locale === "en"}
             onClick={() => setLocale("en")}
-            className={`flex h-full items-center justify-center rounded-md px-2.5 sm:px-3 text-xs transition-all ${
+            className={`flex h-full items-center justify-center rounded-[5px] px-2.5 sm:px-3 text-xs transition-all ${
               locale === "en"
                 ? "bg-[#3A5FC3] text-white font-bold shadow-xs cursor-default"
                 : "text-slate-600 hover:text-slate-900 font-semibold hover:bg-slate-50 cursor-pointer"
@@ -203,7 +205,7 @@ export default function Header({
           <button
             type="button"
             onClick={() => setDropdownOpen((prev) => !prev)}
-            className="flex h-10 items-center gap-1.5 sm:gap-2.5 rounded-lg border border-slate-200 bg-slate-50/70 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left transition-colors hover:bg-slate-100/90 focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            className="flex h-10 items-center gap-1.5 sm:gap-2.5 rounded-[5px] border border-slate-200 bg-slate-50/70 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left transition-colors hover:bg-slate-100/90 focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
             aria-expanded={dropdownOpen}
             aria-haspopup="true"
           >
@@ -239,7 +241,7 @@ export default function Header({
                 type="button"
                 disabled={isLoggingOut}
                 onClick={handleLogout}
-                className="group flex h-10 w-full cursor-pointer items-center gap-1.5 sm:gap-2.5 rounded-lg border border-slate-200 bg-slate-50/95 hover:bg-rose-50/90 hover:border-rose-200 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left shadow-lg backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:opacity-50"
+                className="group flex h-10 w-full cursor-pointer items-center gap-1.5 sm:gap-2.5 rounded-[5px] border border-slate-200 bg-slate-50/95 hover:bg-rose-50/90 hover:border-rose-200 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left shadow-lg backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:opacity-50"
               >
                 <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm shrink-0 transition-transform group-hover:scale-105">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

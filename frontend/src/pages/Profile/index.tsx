@@ -61,7 +61,7 @@ function ProfileSkeleton({ copy }: { copy: ProfileCopy }) {
   return (
     <div className="space-y-6" aria-label={copy.loading}>
       {[copy.basic, copy.academic, copy.organization].map((section) => (
-        <section key={section} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section key={section} className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 h-5 w-44 animate-pulse rounded bg-slate-100" />
           <div className="grid gap-5 sm:grid-cols-2">
             {[0, 1, 2, 3].map((item) => (
@@ -95,13 +95,13 @@ function StateCard({
     : "border-blue-200 bg-blue-50 text-blue-900";
 
   return (
-    <div className={`rounded-2xl border p-6 shadow-sm ${toneClass}`} role="alert">
+    <div className={`rounded-[5px] border p-6 shadow-sm ${toneClass}`} role="alert">
       <h2 className="text-base font-semibold">{title}</h2>
       <p className="mt-2 text-sm opacity-80">{message}</p>
       <button
         type="button"
         onClick={onAction}
-        className="mt-5 rounded-lg bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-current/20 transition hover:bg-slate-50"
+        className="mt-5 rounded-[5px] bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-current/20 transition hover:bg-slate-50"
       >
         {actionLabel}
       </button>
@@ -180,7 +180,7 @@ export default function ProfilePage() {
 
       {!loading && !error && !notLinked && profile ? (
         <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">{copy.basic}</h2>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <Field label={copy.fullName} value={value(profile.full_name)} />
@@ -189,7 +189,7 @@ export default function ProfilePage() {
             </dl>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">{copy.academic}</h2>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <Field label={copy.academicRank} value={value(profile.academic_rank)} />
@@ -198,7 +198,7 @@ export default function ProfilePage() {
             </dl>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">{copy.organization}</h2>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2">
               <Field label={copy.department} value={value(profile.department)} />
@@ -206,7 +206,7 @@ export default function ProfilePage() {
             </dl>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-base font-semibold text-slate-900">{copy.research}</h2>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2">
               <Field label={copy.orcid} value={value(profile.orcid)} />

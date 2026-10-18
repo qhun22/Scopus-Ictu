@@ -97,6 +97,26 @@ export interface AffiliationSummaryRead {
   note?: string;
 }
 
+export type LinkEvidenceLevel = "IDENTIFIER_SUPPORT" | "PUBLICATION_SUPPORT" | "NAME_ONLY" | "NO_RECORDED_EVIDENCE";
+
+/** D-3: what an approved link rests on (identity_evidence rows only; a review decision is never evidence). */
+export interface LinkEvidenceBasisRead {
+  level: LinkEvidenceLevel;
+  supporting_evidence_types: string[];
+  contradicting_evidence_types: string[];
+  identifier_evidence_count: number;
+  publication_evidence_count: number;
+  name_evidence_count: number;
+  affiliation_evidence_count: number;
+  independently_verified: boolean;
+}
+
+export interface LinkReviewDecisionRead {
+  action: "ACCEPT";
+  decided_at: string;
+  reason: string | null;
+}
+
 export interface PublicationLecturerLinkRead {
   author_order: number;
   scopus_id: string;
@@ -105,6 +125,10 @@ export interface PublicationLecturerLinkRead {
   department: string | null;
   faculty: string | null;
   orcid: string | null;
+  // Additive (D-3); absent on an older backend.
+  link_status?: "APPROVED";
+  evidence_basis?: LinkEvidenceBasisRead | null;
+  review_decision?: LinkReviewDecisionRead | null;
 }
 
 export interface PublicationProvenanceRead {

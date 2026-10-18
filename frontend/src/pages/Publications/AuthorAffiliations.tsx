@@ -93,20 +93,13 @@ function evidenceLine(a: AuthorAffiliationRead, locale: Locale): string {
 }
 const sourceLabel = (s: string) => SOURCE_LABEL[s] ?? s;
 
-export function AffiliationBadge({
-  status,
-  locale,
-  small = false,
-}: {
-  status: AffiliationLinkStatus;
-  locale: Locale;
-  small?: boolean;
-}) {
+// Status badge per Figma "Status Badges" (5:34): pill, 23px high, 10px horizontal padding, width fits content.
+export function AffiliationBadge({ status, locale }: { status: AffiliationLinkStatus; locale: Locale }) {
   return (
     <span
       title={statusHint(status, locale)}
       data-testid={`aff-badge-${status}`}
-      className={`inline-flex items-center whitespace-nowrap rounded border font-bold ${small ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-[11px]"} ${STATUS_STYLE[status]}`}
+      className={`inline-flex h-[23px] shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 text-[11px] font-bold ${STATUS_STYLE[status]}`}
     >
       {statusLabel(status, locale)}
     </span>
@@ -170,7 +163,7 @@ export function AffiliationSummaryBar({
         </span>
         {items.map((i) => (
           <span key={i.key} className="inline-flex items-center gap-1">
-            <AffiliationBadge status={i.status} locale={locale} small />
+            <AffiliationBadge status={i.status} locale={locale} />
             <span>
               {counts[i.key]} {vi ? "tác giả" : counts[i.key] === 1 ? "author" : "authors"} {i.label}
             </span>
@@ -197,7 +190,7 @@ function OverrideNote({ override, locale }: { override: AffiliationOverrideRead;
         <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">
           {vi ? "ADMIN rà soát thủ công" : "ADMIN manual review"}
         </span>
-        <AffiliationBadge status={override.confidence} locale={locale} small />
+        <AffiliationBadge status={override.confidence} locale={locale} />
       </div>
       <p className="mt-1 font-medium text-slate-700">{override.affiliation_text}</p>
       <p className="mt-0.5 text-slate-500">
@@ -299,7 +292,7 @@ export function AuthorAffiliationCell({
           {affiliations.map((a, i) => (
             <li key={`${a.source_system}-${i}`} className="leading-snug" data-testid="aff-item">
               <div className="flex flex-wrap items-center gap-1.5">
-                <AffiliationBadge status={a.link_status} locale={locale} small />
+                <AffiliationBadge status={a.link_status} locale={locale} />
                 <span className="rounded bg-slate-100 px-1.5 text-[10px] font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
                 <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
               </div>

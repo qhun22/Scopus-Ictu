@@ -118,7 +118,7 @@ export default function DuplicateImportDialog({
             className={dialogConfirmButtonClass("warning")}
           >
             {loading && <DialogSpinner />}
-            <span>{loading ? "Đang xử lý..." : copy.importAnyway}</span>
+            <span>{loading ? t.common.processing : copy.importAnyway}</span>
           </button>
         </>
       }

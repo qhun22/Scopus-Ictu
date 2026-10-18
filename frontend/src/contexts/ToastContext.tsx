@@ -160,7 +160,7 @@ function ToastCard({ toast, onClose }: ToastComponentProps) {
       role="status"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="pointer-events-auto relative flex w-full max-w-[290px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 animate-in fade-in slide-in-from-top-2"
+      className="pointer-events-auto relative flex w-full max-w-[290px] flex-col overflow-hidden rounded-[5px] border border-slate-200 bg-white p-3 shadow-sm transition-all duration-200 animate-in fade-in slide-in-from-top-2"
     >
       {/* Header hàng ngang: [Icon Thư Viện] - Tiêu đề - [X] hoàn toàn thẳng hàng */}
       <div className="flex items-center gap-2">
