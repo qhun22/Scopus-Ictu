@@ -18,8 +18,20 @@ const RULES: Record<string, Record<Locale, string>> = {
     en: "Name match after removing academic titles and Vietnamese diacritics",
   },
   RULE_TITLE_STRIPPED_N2_FORMAT: {
-    vi: "Trùng tên sau khi bỏ học hàm, học vị, dấu tiếng Việt và dấu phẩy (dạng “Họ, Tên”)",
-    en: "Name match after removing titles, Vietnamese diacritics and the comma (“Family, Given” form)",
+    vi: "Trùng tên sau khi bỏ học hàm, học vị, dấu tiếng Việt và dấu phẩy (dạng 'Họ, Tên')",
+    en: "Name match after removing titles, Vietnamese diacritics and the comma ('Family, Given' form)",
+  },
+  RULE_N2: {
+    vi: "Trùng tên sau khi bỏ dấu tiếng Việt",
+    en: "Name match after removing Vietnamese diacritics",
+  },
+  RULE_N2_FORMAT: {
+    vi: "Trùng tên sau khi bỏ dấu tiếng Việt và dấu phẩy (dạng 'Họ, Tên')",
+    en: "Name match after removing Vietnamese diacritics and the comma ('Family, Given' form)",
+  },
+  RULE_N2_HYPHEN: {
+    vi: "Trùng tên sau khi bỏ dấu tiếng Việt, dấu phẩy và gạch nối (dạng Scopus 'Họ, Tên-Đệm')",
+    en: "Name match after removing Vietnamese diacritics, comma and hyphen (Scopus 'Family, First-Middle' form)",
   },
   RULE_KNOWN_PUBLICATION_DOI_EXACT: {
     vi: "Công bố đã biết của giảng viên trùng DOI",

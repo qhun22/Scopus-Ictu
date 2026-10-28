@@ -1,0 +1,35 @@
+row,ictu_web_name,ictu_web_email,match_result,roster_source_id,roster_full_name,roster_academic_degree,roster_academic_rank,roster_orcid,ictu_web_primary_id,ictu_web_all_ids
+1,TS. Đỗ Thị Bắc,dtbac@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/do-thi-bac/,Đỗ Thị Bắc,TS,,0000-0001-9425-5167,59526508700,59526508700|57819997900|59663496400|59159284800|57899449200
+2,ThS. Lương Thị Minh Huế,lmhue@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/luong-thi-minh-hue/,Lương Thị Minh Huế,ThS,,0009-0003-3737-7741,60319803200,60319803200|59708285400|60248511400|60219481200|60320211100
+3,TS. Nguyễn Hải Minh,nhminh@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-hai-minh/,Nguyễn Hải Minh,TS,,0009-0002-6213-6299,57192956797,57192956797|7003299472|58771697600|59768336500
+4,TS. Quách Xuân Trưởng,qxtruong@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/quach-xuan-truong/,Quách Xuân Trưởng,TS,,0000-0003-1402-0830,57196472280,57196472280|58937710300|59707353400|57213148275
+5,TS. Lê Hùng Linh,lhlinh@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/le-hung-linh/,Lê Hùng Linh,TS,,0000-0001-7169-9232,56548128100,56548128100|58830932700|57200439355
+6,TS. Nguyễn Văn Tảo,nvtao@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-van-tao/,Nguyễn Văn Tảo,TS,,0000-0003-3045-8621,57192958573,57192958573|56967513900|57221224211
+7,TS. Ngô Hữu Huy,nhhuy@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/ngo-huu-huy/,Ngô Hữu Huy,TS,,0000-0001-8276-0270,57210434401,57210434401|59708261900|59775920700
+8,TS. Phạm Đức Long,pdlong@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/pham-duc-long/,Phạm Đức Long,TS,,,26637116200,26637116200|57197579769|58805722900
+9,TS. Trần Quang Quý,tqquy@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/tran-quang-quy/,Trần Quang Quý,TS,,0009-0005-5521-5863,58771615400,58771615400|60214163500|59768494800
+10,GS.TS. Đặng Quang Á,dqa@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/dang-quang-a/,Đặng Quang Á,TS,GS,0000-0001-6386-7347,36852696600,36852696600|55331947800
+11,Nguyễn Thị Hải Anh,nthanh@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-hai-anh/,Nguyễn Thị Hải Anh,,,,57211884261,57211884261|58482267400
+12,PGS.TS. Nguyễn Văn Huân,nvhuan@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-van-huan/,Nguyễn Văn Huân,TS,PGS,0000-0003-0120-6804,24832994000,24832994000|60550320800
+13,PGS.TS. Phùng Trung Nghĩa,ptnghia@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/phung-trung-nghia/,Phùng Trung Nghĩa,TS,PGS,0000-0003-0075-3427,55605197600,55605197600|58481617700
+14,TS. Nguyễn Thị Hằng,nthang@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-hang/,Nguyễn Thị Hằng,TS,,0000-0003-2777-7023,57215220870,57215220870|57209167101
+15,TS. Nguyễn Thị Mai Phương,ntmphuong@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-mai-phuong/,Nguyễn Thị Mai Phương,TS,,0000-0002-3966-810X,54983454500,54983454500|59840201900
+16,TS. Nguyễn Thị Thanh Nhàn,nttnhan@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-nhan/,Nguyễn Thị Thanh Nhàn,TS,,0009-0009-3019-4997,57220168149,57220168149|57219971000
+17,TS. Nguyễn Toàn Thắng,thangnt@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-toan-thang/,Nguyễn Toàn Thắng,TS,,0009-0007-6666-2831,60560810500,60560810500|58805743700
+18,TS. Nguyễn Đức Bình,ndbinh@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-duc-binh/,Nguyễn Đức Bình,TS,,0000-0002-1258-394X,57075583000,57075583000|58771657000
+19,TS. Trần Thị Xuân,ttxuan@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/tran-thi-xuan/,Trần Thị Xuân,TS,,0000-0002-0920-5075,56592317500,56592317500|59708756900
+20,TS. Trần Văn Khánh,tvkhanh@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/tran-van-khanh/,Trần Văn Khánh,TS,,0000-0002-3445-2596,57201096033,57201096033|59707355400
+21,TS. Tô Hữu Nguyên,thnguyen@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/to-huu-nguyen/,Tô Hữu Nguyên,TS,,0009-0009-1780-456X,57728951300,57728951300|57193624988
+22,TS. Vũ Chiến Thắng,vcthang@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/vu-chien-thang/,Vũ Chiến Thắng,TS,,0000-0002-7080-3808,57192186263,57192186263|60075500200
+23,TS. Vũ Xuân Nam,vxnam@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/vu-xuan-nam/,Vũ Xuân Nam,TS,,0009-0006-1238-9035,57395218000,57395218000|58660663400
+24,TS. Đinh Xuân Lâm,dxlam@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/dinh-xuan-lam/,Đinh Xuân Lâm,TS,,0000-0001-5550-6189,59707347300,59707347300|58805827700
+25,TS. Đỗ Đình Cường,ddcuong@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/do-dinh-cuong/,Đỗ Đình Cường,TS,,0009-0004-7250-6710,26423550300,26423550300|60561601800
+26,ThS. Lê Sơn Thái,lsthai@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/le-son-thai/,Lê Sơn Thái,ThS,,0009-0007-0293-034X,58805733200,58805733200|55619174600
+27,ThS. Nguyễn Hồng Tân,nhtan@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-hong-tan/,Nguyễn Hồng Tân,ThS,,0009-0001-9224-834X,57192956798,57192956798|59666546500
+28,ThS. Nguyễn Kim Sơn,nkson@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-kim-son/,Nguyễn Kim Sơn,ThS,,0009-0005-1616-5373,59708994500,59708994500|58771619500
+29,ThS. Nguyễn Văn Việt,nvviet@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/nguyen-van-viet/,Nguyễn Văn Việt,ThS,,0009-0007-5854-5504,57222054782,57222054782|60320483500
+30,ThS. Phạm Thị Thương,ptthuong@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/pham-thi-thuong/,Phạm Thị Thương,ThS,,0009-0001-1039-6737,60597820600,60597820600|57218793097
+31,ThS. Vũ Việt Dũng,vvdung@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/vu-viet-dung/,Vũ Việt Dũng,ThS,,0009-0000-8317-2454,59453938500,59453938500|59708736000
+32,ThS. Đinh Quý Long,dqlong@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/dinh-quy-long/,Đinh Quý Long,ThS,,0009-0007-3638-7584,59915398900,59915398900|57261535000
+33,ThS. Đào Trần Chung,dtchung@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/dao-tran-chung/,Đào Trần Chung,ThS,,0009-0004-7572-3665,57560522400,57560522400|59709007600
+34,ThS. Đỗ Huy Khôi,dhkhoi@ictu.edu.vn,EXACT_EMAIL_MATCH,https://repository.ictu.edu.vn/giang-vien/do-huy-khoi/,Đỗ Huy Khôi,ThS,,0000-0001-6063-090X,58684988300,58684988300|57207793000

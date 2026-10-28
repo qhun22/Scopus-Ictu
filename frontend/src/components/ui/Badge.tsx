@@ -32,14 +32,16 @@ const TONE_CLASS: Record<BadgeTone, string> = {
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone;
   appearance?: "solid" | "outline";
+  size?: "sm" | "md";
   children: ReactNode;
 }
 
-export default function Badge({ tone = "neutral", appearance = "solid", className = "", children, ...rest }: BadgeProps) {
+export default function Badge({ tone = "neutral", appearance = "solid", size = "sm", className = "", children, ...rest }: BadgeProps) {
   const toneClass = appearance === "outline" ? OUTLINE_CLASS[tone] : TONE_CLASS[tone];
+  const sizeClass = size === "md" ? "h-[26px] px-3 text-[13px]" : "h-badge px-2.5 text-[11px]";
   return (
     <span
-      className={`box-border inline-flex h-badge shrink-0 items-center whitespace-nowrap rounded-full px-2.5 text-[11px] font-bold leading-none ${toneClass} ${className}`.trim()}
+      className={`box-border inline-flex shrink-0 items-center whitespace-nowrap rounded-full font-bold leading-none ${sizeClass} ${toneClass} ${className}`.trim()}
       {...rest}
     >
       {children}

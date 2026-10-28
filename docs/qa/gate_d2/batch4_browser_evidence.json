@@ -1,0 +1,156 @@
+{
+  "audit_purpose": "Gate D.2 Batch 4 browser evidence — TS. Ngô Hữu Huy (×3 IDs) + TS. Trần Quang Quý (×3 IDs)",
+  "observation_date": "2026-10-27",
+  "observer": "Claude Sonnet 4.6 (in-app browser, read-only)",
+  "constraint": "Read-only. No data modified. No ACCEPT/REJECT/REVOKE. No merge.",
+  "method_note": "CrossRef DOI cross-check uses full author list (all positions, no truncation) — corrected approach following FINDING-016 false positive from Batch 3.",
+
+  "ictu_web_source": {
+    "url_accessed": "https://repository.ictu.edu.vn/huong-dan-gop-tai-khoan-scopus/",
+    "page_title": "Hướng dẫn gộp tài khoản Scopus - DSpace",
+    "method": "navigate + javascript_tool DOM extraction, 2026-10-27",
+    "batch4_rows_confirmed": [
+      {
+        "name": "TS. Ngô Hữu Huy",
+        "email": "nhhuy@ictu.edu.vn",
+        "id_count": "3",
+        "pub_count": "18",
+        "primary_id": "57210434401",
+        "all_ids": ["57210434401", "59708261900", "59775920700"]
+      },
+      {
+        "name": "TS. Trần Quang Quý",
+        "email": "tqquy@ictu.edu.vn",
+        "id_count": "3",
+        "pub_count": "12",
+        "primary_id": "58771615400",
+        "all_ids": ["58771615400", "60214163500", "59768494800"]
+      }
+    ],
+    "observation_note": "ICTU-WEB table explicitly lists these Scopus IDs. Source is factual observation — does NOT confirm identity claim is correct."
+  },
+
+  "scopus_id_results": {
+    "57210434401": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57210434401",
+      "page_title": "Ngo, Huu Huy — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Ngo, Huu Huy",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Body error (server issue persists 2026-10-27). Page title confirms ID and name."
+    },
+    "59708261900": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59708261900",
+      "page_title": "Huy, Ngo Huu — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Huy, Ngo Huu",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Inverted name form 'Huy Ngo Huu'. 1 CSV pub 2025 (ResNet50/VGG16 leaf disease). Body error."
+    },
+    "59775920700": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59775920700",
+      "page_title": "Ngo, Huuhuy — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Ngo, Huuhuy",
+      "evidence_level": "PUBLICATION_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.5121/ijcnc.2026.18401",
+        "title": "RLIOT: REINFORCEMENT LEARNING - BASED NETWORK RESOURCE OPTIMIZATION USING IOT SENSOR DATA",
+        "year": 2026,
+        "author_count": 3,
+        "authors_full": [
+          {"pos": 1, "name": "Le Hoang, Hiep"},
+          {"pos": 2, "name": "Hoang, Van-Tam"},
+          {"pos": 3, "name": "Ngo, Huu-Huy", "affil": "AIRCC publisher"}
+        ],
+        "match": "Author #3 'Ngo, Huu-Huy' matches CSV name for ID 59775920700",
+        "publisher": "Academy and Industry Research Collaboration Center (AIRCC)"
+      },
+      "note": "Page title shows 'Ngo, Huuhuy' (hyphen dropped from Huu-Huy). Name variant expected. 9 CSV pubs."
+    },
+    "58771615400": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=58771615400",
+      "page_title": "Quy, Tran Quang — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Quy, Tran Quang",
+      "evidence_level": "PUBLICATION_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.4108/eetiot.5210",
+        "title": "Examining the Influence of Security Perception on Customer Satisfaction: A Quantitative Survey in Vietnam",
+        "year": 2024,
+        "author_count": 3,
+        "authors_full": [
+          {"pos": 1, "name": "Ta Thi Nguyet, Trang"},
+          {"pos": 2, "name": "Pham Chien, Thang"},
+          {"pos": 3, "name": "Tran Quang, Quy"}
+        ],
+        "match": "Author #3 'Tran Quang, Quy' matches primary ID 58771615400",
+        "publisher": "European Alliance for Innovation n.o. (EAI)"
+      },
+      "note": "6 CSV pubs. EoC paper (PLOS) appears in secondary ID 59768494800."
+    },
+    "60214163500": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=60214163500",
+      "page_title": "Tran, Quang Quy — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Tran, Quang Quy",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Name form 'Tran Quang Quy' (family Tran, given Quang Quy) vs primary 'Quy Tran Quang'. 6 CSV pubs. Body error."
+    },
+    "59768494800": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59768494800",
+      "page_title": "Quy, Tran Quang — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Quy, Tran Quang",
+      "evidence_level": "BROWSER_OPENED",
+      "notable_pub": {
+        "doi": "10.1371/journal.pone.0321009",
+        "note": "This is the same PLOS paper with Expression of Concern (FINDING-011) co-authored with TS. Nguyễn Hải Minh (ID 59768336500). TQQ appears as co-author. Identity flag: NOT raised — co-authorship is expected, not anomaly."
+      },
+      "note": "1 CSV pub. Name form same as primary (both 'Quy, Tran Quang')."
+    }
+  },
+
+  "cross_gv_coauthorship": {
+    "source": "Tái lập từ data/scopus/Truong_Quang_Huy_Scopus_Sep2026.csv (660 dòng, toàn bộ). Phương pháp: EID intersection per GV pair. Python script ngày 2026-10-27.",
+    "scope_note": "Số liệu từ full CSV khác batch export CSV vì batch exports chỉ chứa rows lookup target của từng batch. Hai GVs cùng đồng tác giả nhưng chỉ một GV được lookup → bài không xuất hiện trong export của GV kia. Full CSV là nguồn authoritative cho cross-GV analysis.",
+    "pairs": {
+      "LHL_x_NHH": {"eids": 9, "note": "NHH và LHL đồng tác giả thường xuyên — cặp cao nhất"},
+      "NHH_x_TQQ": {"eids": 4, "note": "Bao gồm 2 EIDs chung với cặp QXT×NHH và QXT×TQQ"},
+      "QXT_x_TQQ": {"eids": 5, "note": "Bao gồm 2 EIDs chung với cặp NHH×QXT và NHH×TQQ"},
+      "NHH_x_QXT": {"eids": 2, "note": "2 EIDs này cũng có trong NHH×TQQ và QXT×TQQ"},
+      "LMH_x_NHH": {"eids": 1, "note": "Fine-Tuning Generative LLMs paper"},
+      "TQQ_x_NHM": {"eids": 1, "note": "PLOS EoC paper DOI 10.1371/journal.pone.0321009 — FINDING-011"},
+      "LHL_x_TQQ": {"eids": 1, "note": ""}
+    },
+    "three_way_shared_eids": ["2-s2.0-105000957095", "2-s2.0-105041762468"],
+    "three_way_note": "Hai EIDs trên xuất hiện ở cả 3 cặp NHH×QXT, NHH×TQQ, QXT×TQQ — bài có 3 GVs đồng tác giả (NHH, QXT, TQQ).",
+    "total_9gv_summary": {
+      "gv_publication_links": 166,
+      "unique_eids": 138,
+      "cross_gv_eids_distinct": 25,
+      "single_gv_eids": 113
+    },
+    "validation_note": "All cross-GV EIDs are valid co-authorship relationships, not errors."
+  },
+
+  "summary": {
+    "ngo_huu_huy": {
+      "ids_page_title_confirmed": ["57210434401", "59708261900", "59775920700"],
+      "ids_doi_crossref_confirmed": ["59775920700"],
+      "pubs_in_csv": {"57210434401": 12, "59708261900": 1, "59775920700": 9},
+      "intra_gv_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 22,
+      "name_variants": ["Ngo, Huu-Huy", "Huy, Ngo Huu", "Ngo, Huuhuy", "Ngo, Huy-Huy"]
+    },
+    "tran_quang_quy": {
+      "ids_page_title_confirmed": ["58771615400", "60214163500", "59768494800"],
+      "ids_doi_crossref_confirmed": ["58771615400"],
+      "pubs_in_csv": {"58771615400": 9, "60214163500": 7, "59768494800": 1},
+      "intra_gv_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 17,
+      "name_variants": ["Quy, Tran Quang", "Tran, Quang-Quy", "Tran, Quang Quy"],
+      "correction_note": "[CORRECTED 2026-10-28] pubs_in_csv updated: 58771615400: 6→9, 60214163500: 6→7, total: 13→17. Per full CSV rescan."
+    }
+  }
+}

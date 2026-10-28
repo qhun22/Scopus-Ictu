@@ -1019,7 +1019,9 @@ def to_import_response(
     usage: ImportUsageInfo | None = None,
     archived: bool = False,
 ) -> ScopusImportResponse:
-    processed = item.valid_records + item.invalid_records
+    is_cancelled = item.status == "CANCELLED"
+    processed = 0 if is_cancelled else (item.valid_records + item.invalid_records)
+    imported = 0 if is_cancelled else item.valid_records
     progress = (
         min(100, round(processed * 100 / item.total_records))
         if item.total_records
@@ -1043,7 +1045,7 @@ def to_import_response(
         file_name=item.file_name,
         status=item.status,
         total_records=item.total_records,
-        imported_records=item.valid_records,
+        imported_records=imported,
         failed_records=item.invalid_records,
         processed_records=processed,
         progress_percent=progress,

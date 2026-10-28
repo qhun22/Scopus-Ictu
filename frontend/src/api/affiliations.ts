@@ -97,6 +97,8 @@ export interface EnrichmentJob {
   orcid_fetched: number;
   bundle_dir: string | null;
   error_summary: { code?: string; message?: string } | null;
+  resumed_from_job_id: string | null;
+  resumable: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -145,6 +147,14 @@ export function getLatestOnlineEnrichment(options: ApiRequestOptions = {}): Prom
 export function cancelOnlineEnrichment(jobId: string, options: ApiRequestOptions = {}): Promise<EnrichmentJob> {
   return apiPost<EnrichmentJob, Record<string, never>>(
     `/api/v1/affiliations/enrichment/online/${jobId}/cancel`,
+    {},
+    options,
+  );
+}
+
+export function resumeOnlineEnrichment(jobId: string, options: ApiRequestOptions = {}): Promise<EnrichmentJob> {
+  return apiPost<EnrichmentJob, Record<string, never>>(
+    `/api/v1/affiliations/enrichment/online/${jobId}/resume`,
     {},
     options,
   );
@@ -209,12 +219,17 @@ export interface RevokeOverrideBody {
 }
 
 export function getNeedsReview(
-  params: { limit?: number; offset?: number } = {},
+  params: { limit?: number; offset?: number; query?: string; reason_kind?: string } = {},
   options: ApiRequestOptions = {},
 ): Promise<NeedsReviewListResponse> {
   const query = new URLSearchParams();
   if (params.limit != null) query.set("limit", String(params.limit));
   if (params.offset != null) query.set("offset", String(params.offset));
+  if (params.query) {
+    query.set("query", params.query);
+    query.set("q", params.query);
+  }
+  if (params.reason_kind) query.set("reason_kind", params.reason_kind);
   const qs = query.toString();
   return apiGet<NeedsReviewListResponse>(`/api/v1/affiliations/needs-review${qs ? `?${qs}` : ""}`, options);
 }

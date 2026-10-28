@@ -1,0 +1,30 @@
+row,gv,scopus_id,id_role,eid,doi,year,title_truncated,cited_by,author_name_in_pub,intra_gv_eid_duplicate
+1,LHL,56548128100,PRIMARY,2-s2.0-105038090067,10.1007/978-3-032-18138-1_13,2026,"A Deep Learning Pipeline for Football Multi-player and Ball Tracking Using YOLOv8",0,"Le, Hung Linh",FALSE
+2,LHL,56548128100,PRIMARY,2-s2.0-105011872801,10.3390/app15147988,2025,"AI-Enhanced Nonlinear Predictive Control for Smart Greenhouses: A Performance Comparison",4,"Le, Hung Linh",FALSE
+3,NVT,57221224211,SECONDARY,2-s2.0-105014444022,10.3390/fi17080350,2025,"Security Issues in IoT-Based Wireless Sensor Networks: Classifications and Solutions",7,"Nguyen, Tao V.",FALSE
+4,NVT,57192958573,PRIMARY,2-s2.0-85123285689,10.1007/978-3-030-93179-7_8,2021,"An Effective Approach for Mining k-item High Utility Itemsets from Incremental Databases",0,"Van Tao, Nguyen",FALSE
+5,LHL,56548128100,PRIMARY,2-s2.0-105038594009,10.1007/978-3-032-23577-0_32,2026,"Real-Time Student Behavior Recognition in Classroom Using Pose Estimation and Gaze Analysis",0,"Le, Hung Linh",FALSE
+6,NVT,56967513900,SECONDARY,2-s2.0-85181981306,10.1007/978-3-031-50818-9_4,2024,"Approach New Framework of Compressive Sensing Based Secret Sharing in Wireless Sensor Networks",0,"Nguyen, Van Tao",FALSE
+7,NVT,56967513900,SECONDARY,2-s2.0-85139447706,10.1109/MNET.010.2100509,2023,"Toward the Age of Intelligent Vehicular Networks for Connected and Autonomous Vehicles in 6G",59,"Nguyen, Van-Tao",FALSE
+8,NVT,56967513900,SECONDARY,2-s2.0-105041311904,10.1016/j.phycom.2026.103204,2026,"RALSKI: Robust adversarial learning for securing knowledge interpretation in semantic wireless networks",0,"Nguyen, Van-Tao",FALSE
+9,LHL,56548128100,PRIMARY,2-s2.0-85208627580,10.1007/978-981-97-5081-8_11,2024,"Intelligent Automatic Gate Control System Based on Deep Learning",0,"Le, Hung Linh",FALSE
+10,LHL,56548128100,PRIMARY,2-s2.0-105038099214,10.1007/978-3-032-18138-1_17,2026,"Student Pose Recognition System Based on Deep Learning and Skeleton Feature Extraction",0,"Le, Hung Linh",FALSE
+11,NVT,57192958573,PRIMARY,2-s2.0-85111283001,,2021,"A novel fast algorithm for mining k-item High Utility Itemsets from incremental databases",0,"Van Tao, Nguyen",FALSE
+12,LHL,56548128100,PRIMARY,2-s2.0-105007763089,10.3390/app15115887,2025,"Deep-Learning-Based Cognitive Assistance Embedded Systems for People with Visual Impairment",3,"Le, Hung Linh",FALSE
+13,LHL,56548128100,PRIMARY,2-s2.0-105001014464,10.1007/978-3-031-80943-9_39,2025,"A Virtual Personal Assistant Application Based on a Large Language Model",1,"Le, Hung Linh",FALSE
+14,LHL,56548128100,PRIMARY,2-s2.0-105011970943,10.1007/978-981-96-2724-0_21,2025,"Student Behavior Recognition System in the Classroom Based on Deep Learning",0,"Le, Hung Linh",FALSE
+15,LHL,56548128100,PRIMARY,2-s2.0-105006908192,10.1007/978-981-96-2703-5_6,2025,"Facial Recognition System Using Deep Learning on Mobile Devices",0,"Le, Hung Linh",FALSE
+16,NVT,57192958573,PRIMARY,2-s2.0-85180153755,10.1007/978-3-031-49529-8_4,2023,"Build an Effective System for Container Code Recognition",0,"Van Tao, Nguyen",FALSE
+17,NVT,57221224211,SECONDARY,2-s2.0-85098549498,10.1007/s40305-020-00332-7,2022,"Automatic Identification Fingerprint Based on Machine Learning Method",11,"Nguyen, Tao Van",FALSE
+18,LHL,56548128100,PRIMARY,2-s2.0-85111945484,10.3390/s21165314,2021,"Student behavior recognition system for the classroom environment based on skeleton pose estimation",143,"Le, Hung Linh",FALSE
+19,LHL,56548128100,PRIMARY,2-s2.0-84924736914,,2015,"An ANN-based speed and flux controller of three-phase AC motors with uncertain parameters",0,"Le, Hung Linh",FALSE
+20,LHL,56548128100,PRIMARY,2-s2.0-84949927839,10.1109/ROBIO.2014.7090559,2014,"Speed and flux control of three-phase AC induction motor with uncertain parameters using adaptive NNs",0,"Le, Hung Linh",FALSE
+21,LHL,58830932700,SECONDARY,2-s2.0-77957861614,10.1109/ICCA.2010.5524407,2010,"Speed control of 3-phase asynchronous motor using artificial neural network",4,"Linh, Le Hung",FALSE
+22,NVT,56967513900,SECONDARY,2-s2.0-85015266973,10.1109/NAFIPS.2016.7851622,2016,"Medical diagnosis from dental X-ray images: A novel approach using Clustering combined with fuzzy system",6,"Nguyen, Van Tao",FALSE
+23,NVT,57192958573,PRIMARY,2-s2.0-85076723754,10.1007/978-3-030-37497-6_23,2020,"Classifying 3D Models Based on Transcending Local Features",0,"Van Tao, Nguyen",FALSE
+24,NVT,57192958573,PRIMARY,2-s2.0-85009518383,10.1007/978-3-319-49073-1_21,2017,"Classifying human body postures by a support vector machine with two simple features",0,"Van Tao, Nguyen",FALSE
+25,NVT,56967513900,SECONDARY,2-s2.0-84947561521,10.1155/2015/170183,2015,"Eigennoise speech recovery in adverse environments with joint compensation of additive and convolutive noise",0,"Nguyen, Van-Tao",FALSE
+26,LHL,56548128100,PRIMARY,2-s2.0-85009484127,10.1007/978-3-319-49073-1_60,2017,"Solving Navier-Stokes equation using FPGA cellular neural network chip",2,"Linh, Le Hung",FALSE
+27,NVT,56967513900,SECONDARY,2-s2.0-85043382754,10.1109/NAFOSTED.2017.8108032,2017,"Towards domain adaptation for neural network language generation in dialogue",2,"Nguyen, Van-Tao",FALSE
+28,LHL,57200439355,SECONDARY,2-s2.0-85041340824,10.3906/elk-1705-167,2018,"Neural network-based adaptive tracking control for a nonholonomic wheeled mobile robot with unknown dynamics",14,"Le, Linh",FALSE
+29,NVT,56967513900,SECONDARY,2-s2.0-85043694420,10.1109/KSE.2017.8119454,2017,"Enhanced semantic refinement gate for RNN-based neural language generator",4,"Nguyen, Van-Tao",FALSE

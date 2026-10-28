@@ -54,7 +54,7 @@ export default function PageLoadingBar({ isSidebarCollapsed = false }: PageLoadi
       setOverlayVisible(false);
       markVisited(pageKey);
     }, OVERLAY_HIDE_MS);
-    return () => { isActive = false; [t1, t2, t3].forEach(window.clearTimeout); };
+    return () => { isActive = false;[t1, t2, t3].forEach(window.clearTimeout); };
   }, [isFirstVisit, markVisited, pageKey]);
 
   return (
@@ -79,9 +79,8 @@ export default function PageLoadingBar({ isSidebarCollapsed = false }: PageLoadi
           aria-live="polite"
           aria-busy="true"
           data-testid="first-visit-loading"
-          className={`pointer-events-none fixed top-16 bottom-0 right-0 z-30 flex items-center justify-center bg-[#f4f6fb]/80 px-4 backdrop-blur-[1px] transition-all duration-200 ease-out dark:bg-slate-950/80 ${
-            isSidebarCollapsed ? "left-0 md:left-20" : "left-0 md:left-64"
-          }`}
+          className={`pointer-events-none fixed top-16 bottom-0 right-0 z-30 flex items-center justify-center bg-[#f4f6fb]/80 px-4 backdrop-blur-[1px] transition-all duration-200 ease-out dark:bg-slate-950/80 ${isSidebarCollapsed ? "left-0 md:left-20" : "left-0 md:left-64"
+            }`}
         >
           <div className="w-full max-w-sm text-center">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-[#3A5FC3]" />

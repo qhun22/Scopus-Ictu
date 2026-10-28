@@ -158,3 +158,29 @@ export function archiveImport(id: string): Promise<ScopusImport> {
 export function restoreImportHistory(id: string): Promise<ScopusImport> {
   return apiPost<ScopusImport>(`/api/v1/imports/${id}/restore-history`);
 }
+
+export const CONFIRMED_IMPORTS_KEY = "scopus-ictu.confirmed-imports";
+
+export function getConfirmedImportIds(): string[] {
+  try {
+    const raw = localStorage.getItem(CONFIRMED_IMPORTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isImportConfirmed(item: ScopusImport, confirmedIds?: string[]): boolean {
+  if (item.type === "LECTURERS") return true;
+  // If normalization already ran or import was applied, it is definitely confirmed/active
+  if (item.normalization || item.normalization_summary || item.status === "APPLIED") {
+    return true;
+  }
+  // Staged imports must be explicitly confirmed by admin
+  if (item.status === "STAGED") {
+    const ids = confirmedIds ?? getConfirmedImportIds();
+    return ids.includes(item.id);
+  }
+  // Any other status without normalization (RECEIVED, PARSING, VALIDATED, CANCELLED, FAILED) is not confirmed/ready
+  return false;
+}

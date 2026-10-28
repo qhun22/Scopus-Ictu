@@ -45,6 +45,8 @@ class AffiliationEnrichmentJob(Base):
     orcid_fetched: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     bundle_dir: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_summary: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    doi_list: Mapped[list | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
+    resumed_from_job_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
@@ -66,6 +68,10 @@ class AffiliationEnrichmentJob(Base):
         CheckConstraint(
             "error_summary IS NULL OR jsonb_typeof(error_summary) = 'object'",
             name="error_summary_object",
+        ),
+        CheckConstraint(
+            "doi_list IS NULL OR jsonb_typeof(doi_list) = 'array'",
+            name="doi_list_array",
         ),
         Index("ix_affiliation_enrichment_jobs_status", "status"),
         Index("ix_affiliation_enrichment_jobs_requested_by", "requested_by_user_id"),

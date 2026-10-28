@@ -41,6 +41,7 @@ from app.models.affiliation import PublicationAuthorAffiliationResolution
 from app.models.affiliation_override import OVERRIDE_CONFIDENCE_VALUES, PublicationAuthorAffiliationOverride
 from app.models.governance import AuditEvent
 from app.models.publication import Publication, PublicationAuthor, ScopusAuthor
+from app.services.text_folding import fold_text
 
 ENTITY_TYPE = "publication_author_affiliation_override"
 CREATED_ACTION = "AFFILIATION_OVERRIDE_CREATED"
@@ -316,7 +317,14 @@ def revoke_override(
 _UNRESOLVED_REASONS_AS_CONFLICT = frozenset({"ID_CONFLICT", "ID_AMBIGUOUS", "POSITION_CLAIMED_BY_OTHER_ID"})
 
 
-def list_needs_review(db: Session, *, limit: int = 100, offset: int = 0) -> tuple[list[NeedsReviewItem], int]:
+def list_needs_review(
+    db: Session,
+    *,
+    limit: int = 100,
+    offset: int = 0,
+    query: str | None = None,
+    reason_kind: str | None = None,
+) -> tuple[list[NeedsReviewItem], int]:
     """Publication-author positions that are UNRESOLVED, have conflicting
     sources (different link_status per source, or a conflict-type reason),
     or are CORROBORATED only (reconciled but not independently verified)."""
@@ -384,6 +392,25 @@ def list_needs_review(db: Session, *, limit: int = 100, offset: int = 0) -> tupl
                 overrides=overrides,
             )
         )
+    if reason_kind:
+        items = [i for i in items if i.reason_kind == reason_kind]
+    if query:
+        raw_q = query.strip()
+        folded_q = fold_text(raw_q)
+        tokens = [t.strip(",. ") for t in folded_q.split() if t.strip(",. ")]
+
+        def _matches(item: NeedsReviewItem) -> bool:
+            low_q = raw_q.lower()
+            if low_q in item.scopus_id.lower() or low_q in item.eid.lower():
+                return True
+            target = f"{fold_text(item.preferred_name)} {item.scopus_id.lower()} {item.eid.lower()} {fold_text(item.title)}"
+            if folded_q in target:
+                return True
+            if tokens and all(token in target for token in tokens):
+                return True
+            return False
+
+        items = [i for i in items if _matches(i)]
     total = len(items)
     return items[offset : offset + limit], total
 

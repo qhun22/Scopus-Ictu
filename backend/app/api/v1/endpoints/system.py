@@ -2,49 +2,23 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_db_session, require_role
 from app.core.exceptions import APIError
-from app.models.affiliation import (
-    Organization,
-    PublicationAuthorAffiliationResolution,
-    PublicationAuthorAffiliation,
-)
-from app.models.candidate import (
-    CandidateGenerationRun,
-    LecturerScopusCandidate,
-    LecturerScopusCandidateEvidence,
-    LecturerScopusCandidateObservation,
-    LecturerScopusCandidateReview,
-)
-from app.models.governance import AuditEvent, User, UserNotification
-from app.models.identity import (
-    LecturerScopusIdentity,
-    IdentityEvidence,
-    MappingReview,
-)
-from app.models.master_lecturer import (
-    Lecturer,
-    LecturerKnownPublication,
-    LecturerSourceSnapshot,
-)
-from app.models.publication import (
-    Publication,
-    PublicationAuthor,
-    PublicationRawSource,
-    ScopusAuthor,
-    ScopusAuthorNameVariant,
-)
-from app.models.scopus_raw import ScopusImport, RawScopusRecord
+from app.models.governance import User
 
 router = APIRouter()
 
 _CONFIRM_PHRASE = "ICTU"
+_logger = logging.getLogger(__name__)
+
 
 
 @router.post("/reset", status_code=200)
@@ -66,68 +40,56 @@ def reset_system(
         )
 
     try:
-        # Delete in FK-safe order (leaves before roots)
+        # 1. Snapshot ADMIN accounts to restore after the wipe.
+        admins = db.execute(text(
+            "SELECT id, email, password_hash, display_name, is_active, version, "
+            "created_at, updated_at, auth_version FROM users WHERE role = 'ADMIN'"
+        )).fetchall()
 
-        # 1. Affiliation children
-        db.query(PublicationAuthorAffiliation).delete(synchronize_session=False)
-        db.query(PublicationAuthorAffiliationResolution).delete(synchronize_session=False)
-        db.query(Organization).delete(synchronize_session=False)
+        # 2. TRUNCATE CASCADE everything including users — simplest way to clear
+        #    the entire FK graph without manually resolving dependency order.
+        db.execute(text(
+            "TRUNCATE users, audit_events, user_notifications, "
+            "lecturer_scopus_candidate_reviews, mapping_reviews, "
+            "publication_author_affiliation_overrides, "
+            "publication_author_affiliations, "
+            "publication_author_affiliation_resolutions, "
+            "organizations, affiliation_enrichment_jobs, "
+            "lecturer_scopus_candidate_evidence, "
+            "lecturer_scopus_candidate_observations, "
+            "lecturer_scopus_candidates, candidate_generation_runs, "
+            "identity_evidence, lecturer_scopus_identities, "
+            "publication_authors, publication_raw_sources, "
+            "publications, scopus_author_name_variants, scopus_authors, "
+            "raw_scopus_records, scopus_imports, "
+            "lecturer_known_publications, lecturer_source_snapshots, "
+            "lecturers RESTART IDENTITY CASCADE"
+        ))
 
-        # 2. Candidate cascade
-        db.query(LecturerScopusCandidateEvidence).delete(synchronize_session=False)
-        db.query(LecturerScopusCandidateReview).delete(synchronize_session=False)
-        db.query(LecturerScopusCandidateObservation).delete(synchronize_session=False)
-        db.query(LecturerScopusCandidate).delete(synchronize_session=False)
-        db.query(CandidateGenerationRun).delete(synchronize_session=False)
-
-        # 3. Identity cascade
-        db.query(IdentityEvidence).delete(synchronize_session=False)
-        db.query(MappingReview).delete(synchronize_session=False)
-        db.query(LecturerScopusIdentity).delete(synchronize_session=False)
-
-        # 4. Publications cascade
-        db.query(PublicationAuthor).delete(synchronize_session=False)
-        db.query(PublicationRawSource).delete(synchronize_session=False)
-        db.query(Publication).delete(synchronize_session=False)
-        db.query(ScopusAuthorNameVariant).delete(synchronize_session=False)
-        db.query(ScopusAuthor).delete(synchronize_session=False)
-
-        # 5. Raw Scopus imports
-        db.query(RawScopusRecord).delete(synchronize_session=False)
-        db.query(ScopusImport).delete(synchronize_session=False)
-
-        # 6. Lecturer cascade
-        db.query(LecturerKnownPublication).delete(synchronize_session=False)
-        db.query(LecturerSourceSnapshot).delete(synchronize_session=False)
-
-        # 7. LECTURER-role users + their notifications (before lecturers)
-        lecturer_user_ids = [
-            row.id
-            for row in db.query(User.id).filter(User.role == "LECTURER").all()
-        ]
-        if lecturer_user_ids:
-            db.query(UserNotification).filter(
-                UserNotification.user_id.in_(lecturer_user_ids)
-            ).delete(synchronize_session=False)
-            db.query(User).filter(User.role == "LECTURER").delete(
-                synchronize_session=False
-            )
-
-        db.query(Lecturer).delete(synchronize_session=False)
-
-        # 8. Audit events (append-only log — clear entirely)
-        db.query(AuditEvent).delete(synchronize_session=False)
-
-        # 9. Remaining notifications for non-LECTURER users
-        db.query(UserNotification).delete(synchronize_session=False)
+        # 3. Restore ADMIN accounts.
+        for row in admins:
+            db.execute(text(
+                "INSERT INTO users (id, email, password_hash, display_name, role, "
+                "lecturer_id, is_active, version, created_at, updated_at, auth_version) "
+                "VALUES (:id, :email, :password_hash, :display_name, 'ADMIN', "
+                "NULL, :is_active, :version, :created_at, :updated_at, :auth_version)"
+            ), {
+                "id": row.id, "email": row.email,
+                "password_hash": row.password_hash,
+                "display_name": row.display_name,
+                "is_active": row.is_active, "version": row.version,
+                "created_at": row.created_at, "updated_at": row.updated_at,
+                "auth_version": row.auth_version + 1,
+            })
 
         db.commit()
 
     except SQLAlchemyError as exc:
         db.rollback()
+        _logger.error("SYSTEM_RESET_FAILED: %s", exc, exc_info=True)
         raise APIError(
             status_code=500,
-            detail="Không thể reset hệ thống do lỗi cơ sở dữ liệu.",
+            detail=f"Không thể reset hệ thống do lỗi cơ sở dữ liệu: {exc}",
             code="SYSTEM_RESET_FAILED",
         ) from exc
 

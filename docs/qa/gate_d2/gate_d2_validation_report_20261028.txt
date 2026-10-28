@@ -1,0 +1,50 @@
+Gate D.2 Batch 3-5 Correction Validation Report
+================================================
+Date: 2026-10-28
+Script: docs/qa/gate_d2/validate_gate_d2.py
+Run: python -I -X utf8 docs/qa/gate_d2/validate_gate_d2.py
+
+Total checks: 76
+Passed: 76
+Failed: 0
+
+RESULT: ALL CHECKS PASSED
+
+Checks performed:
+  CHECK 1: CSV files strict UTF-8 (10 files) — PASS
+  CHECK 2: JSON files parse OK (4 files) — PASS
+  CHECK 3: DOI->ID provenance (9 DOI->ID pairs verified against source CSV) — PASS
+  CHECK 4: Per-ID pub counts match source CSV (20 IDs) — PASS
+  CHECK 5: Coverage documented as set(unique IDs), not visit count — PASS
+  CHECK 6: FINDING-001 through FINDING-021 all present in findings file — PASS
+  CHECK 7: 3 triple-GV EIDs confirmed from source CSV — PASS
+    - 2-s2.0-105000957095: NHH, QXT, TQQ
+    - 2-s2.0-105041762468: NHH, QXT, TQQ
+    - 2-s2.0-85208627580: LHL, NHH, TQQ
+  CHECK 8: Q11 union NHH+QXT+TQQ = 7 distinct EIDs — PASS
+    - NHH x QXT: 2
+    - NHH x TQQ: 4
+    - QXT x TQQ: 5
+    - Union: 7
+
+Corrections applied in this delivery (errata from owner review 2026-10-28):
+  E10: 4 DOI->ID mappings fixed in batch5 artifacts
+       - 10.1007/978-3-031-50818-9_35  -> 58805722900 (was 26637116200)
+       - 10.1109/CISP.2009.5303557     -> 57197579769 (was 58805722900)
+       - 10.1007/s00542-026-06031-2    -> 59526508700 (was 57899449200)
+       - 10.11591/eei.v14i3.9064       -> 57819997900 (was 59526508700)
+  E11: batch4 TQQ pub counts: 6+6+1=13 -> 9+7+1=17
+  E12: Coverage: 46/83, 14/34 GVs -> 41/83 unique, 13/34 GVs (DTB x5 from Gate D.1)
+  E13: Q11: 9 distinct EIDs -> 7 distinct EIDs
+  E14: FINDING-019: 2 -> 3 triple-GV EIDs (added 2-s2.0-85208627580, LHL x NHH x TQQ)
+  E15: FINDING-020: clarified 5 Scopus profile variants vs 2 publisher metadata forms
+  E16: Name typo "Quan Xuan Truong" -> "Quach Xuan Truong" in 03_THESIS_DEFENSE_NOTES.md
+  NEW: FINDING-021 added (provenance lesson: DOI evidence must link to exact CSV row's ID)
+
+ZIP file: gate_d2_batch3to5_corrected_20261028.zip
+SHA-256: 2e33f2cf14a8c51c2aa1507c0e563fddec1831c9c08bec95520ab03dd1711e8e
+Size: 51210 bytes (50 KB)
+Files in ZIP: 15
+
+Constraint: Read-only audit. No DB writes. No ACCEPT/REJECT/REVOKE. No source data modified.
+STOP: Awaiting owner/independent review before Batch 6.

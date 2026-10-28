@@ -9,6 +9,7 @@ import {
   getLatestOnlineEnrichment,
   getOnlineEnrichment,
   previewAffiliations,
+  resumeOnlineEnrichment,
   startOnlineEnrichment,
 } from "../../api/affiliations";
 import { ApiError } from "../../api/client";
@@ -76,18 +77,22 @@ const ERROR_LABEL: Record<string, Record<Locale, string>> = {
     vi: "Một lượt thu thập trực tuyến khác đang chạy.",
     en: "Another online enrichment run is already in progress.",
   },
+  ENRICHMENT_NOT_RESUMABLE: {
+    vi: "Lượt này không thể tiếp tục (có thể đã xử lý hết hoặc không có dữ liệu điểm dừng). Hãy bắt đầu một lượt mới.",
+    en: "This run cannot be resumed (all DOIs may already be processed, or no checkpoint data exists). Start a new run.",
+  },
 };
 const ENRICHMENT_STATUS_LABEL: Record<string, Record<Locale, string>> = {
   RECEIVED: { vi: "Đã nhận, chuẩn bị chạy", en: "Received, about to start" },
   RUNNING: { vi: "Đang thu thập…", en: "Collecting…" },
   COMPLETED: { vi: "Hoàn tất", en: "Completed" },
-  FAILED: { vi: "Thất bại", en: "Failed" },
-  CANCELLED: { vi: "Đã hủy", en: "Cancelled" },
+  FAILED: { vi: "Đã dừng", en: "Stopped" },
+  CANCELLED: { vi: "Đã tạm dừng", en: "Paused" },
 };
 const ENRICHMENT_FAILURE_CODE_LABEL: Record<string, Record<Locale, string>> = {
   ENRICHMENT_INTERRUPTED: {
-    vi: "Tiến trình bị gián đoạn khi máy chủ khởi động lại. Dữ liệu đã thu thập trước đó (nếu có) không bị mất, nhưng lượt chạy này đã dừng — hãy bắt đầu một lượt thu thập mới.",
-    en: "The run was interrupted by a server restart. Any data collected earlier is not lost, but this run has stopped — start a new collection.",
+    vi: 'Tiến trình bị gián đoạn khi máy chủ khởi động lại. Nhấn "Tiếp tục" để xử lý phần còn lại.',
+    en: 'The run was interrupted by a server restart. Click "Resume" to continue from where it left off.',
   },
   ENRICHMENT_PROCESSING_FAILED: {
     vi: "Không thể hoàn tất thu thập dữ liệu trực tuyến. Hãy thử lại; nếu lỗi lặp lại, kiểm tra kết nối mạng của máy chủ.",
@@ -121,6 +126,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [job, setJob] = useState<EnrichmentJob | null>(null);
   const [starting, setStarting] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const [sourceMode, setSourceMode] = useState<"offline" | "online">("offline");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -237,6 +243,19 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
     }
   });
 
+  const runResumeEnrichment = useSingleFlight(async () => {
+    if (!job) return;
+    setResuming(true);
+    setMessage(null);
+    try {
+      setJob(await resumeOnlineEnrichment(job.id));
+    } catch (error) {
+      setMessage({ kind: "error", text: explain(error) });
+    } finally {
+      setResuming(false);
+    }
+  });
+
   const runPreview = useSingleFlight(async () => {
     setPreviewing(true);
     setMessage(null);
@@ -282,11 +301,6 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
 
   return (
     <div className="space-y-4" data-testid="affiliations-tab">
-      <div className="rounded-[5px] border border-sky-100 bg-sky-50/70 p-3 text-xs leading-relaxed text-sky-900">
-        {vi
-          ? "File CSV Scopus không có cột đơn vị theo từng tác giả. Bước này bổ sung đơn vị từ metadata công khai đã tải sẵn (OpenAlex, Crossref, ORCID). Hệ thống không tự kết nối mạng. Đơn vị là lời khai của nguồn ngoài, không phải xác nhận của Scopus; tác giả không đủ bằng chứng sẽ hiển thị “Chưa xác định” và không bị gán đơn vị."
-          : "The Scopus CSV carries no per-author affiliation. This step adds affiliations from pre-downloaded public metadata (OpenAlex, Crossref, ORCID). The system never goes online by itself. Units are statements of external sources, not asserted by Scopus; authors without enough evidence stay “Unresolved” and get no unit."}
-      </div>
 
       {loadError && <p className="text-xs font-medium text-rose-600" role="alert">{loadError}</p>}
 
@@ -374,7 +388,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               </p>
               {Object.keys(db.resolutions_by_source_and_status).length === 0 ? (
                 <p className="font-medium text-slate-500" data-testid="aff-none-applied">
-                  {vi ? "Chưa áp dụng đối chiếu đơn vị nào. Mọi tác giả đang hiển thị “Chưa đối chiếu”." : "No affiliation reconciliation applied yet. Every author shows “Not reconciled”."}
+                  {vi ? `Chưa áp dụng đối chiếu đơn vị nào. Mọi tác giả đang hiển thị "Chưa đối chiếu".` : `No affiliation reconciliation applied yet. Every author shows "Not reconciled".`}
                 </p>
               ) : (
                 <ul className="space-y-0.5" data-testid="aff-state-list">
@@ -402,27 +416,46 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
       <Card title={vi ? "2. Thu thập đơn vị trực tuyến (tùy chọn)" : "2. Online affiliation collection (optional)"} testId="aff-online-card">
         <p className="mb-3 text-xs leading-relaxed text-slate-600">
           {vi
-            ? "ADMIN có thể chủ động tra cứu OpenAlex, Crossref và ORCID công khai cho DOI của các công bố hiện có, thay vì cần chuẩn bị bộ nguồn offline thủ công. Chạy nền; có thể hủy giữa chừng."
-            : "ADMIN may actively query public OpenAlex, Crossref and ORCID for the DOIs of existing publications, instead of preparing an offline bundle by hand. Runs in the background; can be cancelled mid-way."}
+            ? "ADMIN có thể chủ động tra cứu OpenAlex, Crossref và ORCID công khai cho DOI của các công bố hiện có, thay vì cần chuẩn bị bộ nguồn offline thủ công. Chạy nền; có thể tạm dừng và tiếp tục bất cứ lúc nào."
+            : "ADMIN may actively query public OpenAlex, Crossref and ORCID for the DOIs of existing publications, instead of preparing an offline bundle by hand. Runs in the background; can be paused and resumed at any time."}
         </p>
         {!job || !ENRICHMENT_ACTIVE.includes(job.status) ? (
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={runStartEnrichment}
-            disabled={starting}
-            data-testid="aff-online-start-btn"
-          >
-            {starting ? (vi ? "Đang khởi tạo…" : "Starting…") : vi ? "Bắt đầu thu thập trực tuyến" : "Start online collection"}
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2" data-testid="aff-online-running">
-            <span className="text-xs font-medium text-sky-700">
-              {ENRICHMENT_STATUS_LABEL[job.status]?.[locale] ?? job.status} ({fmt(job.processed_dois)}/{fmt(job.total_dois)})
-            </span>
-            <Button type="button" variant="secondary" onClick={runCancelEnrichment} data-testid="aff-online-cancel-btn">
-              {vi ? "Hủy" : "Cancel"}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={runStartEnrichment}
+              disabled={starting || resuming}
+              data-testid="aff-online-start-btn"
+            >
+              {starting ? (vi ? "Đang khởi tạo…" : "Starting…") : vi ? "Bắt đầu thu thập trực tuyến" : "Start online collection"}
             </Button>
+            {job?.resumable && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={runResumeEnrichment}
+                disabled={resuming || starting}
+                data-testid="aff-online-resume-btn"
+              >
+                {resuming
+                  ? (vi ? "Đang khởi động…" : "Starting…")
+                  : vi
+                    ? `Tiếp tục · còn ${fmt(job.total_dois - job.processed_dois)} DOI`
+                    : `Resume · ${fmt(job.total_dois - job.processed_dois)} DOIs left`}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3" data-testid="aff-online-running">
+            <Button type="button" variant="secondary" onClick={runCancelEnrichment} data-testid="aff-online-cancel-btn">
+              {vi ? "Tạm dừng" : "Pause"}
+            </Button>
+            <span className="text-xs font-medium text-sky-700">
+              {job.processed_dois >= job.total_dois
+                ? (vi ? "Đang hoàn tất…" : "Finishing…")
+                : `${ENRICHMENT_STATUS_LABEL[job.status]?.[locale] ?? job.status} (${fmt(job.processed_dois)}/${fmt(job.total_dois)} DOI)`}
+            </span>
           </div>
         )}
         {job && !ENRICHMENT_ACTIVE.includes(job.status) && (
@@ -447,11 +480,25 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                 {ENRICHMENT_FAILURE_CODE_LABEL[job.error_summary.code]?.[locale] ?? job.error_summary.message}
               </p>
             )}
-            {job.status === "CANCELLED" && (
-              <p className="mt-1 text-slate-500">
-                {vi
-                  ? "Lượt thu thập này đã bị hủy theo yêu cầu. Bắt đầu một lượt mới nếu cần."
-                  : "This run was cancelled on request. Start a new one if needed."}
+            {(job.status === "FAILED" || job.status === "CANCELLED") && (
+              <p className="mt-1 text-slate-500" data-testid="aff-online-progress-hint">
+                {job.processed_dois > 0
+                  ? vi
+                    ? `Đã xử lý ${fmt(job.processed_dois)}/${fmt(job.total_dois)} DOI.`
+                    : `Processed ${fmt(job.processed_dois)}/${fmt(job.total_dois)} DOIs.`
+                  : vi
+                    ? "Chưa xử lý DOI nào."
+                    : "No DOIs were processed."}
+                {job.resumable && (
+                  <span className="ml-1 font-medium text-sky-700">
+                    {vi ? ` Nhấn "Tiếp tục" để xử lý phần còn lại.` : ' Click "Resume" to process the rest.'}
+                  </span>
+                )}
+                {!job.resumable && (
+                  <span className="ml-1">
+                    {vi ? ` Nhấn "Bắt đầu" để chạy lại từ đầu.` : ' Click "Start" to run again from the beginning.'}
+                  </span>
+                )}
               </p>
             )}
             {job.status === "COMPLETED" && (
@@ -596,8 +643,8 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               />
               <span>
                 {vi
-                  ? "Tôi đã xem kết quả trên. Đơn vị đến từ nguồn ngoài, “Đã đối chiếu” chưa phải “Đã xác minh”, và tác giả không đủ bằng chứng sẽ giữ “Chưa xác định”."
-                  : "I reviewed the result above. Units come from external sources, “Cross-checked” is not “Verified”, and authors without enough evidence stay “Unresolved”."}
+                  ? `Tôi đã xem kết quả trên. Đơn vị đến từ nguồn ngoài, "Đã đối chiếu" chưa phải "Đã xác minh", và tác giả không đủ bằng chứng sẽ giữ "Chưa xác định".`
+                  : `I reviewed the result above. Units come from external sources, "Cross-checked" is not "Verified", and authors without enough evidence stay "Unresolved".`}
               </span>
             </label>
             <Button

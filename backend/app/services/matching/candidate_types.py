@@ -15,6 +15,9 @@ RuleId = Literal[
     "RULE_TITLE_STRIPPED_N0",
     "RULE_TITLE_STRIPPED_N2",
     "RULE_TITLE_STRIPPED_N2_FORMAT",
+    "RULE_N2",
+    "RULE_N2_FORMAT",
+    "RULE_N2_HYPHEN",
 ]
 
 PublicationEvidenceRuleId = Literal[

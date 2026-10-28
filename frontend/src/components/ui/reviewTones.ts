@@ -3,7 +3,7 @@ import type { CandidateStatus, ReviewHistoryAction } from "../../types/review";
 
 // Review-candidate status. ACCEPTED means "review accepted" — it is not an identity VERIFIED state.
 export const CANDIDATE_STATUS_TONE: Record<CandidateStatus, BadgeTone> = {
-  PENDING: "warning",
+  PENDING: "brand",
   ACCEPTED: "success",
   REJECTED: "danger",
   SUPERSEDED: "neutral",

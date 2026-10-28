@@ -1,0 +1,63 @@
+@startuml UCD-0_tong_the
+' Nguồn: docs/design/usecase/usecase_map.json (sinh bởi tools/gen_usecase_assets.py). Không sửa tay phần sinh tự động.
+left to right direction
+skinparam dpi 160
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor #EAF2F8
+  BorderColor #1F618D
+  FontSize 12
+}
+skinparam actor {
+  BackgroundColor #FDEBD0
+  BorderColor #B9770E
+}
+skinparam ArrowColor #34495E
+skinparam ArrowFontSize 10
+skinparam linetype ortho
+
+title UCD-0 — Use Case tổng thể theo nhóm nghiệp vụ (ba actor + script CLI)
+
+actor "Quản trị viên\n(ADMIN)" as ADMIN
+actor "Phê duyệt viên\n(REVIEWER)" as REVIEWER
+actor "Giảng viên\n(LECTURER)" as LECTURER
+actor "Kỹ thuật viên\n«CLI — không phải vai trò»" as TECH <<CLI>>
+
+rectangle "Hệ thống Scopus–ICTU (mức nhóm — chi tiết xem UCD-1…UCD-6)" {
+  usecase "Nhóm 1 — Nhập dữ liệu\n(UC-08, UC-08a, UC-10, UC-10a, UC-25)" as G1
+  usecase "Nhóm 4 — Chuẩn hóa, đối\nsoát và phê duyệt\n(UC-11, UC-12, UC-24, UC-17, UC-18, UC-19)" as G4
+  usecase "Nhóm 5 — Tìm kiếm, thống\nkê và xuất dữ liệu\n(UC-14, UC-04, UC-15, UC-09)" as G5
+  usecase "Xác thực, thông báo và\ngiám sát\n(UC-01, UC-02, UC-03, UC-07, UC-26)" as XT
+  usecase "Nhóm 3 — Quản lý công bố\n(UC-13, UC-22)" as G3
+  usecase "Nhóm 2 — Quản lý hồ sơ\ntác giả/giảng viên\n(UC-05, UC-06, UC-16, UC-20, UC-21, UC-23)" as G2
+}
+
+ADMIN --> G1
+TECH --> G1
+ADMIN --> G4
+REVIEWER --> G4
+TECH --> G4
+ADMIN --> G5
+REVIEWER --> G5
+ADMIN --> XT
+REVIEWER --> XT
+LECTURER --> XT
+TECH --> XT
+ADMIN --> G3
+REVIEWER --> G3
+LECTURER --> G3
+ADMIN --> G2
+LECTURER --> G2
+legend bottom right
+  <b>Chú giải</b>
+  Oval = use case có thật trong mã (ID khớp UC_INVENTORY.md)
+  [CLI] chạy bằng script · [API] chỉ có API, chưa có giao diện · [một phần] triển khai chưa đầy đủ
+  Đường nét liền actor—UC = quyền truy cập đã đối chiếu với require_role (RBAC_API_MATRIX)
+  Mỗi oval = một NHÓM use case; actor nối tới nhóm nếu có ít nhất một UC trong nhóm dành cho actor đó.
+  Quyền chi tiết từng UC xem ACTOR_UC_MATRIX.md; 5 nhóm 1–5 khớp 5 UC chính của đề cương (PI-1.3).
+endlegend
+
+@enduml

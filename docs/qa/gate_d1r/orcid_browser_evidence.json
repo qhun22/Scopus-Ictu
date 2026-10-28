@@ -1,0 +1,81 @@
+{
+  "audit_purpose": "Gate D.1 Final Evidence Closeout — ORCID 0009-0001-3939-8656 browser evidence",
+  "observation_date": "2026-10-27",
+  "observer": "Claude Sonnet 4.6 (in-app browser, read-only)",
+  "constraint": "Read-only. No data modified. No ACCEPT/REJECT/REVOKE. No merge.",
+
+  "source_1_ictu_bui_thi_quyen": {
+    "url_accessed": "https://repository.ictu.edu.vn/giang-vien/bui-thi-quyen/",
+    "page_title": "DSpace - TRƯỜNG CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG - ĐẠI HỌC THÁI NGUYÊN",
+    "method": "navigate + javascript_tool DOM extraction",
+    "dom_extracted_fields": {
+      "displayed_name": "ThS. Bùi Thị Quyên",
+      "academic_degree": "ThS",
+      "specialization": "Lý luận và phương pháp giảng dạy tiếng Anh",
+      "gender": "Nữ",
+      "date_of_birth": "13/06/1978",
+      "email": "btquyen@ictu.edu.vn",
+      "phone": "0988142757",
+      "orcid_displayed_on_page": "0009-0001-3939-8656",
+      "orcid_link_href": "https://orcid.org/0009-0001-3939-8656",
+      "publications_count": "Bài báo (0) — Chưa có bài báo khoa học nào.",
+      "google_scholar": "Xem hồ sơ ↗ (link present)"
+    },
+    "observation_note": "The ORCID 0009-0001-3939-8656 is DISPLAYED on this page for Bùi Thị Quyên. This is a factual observation — the page shows this value. It does NOT prove Bùi Thị Quyên is the registered owner of this ORCID; it only confirms the ICTU Repository currently assigns this ORCID to this record.",
+    "screenshot_path": "C:\\Users\\QuangHuy\\.claude\\projects\\D--DataFolder-ProjectIctu-DoAn-Scopus-Ictu\\3b4f8e53-86a8-4e73-87a6-65d84faab755\\tool-results\\mcp-Claude_Browser-blob-1793093855307-eek3qu.jpg"
+  },
+
+  "source_2_ictu_vi_thi_bich_ngoc": {
+    "url_accessed": "https://repository.ictu.edu.vn/giang-vien/vi-thi-bich-ngoc/",
+    "page_title": "DSpace - TRƯỜNG CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG - ĐẠI HỌC THÁI NGUYÊN",
+    "method": "navigate + javascript_tool DOM extraction",
+    "dom_extracted_fields": {
+      "displayed_name": "ThS. Vi Thị Bích Ngọc",
+      "academic_degree": "ThS",
+      "specialization": "Ngôn ngữ Hán",
+      "gender": "Nữ",
+      "date_of_birth": "24/06/1984",
+      "email": "ngocvtb@ictu.edu.vn",
+      "orcid_displayed_on_page": "0009-0001-3939-8656",
+      "orcid_link_href": "https://orcid.org/0009-0001-3939-8656",
+      "publications_count": "Bài báo (0) — Chưa có bài báo khoa học nào."
+    },
+    "observation_note": "The ORCID 0009-0001-3939-8656 is DISPLAYED on this page for Vi Thị Bích Ngọc as well. Two different people (different names, specializations, emails, dates of birth) share the same ORCID value in the ICTU Repository.",
+    "screenshot_path": "C:\\Users\\QuangHuy\\.claude\\projects\\D--DataFolder-ProjectIctu-DoAn-Scopus-Ictu\\3b4f8e53-86a8-4e73-87a6-65d84faab755\\tool-results\\mcp-Claude_Browser-blob-1793093882670-b1tg1o.jpg"
+  },
+
+  "source_3_orcid_org": {
+    "url_accessed": "https://orcid.org/0009-0001-3939-8656",
+    "page_title_from_html_head": "Vi Thị Bích Ngọc (0009-0001-3939-8656) - ORCID",
+    "method": "navigate + cookie rejection + javascript_tool DOM extraction",
+    "dom_extracted_fields": {
+      "registered_name": "Vi Thị Bích Ngọc",
+      "orcid_id": "https://orcid.org/0009-0001-3939-8656",
+      "employment_organization": "Thai Nguyen University of Information and Communication Technology",
+      "employment_location": "Thái Nguyên, Thai Nguyen, VN",
+      "employment_title": "Lecturer of Chinese Language",
+      "employment_department": "Department of Foreign Languages, Faculty of Basic Sciences",
+      "employment_period": "2010-01 to present",
+      "employment_source": "Vi Thị Bích Ngọc (self-entered)",
+      "personal_information": "No personal information available"
+    },
+    "observation_note": "ORCID.org page title and body both identify the account owner as Vi Thị Bích Ngọc. The employment record was entered by Vi Thị Bích Ngọc herself (Source field). This is consistent with the ICTU Repository record for Vi Thị Bích Ngọc, and inconsistent with Bùi Thị Quyên being the owner.",
+    "screenshot_path": "C:\\Users\\QuangHuy\\.claude\\projects\\D--DataFolder-ProjectIctu-DoAn-Scopus-Ictu\\3b4f8e53-86a8-4e73-87a6-65d84faab755\\tool-results\\mcp-Claude_Browser-blob-1793093919206-5tanvu.jpg"
+  },
+
+  "conclusion_from_evidence": {
+    "what_is_confirmed": [
+      "ICTU Repository shows ORCID 0009-0001-3939-8656 on the profile page of Bùi Thị Quyên (btquyen@ictu.edu.vn)",
+      "ICTU Repository shows ORCID 0009-0001-3939-8656 on the profile page of Vi Thị Bích Ngọc (ngocvtb@ictu.edu.vn)",
+      "orcid.org confirms the registered account owner for this ORCID is Vi Thị Bích Ngọc",
+      "The two people have different names, specializations, emails, and dates of birth — they are distinct individuals"
+    ],
+    "what_is_NOT_confirmed": [
+      "Whether lecturers.json was the source of the error or only reflects it",
+      "Whether the ICTU Repository admin entered the wrong ORCID for Bùi Thị Quyên or if it was a copy-paste error",
+      "What the correct ORCID for Bùi Thị Quyên is (if any)"
+    ],
+    "risk_classification": "HIGH — definite ORCID assignment error in source data",
+    "recommended_action": "Report to ICTU data custodian for correction in source system. Do NOT auto-correct lecturers.json or any DB record."
+  }
+}

@@ -290,6 +290,7 @@ export interface TranslationSchema {
     confirmImport: string;
     previewTitle: string;
     previewErrorTitle: string;
+    previewInvalidDataset: string;
     previewConflictTitle: string;
     importErrorTitle: string;
     importSuccessTitle: string;
@@ -627,8 +628,6 @@ export interface TranslationSchema {
     nameMismatchWarningTitle: string;
     nameMismatchWarningDescription: string;
     noPublicationEvidence: string;
-    ruleVersionLabel: string;
-    nameRuleExplanation: string;
     lecturerProfileNameLabel: string;
     comparisonValueLabel: string;
     scopusNameLabel: string;
@@ -667,6 +666,13 @@ export interface TranslationSchema {
     reasonTriggerMultipleCandidates: string;
     decisionAccept: string;
     decisionReject: string;
+    generateBtn: string;
+    generateConfirmTitle: string;
+    generateConfirmText: string;
+    generateConfirmOk: string;
+    generateSuccessTitle: string;
+    generateSuccessMessage: string;
+    generateErrorTitle: string;
   };
   dashboard: {
     title: string;

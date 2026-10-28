@@ -569,5 +569,5 @@ const IMPORT_STATUS_LABEL: Record<string, Record<"vi" | "en", string>> = {
 
 function ImportStatusBadge({ status, locale }: { status: string; locale: "vi" | "en" }) {
   const label = IMPORT_STATUS_LABEL[status]?.[locale] ?? status;
-  return <Badge tone={IMPORT_STATUS_TONE[status] ?? "neutral"}>{label}</Badge>;
+  return <Badge tone={IMPORT_STATUS_TONE[status] ?? "neutral"} className="!rounded-[5px]">{label}</Badge>;
 }

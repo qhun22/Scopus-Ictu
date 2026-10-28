@@ -29,7 +29,7 @@ Trạng thái: **ĐÃ TRIỂN KHAI** = có đường chạy hoàn chỉnh · **M
 | UC | Tên | Actor | API (quyền thực từ mã) | Giao diện | Trạng thái | Quan hệ UML |
 |---|---|---|---|---|---|---|
 | **UC-05** | Quản lý hồ sơ giảng viên | ADMIN | `GET /api/v1/lecturers` (ADMIN)<br>`GET /api/v1/lecturers/master` (ADMIN)<br>`POST /api/v1/lecturers` (ADMIN)<br>`PATCH /api/v1/lecturers/{lecturer_id}` (ADMIN)<br>`PUT /api/v1/lecturers/{lecturer_id}` (ADMIN)<br>`DELETE /api/v1/lecturers/{lecturer_id}` (ADMIN)<br>`DELETE /api/v1/lecturers/unlinked/cleanup` (ADMIN) | `/lecturers` | ĐÃ TRIỂN KHAI (UI+API) | — |
-| **UC-06** | Quản lý tài khoản và phân quyền | ADMIN | `GET /api/v1/users` (ADMIN)<br>`GET /api/v1/users/{user_id}` (ADMIN)<br>`PATCH /api/v1/users/{user_id}` (ADMIN)<br>`POST /api/v1/users/{user_id}/lock` (ADMIN)<br>`POST /api/v1/users/{user_id}/unlock` (ADMIN)<br>`POST /api/v1/users/{user_id}/reset-password` (ADMIN)<br>`GET /api/v1/auth/users` (ADMIN) | `/lecturers`<br><i>Nằm trong cửa sổ Chi tiết giảng viên; /users chuyển hướng sang /lecturers; GET /auth/users là bí danh cũ (deprecated)</i> | ĐÃ TRIỂN KHAI (UI+API) | — |
+| **UC-06** | Quản lý tài khoản và phân quyền | ADMIN | `POST /api/v1/users` (ADMIN)<br>`GET /api/v1/users` (ADMIN)<br>`GET /api/v1/users/{user_id}` (ADMIN)<br>`PATCH /api/v1/users/{user_id}` (ADMIN)<br>`POST /api/v1/users/{user_id}/lock` (ADMIN)<br>`POST /api/v1/users/{user_id}/unlock` (ADMIN)<br>`POST /api/v1/users/{user_id}/reset-password` (ADMIN)<br>`GET /api/v1/auth/users` (ADMIN) | `/users`, `/lecturers`<br><i>Trang /users quản lý tài khoản riêng; tạo tài khoản LECTURER/REVIEWER không cần hồ sơ; /lecturers vẫn có cửa sổ Chi tiết giảng viên; GET /auth/users là bí danh cũ (deprecated)</i> | ĐÃ TRIỂN KHAI (UI+API) | — |
 | **UC-16** | Xem tác giả Scopus (danh sách, thống kê, chi tiết) | ADMIN | `GET /api/v1/authors` (ADMIN)<br>`GET /api/v1/authors/stats` (ADMIN)<br>`GET /api/v1/authors/{author_id}` (ADMIN) | `/normalization`<br><i>Tab 'Tác giả'; chi tiết tác giả chưa có nút trên UI</i> | MỘT PHẦN (UI chưa có chi tiết) | — |
 | **UC-20** | Xem hồ sơ cá nhân | LECTURER | `GET /api/v1/lecturers/me/profile` (LECTURER) | `/profile` | ĐÃ TRIỂN KHAI (UI+API) | — |
 | **UC-21** | Xem liên kết Scopus đã duyệt của tôi | LECTURER | `GET /api/v1/lecturers/me/identities` (LECTURER) | `/identity` | ĐÃ TRIỂN KHAI (UI+API) | — |
@@ -58,7 +58,7 @@ Trạng thái: **ĐÃ TRIỂN KHAI** = có đường chạy hoàn chỉnh · **M
 | UC | Tên | Actor | API (quyền thực từ mã) | Giao diện | Trạng thái | Quan hệ UML |
 |---|---|---|---|---|---|---|
 | **UC-14** | Tra cứu tổng hợp (giảng viên, công bố, tác giả) | ADMIN, REVIEWER | `GET /api/v1/search` (ADMIN/REVIEWER) | `/search` | ĐÃ TRIỂN KHAI (UI+API) | — |
-| **UC-04** | Xem thống kê tổng quan (dashboard) | ADMIN | `GET /api/v1/dashboard/summary` (ADMIN) | `/dashboard` | MỘT PHẦN (chỉ số đếm; biểu đồ giữ chỗ) | — |
+| **UC-04** | Xem thống kê tổng quan (dashboard) | ADMIN | `GET /api/v1/dashboard/summary` (ADMIN)<br>`GET /api/v1/dashboard/charts` (ADMIN) | `/dashboard` | ĐÃ TRIỂN KHAI (UI+API) | — |
 | **UC-15** | Xuất dữ liệu công bố ra JSON | ADMIN | `GET /api/v1/publications/export` (ADMIN) | `/publications`<br><i>Nút Xuất JSON ở trang Công bố</i> | ĐÃ TRIỂN KHAI (UI+API); chỉ JSON | — |
 | **UC-09** | Xuất hồ sơ giảng viên ra JSON | ADMIN | `GET /api/v1/lecturers/export` (ADMIN) | `/lecturers`<br><i>Nút Xuất JSON ở trang Giảng viên</i> | ĐÃ TRIỂN KHAI (UI+API); chỉ JSON | — |
 

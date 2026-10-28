@@ -151,6 +151,8 @@ def overview():
 def write_diagrams():
     d = UC_DIR / "diagrams"
     d.mkdir(exist_ok=True)
+    # UCD-0: tổng quan mức nhóm, cả 3 vai trò
+    (d / "UCD-0_tong_the.puml").write_text(overview(), encoding="utf8")
     for actor, tag, label in (("ADMIN", "0A", "Quản trị viên (ADMIN)"), ("REVIEWER", "0B", "Phê duyệt viên (REVIEWER)"), ("LECTURER", "0C", "Giảng viên (LECTURER)")):
         ids = [u["id"] for u in M["use_cases"] if actor in u["actors"]]
         name = f"UCD-{tag}_tong_the_{actor.lower()}"

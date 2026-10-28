@@ -52,7 +52,7 @@ rectangle "Nhóm 4 — Chuẩn hóa, đối soát và phê duyệt" {
 }
 rectangle "Nhóm 5 — Tìm kiếm, thống kê và xuất dữ liệu" {
   usecase "UC-14\nTra cứu tổng hợp (giảng\nviên, công bố, tác giả)" as UC14
-  usecase "UC-04\nXem thống kê tổng quan\n(dashboard)\n[một phần]" as UC04
+  usecase "UC-04\nXem thống kê tổng quan\n(dashboard)" as UC04
   usecase "UC-15\nXuất dữ liệu công bố ra\nJSON" as UC15
   usecase "UC-09\nXuất hồ sơ giảng viên ra\nJSON" as UC09
 }

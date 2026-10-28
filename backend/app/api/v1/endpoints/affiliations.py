@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -98,11 +98,20 @@ class EnrichmentJobRead(BaseModel):
     orcid_fetched: int
     bundle_dir: str | None
     error_summary: dict[str, Any] | None
+    resumed_from_job_id: uuid.UUID | None
+    resumable: bool
     created_at: str
     updated_at: str
 
 
 def _job_read(job: enrichment.AffiliationEnrichmentJob) -> EnrichmentJobRead:
+    skipped = job.processed_dois or 0
+    stored = job.doi_list or []
+    resumable = (
+        job.status in ("FAILED", "CANCELLED")
+        and bool(stored)
+        and skipped < len(stored)
+    )
     return EnrichmentJobRead(
         id=job.id,
         status=job.status,
@@ -113,6 +122,8 @@ def _job_read(job: enrichment.AffiliationEnrichmentJob) -> EnrichmentJobRead:
         orcid_fetched=job.orcid_fetched,
         bundle_dir=job.bundle_dir,
         error_summary=job.error_summary,
+        resumed_from_job_id=job.resumed_from_job_id,
+        resumable=resumable,
         created_at=job.created_at.isoformat(),
         updated_at=job.updated_at.isoformat(),
     )
@@ -276,6 +287,27 @@ def cancel_online_enrichment(job_id: uuid.UUID, admin: AdminUser, db: DatabaseSe
     return _job_read(job)
 
 
+
+@router.post(
+    "/enrichment/online/{job_id}/resume",
+    response_model=EnrichmentJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Resume a FAILED or CANCELLED online enrichment job from where it left off",
+)
+def resume_online_enrichment(
+    job_id: uuid.UUID, admin: AdminUser, db: DatabaseSession, background_tasks: BackgroundTasks
+) -> EnrichmentJobRead:
+    try:
+        job = enrichment.resume_job(db, job_id, admin, reserve_worker_lease=True)
+    except enrichment.AffiliationEnrichmentError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    background_tasks.add_task(enrichment.process_enrichment_job, job.id)
+    return _job_read(job)
+
+
 # --------------------------------------------------------------------------- manual review (Priority 2 / NO-JSON closure)
 class NeedsReviewItemRead(BaseModel):
     publication_author_id: uuid.UUID
@@ -365,10 +397,19 @@ def _override_read(row: override_service.PublicationAuthorAffiliationOverride) -
     summary="Author positions that are UNRESOLVED, conflicting, or only CORROBORATED",
 )
 def needs_review(
-    _admin: AdminUser, db: DatabaseSession, limit: Annotated[int, Field(ge=1, le=500)] = 100, offset: int = 0
+    _admin: AdminUser,
+    db: DatabaseSession,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    query: Annotated[str | None, Query()] = None,
+    q: Annotated[str | None, Query()] = None,
+    reason_kind: Annotated[str | None, Query()] = None,
 ) -> NeedsReviewListResponse:
     try:
-        items, total = override_service.list_needs_review(db, limit=limit, offset=offset)
+        search_query = query if query is not None else q
+        items, total = override_service.list_needs_review(
+            db, limit=limit, offset=offset, query=search_query, reason_kind=reason_kind
+        )
     except SQLAlchemyError as exc:
         raise _db_error(exc) from exc
     return NeedsReviewListResponse(

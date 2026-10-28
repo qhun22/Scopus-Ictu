@@ -229,6 +229,25 @@ def _get_lecturer_stats(db: Session) -> LecturerStats:
 
 def _lecturer_sort_key(lec: Lecturer, dup_ids: set[uuid.UUID], locked_ids: set[uuid.UUID]):
     is_warn = 0 if lec.id in dup_ids else (1 if lec.id in locked_ids else 2)
+    position = (lec.position or "").strip().lower()
+    if position == "hiệu trưởng":
+        position_rank = 0
+    elif position == "phó hiệu trưởng":
+        position_rank = 1
+    elif position == "trưởng khoa":
+        position_rank = 2
+    elif position == "phó trưởng khoa":
+        position_rank = 3
+    elif position == "trưởng bộ môn":
+        position_rank = 4
+    elif position == "phó trưởng bộ môn":
+        position_rank = 5
+    elif position == "trưởng phòng":
+        position_rank = 6
+    elif position == "phó trưởng phòng":
+        position_rank = 7
+    else:
+        position_rank = 99
     ru = (lec.academic_rank or "").strip().upper()
     rk = 0 if (ru == "GS" or ru.startswith("GIÁO SƯ")) else (1 if (ru == "PGS" or ru.startswith("PHÓ GIÁO SƯ")) else 2)
     du = (lec.academic_degree or "").strip().upper()
@@ -242,7 +261,7 @@ def _lecturer_sort_key(lec: Lecturer, dup_ids: set[uuid.UUID], locked_ids: set[u
         dk = 3
     else:
         dk = 4
-    return (is_warn, rk, dk, (lec.full_name or "").lower(), str(lec.id))
+    return (is_warn, position_rank, rk, dk, (lec.full_name or "").lower(), str(lec.id))
 
 
 @router.get(
@@ -342,9 +361,23 @@ def list_lecturers(
                 else_=4,
             ).asc()
 
+            position_lower = func.lower(func.trim(func.coalesce(Lecturer.position, "")))
+            position_expr = case(
+                (position_lower == "hiệu trưởng", 0),
+                (position_lower == "phó hiệu trưởng", 1),
+                (position_lower == "trưởng khoa", 2),
+                (position_lower == "phó trưởng khoa", 3),
+                (position_lower == "trưởng bộ môn", 4),
+                (position_lower == "phó trưởng bộ môn", 5),
+                (position_lower == "trưởng phòng", 6),
+                (position_lower == "phó trưởng phòng", 7),
+                else_=99,
+            ).asc()
+
             rows = db.execute(
                 stmt.order_by(
                     abnormal_expr,
+                    position_expr,
                     rank_expr,
                     degree_expr,
                     Lecturer.full_name.asc(),
@@ -640,24 +673,24 @@ def update_lecturer(
                     # semantic and surface it as a warning, not an error.
                     pass
             lecturer.email = email
-        if payload.academic_degree is not None:
-            lecturer.academic_degree = payload.academic_degree.strip() or None
-        if payload.academic_rank is not None:
-            lecturer.academic_rank = payload.academic_rank.strip() or None
-        if payload.faculty is not None:
-            lecturer.faculty = payload.faculty.strip() or None
-        if payload.department is not None:
-            lecturer.department = payload.department.strip() or None
-        if payload.position is not None:
-            lecturer.position = payload.position.strip() or None
-        if payload.specialization is not None:
-            lecturer.specialization = payload.specialization.strip() or None
-        if payload.gender is not None:
-            lecturer.gender = payload.gender.strip() or None
-        if payload.date_of_birth is not None:
+        if "academic_degree" in provided:
+            lecturer.academic_degree = (payload.academic_degree or "").strip() or None
+        if "academic_rank" in provided:
+            lecturer.academic_rank = (payload.academic_rank or "").strip() or None
+        if "faculty" in provided:
+            lecturer.faculty = (payload.faculty or "").strip() or None
+        if "department" in provided:
+            lecturer.department = (payload.department or "").strip() or None
+        if "position" in provided:
+            lecturer.position = (payload.position or "").strip() or None
+        if "specialization" in provided:
+            lecturer.specialization = (payload.specialization or "").strip() or None
+        if "gender" in provided:
+            lecturer.gender = (payload.gender or "").strip() or None
+        if "date_of_birth" in provided:
             lecturer.date_of_birth = payload.date_of_birth
-        if payload.phone is not None:
-            lecturer.phone = payload.phone.strip() or None
+        if "phone" in provided:
+            lecturer.phone = (payload.phone or "").strip() or None
         if payload.orcid is not None:
             orcid_value = payload.orcid.strip() or None
             if orcid_value is not None and not re.fullmatch(r"\d{4}-\d{4}-\d{4}-\d{3}[\dX]", orcid_value):

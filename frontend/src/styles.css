@@ -42,6 +42,12 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Prevent page shift when AntD modal locks body scroll */
+body.ant-scrolling-effect {
+  overflow-y: scroll !important;
+  width: auto !important;
+}
+
 html,
 body,
 #root {

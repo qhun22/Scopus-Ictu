@@ -1,0 +1,164 @@
+{
+  "audit_purpose": "Gate D.2 Batch 2 browser evidence — ThS. Lương Thị Minh Huế (×5 IDs) + TS. Nguyễn Hải Minh (×4 IDs)",
+  "observation_date": "2026-10-27",
+  "observer": "Claude Sonnet 4.6 (in-app browser, read-only)",
+  "constraint": "Read-only. No data modified. No ACCEPT/REJECT/REVOKE. No merge.",
+
+  "ictu_web_source": {
+    "url_accessed": "https://repository.ictu.edu.vn/huong-dan-gop-tai-khoan-scopus/",
+    "page_title": "Hướng dẫn gộp tài khoản Scopus - DSpace",
+    "method": "navigate + javascript_tool DOM extraction",
+    "table_structure": {
+      "total_rows": 35,
+      "header": "Giảng viên | Email | IDs | # | ID chính hiện dùng | Các Scopus ID cần rà soát/gộp"
+    },
+    "batch2_rows_confirmed": [
+      {
+        "name": "ThS. Lương Thị Minh Huế",
+        "email": "lmhue@ictu.edu.vn",
+        "id_count": "5",
+        "pub_count": "10",
+        "primary_id": "60319803200",
+        "all_ids": ["60319803200","59708285400","60248511400","60219481200","60320211100"]
+      },
+      {
+        "name": "TS. Nguyễn Hải Minh",
+        "email": "nhminh@ictu.edu.vn",
+        "id_count": "4",
+        "pub_count": "14",
+        "primary_id": "57192956797",
+        "all_ids": ["57192956797","7003299472","58771697600","59768336500"]
+      }
+    ],
+    "observation_note": "ICTU-WEB table explicitly lists these Scopus IDs for each lecturer. Source is factual observation — the table shows these values. It does NOT confirm ICTU's identity claim is correct; it confirms these IDs are listed by ICTU as belonging to these lecturers."
+  },
+
+  "ictu_profile_luong_thi_minh_hue": {
+    "url_accessed": "https://repository.ictu.edu.vn/giang-vien/luong-thi-minh-hue/",
+    "page_title": "DSpace - TRƯỜNG CÔNG NGHỆ THÔNG TIN VÀ TRUYỀN THÔNG - ĐẠI HỌC THÁI NGUYÊN",
+    "method": "navigate + javascript_tool DOM extraction",
+    "dom_extracted_fields": {
+      "displayed_name": "ThS. Lương Thị Minh Huế",
+      "academic_degree": "ThS",
+      "specialization": "Khoa học máy tính",
+      "gender": "Nữ",
+      "email": "lmhue@ictu.edu.vn",
+      "orcid_displayed_on_page": "0009-0003-3737-7741",
+      "orcid_link_href": "https://orcid.org/0009-0003-3737-7741",
+      "publication_count": "Bài báo (20) — as of 2026-10-27",
+      "scopus_id_on_profile_page": "NOT DISPLAYED — profile does not show Scopus Author ID directly"
+    },
+    "observation_note": "ICTU Repository profile does not display Scopus Author ID. The multi-ID list is on the separate /huong-dan-gop-tai-khoan-scopus/ page."
+  },
+
+  "scopus_id_results": {
+    "60319803200": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=60319803200",
+      "page_title": "Luong, Thi Minh Hue - Author details - Scopus Preview",
+      "scopus_preview_body_status": "ACCESSIBLE",
+      "author_name_on_page": "Luong, Thi Minh Hue",
+      "affiliation_on_page": "Thai Nguyen University of Information and Communication Technology (ICTU), Thai Nguyen, Viet Nam",
+      "scopus_id_confirmed": "60319803200",
+      "orcid_on_page": "0009-0003-3737-7741",
+      "evidence_level": "PROFILE_ACCESSIBLE"
+    },
+    "59708285400": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59708285400",
+      "page_title": "Scopus preview - Scopus - Page not found",
+      "scopus_preview_body_status": "NOT FOUND — This author profile does not exist or has merged with another author profile.",
+      "author_name_on_page": null,
+      "affiliation_on_page": null,
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Page not found; likely already merged into another profile. Consistent with ICTU-WEB merge request listing."
+    },
+    "60248511400": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=60248511400",
+      "page_title": "Scopus preview - Scopus - Page not found",
+      "scopus_preview_body_status": "NOT FOUND — This author profile does not exist or has merged with another author profile.",
+      "author_name_on_page": null,
+      "affiliation_on_page": null,
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Page not found; likely already merged."
+    },
+    "60219481200": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=60219481200",
+      "page_title": "Luong Thi, Minh Hue - Author details - Scopus Preview",
+      "scopus_preview_body_status": "ACCESSIBLE",
+      "author_name_on_page": "Luong Thi, Minh Hue",
+      "affiliation_on_page": "Thai Nguyen University of Information and Communication Technology (ICTU), Thai Nguyen, Viet Nam",
+      "scopus_id_confirmed": "60219481200",
+      "orcid_on_page": null,
+      "evidence_level": "PROFILE_ACCESSIBLE",
+      "note": "Name tokenization differs from 60319803200 (Luong Thi vs Luong); likely same person, different Scopus name parsing"
+    },
+    "60320211100": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=60320211100",
+      "page_title": "Scopus preview - Scopus - Page not found",
+      "scopus_preview_body_status": "NOT FOUND — This author profile does not exist or has merged with another author profile.",
+      "author_name_on_page": null,
+      "affiliation_on_page": null,
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Page not found; likely already merged."
+    },
+    "57192956797": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57192956797",
+      "page_title": "Nguyen, Hai Minh - Author details - Scopus Preview",
+      "scopus_preview_body_status": "ACCESSIBLE",
+      "author_name_on_page": "Nguyen, Hai Minh",
+      "affiliation_on_page": "Thai Nguyen University of Information and Communication Technology (ICTU), Thai Nguyen, Viet Nam",
+      "scopus_id_confirmed": "57192956797",
+      "orcid_on_page": null,
+      "evidence_level": "PROFILE_ACCESSIBLE"
+    },
+    "7003299472": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=7003299472",
+      "page_title": "Minh, Nguyen Hai - Author details - Scopus Preview",
+      "scopus_preview_body_status": "ACCESSIBLE",
+      "author_name_on_page": "Minh, Nguyen Hai",
+      "affiliation_on_page": "Thai Nguyen University of Information and Communication Technology (ICTU), Thai Nguyen, Viet Nam",
+      "scopus_id_confirmed": "7003299472",
+      "id_length_note": "10 digits — atypical (most Scopus IDs are 11 digits); confirmed as valid ID from ICTU-WEB DOM and Scopus Preview page load",
+      "orcid_on_page": null,
+      "evidence_level": "PROFILE_ACCESSIBLE"
+    },
+    "58771697600": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=58771697600",
+      "page_title": "Minh, Nguyen Hai - Author details - Scopus Preview",
+      "scopus_preview_body_status": "ACCESSIBLE",
+      "author_name_on_page": "Minh, Nguyen Hai",
+      "affiliation_on_page": "Thai Nguyen University of Information and Communication Technology (ICTU), Thai Nguyen, Viet Nam",
+      "scopus_id_confirmed": "58771697600",
+      "orcid_on_page": null,
+      "evidence_level": "PROFILE_ACCESSIBLE"
+    },
+    "59768336500": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59768336500",
+      "page_title": "Hai Minh, Nguyen - Author details - Scopus Preview",
+      "scopus_preview_body_status": "ACCESSIBLE",
+      "author_name_on_page": "Hai Minh, Nguyen",
+      "affiliation_on_page": "Thai Nguyen University of Information and Communication Technology (ICTU), Thai Nguyen, Viet Nam",
+      "scopus_id_confirmed": "59768336500",
+      "orcid_on_page": null,
+      "evidence_level": "PROFILE_ACCESSIBLE",
+      "note": "Name form 'Hai Minh Nguyen' differs from primary; research domain in CSV pub (colorectal cancer / medical imaging) differs from primary IDs (clustering, ML) — worth flagging for human reviewer"
+    }
+  },
+
+  "summary": {
+    "luong_thi_minh_hue": {
+      "ids_accessible": ["60319803200","60219481200"],
+      "ids_not_found_likely_merged": ["59708285400","60248511400","60320211100"],
+      "pubs_in_csv": {"60319803200": 19, "59708285400": 0, "60248511400": 0, "60219481200": 0, "60320211100": 0},
+      "cross_id_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 19
+    },
+    "nguyen_hai_minh": {
+      "ids_accessible": ["57192956797","7003299472","58771697600","59768336500"],
+      "ids_not_found_likely_merged": [],
+      "pubs_in_csv": {"57192956797": 8, "7003299472": 5, "58771697600": 1, "59768336500": 1},
+      "cross_id_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 15,
+      "flag": "ID 59768336500 shows medical imaging domain; other IDs show clustering/ML domain — reviewer should verify this is the same person"
+    }
+  }
+}

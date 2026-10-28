@@ -1,0 +1,8 @@
+scope,total_population,source_listed,browser_opened,profile_accessible,identity_ownership_verified,approved_in_app,notes
+GV roster (lecturers.json),410,410,0,0,0,BLOCKED,"lecturers.json EXISTS locally (SHA256 prefix c12252e0); 410 records confirmed; no Scopus ID field in JSON — cross-reference not yet done"
+GV multi-ID (ICTU-WEB),35,34,4,4,2,UNKNOWN,"SOURCE COUNT DISCREPANCY: ICTU-WEB header claims 35 GV; DOM bảng 1 has 34 data rows (1 header + 34 = 35 tr total). Summary stats: 25 with 2 IDs + 9 with >=3 IDs = 34 rows. The stated 35 vs observed 34 discrepancy is IN THE SOURCE HEADER, not in Claude extraction."
+Scopus IDs (multi-ID group),83,83,10,10,4,UNKNOWN,"10 IDs opened: Đỗ Thị Bắc ×5 + Đỗ Đình Cường ×2 + Đinh Xuân Lâm ×2 + Quách Xuân Trưởng ×1 (primary only); 73 IDs NOT CHECKED"
+IDs ambiguous,10,10,1,1,0,1,"59253245500 opened (2 docs 58 citations ICTU affiliation); 9 NOT CHECKED; 1 already ACCEPTED in app — REVIEW DECISION REQUIRES AUDIT"
+IDs unknown owner,59,59,0,0,0,0,NOT CHECKED
+Scopus Authors DB,1207,0,0,0,0,UNKNOWN,BLOCKED — no direct DB access this session
+Candidates PENDING DB,149,0,0,0,0,UNKNOWN,BLOCKED — no direct DB access this session

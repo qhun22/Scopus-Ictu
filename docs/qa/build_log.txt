@@ -1,0 +1,16 @@
+[1] orcid_collision_review.csv: 20 rows (10 collision pairs)
+[2] email_crossref_with_sourceid.csv: 34 rows, 34/34 EXACT_EMAIL_MATCH
+
+[3] pub_link_count analysis from lecturers.json:
+    Records with pub_link_count > 0 : 106
+    Total sum of pub_link_count     : 1160
+
+    pub_link_count = len(public_publication_links[]) per record in lecturers.json
+    This counts URLs to ICTU repository item pages, NOT Scopus-linked publication records.
+
+    The "48 lecturers / 328 links" from prior QA refers to:
+    - 48 = lecturers who have Scopus publications imported into the app DB
+    - 328 = lecturer-publication foreign key rows in the app DB
+    These two counts measure DIFFERENT things from DIFFERENT sources.
+    No contradiction: 106/1160 is from the raw crawler JSON snapshot;
+    48/328 is from the app DB after Scopus CSV import and deduplication.

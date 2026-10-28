@@ -172,7 +172,7 @@ def start_job(
     if not dois:
         db.rollback()
         raise NoPublicationsToEnrich
-    job = AffiliationEnrichmentJob(requested_by_user_id=actor.id, total_dois=len(dois))
+    job = AffiliationEnrichmentJob(requested_by_user_id=actor.id, total_dois=len(dois), doi_list=dois)
     db.add(job)
     db.flush()
     worker_lease = None
@@ -307,11 +307,111 @@ def cancel_job(db: Session, job_id: uuid.UUID, actor: User) -> AffiliationEnrich
     return None
 
 
+class EnrichmentNotResumable(AffiliationEnrichmentError):
+    def __init__(self, reason: str = "") -> None:
+        super().__init__(
+            "ENRICHMENT_NOT_RESUMABLE",
+            f"Lượt thu thập này không thể tiếp tục: {reason}" if reason else "Lượt thu thập này không thể tiếp tục.",
+            409,
+        )
+
+
+def resume_job(
+    db: Session, prior_job_id: uuid.UUID, actor: User, *, reserve_worker_lease: bool = False
+) -> AffiliationEnrichmentJob:
+    """Create a new job that continues from where a FAILED/CANCELLED job left off.
+
+    The new job reuses the ``doi_list`` from the prior job, skipping the first
+    ``processed_dois`` entries so only the unfinished tail is fetched again.
+    """
+    root = cache_root()
+    if root is None:
+        raise OnlineCacheNotConfigured
+
+    got = db.execute(text("select pg_try_advisory_xact_lock(:k)"), {"k": _START_LOCK_KEY}).scalar_one()
+    if not got:
+        db.rollback()
+        raise EnrichmentAlreadyRunning
+
+    already_active = db.execute(
+        select(AffiliationEnrichmentJob.id).where(
+            AffiliationEnrichmentJob.status.in_(AFFILIATION_ENRICHMENT_ACTIVE_STATUSES)
+        )
+    ).first()
+    if already_active is not None:
+        db.rollback()
+        raise EnrichmentAlreadyRunning
+
+    prior = db.query(AffiliationEnrichmentJob).filter(AffiliationEnrichmentJob.id == prior_job_id).first()
+    if prior is None:
+        db.rollback()
+        raise EnrichmentNotResumable("Không tìm thấy lượt thu thập gốc.")
+    if prior.status not in ("FAILED", "CANCELLED"):
+        db.rollback()
+        raise EnrichmentNotResumable(f"Trạng thái hiện tại là {prior.status}, chỉ có thể tiếp tục từ FAILED hoặc CANCELLED.")
+    if not prior.doi_list:
+        db.rollback()
+        raise EnrichmentNotResumable("Lượt gốc không lưu danh sách DOI (có thể được tạo trước khi tính năng này ra mắt).")
+
+    skip = prior.processed_dois or 0
+    remaining_dois = list(prior.doi_list)[skip:]
+    if not remaining_dois:
+        db.rollback()
+        raise EnrichmentNotResumable("Tất cả DOI đã được xử lý, không còn gì để tiếp tục.")
+
+    job = AffiliationEnrichmentJob(
+        requested_by_user_id=actor.id,
+        total_dois=len(remaining_dois),
+        doi_list=remaining_dois,
+        resumed_from_job_id=prior_job_id,
+    )
+    db.add(job)
+    db.flush()
+
+    worker_lease = None
+    if reserve_worker_lease:
+        worker_lease = _acquire_worker_lease(job.id, db.get_bind())
+        if worker_lease is None:
+            db.rollback()
+            raise EnrichmentAlreadyRunning
+
+    db.add(
+        AuditEvent(
+            entity_type="affiliation_enrichment_job",
+            entity_id=job.id,
+            action=STARTED_ACTION,
+            actor_type="USER",
+            actor_user_id=actor.id,
+            event_metadata={
+                "total_dois": len(remaining_dois),
+                "skipped_dois": skip,
+                "resumed_from_job_id": str(prior_job_id),
+            },
+        )
+    )
+    try:
+        db.commit()
+        db.refresh(job)
+    except Exception:
+        db.rollback()
+        if worker_lease is not None:
+            _release_worker_lease(job.id, worker_lease)
+        raise
+
+    if worker_lease is not None:
+        with _pending_worker_leases_lock:
+            _pending_worker_leases[job.id] = worker_lease
+    return job
+
+
 def _dois_for_job(job_id: uuid.UUID) -> tuple[list[str], Path] | None:
     with get_session_factory()() as db:
         item = get_job(db, job_id)
         if item is None or item.status not in AFFILIATION_ENRICHMENT_ACTIVE_STATUSES:
             return None
+        # Use the stored doi_list if available (resume path or normal start with stored list).
+        # Fall back to a fresh query only for legacy jobs created before this column existed.
+        stored_dois = list(item.doi_list) if item.doi_list else None
         item.status = "RUNNING"
         item.updated_at = datetime.now(UTC)
         db.commit()
@@ -319,6 +419,8 @@ def _dois_for_job(job_id: uuid.UUID) -> tuple[list[str], Path] | None:
     if root is None:
         return None
     bundle_dir = root / str(job_id)
+    if stored_dois is not None:
+        return stored_dois, bundle_dir
     with get_session_factory()() as db:
         dois = _dois_to_enrich(db)
     return dois, bundle_dir
@@ -433,6 +535,7 @@ __all__ = [
     "COMPLETED_ACTION",
     "CANCELLED_ACTION",
     "EnrichmentAlreadyRunning",
+    "EnrichmentNotResumable",
     "FAILED_ACTION",
     "NoPublicationsToEnrich",
     "OnlineCacheNotConfigured",
@@ -443,5 +546,6 @@ __all__ = [
     "get_latest_job",
     "process_enrichment_job",
     "recover_interrupted_enrichment_jobs",
+    "resume_job",
     "start_job",
 ]

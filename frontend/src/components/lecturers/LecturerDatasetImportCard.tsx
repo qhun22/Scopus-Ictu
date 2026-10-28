@@ -156,7 +156,10 @@ const LecturerDatasetImportCard = forwardRef<
     if (!selectedFile || previewing || isImporting) return;
     setPreviewing(true);
     try {
-      const response = await previewLecturerDataset(selectedFile, allowDuplicate);
+      const [response] = await Promise.all([
+        previewLecturerDataset(selectedFile, allowDuplicate),
+        new Promise((resolve) => setTimeout(resolve, 1500)),
+      ]);
       setDuplicateWarning(null);
       if (response.conflicts && response.conflicts.length > 0) {
         toast.warning(
@@ -181,11 +184,13 @@ const LecturerDatasetImportCard = forwardRef<
       }
       const code = error instanceof ApiError ? error.code : "PREVIEW_FAILED";
       const detail =
-        error instanceof ApiError
-          ? error.message
-          : locale === "vi"
-            ? "Không thể kiểm tra tệp JSON."
-            : "Unable to preview the JSON file.";
+        error instanceof ApiError && code === "INVALID_LECTURER_DATASET"
+          ? t.lecturerImport.previewInvalidDataset
+          : error instanceof ApiError
+            ? error.message
+            : locale === "vi"
+              ? "Không thể kiểm tra tệp JSON."
+              : "Unable to preview the JSON file.";
       toast.error(t.lecturerImport.previewErrorTitle, `${code}: ${detail}`);
     } finally {
       setPreviewing(false);
@@ -253,7 +258,7 @@ const LecturerDatasetImportCard = forwardRef<
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth="1.8"
-                d="M12 4v16m8-8H4"
+                d="M7 19a4 4 0 01-.88-7.903A5.002 5.002 0 0116.9 9H17a4 4 0 010 8h-1m-4-6v6m0 0l-2-2m2 2l2-2"
               />
             </svg>
           </div>
@@ -264,8 +269,8 @@ const LecturerDatasetImportCard = forwardRef<
           </p>
           <p className="mt-1 text-[11px] text-slate-400">
             {locale === "vi"
-              ? "Hỗ trợ .json — tối đa 20.0 MB"
-              : "Supports .json — up to 20.0 MB"}
+              ? "Hỗ trợ .json - tối đa 20.0 MB"
+              : "Supports .json - up to 20.0 MB"}
           </p>
         </div>
       ) : (
@@ -302,25 +307,17 @@ const LecturerDatasetImportCard = forwardRef<
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-end">
-              <button
-                type="button"
-                disabled={previewing || isImporting}
-                onClick={exitFile}
-                className={buttonClass("secondary")}
-              >
-                {t.imports.cancelFile}
-              </button>
+            <div className="flex flex-col gap-2 shrink-0 w-full sm:w-40 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 justify-center">
               <button
                 type="button"
                 disabled={previewing || isImporting}
                 onClick={() => void handlePreview()}
-                className={buttonClass("primary")}
+                className={`${buttonClass("primary", "md", true)} w-full`}
               >
                 {previewing ? (
                   <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                    <span>{t.common.loading}</span>
+                    <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    <span>{locale === "vi" ? "Đang xử lý..." : "Processing..."}</span>
                   </>
                 ) : (
                   <>
@@ -335,6 +332,14 @@ const LecturerDatasetImportCard = forwardRef<
                     <span>{t.lecturerImport.checkData}</span>
                   </>
                 )}
+              </button>
+              <button
+                type="button"
+                disabled={previewing || isImporting}
+                onClick={exitFile}
+                className={`${buttonClass("secondary", "md", true)} w-full`}
+              >
+                {t.imports.cancelFile}
               </button>
             </div>
           </div>

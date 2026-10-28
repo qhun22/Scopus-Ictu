@@ -41,6 +41,9 @@ RULE_ORDER: tuple[RuleId, ...] = (
     "RULE_TITLE_STRIPPED_N0",
     "RULE_TITLE_STRIPPED_N2",
     "RULE_TITLE_STRIPPED_N2_FORMAT",
+    "RULE_N2",
+    "RULE_N2_FORMAT",
+    "RULE_N2_HYPHEN",
 )
 
 _TITLE_PREFIX_PATTERN = re.compile(
@@ -69,6 +72,12 @@ def normalize_name_n2(value: str) -> str:
 def normalize_comma_equivalence(value: str) -> str:
     """Remove comma separators while preserving the original token order."""
     return " ".join(re.sub(r"\s*,\s*", " ", normalize_name_n2(value)).split())
+
+
+def normalize_hyphen_equivalence(value: str) -> str:
+    """Remove comma and hyphen separators — matches Scopus 'Last, First-Middle' to Vietnamese 'First Middle Last'."""
+    n2 = normalize_name_n2(value)
+    return " ".join(re.sub(r"[\s,\-]+", " ", n2).split())
 
 
 def has_observed_title_prefix(value: str) -> bool:
@@ -106,6 +115,15 @@ def _lecturer_query(rule_id: RuleId, full_name: str) -> str | None:
     if rule_id == "RULE_EXACT_N0":
         return normalize_name_n0(full_name)
 
+    if rule_id == "RULE_N2":
+        return normalize_name_n2(full_name)
+
+    if rule_id == "RULE_N2_FORMAT":
+        return normalize_comma_equivalence(full_name)
+
+    if rule_id == "RULE_N2_HYPHEN":
+        return normalize_hyphen_equivalence(full_name)
+
     if not has_observed_title_prefix(full_name):
         return None
 
@@ -122,10 +140,12 @@ def _lecturer_query(rule_id: RuleId, full_name: str) -> str | None:
 def _surface_query(rule_id: RuleId, value: str) -> str:
     if rule_id in {"RULE_EXACT_N0", "RULE_TITLE_STRIPPED_N0"}:
         return normalize_name_n0(value)
-    if rule_id == "RULE_TITLE_STRIPPED_N2":
+    if rule_id in {"RULE_TITLE_STRIPPED_N2", "RULE_N2"}:
         return normalize_name_n2(value)
-    if rule_id == "RULE_TITLE_STRIPPED_N2_FORMAT":
+    if rule_id in {"RULE_TITLE_STRIPPED_N2_FORMAT", "RULE_N2_FORMAT"}:
         return normalize_comma_equivalence(value)
+    if rule_id == "RULE_N2_HYPHEN":
+        return normalize_hyphen_equivalence(value)
     raise ValueError(f"Unknown candidate rule: {rule_id}")
 
 
@@ -199,7 +219,7 @@ def generate_candidates(
     for rule_id in RULE_ORDER:
         index: dict[str, list[_IndexedSurface]] = defaultdict(list)
         for surface in surfaces:
-            if rule_id == "RULE_TITLE_STRIPPED_N2_FORMAT" and "," not in surface.surface_value:
+            if rule_id in {"RULE_TITLE_STRIPPED_N2_FORMAT", "RULE_N2_FORMAT"} and "," not in surface.surface_value:
                 continue
             indexed = _IndexedSurface(
                 surface=surface,
@@ -240,6 +260,19 @@ def generate_candidates(
             evidence.scopus_comparison_value,
         )
 
+    def _dedup_evidence(evidences: set[CandidateEvidence]) -> tuple[CandidateEvidence, ...]:
+        """Keep only the highest-priority rule per (surface_type, comparison pair).
+
+        When two rules produce identical comparison values for the same surface,
+        only the first rule in RULE_ORDER is informative — the rest are redundant.
+        """
+        seen: dict[tuple[str, str, str], CandidateEvidence] = {}
+        for ev in sorted(evidences, key=evidence_key):
+            dedup_key = (ev.scopus_surface_type, ev.lecturer_comparison_value, ev.scopus_comparison_value)
+            if dedup_key not in seen:
+                seen[dedup_key] = ev
+        return tuple(sorted(seen.values(), key=evidence_key))
+
     result = []
     for pair in sorted(
         evidence_by_pair,
@@ -256,7 +289,7 @@ def generate_candidates(
                 scopus_author_id=pair[1],
                 scopus_id=surface.scopus_id,
                 preferred_name=surface.preferred_name,
-                evidence=tuple(sorted(evidence_by_pair[pair], key=evidence_key)),
+                evidence=_dedup_evidence(evidence_by_pair[pair]),
             )
         )
     return tuple(result)

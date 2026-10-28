@@ -28,7 +28,7 @@ const sourceText = (types: string[], locale: Locale) =>
   types.map((t) => SOURCE[t]?.[locale] ?? (locale === "vi" ? "Loại chứng cứ khác" : "Other evidence type")).join(" · ");
 
 export function LinkStatusBadge({ locale }: { locale: Locale }) {
-  return <Badge tone="success">{locale === "vi" ? "Liên kết định danh đã duyệt" : "Approved identity link"}</Badge>;
+  return <Badge tone="success" className="!rounded-[5px]">{locale === "vi" ? "Liên kết định danh đã duyệt" : "Approved identity link"}</Badge>;
 }
 
 export function EvidenceBasisCell({ basis, locale }: { basis?: LinkEvidenceBasisRead | null; locale: Locale }) {
@@ -37,7 +37,7 @@ export function EvidenceBasisCell({ basis, locale }: { basis?: LinkEvidenceBasis
   const verifiedLabel = locale === "vi" ? "Định danh đã xác minh độc lập" : "Independently verified identity";
   return (
     <div className="flex flex-col items-start gap-1" data-testid="link-evidence-basis" data-level={basis.level}>
-      <Badge tone={level.tone} appearance="outline">
+      <Badge tone={level.tone} appearance="outline" className="!rounded-[5px]">
         {basis.independently_verified ? verifiedLabel : level[locale]}
       </Badge>
       {basis.supporting_evidence_types.length > 0 ? (

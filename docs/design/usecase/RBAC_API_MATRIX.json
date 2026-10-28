@@ -553,6 +553,26 @@
   "deprecated": false
  },
  {
+  "method": "POST",
+  "path": "/api/v1/users",
+  "summary": "Create a REVIEWER/LECTURER account (no lecturer profile required)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
+  "method": "GET",
+  "path": "/api/v1/dashboard/charts",
+  "summary": "Dashboard chart data (publications by year/type, affiliation coverage)",
+  "access": "ROLE:ADMIN",
+  "roles": [
+   "ADMIN"
+  ],
+  "deprecated": false
+ },
+ {
   "method": "GET",
   "path": "/health",
   "summary": "Health check",

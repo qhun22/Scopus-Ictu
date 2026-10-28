@@ -1,0 +1,204 @@
+{
+  "audit_purpose": "Gate D.2 Batch 5 browser evidence — TS. Phạm Đức Long (×3 IDs) + TS. Đỗ Thị Bắc (×5 IDs)",
+  "observation_date": "2026-10-27",
+  "observer": "Claude Sonnet 4.6 (in-app browser, read-only)",
+  "constraint": "Read-only. No data modified. No ACCEPT/REJECT/REVOKE. No merge.",
+  "method_note": "CrossRef DOI cross-check uses full author list (all positions, no truncation) — corrected approach following FINDING-016 false positive from Batch 3.",
+
+  "ictu_web_source": {
+    "url_accessed": "https://repository.ictu.edu.vn/huong-dan-gop-tai-khoan-scopus/",
+    "page_title": "Hướng dẫn gộp tài khoản Scopus - DSpace",
+    "method": "navigate + javascript_tool DOM extraction, 2026-10-27",
+    "batch5_rows_confirmed": [
+      {
+        "name": "TS. Phạm Đức Long",
+        "email": "pdlong@ictu.edu.vn",
+        "id_count": "3",
+        "pub_count": "6",
+        "primary_id": "26637116200",
+        "all_ids": ["26637116200", "57197579769", "58805722900"]
+      },
+      {
+        "name": "TS. Đỗ Thị Bắc",
+        "email": "dtbac@ictu.edu.vn",
+        "id_count": "5",
+        "pub_count": "11",
+        "primary_id": "59526508700",
+        "all_ids": ["59526508700", "57819997900", "59663496400", "59159284800", "57899449200"]
+      }
+    ],
+    "observation_note": "ICTU-WEB table explicitly lists these Scopus IDs. Source is factual observation — does NOT confirm identity claim is correct."
+  },
+
+  "scopus_id_results": {
+    "26637116200": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=26637116200",
+      "page_title": "Scopus preview - Long, Pham Duc - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Long, Pham Duc",
+      "evidence_level": "BROWSER_OPENED",
+      "crossref_doi_verified": null,
+      "correction_note": "[CORRECTED 2026-10-28] No DOI in CSV rows maps to this ID. DOI 10.1007/978-3-031-50818-9_35 belongs to ID 58805722900 in Scopus CSV. Evidence level downgraded from PUBLICATION_NAME_CORROBORATED to BROWSER_OPENED.",
+      "note": "Primary ID. 4 CSV pubs (2009–2024). Domain: image processing, cellular neural networks, AI in agriculture."
+    },
+    "57197579769": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57197579769",
+      "page_title": "Scopus preview - Pham, Duc Long - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Pham, Duc Long",
+      "evidence_level": "PUBLICATION_NAME_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.1109/CISP.2009.5303557",
+        "title": "Real Time Speckle Filter by Cellular Neural Network",
+        "year": 2009,
+        "author_count": 3,
+        "authors_full": [
+          {"pos": 1, "name": "Nguyen Tuan Minh", "affil": ""},
+          {"pos": 2, "name": "Pham Thuong Cat", "affil": ""},
+          {"pos": 3, "name": "Pham Duc Long", "affil": ""}
+        ],
+        "match": "Author #3 'Pham Duc Long' — CSV row has ID 57197579769 for this EID (2-s2.0-73849149157)",
+        "note": "Name-only corroboration. CSV maps this DOI to ID 57197579769, not 58805722900."
+      },
+      "note": "Name tokenization variant (Pham Duc Long). 1 CSV pub (IEEE CISP 2009). DOI correctly assigned to this ID per Scopus CSV."
+    },
+    "58805722900": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=58805722900",
+      "page_title": "Scopus preview - Long, Pham Duc - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Long, Pham Duc",
+      "evidence_level": "PUBLICATION_NAME_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.1007/978-3-031-50818-9_35",
+        "title": "Using Information Technology to Identify Fruit Flies in Agriculture",
+        "year": 2024,
+        "author_count": 1,
+        "authors_full": [
+          {"pos": 1, "name": "Pham Duc Long", "affil": ""}
+        ],
+        "match": "Author #1 'Pham Duc Long' — CSV row has ID 58805722900 for this EID (2-s2.0-85181976602)",
+        "note": "Single-author. Name-only corroboration. CSV maps this DOI to ID 58805722900."
+      },
+      "correction_note": "[CORRECTED 2026-10-28] DOI 10.1007/978-3-031-50818-9_35 correctly belongs to this ID (58805722900) per Scopus CSV, not 26637116200 as previously stated. Evidence upgraded from BROWSER_OPENED.",
+      "note": "1 CSV pub 2024 (Springer LNCS). DOI correctly assigned to this ID per Scopus CSV."
+    },
+    "59526508700": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59526508700",
+      "page_title": "Scopus preview - Do, Thi Bac - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Do, Thi Bac",
+      "evidence_level": "PUBLICATION_NAME_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.1007/s00542-026-06031-2",
+        "title": "A hybrid lightweight and post-quantum communication framework for NB-IoT networks",
+        "year": 2026,
+        "author_count": 2,
+        "authors_full": [
+          {"pos": 1, "name": "Thi-Bac Do", "affil": ""},
+          {"pos": 2, "name": "Quang-Huy Tran", "affil": ""}
+        ],
+        "match": "Author #1 'Thi-Bac Do' — CSV row has ID 59526508700 for this EID (2-s2.0-105033817001)",
+        "note": "Name-only. CSV maps DOI 10.1007/s00542-026-06031-2 to ID 59526508700."
+      },
+      "correction_note": "[CORRECTED 2026-10-28] DOI replaced from 10.11591/eei.v14i3.9064 (belongs to ID 57819997900) to 10.1007/s00542-026-06031-2 (correctly belongs to 59526508700 per Scopus CSV).",
+      "note": "Primary ID. 8 CSV pubs. Domain: algebra, post-quantum cryptography."
+    },
+    "57819997900": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57819997900",
+      "page_title": "Scopus preview - Do, Bac Thi - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Do, Bac Thi",
+      "evidence_level": "PUBLICATION_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.11591/eei.v14i3.9064",
+        "title": "Structure of 6-dimensional finite non-commutative algebras with many single-sided units",
+        "year": 2025,
+        "author_count": 5,
+        "authors_full": [
+          {"pos": 1, "name": "May Thu Duong", "affil": ""},
+          {"pos": 2, "name": "Alexander Andreevich Moldovyan", "affil": ""},
+          {"pos": 3, "name": "Nikolay Andreevich Moldovyan", "affil": ""},
+          {"pos": 4, "name": "Minh Hieu Nguyen", "affil": ""},
+          {"pos": 5, "name": "Bac Thi Do", "affil": ""}
+        ],
+        "match": "Author #5 'Bac Thi Do' — CSV row has ID 57819997900 for this EID (2-s2.0-105005271164)",
+        "publisher_evidence": "Publisher page beei.org/index.php/EEI/article/view/9064 lists author Bac Thi Do with affiliation Thai Nguyen University of ICT and email dtbac@ictu.edu.vn. This is E5-level evidence (affiliation + email from publisher).",
+        "evidence_level_rationale": "PUBLICATION_CORROBORATED: publisher confirms affil=ICTU + email=dtbac@ictu.edu.vn for author on this paper. CSV maps DOI to ID 57819997900."
+      },
+      "correction_note": "[CORRECTED 2026-10-28] DOI 10.11591/eei.v14i3.9064 correctly belongs to ID 57819997900 (not 59526508700) per Scopus CSV. Evidence upgraded from BROWSER_OPENED. Publisher page confirms ICTU affiliation and email.",
+      "note": "Name tokenization inverted (Bac Thi Do). 3 CSV pubs."
+    },
+    "59663496400": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59663496400",
+      "page_title": "Scopus preview - Bac, Do Thi - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "Bac, Do Thi",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Name form family=Bac, given=Do Thi. 1 CSV pub 2023 (KSE conference). Body error."
+    },
+    "59159284800": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=59159284800",
+      "page_title": "Scopus preview - do Thi, Bac - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "do Thi, Bac",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Unusual form: lowercase 'do'. 1 CSV pub. Body error."
+    },
+    "57899449200": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57899449200",
+      "page_title": "Scopus preview - ThiBac, Do - Author details - Scopus",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY",
+      "author_name_from_title": "ThiBac, Do",
+      "evidence_level": "BROWSER_OPENED",
+      "crossref_doi_verified": null,
+      "correction_note": "[CORRECTED 2026-10-28] DOI 10.1007/s00542-026-06031-2 belongs to ID 59526508700 in Scopus CSV, not this ID. Evidence downgraded from PUBLICATION_NAME_CORROBORATED to BROWSER_OPENED. No separate DOI corroboration available for 57899449200.",
+      "note": "1 CSV pub 2026 Springer (EID 2-s2.0-105033817001 maps to ID 59526508700, not this ID — CSV Author(s) ID for this pub is 59526508700;57208579583). Page title confirms 'ThiBac, Do' name form."
+    }
+  },
+
+  "doi_secondary_check": {
+    "correction_note": "[CORRECTED 2026-10-28] Original secondary check assigned DOI 10.1109/CISP.2009.5303557 to ID 58805722900. Correct: this DOI belongs to ID 57197579769 per Scopus CSV. Moved to main scopus_id_results entry for 57197579769.",
+    "pdl_cisp_doi_corrected": {
+      "doi": "10.1109/CISP.2009.5303557",
+      "id_in_csv": "57197579769",
+      "eid": "2-s2.0-73849149157",
+      "result": "PUBLICATION_NAME_CORROBORATED for ID 57197579769"
+    }
+  },
+
+  "cross_gv_coauthorship": {
+    "source": "Tái lập từ data/scopus/Truong_Quang_Huy_Scopus_Sep2026.csv (660 dòng). 2026-10-27.",
+    "pdl_x_batch1234_gvs": "None — PDL không có cross-GV EIDs với QXT/DQA/PTN/LMH/NHM/LHL/NVT/NHH/TQQ trong CSV này",
+    "dtb_x_batch1234_gvs": "None — DTB không có cross-GV EIDs với các GVs Batch 1–4 trong CSV này",
+    "pdl_x_dtb": "0 EIDs — không đồng tác giả",
+    "note": "CSV là personal export QH Sep 2026. PDL và DTB có thể đồng tác giả với GVs khác không có trong CSV này."
+  },
+
+  "name_variants": {
+    "Phạm Đức Long": ["Long, Pham Duc", "Pham, Duc Long"],
+    "Đỗ Thị Bắc": ["Do, Thi Bac", "Do, Bac Thi", "Bac, Do Thi", "do Thi, Bac", "ThiBac, Do", "Thi-Bac Do", "Bac Thi Do"]
+  },
+
+  "summary": {
+    "correction_note": "[CORRECTED 2026-10-28] DOI→ID mappings corrected per Scopus CSV. See scopus_id_results entries for details.",
+    "pham_duc_long": {
+      "ids_page_title_confirmed": ["26637116200", "57197579769", "58805722900"],
+      "ids_doi_crossref_name_confirmed": ["57197579769", "58805722900"],
+      "ids_browser_only": ["26637116200"],
+      "pubs_in_csv": {"26637116200": 4, "57197579769": 1, "58805722900": 1},
+      "intra_gv_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 6,
+      "domain": "image processing, cellular neural networks, AI"
+    },
+    "do_thi_bac": {
+      "ids_page_title_confirmed": ["59526508700", "57819997900", "59663496400", "59159284800", "57899449200"],
+      "ids_doi_crossref_name_confirmed": ["59526508700", "57819997900"],
+      "ids_with_publisher_affil_confirmed": ["57819997900"],
+      "ids_browser_only": ["59663496400", "59159284800", "57899449200"],
+      "pubs_in_csv": {"59526508700": 8, "57819997900": 3, "57899449200": 1, "59159284800": 1, "59663496400": 1},
+      "intra_gv_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 14,
+      "domain": "algebra, post-quantum cryptography, commutative/non-commutative structures"
+    }
+  }
+}

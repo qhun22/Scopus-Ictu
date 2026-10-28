@@ -1,0 +1,11 @@
+row,scopus_name,scopus_id,pub_count_ictu,source,browser_opened,in_app_system,notes
+1,Nguyen Thanh Tung,58035626100,12,ICTU-WEB DOM,NO,UNKNOWN,NOT CHECKED
+2,Vu Hai Yen,59457874400,1,ICTU-WEB DOM,NO,UNKNOWN,NOT CHECKED
+3,Dung Nguyen Thuy,57347583100,5,ICTU-WEB DOM,NO,UNKNOWN,NOT CHECKED
+4,Nguyen Thi Dung,59253245500,2,ICTU-WEB DOM,YES,ACCEPTED for PGS.TS. Nguyen Thi Dung (DATA-01),"REVIEW DECISION REQUIRES AUDIT: ACCEPTED with NAME evidence only; 58 citations on 2 docs (observed browser); 5 lecturers at ICTU share this name; decision audit required before any action"
+5,Hoang Thuong,57201688092,1,ICTU-WEB DOM,NO,UNKNOWN,NOT CHECKED
+6,Doan Cuong M.,57287238000,1,ICTU-WEB DOM,NO,UNKNOWN,NOT CHECKED
+7,Nguyen Dung T.,59915579700,5,ICTU-WEB DOM,NO,UNKNOWN,NOT CHECKED
+8,Thi Dung Nguyen,57217138823,5,ICTU-WEB DOM,NO,UNKNOWN,NOT CHECKED
+9,Dung Nguyen Thi,36721684800,13,ICTU-WEB DOM,NO,UNKNOWN,"SAME NAME as row 4 (Nguyen Thi Dung) but different ID and 13 pubs — high risk of confusion with already-ACCEPTED ID 59253245500"
+10,Dung Nguyen Thi,59268985800,1,ICTU-WEB DOM,NO,UNKNOWN,"SAME NAME as rows 4 and 9 — 3 IDs total for name Nguyen Thi Dung"

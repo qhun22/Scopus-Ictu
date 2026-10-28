@@ -13,11 +13,19 @@ import {
   Spin,
   Typography,
 } from "antd";
-// Brand / danger colours and button radius from the design tokens (Figma 5:2), scoped to this page —
-// the only AntD consumer — so AntD primary/danger buttons (modal OK, Accept/Reject) match the Design System.
+// Design system tokens scoped to this page's AntD usage.
 const ANTD_THEME = {
-  token: { colorPrimary: "#3A5FC3", colorError: "#E11D48" },
-  components: { Button: { borderRadius: 6 } },
+  token: {
+    colorPrimary: "#3A5FC3",
+    colorError: "#E11D48",
+    borderRadius: 5,
+    fontFamily: "Saira, Arial, sans-serif",
+  },
+  components: {
+    Button: { borderRadius: 5 },
+    Modal: { borderRadiusLG: 5, titleFontSize: 15 },
+    Card: { borderRadiusLG: 5 },
+  },
 };
 
 import {
@@ -26,11 +34,13 @@ import {
   getReviewCandidates,
   getReviewContext,
 } from "../../api/reviews";
+import { generateCandidates } from "../../api/matching";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n/I18nContext";
 import Badge from "../../components/ui/Badge";
+import UiButton from "../../components/ui/Button";
 import { CANDIDATE_STATUS_TONE } from "../../components/ui/reviewTones";
 import { reconciliationLabel, ruleLabel, surfaceLabel } from "./ruleLabels";
 import type { TranslationSchema } from "../../i18n/types";
@@ -46,7 +56,7 @@ import type {
   ReviewReasonTrigger,
 } from "../../types/review";
 
-const { Paragraph, Text } = Typography;
+const { Text } = Typography;
 
 type EvidenceFilter = EvidenceCategory | "all";
 type AmbiguitySelection = AmbiguityFilter | "all";
@@ -118,15 +128,11 @@ function provenanceText(t: T, ref: unknown): string {
 function NameEvidenceCard({ t, locale, evidence }: { t: T; locale: "vi" | "en"; evidence: ReviewNameEvidence }) {
   return (
     <div className="rounded-[5px] border border-slate-200 bg-slate-50/70 p-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-slate-800" title={evidence.rule_id} data-testid="name-rule-label">
           {ruleLabel(evidence.rule_id, locale)}
         </span>
-        <Text type="secondary">{format(t.ruleVersionLabel, { version: evidence.rule_version })}</Text>
       </div>
-      <Paragraph className="!mb-3 !mt-2 !text-slate-600">
-        {t.nameRuleExplanation}
-      </Paragraph>
       <div className="grid gap-3 md:grid-cols-2">
         <div>
           <Text type="secondary">{t.lecturerProfileNameLabel}</Text>
@@ -248,6 +254,9 @@ export default function ApprovalQueuePage() {
   const [serverReasonTriggers, setServerReasonTriggers] = useState<ReviewReasonTrigger[]>([]);
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
 
+  const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
   const loadQueue = useCallback(async () => {
     setQueueLoading(true);
     setQueueError(null);
@@ -307,6 +316,21 @@ export default function ApprovalQueuePage() {
     if (!selectedCandidateId) return;
     void loadDetail(selectedCandidateId);
   }, [loadDetail, selectedCandidateId]);
+
+  const handleGenerate = useCallback(async () => {
+    setGenerating(true);
+    setGenerateConfirmOpen(false);
+    try {
+      const result = await generateCandidates();
+      const msg = format(t.generateSuccessMessage, { count: String(result.candidate_roots) });
+      toast.success(t.generateSuccessTitle, msg);
+      await loadQueue();
+    } catch (error) {
+      toast.error(t.generateErrorTitle, getApiErrorMessage(error, t.generateErrorTitle));
+    } finally {
+      setGenerating(false);
+    }
+  }, [loadQueue, t, toast]);
 
   const openDetail = (candidateId: string) => {
     setConflictMessage(null);
@@ -427,10 +451,37 @@ export default function ApprovalQueuePage() {
             {t.subtitle}
           </p>
         </div>
-        <div className="text-xs text-slate-500 mt-1">
-          {t.totalLabel}: <span className="font-semibold text-slate-800">{total}</span>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-slate-500">
+            {t.totalLabel}: <span className="font-semibold text-slate-800">{total}</span>
+          </div>
+          <UiButton
+            variant="primary"
+            size="md"
+            loading={generating}
+            onClick={() => setGenerateConfirmOpen(true)}
+            icon={
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
+              </svg>
+            }
+          >
+            <span className="truncate">{t.generateBtn}</span>
+          </UiButton>
         </div>
       </div>
+
+      <Modal
+        open={generateConfirmOpen}
+        title={t.generateConfirmTitle}
+        okText={t.generateConfirmOk}
+        cancelText={t.cancel}
+        onOk={() => void handleGenerate()}
+        onCancel={() => setGenerateConfirmOpen(false)}
+        confirmLoading={generating}
+      >
+        <p className="text-sm text-slate-600">{t.generateConfirmText}</p>
+      </Modal>
 
       {/* ── Filter Bar ──────────────────────────────────────────────────── */}
       <div className="rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs">
@@ -565,21 +616,21 @@ export default function ApprovalQueuePage() {
                         <div className="mt-0.5 font-mono text-[10px] text-slate-400">{item.scopus_author.scopus_id}</div>
                       </td>
                       <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
-                        <Badge tone={CANDIDATE_STATUS_TONE[item.candidate_status]}>
+                        <Badge tone={CANDIDATE_STATUS_TONE[item.candidate_status]} className="min-w-[84px] justify-center !rounded-[5px]">
                           {statusLabels(t)[item.candidate_status]}
                         </Badge>
                       </td>
                       <td className="px-4 py-3.5 align-middle">
                         {item.publication_support_count > 0 && item.name_evidence_count === 0 ? (
                           <div>
-                            <Badge tone="violet" appearance="outline" title={t.craweOnlyBadgeTooltip}>
+                            <Badge tone="violet" appearance="outline" className="min-w-[130px] justify-center !rounded-[5px]" title={t.craweOnlyBadgeTooltip}>
                               {t.craweOnlyBadge}
                             </Badge>
                             <div className="mt-1 text-[10px] text-slate-400">{format(t.craweOnlyCount, { count: item.publication_support_count })}</div>
                           </div>
                         ) : item.publication_support_count > 0 ? (
                           <div>
-                            <Badge tone="info" appearance="outline">
+                            <Badge tone="info" appearance="outline" className="min-w-[130px] justify-center !rounded-[5px]">
                               {t.publicationSupportedBadge}
                             </Badge>
                             <div className="mt-1 text-[10px] text-slate-400">
@@ -588,7 +639,7 @@ export default function ApprovalQueuePage() {
                           </div>
                         ) : (
                           <div>
-                            <Badge tone="neutral" appearance="outline">
+                            <Badge tone="neutral" appearance="outline" className="min-w-[130px] justify-center !rounded-[5px]">
                               {t.nameOnlyBadge}
                             </Badge>
                             <div className="mt-1 text-[10px] text-slate-400">{format(t.nameOnlyCount, { count: item.name_evidence_count })}</div>
@@ -596,15 +647,15 @@ export default function ApprovalQueuePage() {
                         )}
                       </td>
                       <td className="px-4 py-3.5 align-middle">
-                        <div className="flex flex-col gap-1">
-                          <Badge tone={item.is_ambiguous ? "warning" : "neutral"} appearance="outline" className="w-fit">
+                        <div className="flex flex-col items-start gap-1">
+                          <Badge tone={item.is_ambiguous ? "warning" : "neutral"} appearance="outline" className="!rounded-[5px]">
                             {ambiguityText(t, item.candidate_count_for_lecturer)}
                           </Badge>
                           {item.is_shared_scopus_author && (
                             <Badge
                               tone="danger"
                               appearance="outline"
-                              className="w-fit"
+                              className="!rounded-[5px]"
                               data-testid="shared-author-tag"
                               title={sharedAuthorText(t, item.candidate_count_for_scopus_author)}
                             >
@@ -684,10 +735,12 @@ export default function ApprovalQueuePage() {
         title={t.detailModalTitle}
         width={1040}
         footer={null}
+        centered
         destroyOnClose
         maskClosable={!decisionSubmitting}
         closable={!decisionSubmitting}
         onCancel={closeDetail}
+        styles={{ body: { padding: 0 } }}
       >
         {detailLoading ? (
           <div className="flex min-h-72 flex-col items-center justify-center gap-3">
@@ -707,7 +760,8 @@ export default function ApprovalQueuePage() {
             }
           />
         ) : detail ? (
-          <div className="max-h-[72vh] overflow-y-auto pr-1">
+          <div className="flex max-h-[80vh] flex-col">
+          <div className="flex-1 overflow-y-auto px-6 pb-2 pt-4">
             {conflictMessage && (
               <Alert className="mb-4" showIcon closable type="warning" message={t.conflictAlertTitle} description={conflictMessage} onClose={() => setConflictMessage(null)} />
             )}
@@ -732,7 +786,7 @@ export default function ApprovalQueuePage() {
                   <Descriptions.Item label={t.fieldScopusId}><Text code>{detail.scopus_author.scopus_id}</Text></Descriptions.Item>
                   <Descriptions.Item label={t.fieldNameVariants}>
                     {detail.scopus_author.name_variants.length > 0 ? (
-                      <Space wrap>{detail.scopus_author.name_variants.map((variant) => <Badge key={variant} tone="neutral">{variant}</Badge>)}</Space>
+                      <Space wrap>{detail.scopus_author.name_variants.map((variant) => <Badge key={variant} tone="neutral" className="!rounded-[5px]">{variant}</Badge>)}</Space>
                     ) : t.noNameVariants}
                   </Descriptions.Item>
                 </Descriptions>
@@ -757,10 +811,10 @@ export default function ApprovalQueuePage() {
                 {detail.publication_evidence.map((evidence) => (
                   <div key={evidence.evidence_id} className="rounded-[5px] border border-slate-200 p-4">
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Badge tone={evidence.reconciliation === "DOI_EXACT" ? "success" : "brand"} title={evidence.reconciliation ?? undefined}>
+                      <Badge tone={evidence.reconciliation === "DOI_EXACT" ? "success" : "brand"} className="!rounded-[5px]" title={evidence.reconciliation ?? undefined}>
                         {reconciliationLabel(evidence.reconciliation, locale, t.reconciliationUnknown)}
                       </Badge>
-                      <Text type="secondary" title={evidence.rule_id}>{ruleLabel(evidence.rule_id, locale)} · {format(t.ruleVersionLabel, { version: evidence.rule_version })}</Text>
+                      <Text type="secondary" title={evidence.rule_id}>{ruleLabel(evidence.rule_id, locale)}</Text>
                     </div>
                     <div className="text-base font-semibold text-slate-900">{displayValue(t, evidence.title)}</div>
                     <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
@@ -804,16 +858,17 @@ export default function ApprovalQueuePage() {
                       <div className="font-medium text-slate-900">{candidate.scopus_author.preferred_name}</div>
                       <div className="font-mono text-xs text-slate-500">{candidate.scopus_author.scopus_id}</div>
                     </div>
-                    <Badge tone={CANDIDATE_STATUS_TONE[candidate.candidate_status]}>{statusLabels(t)[candidate.candidate_status]}</Badge>
+                    <Badge tone={CANDIDATE_STATUS_TONE[candidate.candidate_status]} size="md" className="min-w-[96px] justify-center !rounded-[5px]">{statusLabels(t)[candidate.candidate_status]}</Badge>
                   </div>
                 ))}
               </div>
             )}
 
-            <Divider />
+          </div>
+          <div className="shrink-0 border-t border-slate-200 px-6 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-slate-500">
-                {t.currentStatusLabel}: <Badge tone={CANDIDATE_STATUS_TONE[detail.candidate_status]}>{statusLabels(t)[detail.candidate_status]}</Badge>
+                {t.currentStatusLabel}: <Badge tone={CANDIDATE_STATUS_TONE[detail.candidate_status]} size="md" className="min-w-[96px] justify-center !rounded-[5px]">{statusLabels(t)[detail.candidate_status]}</Badge>
               </div>
               {detail.candidate_status === "PENDING" && (
                 <Space wrap>
@@ -823,7 +878,8 @@ export default function ApprovalQueuePage() {
               )}
             </div>
           </div>
-        ) : <Empty description={t.noDetailData} />}
+          </div>
+        ) : <Empty description={t.noDetailData} className="py-10" />}
       </Modal>
 
       <Modal
@@ -845,7 +901,7 @@ export default function ApprovalQueuePage() {
               <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
               <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name}</Descriptions.Item>
               <Descriptions.Item label={t.fieldScopusId}><Text code>{detail.scopus_author.scopus_id}</Text></Descriptions.Item>
-              <Descriptions.Item label={t.fieldAction}><Badge tone="success">{t.decisionAccept}</Badge></Descriptions.Item>
+              <Descriptions.Item label={t.fieldAction}><Badge tone="success" className="!rounded-[5px]">{t.decisionAccept}</Badge></Descriptions.Item>
             </Descriptions>
             {acceptReasonRequired && (
               <Alert
@@ -912,7 +968,7 @@ export default function ApprovalQueuePage() {
             <Descriptions size="small" column={1} colon={false}>
               <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
               <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name} ({detail.scopus_author.scopus_id})</Descriptions.Item>
-              <Descriptions.Item label={t.fieldAction}><Badge tone="danger">{t.decisionReject}</Badge></Descriptions.Item>
+              <Descriptions.Item label={t.fieldAction}><Badge tone="danger" className="!rounded-[5px]">{t.decisionReject}</Badge></Descriptions.Item>
             </Descriptions>
             <div>
               <label htmlFor="review-reject-reason" className="mb-1.5 block font-semibold text-slate-700">

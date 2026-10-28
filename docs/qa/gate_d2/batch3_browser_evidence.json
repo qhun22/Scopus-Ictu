@@ -1,0 +1,163 @@
+{
+  "audit_purpose": "Gate D.2 Batch 3 browser evidence — TS. Lê Hùng Linh (×3 IDs) + TS. Nguyễn Văn Tảo (×3 IDs)",
+  "observation_date": "2026-10-27",
+  "observer": "Claude Sonnet 4.6 (in-app browser, read-only)",
+  "constraint": "Read-only. No data modified. No ACCEPT/REJECT/REVOKE. No merge.",
+
+  "ictu_web_source": {
+    "url_accessed": "https://repository.ictu.edu.vn/huong-dan-gop-tai-khoan-scopus/",
+    "page_title": "Hướng dẫn gộp tài khoản Scopus - DSpace",
+    "method": "navigate + javascript_tool DOM extraction",
+    "table_structure": {
+      "total_rows": 35,
+      "header": "Giảng viên | Email | IDs | # | ID chính hiện dùng | Các Scopus ID cần rà soát/gộp"
+    },
+    "batch3_rows_confirmed": [
+      {
+        "name": "TS. Lê Hùng Linh",
+        "email": "lhlinh@ictu.edu.vn",
+        "id_count": "3",
+        "pub_count": "12",
+        "primary_id": "56548128100",
+        "all_ids": ["56548128100", "58830932700", "57200439355"]
+      },
+      {
+        "name": "TS. Nguyễn Văn Tảo",
+        "email": "nvtao@ictu.edu.vn",
+        "id_count": "3",
+        "pub_count": "16",
+        "primary_id": "57192958573",
+        "all_ids": ["57192958573", "56967513900", "57221224211"]
+      }
+    ],
+    "observation_note": "ICTU-WEB table explicitly lists these Scopus IDs for each lecturer. Source is factual observation — the table shows these values. It does NOT confirm ICTU's identity claim is correct; it confirms these IDs are listed by ICTU as belonging to these lecturers."
+  },
+
+  "scopus_id_results": {
+    "56548128100": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=56548128100",
+      "page_title": "Le, Hung Linh — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY — 'Unable to display author profile'",
+      "author_name_from_title": "Le, Hung Linh",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Body error on all Batch 3 profiles (Scopus Preview server issue 2026-10-27); page title still confirms ID and name"
+    },
+    "58830932700": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=58830932700",
+      "page_title": "Linh, Le Hung — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY — 'Unable to display author profile'",
+      "author_name_from_title": "Linh, Le Hung",
+      "evidence_level": "PUBLICATION_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.1109/ICCA.2010.5524407",
+        "title": "Speed control of 3-phase asynchronous motor using artificial neural network",
+        "year": 2010,
+        "author_confirmed": "Le Hung, Linh",
+        "publisher": "IEEE / ICCA",
+        "crossref_status": "ok",
+        "match": "name 'Le Hung, Linh' matches CSV entry 'Linh, Le Hung' for ID 58830932700"
+      },
+      "note": "Different name tokenization from primary (Linh Le Hung vs Le Hung Linh). DOI cross-check confirms publication authorship."
+    },
+    "57200439355": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57200439355",
+      "page_title": "Le, Linh — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY — 'Unable to display author profile'",
+      "author_name_from_title": "Le, Linh",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Name 'Le, Linh' is shorter form. 1 CSV pub (2018 neural network mobile robot). No DOI cross-check performed."
+    },
+    "57192958573": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57192958573",
+      "page_title": "van Tao, Nguyen — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY — 'Unable to display author profile'",
+      "author_name_from_title": "van Tao, Nguyen",
+      "evidence_level": "BROWSER_OPENED",
+      "note": "Body error; page title confirms ID. Name form 'van Tao Nguyen' (lowercase 'van') is alternate Vietnamese name handling."
+    },
+    "56967513900": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=56967513900",
+      "page_title": "Nguyen, Van Tao — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY — 'Unable to display author profile'",
+      "author_name_from_title": "Nguyen, Van Tao",
+      "evidence_level": "BROWSER_OPENED",
+      "doi_crossref_verified": {
+        "doi": "10.1109/MNET.010.2100509",
+        "title": "Toward the Age of Intelligent Vehicular Networks for Connected and Autonomous Vehicles in 6G",
+        "year": 2023,
+        "author_count": 5,
+        "authors_full": [
+          {"pos": 1, "name": "Nguyen, Van-Linh", "affil": "CCU, Taiwan"},
+          {"pos": 2, "name": "Hwang, Ren-Hung", "affil": "NYCU, Taiwan"},
+          {"pos": 3, "name": "Lin, Po-Ching", "affil": "CCU, Taiwan"},
+          {"pos": 4, "name": "Vyas, Abhishek", "affil": "CCU, Taiwan"},
+          {"pos": 5, "name": "Nguyen, Van-Tao", "affil": "Thai Nguyen University of Information and Communication Technology, Vietnam"}
+        ],
+        "match": "Author #5 'Nguyen, Van-Tao' from ICTU matches NVT",
+        "corroboration_sources": ["CrossRef API full list", "DBLP dblp.org/rec/journals/network/NguyenHLVN23", "NYCU scholar portal", "ICTU Repository article page"],
+        "CORRECTION_NOTE": "[CORRECTED 2026-10-27] Initial audit (v1.1) flagged as DOI_ANOMALY — FALSE POSITIVE. Code used .slice(0,4) and missed author #5. Anomaly flag removed.",
+        "assessment": "PUBLICATION_CORROBORATED: Van-Tao Nguyen is co-author #5 on this paper. Not identity ownership proof for full ID 56967513900."
+      },
+      "note": "7 pubs in CSV. DOI cross-check corrected after independent review."
+    },
+    "57221224211": {
+      "url_accessed": "https://www.scopus.com/authid/detail.uri?authorId=57221224211",
+      "page_title": "Nguyen, Tao Van — Author details — Scopus Preview",
+      "scopus_preview_body_status": "UNABLE_TO_DISPLAY — 'Unable to display author profile'",
+      "author_name_from_title": "Nguyen, Tao Van",
+      "evidence_level": "PUBLICATION_CORROBORATED",
+      "crossref_doi_verified": {
+        "doi": "10.3390/fi17080350",
+        "title": "Security Issues in IoT-Based Wireless Sensor Networks: Classifications and Solutions",
+        "year": 2025,
+        "author_confirmed": "Nguyen, Tao V.",
+        "affiliation_confirmed": "Faculty of Engineering and Technology, Thai Nguyen University of Information and Communication Technology, Thai Nguyen 24000, Vietnam",
+        "publisher": "MDPI AG",
+        "crossref_status": "ok",
+        "match": "name 'Nguyen Tao V.' with ICTU affiliation matches CSV entry for ID 57221224211"
+      },
+      "note": "E5 evidence: publisher CrossRef record confirms ICTU affiliation for Nguyen Tao V."
+    }
+  },
+
+  "doi_cross_check_summary": {
+    "lhl_58830932700": {
+      "doi": "10.1109/ICCA.2010.5524407",
+      "result": "CrossRef: 'Le Hung, Linh' author confirmed in 2010 motor speed control paper",
+      "evidence_level": "PUBLICATION_NAME_CORROBORATED — name matches; no email/ORCID from publisher in this check"
+    },
+    "nvt_56967513900": {
+      "doi": "10.1109/MNET.010.2100509",
+      "result": "CORRECTED [was: ANOMALY — FALSE POSITIVE]. CrossRef full 5-author list: author #5 is 'Nguyen, Van-Tao' from ICTU. Confirmed by DBLP + NYCU scholar + ICTU Repository.",
+      "evidence_level": "PUBLICATION_CORROBORATED",
+      "correction_note": "Initial v1.1 audit used .slice(0,4) and missed author #5. Corrected 2026-10-27 after independent review."
+    },
+    "nvt_57221224211": {
+      "doi": "10.3390/fi17080350",
+      "result": "CONFIRMED — CrossRef + MDPI: Nguyen Tao V. from ICTU, 2025 IoT security. MDPI page shows ICTU affiliation. PDF reportedly contains nvtao@ictu.edu.vn (per independent review).",
+      "evidence_level": "PUBLICATION_CORROBORATED (strong — ICTU affiliation confirmed by publisher)"
+    }
+  },
+
+  "summary": {
+    "le_hung_linh": {
+      "ids_page_title_confirmed": ["56548128100", "58830932700", "57200439355"],
+      "ids_body_accessible": [],
+      "ids_not_found": [],
+      "ids_doi_crossref_confirmed": ["58830932700"],
+      "pubs_in_csv": {"56548128100": 13, "58830932700": 1, "57200439355": 1},
+      "intra_gv_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 15
+    },
+    "nguyen_van_tao": {
+      "ids_page_title_confirmed": ["57192958573", "56967513900", "57221224211"],
+      "ids_body_accessible": [],
+      "ids_not_found": [],
+      "ids_doi_crossref_confirmed": ["57221224211"],
+      "ids_doi_anomaly_flagged": ["56967513900"],
+      "pubs_in_csv": {"57192958573": 5, "56967513900": 7, "57221224211": 2},
+      "intra_gv_eid_duplicates": 0,
+      "total_unique_eids_in_csv": 14
+    }
+  }
+}

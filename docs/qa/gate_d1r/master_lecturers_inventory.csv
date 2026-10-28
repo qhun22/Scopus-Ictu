@@ -1,0 +1,411 @@
+row,source_id,full_name,institutional_email,academic_degree,academic_rank,position,faculty,department,orcid,is_active,pub_link_count
+1,https://repository.ictu.edu.vn/giang-vien/bui-anh-tu/,Bùi Anh Tú,batu@ictu.edu.vn,TS,,,,,0009-0005-1636-6407,True,18
+2,https://repository.ictu.edu.vn/giang-vien/bui-ngoc-tuan/,Bùi Ngọc Tuấn,bntuan@ictu.edu.vn,TS,,,,,,True,3
+3,https://repository.ictu.edu.vn/giang-vien/bui-phuong-thao/,Bùi Phương Thảo,bpthao@ictu.edu.vn,ThS,,,,,0009-0007-2174-6599,True,0
+4,https://repository.ictu.edu.vn/giang-vien/bui-quynh-trang/,Bùi Quỳnh Trang,bqtrang@ictu.edu.vn,ThS,,,,,0009-0006-6749-8642,True,0
+5,https://repository.ictu.edu.vn/giang-vien/bui-thi-giang/,Bùi Thị Giang,btgiang@ictu.edu.vn,Khác,,,,,0009-0001-0811-522X,True,0
+6,https://repository.ictu.edu.vn/giang-vien/bui-thi-huong-thom/,Bùi Thị Hương Thơm,bththom@ictu.edu.vn,ThS,,,,,0009-0004-1092-6197,True,0
+7,https://repository.ictu.edu.vn/giang-vien/bui-thi-kieu-trang/,Bùi Thị Kiều Trang,btktrang@ictu.edu.vn,ThS,,,,,0009-0007-5976-3706,True,0
+8,https://repository.ictu.edu.vn/giang-vien/bui-thi-kim-thai/,Bùi Thị Kim Thái,btkthai@ictu.edu.vn,ĐH,,,,,0009-0006-5604-5111,True,0
+9,https://repository.ictu.edu.vn/giang-vien/bui-thi-ngoc-chau/,Bùi Thị Ngọc Châu,btnchau@ictu.edu.vn,ĐH,,,,,0009-0003-1069-5934,True,0
+10,https://repository.ictu.edu.vn/giang-vien/bui-thi-quyen/,Bùi Thị Quyên,btquyen@ictu.edu.vn,ThS,,,,,0009-0001-3939-8656,True,0
+11,https://repository.ictu.edu.vn/giang-vien/bui-thi-thanh-thuy/,Bùi Thị Thanh Thủy,bttthuy@ictu.edu.vn,ThS,,,,,0009-0006-8237-2183,True,0
+12,https://repository.ictu.edu.vn/giang-vien/bui-tuan-anh/,Bùi Tuấn Anh,btanh@ictu.edu.vn,ThS,,,,,0009-0006-8385-5814,True,0
+13,https://repository.ictu.edu.vn/giang-vien/bui-van-thanh/,Bùi Văn Thanh,bvthanh@ictu.edu.vn,Khác,,,,,0009-0009-2880-5285,True,0
+14,https://repository.ictu.edu.vn/giang-vien/bui-van-tung/,Bùi Văn Tùng,bvtung@ictu.edu.vn,TS,,,,,0000-0001-9201-2751,True,1
+15,https://repository.ictu.edu.vn/giang-vien/cam-thi-thu-thuong/,Cam Thị Thu Thương,ctthuong@ictu.edu.vn,ĐH,,,,,0009-0007-9008-4592,True,0
+16,https://repository.ictu.edu.vn/giang-vien/cao-manh-cuong/,Cao Mạnh Cường,cmcuong@ictu.edu.vn,Khác,,,,,0009-0004-5389-317X,True,0
+17,https://repository.ictu.edu.vn/giang-vien/chu-thi-tam/,Chu Thị Tâm,cttam@ictu.edu.vn,Khác,,,,,0009-0008-1196-2471,True,0
+18,https://repository.ictu.edu.vn/giang-vien/chu-thi-tuyen/,Chu Thị Tuyến,cttuyen@ictu.edu.vn,ThS,,,,,0009-0001-5245-7956,True,0
+19,https://repository.ictu.edu.vn/giang-vien/chu-xuan-tien/,Chu Xuân Tiến,cxtien@ictu.edu.vn,ThS,,,,,0009-0008-2110-2782,True,0
+20,https://repository.ictu.edu.vn/giang-vien/dam-bao-loc/,Đàm Bảo Lộc,dbloc@ictu.edu.vn,TS,,,,,0009-0007-7556-7203,True,0
+21,https://repository.ictu.edu.vn/giang-vien/dam-thi-phuong-thao/,Đàm Thị Phương Thảo,dtpthao@ictu.edu.vn,ThS,,,,,0009-0003-0981-7631,True,0
+22,https://repository.ictu.edu.vn/giang-vien/dang-cong-tan/,Đặng Công Tân,dctan@ictu.edu.vn,ĐH,,,,,0009-0000-6963-5678,True,0
+23,https://repository.ictu.edu.vn/giang-vien/dang-phuong-mai/,Đặng Phương Mai,dpmai@ictu.edu.vn,ThS,,,,,0009-0002-7104-2227,True,0
+24,https://repository.ictu.edu.vn/giang-vien/dang-quang-a/,Đặng Quang Á,dqa@ictu.edu.vn,TS,GS,,,,0000-0001-6386-7347,True,0
+25,https://repository.ictu.edu.vn/giang-vien/dang-thi-kim-dung/,Đặng Thị Kim Dung,dkdung@ictu.edu.vn,ThS,,,,,0009-0007-9477-4486,True,0
+26,https://repository.ictu.edu.vn/giang-vien/dang-thi-loan-phuong/,Đặng Thị Loan Phượng,dtlphuong@ictu.edu.vn,ThS,,,,,0009-0006-1953-045X,True,0
+27,https://repository.ictu.edu.vn/giang-vien/dang-thi-thao/,Đặng Thị Thảo,dtthao@ictu.edu.vn,ThS,,,,,0009-0002-6115-3492,True,0
+28,https://repository.ictu.edu.vn/giang-vien/dang-thuong-hoai-linh/,Đặng Thương Hoài Linh,dthlinh@ictu.edu.vn,ThS,,,,,0009-0004-6787-0083,True,0
+29,https://repository.ictu.edu.vn/giang-vien/dang-tuan-nam/,Đặng Tuấn Nam,namdt@ictu.edu.vn,ThS,,,,,0009-0005-4673-4709,True,0
+30,https://repository.ictu.edu.vn/giang-vien/dang-van-ngoc/,Đặng Văn Ngọc,dvngoc@ictu.edu.vn,ThS,,,,,0009-0006-0513-0885,True,0
+31,https://repository.ictu.edu.vn/giang-vien/dao-the-huy/,Đào Thế Huy,dthuy@ictu.edu.vn,TS,,,,,,True,0
+32,https://repository.ictu.edu.vn/giang-vien/dao-thi-hang/,Đào Thị Hằng,dthang@ictu.edu.vn,ThS,,,,,0009-0000-1212-3874,True,8
+33,https://repository.ictu.edu.vn/giang-vien/dao-thi-phuong/,Đào Thị Phượng,dtphuongcndttt@ictu.edu.vn,ThS,,,,,0009-0000-4596-0679,True,0
+34,https://repository.ictu.edu.vn/giang-vien/dao-thi-thu/,Đào Thị Thu,dtthu@ictu.edu.vn,ThS,,,,,0009-0007-9076-028X,True,7
+35,https://repository.ictu.edu.vn/giang-vien/dao-tran-chung/,Đào Trần Chung,dtchung@ictu.edu.vn,ThS,,,,,0009-0004-7572-3665,True,0
+36,https://repository.ictu.edu.vn/giang-vien/dinh-duc-hoang/,Đinh Đức Hoàng,ddhoang@ictu.edu.vn,ThS,,,,,0009-0004-5133-8623,True,0
+37,https://repository.ictu.edu.vn/giang-vien/dinh-khanh-linh/,Đinh Khánh Linh,dklinh@ictu.edu.vn,ThS,,,,,0009-0000-4027-1065,True,0
+38,https://repository.ictu.edu.vn/giang-vien/dinh-ngoc-duc/,Đinh Ngọc Đức,dnduc@ictu.edu.vn,,,,,,,True,0
+39,https://repository.ictu.edu.vn/giang-vien/dinh-quy-long/,Đinh Quý Long,dqlong@ictu.edu.vn,ThS,,,,,0009-0007-3638-7584,True,0
+40,https://repository.ictu.edu.vn/giang-vien/dinh-thi-ngoc-oanh/,Đinh Thị Ngọc Oanh,dtnoanh@ictu.edu.vn,ThS,,,,,0009-0002-3791-1636,True,0
+41,https://repository.ictu.edu.vn/giang-vien/dinh-thi-nguyen/,Đinh Thị Nguyên,dtnguyen@ictu.edu.vn,ThS,,,,,0009-0009-7363-6804,True,0
+42,https://repository.ictu.edu.vn/giang-vien/dinh-xuan-lam/,Đinh Xuân Lâm,dxlam@ictu.edu.vn,TS,,,,,0000-0001-5550-6189,True,11
+43,https://repository.ictu.edu.vn/giang-vien/do-dinh-cuong/,Đỗ Đình Cường,ddcuong@ictu.edu.vn,TS,,,,,0009-0004-7250-6710,True,27
+44,https://repository.ictu.edu.vn/giang-vien/do-dinh-luc/,Đỗ Đình Lực,ddluc@ictu.edu.vn,ThS,,,,,0009-0001-9007-020X,True,8
+45,https://repository.ictu.edu.vn/giang-vien/do-huy-khoi/,Đỗ Huy Khôi,dhkhoi@ictu.edu.vn,ThS,,,,,0000-0001-6063-090X,True,0
+46,https://repository.ictu.edu.vn/giang-vien/do-phuong-thao/,Đỗ Phương Thảo,dpthao@ictu.edu.vn,ĐH,,,,,0009-0002-7885-2978,True,1
+47,https://repository.ictu.edu.vn/giang-vien/do-quynh-hoa/,Đỗ Quỳnh Hoa,dqhoa@ictu.edu.vn,TS,,,,,0009-0005-9554-1487,True,0
+48,https://repository.ictu.edu.vn/giang-vien/do-thi-bac/,Đỗ Thị Bắc,dtbac@ictu.edu.vn,TS,,,,,0000-0001-9425-5167,True,9
+49,https://repository.ictu.edu.vn/giang-vien/do-thi-bich-loan/,Đỗ Thị Bích Loan,dtbloan@ictu.edu.vn,ThS,,,,,0009-0000-2598-1405,True,0
+50,https://repository.ictu.edu.vn/giang-vien/do-thi-chi/,Đỗ Thị Chi,dtchi@ictu.edu.vn,ThS,,,,,0009-0004-0102-5805,True,0
+51,https://repository.ictu.edu.vn/giang-vien/do-thi-dieu-thu/,Đỗ Thị Diệu Thu,dtdthu@ictu.edu.vn,ThS,,,,,0009-0006-6124-6284,True,0
+52,https://repository.ictu.edu.vn/giang-vien/do-thi-mai/,Đỗ Thị Mai,dtmai@ictu.edu.vn,ThS,,,,,0009-0008-8957-2975,True,0
+53,https://repository.ictu.edu.vn/giang-vien/do-thi-phuong/,Đỗ Thị Phượng,phuongdt@ictu.edu.vn,ThS,,,,,0009-0007-2200-4394,True,2
+54,https://repository.ictu.edu.vn/giang-vien/do-thi-quyen/,Đỗ Thị Quyên,dtquyen@ictu.edu.vn,TS,,,,,0000-0002-1305-0686,True,0
+55,https://repository.ictu.edu.vn/giang-vien/do-thu-hoai/,Đỗ Thu Hoài,dthoai@ictu.edu.vn,ThS,,,,,0009-0007-8477-3623,True,0
+56,https://repository.ictu.edu.vn/giang-vien/do-thu-tra/,Đỗ Thu Trà,dttra@ictu.edu.vn,ĐH,,,,,0009-0002-1546-4775,True,0
+57,https://repository.ictu.edu.vn/giang-vien/do-van-dai/,Đỗ Văn Đại,dvdai@ictu.edu.vn,ThS,,,,,0009-0004-5721-8999,True,0
+58,https://repository.ictu.edu.vn/giang-vien/do-van-quyen/,Đỗ Văn Quyền,dvquyen@ictu.edu.vn,ThS,,,,,,True,0
+59,https://repository.ictu.edu.vn/giang-vien/do-xuan-quan/,Đỗ Xuân Quân,dxquan@ictu.edu.vn,ĐH,,,,,0009-0000-2964-1416,True,0
+60,https://repository.ictu.edu.vn/giang-vien/doan-duc-hai/,Đoàn Đức Hải,ddhai@ictu.edu.vn,TS,,,,,0009-0006-5546-7726,True,0
+61,https://repository.ictu.edu.vn/giang-vien/doan-man-cuong/,Đoàn Mạn Cường,dmcuong@ictu.edu.vn,,,,,,,True,0
+62,https://repository.ictu.edu.vn/giang-vien/doan-manh-cuong/,Đoàn Mạnh Cường,dmcuong1989@ictu.edu.vn,ThS,,,,,0009-0009-3206-8652,True,0
+63,https://repository.ictu.edu.vn/giang-vien/doan-ngoc-phuong/,Đoàn Ngọc Phương,dnphuong@ictu.edu.vn,ThS,,,,,0009-0004-5455-3820,True,13
+64,https://repository.ictu.edu.vn/giang-vien/doan-thi-bich-ngoc/,Đoàn Thị Bích Ngọc,dtbngoc@ictu.edu.vn,ThS,,,,,0009-0003-2641-683X,True,10
+65,https://repository.ictu.edu.vn/giang-vien/doan-thi-thanh-thao/,Đoàn Thị Thanh Thảo,dttthao@ictu.edu.vn,ThS,,,,,0009-0007-4180-7264,True,0
+66,https://repository.ictu.edu.vn/giang-vien/doan-thi-thu-trang/,Đoàn Thị Thu Trang,dtttrang@ictu.edu.vn,ĐH,,,,,0009-0009-2730-8340,True,0
+67,https://repository.ictu.edu.vn/giang-vien/duong-hoa-an/,Dương Hòa An,dhan@ictu.edu.vn,TS,,,,,0009-0003-3673-5455,True,0
+68,https://repository.ictu.edu.vn/giang-vien/duong-minh-quoc/,Dương Minh Quốc,dmquoc@ictu.edu.vn,ĐH,,,,,0009-0004-6416-5223,True,0
+69,https://repository.ictu.edu.vn/giang-vien/duong-thi-hong-an/,Dương Thị Hồng An,dthan@ictu.edu.vn,ThS,,,,,0009-0002-3126-0342,True,1
+70,https://repository.ictu.edu.vn/giang-vien/duong-thi-mai-thuong/,Dương Thị Mai Thương,dtmthuong@ictu.edu.vn,ThS,,,,,0009-0005-7862-7473,True,10
+71,https://repository.ictu.edu.vn/giang-vien/duong-thi-nhung/,Dương Thị Nhung,dtnhung@ictu.edu.vn,,,,,,,True,0
+72,https://repository.ictu.edu.vn/giang-vien/duong-thi-quy/,Dương Thị Quy,dtquy@ictu.edu.vn,ThS,,,,,0009-0003-2077-2868,True,10
+73,https://repository.ictu.edu.vn/giang-vien/duong-thi-thanh-tam/,Dương Thị Thanh Tâm,dtttam@ictu.edu.vn,ThS,,,,,0009-0005-2050-0496,True,0
+74,https://repository.ictu.edu.vn/giang-vien/duong-thi-thu-huong/,Dương Thị Thu Hương,dtthuong@ictu.edu.vn,ThS,,,,,0009-0004-7300-4237,True,0
+75,https://repository.ictu.edu.vn/giang-vien/duong-thi-thuy-nga/,Dương Thị Thúy Nga,dttnga@ictu.edu.vn,ThS,,,,,0009-0002-5839-4324,True,0
+76,https://repository.ictu.edu.vn/giang-vien/duong-thu-may/,Dương Thu Mây,dtmay@ictu.edu.vn,TS,,,,,0000-0002-8050-6858,True,6
+77,https://repository.ictu.edu.vn/giang-vien/duong-thuy-huong/,Dương Thúy Hường,dthuong@ictu.edu.vn,ThS,,,,,0009-0004-1072-4595,True,2
+78,https://repository.ictu.edu.vn/giang-vien/duong-van-tai/,Dương Văn Tài,dvtai@ictu.edu.vn,ĐH,,,,,0009-0009-4190-0893,True,0
+79,https://repository.ictu.edu.vn/giang-vien/duong-van-to/,Dương Văn Tố,dvto@ictu.edu.vn,Khác,,,,,0009-0001-3373-5105,True,0
+80,https://repository.ictu.edu.vn/giang-vien/gia-thi-dinh/,Gia Thị Định,gtdinh@ictu.edu.vn,TS,,,,,0009-0008-1165-5180,True,1
+81,https://repository.ictu.edu.vn/giang-vien/ha-duy-long/,Hà Duy Long,hdlong@ictu.edu.vn,Khác,,,,,0009-0001-0791-3326,True,0
+82,https://repository.ictu.edu.vn/giang-vien/ha-my-trinh/,Hà Mỹ Trinh,hmtrinh@ictu.edu.vn,ThS,,,,,0009-0001-6415-4995,True,0
+83,https://repository.ictu.edu.vn/giang-vien/ha-quang-tien/,Hà Quang Tiến,hqtien@ictu.edu.vn,TS,PGS,,,,0009-0005-0996-5508,True,0
+84,https://repository.ictu.edu.vn/giang-vien/ha-thi-thanh/,Hà Thị Thanh,htthanh@ictu.edu.vn,TS,,,,,0009-0007-5573-1803,True,12
+85,https://repository.ictu.edu.vn/giang-vien/ha-van-ninh/,Hà Văn Ninh,hvninh@ictu.edu.vn,ĐH,,,,,0009-0009-3215-4104,True,0
+86,https://repository.ictu.edu.vn/giang-vien/ha-van-vuong/,Hà Văn Vương,hvvuong@ictu.edu.vn,ThS,,,,,0009-0004-4048-9506,True,0
+87,https://repository.ictu.edu.vn/giang-vien/hang-dieu-dinh/,Hằng Diệu Đinh,ddhang@ictu.edu.vn,,,,,,,True,0
+88,https://repository.ictu.edu.vn/giang-vien/ho-mau-viet/,Hồ Mậu Việt,hmviet@ictu.edu.vn,ThS,,,,,0009-0000-4969-4160,True,0
+89,https://repository.ictu.edu.vn/giang-vien/ho-thi-tuyen/,Hồ Thị Tuyến,httuyen@ictu.edu.vn,ThS,,,,,0009-0000-5924-4817,True,7
+90,https://repository.ictu.edu.vn/giang-vien/hoang-ba-lam/,Hoàng Bá Lâm,hblam@ictu.edu.vn,,,,,,,True,0
+91,https://repository.ictu.edu.vn/giang-vien/hoang-duc-quynh/,Hoàng Đức Quỳnh,hdquynh@ictu.edu.vn,TS,,,,,0009-0003-6016-9318,True,1
+92,https://repository.ictu.edu.vn/giang-vien/hoang-ha-giang/,Hoàng Hà Giang,hhgiang@ictu.edu.vn,ĐH,,,,,0009-0002-2471-8079,True,0
+93,https://repository.ictu.edu.vn/giang-vien/hoang-ngoc-bich/,Hoàng Ngọc Bích,hnbich@ictu.edu.vn,ThS,,,,,0009-0000-4943-1213,True,0
+94,https://repository.ictu.edu.vn/giang-vien/hoang-ngoc-yen/,Hoàng Ngọc Yến,hnyen@ictu.edu.vn,ĐH,,,,,0009-0002-8074-5338,True,0
+95,https://repository.ictu.edu.vn/giang-vien/hoang-phuong-khanh/,Hoàng Phương Khánh,hpkhanh@ictu.edu.vn,,,,,,,True,0
+96,https://repository.ictu.edu.vn/giang-vien/hoang-thi-canh/,Hoàng Thị Cành,htcanh@ictu.edu.vn,ThS,,,,,0009-0002-8055-7863,True,9
+97,https://repository.ictu.edu.vn/giang-vien/hoang-thi-duyen/,Hoàng Thị Duyên,htduyen@ictu.edu.vn,ThS,,,,,,True,0
+98,https://repository.ictu.edu.vn/giang-vien/hoang-thi-hai-yen/,Hoàng Thị Hải Yến,hthyen@ictu.edu.vn,ThS,,,,,0009-0002-9879-5288,True,0
+99,https://repository.ictu.edu.vn/giang-vien/hoang-thi-hoa-an-2/,Hoàng Thị Hòa An,hthan2@ictu.edu.vn,,,,,,,True,0
+100,https://repository.ictu.edu.vn/giang-vien/hoang-thi-hoa-an/,Hoàng Thị Hoà An,hthan@ictu.edu.vn,ĐH,,,,,0009-0002-9507-0994,True,0
+101,https://repository.ictu.edu.vn/giang-vien/hoang-thi-thuong-2/,Hoàng Thị Thương,htthuong1987@ictu.edu.vn,ThS,,,,,0009-0000-4765-1490,True,0
+102,https://repository.ictu.edu.vn/giang-vien/hoang-thi-thuong/,Hoàng Thi Thương,htthuong@ictu.edu.vn,,,,,,,True,0
+103,https://repository.ictu.edu.vn/giang-vien/hoang-thu-giang/,Hoàng Thu Giang,htgiang@ictu.edu.vn,ThS,,,,,0009-0006-1959-7240,True,0
+104,https://repository.ictu.edu.vn/giang-vien/hoang-van-khanh/,Hoàng Văn Khanh,hvkhanh@ictu.edu.vn,,,,,,,True,0
+105,https://repository.ictu.edu.vn/giang-vien/hoang-van-quan/,Hoàng Văn Quản,hvquan@ictu.edu.vn,TS,,,,,0000-0003-2821-5129,True,0
+106,https://repository.ictu.edu.vn/giang-vien/hoang-van-sau/,Hoàng Văn Sáu,hvsau@ictu.edu.vn,ThS,,,,,0009-0006-3072-7288,True,0
+107,https://repository.ictu.edu.vn/giang-vien/hoang-van-tam/,Hoàng Văn Tâm,hvtam@ictu.edu.vn,TS,,,,,0009-0002-8414-1929,True,10
+108,https://repository.ictu.edu.vn/giang-vien/hoang-van-thuc/,Hoàng Văn Thực,hvthuc@ictu.edu.vn,ThS,,,,,0009-0007-0759-6432,True,0
+109,https://repository.ictu.edu.vn/giang-vien/la-thi-quynh-mai/,Lã Thị Quỳnh Mai,ltqmai@ictu.edu.vn,ThS,,,,,0009-0005-1612-7190,True,0
+110,https://repository.ictu.edu.vn/giang-vien/la-thuy-linh-2/,Lã Thùy Linh,ltlinh1988@ictu.edu.vn,TS,,,,,0009-0000-2190-4445,True,0
+111,https://repository.ictu.edu.vn/giang-vien/la-thuy-linh/,Lã Thuỳ Linh,ltlinh@ictu.edu.vn,,,,,,,True,0
+112,https://repository.ictu.edu.vn/giang-vien/lai-van-trung/,Lại Văn Trung,lvtrung@ictu.edu.vn,ThS,,,,,0009-0007-0000-9514,True,0
+113,https://repository.ictu.edu.vn/giang-vien/le-anh-tu-2/,Lê Anh Tú,latuhtttkt@ictu.edu.vn,ThS,,,,,0009-0004-3376-4514,True,1
+114,https://repository.ictu.edu.vn/giang-vien/le-anh-tu/,Lê Anh Tú,tula@ictu.edu.vn,ThS,,,,,0009-0004-3376-4514,True,2
+115,https://repository.ictu.edu.vn/giang-vien/le-hoang-hiep/,Lê Hoàng Hiệp,lhhiep@ictu.edu.vn,ThS,,,,,0009-0004-7830-8504,True,1
+116,https://repository.ictu.edu.vn/giang-vien/le-hong-thu/,Lê Hồng Thu,lhthu@ictu.edu.vn,ThS,,,,,0009-0000-5160-6641,True,0
+117,https://repository.ictu.edu.vn/giang-vien/le-hung-linh/,Lê Hùng Linh,lhlinh@ictu.edu.vn,TS,,,,,0000-0001-7169-9232,True,3
+118,https://repository.ictu.edu.vn/giang-vien/le-khanh-duong/,Lê Khánh Dương,lkduong@ictu.edu.vn,ThS,,,,,0009-0003-9012-7573,True,9
+119,https://repository.ictu.edu.vn/giang-vien/le-ngoc-ha/,Lê Ngọc Hà,lnha@ictu.edu.vn,Khác,,,,,0009-0008-2637-5018,True,0
+120,https://repository.ictu.edu.vn/giang-vien/le-son-thai/,Lê Sơn Thái,lsthai@ictu.edu.vn,ThS,,,,,0009-0007-0293-034X,True,0
+121,https://repository.ictu.edu.vn/giang-vien/le-thanh-hieu/,Lê Thanh Hiếu,lthieu@ictu.edu.vn,ThS,,,,,0009-0002-1162-2502,True,0
+122,https://repository.ictu.edu.vn/giang-vien/le-thi-hang/,Lê Thị Hằng,lthang@ictu.edu.vn,ThS,,,,,0009-0000-0665-3940,True,0
+123,https://repository.ictu.edu.vn/giang-vien/le-thi-huong/,Lê Thị Hường,lthuong@ictu.edu.vn,ThS,,,,,0009-0008-1219-6545,True,0
+124,https://repository.ictu.edu.vn/giang-vien/le-thi-thu-huyen/,Lê Thị Thu Huyền,ltthuyen@ictu.edu.vn,ThS,,,,,0009-0000-8082-8665,True,0
+125,https://repository.ictu.edu.vn/giang-vien/le-thi-thu-phuong/,Lê Thị Thu Phương,lttphuong@ictu.edu.vn,ThS,,,,,0009-0009-3185-2285,True,0
+126,https://repository.ictu.edu.vn/giang-vien/le-thi-tuyet-ngan/,Lê Thị Tuyết Ngân,lttngan@ictu.edu.vn,TS,,,,,0009-0005-4693-6984,True,0
+127,https://repository.ictu.edu.vn/giang-vien/le-thu-trang/,Lê Thu Trang,lttrang@ictu.edu.vn,ThS,,,,,0009-0000-6617-0377,True,10
+128,https://repository.ictu.edu.vn/giang-vien/le-trieu-tuan/,Lê Triệu Tuấn,lttuan@ictu.edu.vn,TS,,,,,0000-0002-4412-8941,True,0
+129,https://repository.ictu.edu.vn/giang-vien/le-tuan-anh/,Lê Tuấn Anh,ltanh@ictu.edu.vn,ThS,,,,,0009-0001-3836-0648,True,6
+130,https://repository.ictu.edu.vn/giang-vien/le-tuan-tu/,Lê Tuấn Tú,lttu@ictu.edu.vn,ThS,,,,,0009-0003-4932-0638,True,0
+131,https://repository.ictu.edu.vn/giang-vien/le-van-chung/,Lê Văn Chung,lvchung@ictu.edu.vn,TS,,,,,0009-0007-7268-9627,True,2
+132,https://repository.ictu.edu.vn/giang-vien/le-viet-duy/,Lê Viết Duy,lvduy@ictu.edu.vn,ĐH,,,,,0009-0007-6566-7286,True,0
+133,https://repository.ictu.edu.vn/giang-vien/luong-quang-huy/,Lương Quang Huy,lqhuy@ictu.edu.vn,ThS,,,,,0009-0004-0427-097X,True,0
+134,https://repository.ictu.edu.vn/giang-vien/luong-thi-minh-hue/,Lương Thị Minh Huế,lmhue@ictu.edu.vn,ThS,,,,,0009-0003-3737-7741,True,31
+135,https://repository.ictu.edu.vn/giang-vien/luong-thi-theu/,Lương Thị Thêu,lttheu@ictu.edu.vn,ĐH,,,,,0009-0007-1916-1962,True,0
+136,https://repository.ictu.edu.vn/giang-vien/luong-thi-thu-ha/,Lương Thị Thu Hà,lttha@ictu.edu.vn,ThS,,,,,0009-0000-2184-2686,True,0
+137,https://repository.ictu.edu.vn/giang-vien/ly-mai-chi/,Lý Mai Chi,lmchi@ictu.edu.vn,ThS,,,,,0009-0009-2618-7065,True,0
+138,https://repository.ictu.edu.vn/giang-vien/ly-my-vi/,Lý Mỹ Vi,lmvi@ictu.edu.vn,ThS,,,,,0009-0001-6137-9718,True,0
+139,https://repository.ictu.edu.vn/giang-vien/ly-thu-trang/,Lý Thu Trang,tranglt@ictu.edu.vn,ThS,,,,,0009-0005-4925-0574,True,0
+140,https://repository.ictu.edu.vn/giang-vien/ma-hoai-tam/,Ma Hoài Tâm,mhtam@ictu.edu.vn,,,,,,,True,0
+141,https://repository.ictu.edu.vn/giang-vien/ma-thi-hong-anh/,Ma Thị Hồng Anh,mthanh@ictu.edu.vn,ĐH,,,,,,True,0
+142,https://repository.ictu.edu.vn/giang-vien/ma-thi-van-ha/,Ma Thị Vân Hà,mtvha@ictu.edu.vn,ThS,,,,,0009-0004-6717-677X,True,0
+143,https://repository.ictu.edu.vn/giang-vien/ma-van-du/,Mã Văn Du,mvdu@ictu.edu.vn,ThS,,,,,0009-0008-3409-2819,True,0
+144,https://repository.ictu.edu.vn/giang-vien/ma-van-thu/,Mã Văn Thu,mvthu@ictu.edu.vn,ThS,,,,,0009-0006-8893-5784,True,0
+145,https://repository.ictu.edu.vn/giang-vien/mac-thi-phuong/,Mạc Thị Phượng,mtphuong@ictu.edu.vn,ThS,,,,,0009-0002-4750-5949,True,0
+146,https://repository.ictu.edu.vn/giang-vien/mach-quy-duong/,Mạch Quý Dương,mqduong@ictu.edu.vn,ThS,,,,,0009-0003-8613-1326,True,0
+147,https://repository.ictu.edu.vn/giang-vien/mai-hoai-tam/,Mai Hoài Tâm,mhtam2001@ictu.edu.vn,ThS,,,,,0009-0000-1955-2233,True,0
+148,https://repository.ictu.edu.vn/giang-vien/mai-ngoc-han/,Mai Ngọc Hân,mnhan@ictu.edu.vn,ThS,,,,,0009-0007-8354-9240,True,0
+149,https://repository.ictu.edu.vn/giang-vien/mai-thi-kim-anh/,Mai Thị Kim Anh,mtkanh@ictu.edu.vn,ThS,,,,,0009-0001-2642-8051,True,0
+150,https://repository.ictu.edu.vn/giang-vien/mai-van-hoan/,Mai Văn Hoàn,mvhoan@ictu.edu.vn,ThS,,,,,0009-0000-8344-1191,True,7
+151,https://repository.ictu.edu.vn/giang-vien/minh-thi-le/,Minh Thị Lê,ltminh@ictu.edu.vn,,,,,,,True,0
+152,https://repository.ictu.edu.vn/giang-vien/mong-quoc-tuan/,Mông Quốc Tuấn,mqtuan@ictu.edu.vn,ThS,,,,,0009-0006-3882-5907,True,3
+153,https://repository.ictu.edu.vn/giang-vien/ngo-cam-tu/,Ngô Cẩm Tú,nctu@ictu.edu.vn,TS,,,,,0009-0007-5586-0242,True,0
+154,https://repository.ictu.edu.vn/giang-vien/ngo-co-ban/,Ngô Cơ Bản,ncban@ictu.edu.vn,ĐH,,,,,0009-0003-8319-0195,True,0
+155,https://repository.ictu.edu.vn/giang-vien/ngo-huu-huy/,Ngô Hữu Huy,nhhuy@ictu.edu.vn,TS,,,,,0000-0001-8276-0270,True,14
+156,https://repository.ictu.edu.vn/giang-vien/ngo-mai-phuong/,Ngô Mai Phương,nmphuong@ictu.edu.vn,ThS,,,,,0009-0001-1071-5988,True,0
+157,https://repository.ictu.edu.vn/giang-vien/ngo-manh-cuong/,Ngô Mạnh Cường,nmcuong@ictu.edu.vn,ThS,,,,,0009-0000-2723-3232,True,0
+158,https://repository.ictu.edu.vn/giang-vien/ngo-manh-tuong/,Ngô Mạnh Tưởng,nmtuong@ictu.edu.vn,TS,,,,,0000-0003-2238-3762,True,3
+159,https://repository.ictu.edu.vn/giang-vien/ngo-phuong-thao/,Ngô Phương Thảo,thaont@ictu.edu.vn,ĐH,,,,,0009-0007-0987-7473,True,0
+160,https://repository.ictu.edu.vn/giang-vien/ngo-phuong-thuy-2/,Ngô Phương Thùy,thuynp@tnu.edu.vn,ThS,,,,,0009-0009-5410-0457,True,0
+161,https://repository.ictu.edu.vn/giang-vien/ngo-phuong-thuy/,Ngô Phương Thùy,npthuy@ictu.edu.vn,ThS,,,,,0009-0009-5410-0457,True,0
+162,https://repository.ictu.edu.vn/giang-vien/ngo-thi-bich-ngoc/,Ngô Thị Bích Ngọc,ntbngoc@ictu.edu.vn,ThS,,,,,0009-0009-3367-2392,True,0
+163,https://repository.ictu.edu.vn/giang-vien/ngo-thi-lan-phuong/,Ngô Thị Lan Phương,ntlphuong@ictu.edu.vn,ThS,,,,,0009-0003-2518-4627,True,10
+164,https://repository.ictu.edu.vn/giang-vien/ngo-thi-lan/,Ngô Thị Lan,ntlan@ictu.edu.vn,ThS,,,,,,True,0
+165,https://repository.ictu.edu.vn/giang-vien/ngo-thi-thu-huong/,Ngô Thị Thu Hương,ntthuong@ictu.edu.vn,Khác,,,,,0009-0009-0486-9671,True,0
+166,https://repository.ictu.edu.vn/giang-vien/ngo-thi-vinh/,Ngô Thị Vinh,ntvinh@ictu.edu.vn,TS,,,,,0000-0001-8764-6688,True,10
+167,https://repository.ictu.edu.vn/giang-vien/ngo-van-manh/,Ngô Văn Mạnh,nvmanh@ictu.edu.vn,TS,,,,,0009-0007-7935-6972,True,0
+168,https://repository.ictu.edu.vn/giang-vien/nguyen-an-khanh/,Nguyễn An Khánh,nakhanh@ictu.edu.vn,ThS,,,,,0009-0004-6166-1870,True,0
+169,https://repository.ictu.edu.vn/giang-vien/nguyen-anh-chuyen/,Nguyễn Anh Chuyên,nachuyen@ictu.edu.vn,ThS,,,,,0009-0005-8374-3321,True,10
+170,https://repository.ictu.edu.vn/giang-vien/nguyen-dai-hoang/,Nguyễn Đại Hoàng,ndhoang@ictu.edu.vn,,,,,,,True,0
+171,https://repository.ictu.edu.vn/giang-vien/nguyen-dinh-dung/,Nguyễn Đình Dũng,nddung@ictu.edu.vn,TS,,,,,0009-0007-2668-5561,True,19
+172,https://repository.ictu.edu.vn/giang-vien/nguyen-dinh-que/,Nguyễn Đình Quế,ndque@ictu.edu.vn,Khác,,,,,0009-0007-2972-5004,True,0
+173,https://repository.ictu.edu.vn/giang-vien/nguyen-duc-binh/,Nguyễn Đức Bình,ndbinh@ictu.edu.vn,TS,,,,,0000-0002-1258-394X,True,22
+174,https://repository.ictu.edu.vn/giang-vien/nguyen-duy-minh/,Nguyễn Duy Minh,ndminh@ictu.edu.vn,TS,,,,,0009-0002-1897-3292,True,13
+175,https://repository.ictu.edu.vn/giang-vien/nguyen-duy-nhiep/,Nguyễn Duy Nhiếp,ndnhiep@ictu.edu.vn,ThS,,,,,0009-0008-8701-1568,True,0
+176,https://repository.ictu.edu.vn/giang-vien/nguyen-hai-minh/,Nguyễn Hải Minh,nhminh@ictu.edu.vn,TS,,,,,0009-0002-6213-6299,True,19
+177,https://repository.ictu.edu.vn/giang-vien/nguyen-hien-trinh/,Nguyễn Hiền Trinh,nhtrinh@ictu.edu.vn,TS,,,,,0009-0000-4914-1785,True,10
+178,https://repository.ictu.edu.vn/giang-vien/nguyen-hoang-linh/,Nguyễn Hoàng Linh,nhlinh@ictu.edu.vn,ĐH,,,,,0009-0006-0173-872X,True,0
+179,https://repository.ictu.edu.vn/giang-vien/nguyen-hoang-nguyen/,Nguyễn Hoàng Nguyên,nhnguyen@ictu.edu.vn,TS,,,,,0009-0009-1520-9871,True,0
+180,https://repository.ictu.edu.vn/giang-vien/nguyen-hong-tan/,Nguyễn Hồng Tân,nhtan@ictu.edu.vn,ThS,,,,,0009-0001-9224-834X,True,3
+181,https://repository.ictu.edu.vn/giang-vien/nguyen-huu-thang/,Nguyễn Hữu Thắng,nhthang@ictu.edu.vn,TS,,,,,0000-0002-0292-2899,True,0
+182,https://repository.ictu.edu.vn/giang-vien/nguyen-khanh-ly/,Nguyễn Khánh Ly,nkly@ictu.edu.vn,ThS,,,,,0009-0001-8147-2071,True,0
+183,https://repository.ictu.edu.vn/giang-vien/nguyen-kim-son/,Nguyễn Kim Sơn,nkson@ictu.edu.vn,ThS,,,,,0009-0005-1616-5373,True,34
+184,https://repository.ictu.edu.vn/giang-vien/nguyen-lan-huong/,Nguyễn Lan Hương,nlhuong@ictu.edu.vn,TS,,,,,0000-0002-2364-1295,True,0
+185,https://repository.ictu.edu.vn/giang-vien/nguyen-lan-oanh/,Nguyễn Lan Oanh,nloanh@ictu.edu.vn,ThS,,,,,0009-0004-2582-3983,True,13
+186,https://repository.ictu.edu.vn/giang-vien/nguyen-manh-tuan/,Nguyễn Mạnh Tuấn,nmtuan@ictu.edu.vn,Khác,,,,,0009-0007-9474-4199,True,0
+187,https://repository.ictu.edu.vn/giang-vien/nguyen-ngoc-anh/,Nguyễn Ngọc Ánh,nnanh@ictu.edu.vn,ThS,,,,,0009-0009-7682-7841,True,0
+188,https://repository.ictu.edu.vn/giang-vien/nguyen-ngoc-duong/,Nguyễn Ngọc Dương,nnduong@ictu.edu.vn,ThS,,,,,0009-0003-5150-6394,True,1
+189,https://repository.ictu.edu.vn/giang-vien/nguyen-ngoc-hoan/,Nguyễn Ngọc Hoan,nnhoan@ictu.edu.vn,ThS,,,,,0009-0006-5245-6503,True,9
+190,https://repository.ictu.edu.vn/giang-vien/nguyen-ngoc-hung/,Nguyễn Ngọc Hùng,nnhung@ictu.edu.vn,Khác,,,,,0009-0008-7432-0206,True,0
+191,https://repository.ictu.edu.vn/giang-vien/nguyen-ngoc-tuan/,Nguyễn Ngọc Tuấn,nntuan@ictu.edu.vn,TS,,,,,0009-0005-8425-890X,True,0
+192,https://repository.ictu.edu.vn/giang-vien/nguyen-phan-tung/,Nguyễn Phan Tùng,nptung@ictu.edu.vn,ĐH,,,,,0009-0004-1459-429X,True,0
+193,https://repository.ictu.edu.vn/giang-vien/nguyen-phuong-thao/,Nguyễn Phương Thảo,npthao@ictu.edu.vn,ThS,,,,,0000-0003-2017-5812,True,0
+194,https://repository.ictu.edu.vn/giang-vien/nguyen-quang-hiep/,Nguyễn Quang Hiệp,nqhiep@ictu.edu.vn,ThS,,,,,0009-0006-4844-4913,True,7
+195,https://repository.ictu.edu.vn/giang-vien/nguyen-quang-minh/,Nguyễn Quang Minh,nqminh@ictu.edu.vn,ThS,,,,,0009-0005-7182-7827,True,0
+196,https://repository.ictu.edu.vn/giang-vien/nguyen-quyen-anh/,Nguyễn Quyền Anh,nqanh@ictu.edu.vn,ĐH,,,,,0009-0009-0722-8212,True,0
+197,https://repository.ictu.edu.vn/giang-vien/nguyen-sy-hiep/,Nguyễn Sỹ Hiệp,nshiep@ictu.edu.vn,ThS,,,,,0009-0001-6442-9039,True,0
+198,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-ha/,Nguyễn Thanh Hà,ntha@ictu.edu.vn,TS,PGS,,,,0009-0008-6202-3028,True,0
+199,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-hai/,Nguyễn Thanh Hải,nthai@ictu.edu.vn,TS,,,,,0000-0003-1801-5887,True,10
+200,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-huong/,Nguyễn Thanh Hường,huongnt@ictu.edu.vn,ĐH,,,,,0009-0002-2578-6866,True,0
+201,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-lam/,Nguyễn Thanh Lâm,ntlam@ictu.edu.vn,ĐH,,,,,0009-0004-5987-1449,True,0
+202,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-trung/,Nguyễn Thành Trung,nttrungktmt@ictu.edu.vn,TS,,,,,0009-0004-3673-082X,True,10
+203,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-tuan/,Nguyễn Thanh Tuấn,nttuan@ictu.edu.vn,TS,,,,,0009-0003-9129-1316,True,0
+204,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-tung-2/,Nguyễn Thanh Tùng,nttung@ictu.edu.vn,TS,,,,,0000-0002-7857-2602,True,0
+205,https://repository.ictu.edu.vn/giang-vien/nguyen-thanh-tung/,Nguyễn Thanh Tùng,tungnt@ictu.edu.vn,ThS,,,,,0000-0002-7857-2602,True,0
+206,https://repository.ictu.edu.vn/giang-vien/nguyen-the-dung/,Nguyễn Thế Dũng,dungcndt@ictu.edu.vn,ThS,,,,,0009-0007-4584-2673,True,0
+207,https://repository.ictu.edu.vn/giang-vien/nguyen-the-vinh/,Nguyễn Thế Vịnh,vinhnt@ictu.edu.vn,TS,,,,,0000-0002-1300-3943,True,96
+208,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-bich-diep/,Nguyễn Thị Bích Điệp,ntbdiep@ictu.edu.vn,TS,,,,,0000-0002-0901-4949,True,10
+209,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-diem/,Nguyễn Thị Điểm,ntdiem@ictu.edu.vn,Khác,,,,,0009-0008-2314-8266,True,0
+210,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-dung-2/,Nguyễn Thị Dung,dungnt@ictu.edu.vn,ThS,,,,,0009-0009-0874-6732,True,0
+211,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-dung-3/,Nguyễn Thị Dung,dungnt.khmt@ictu.edu.vn,ThS,,,,,0009-0002-1124-0256,True,0
+212,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-dung-4/,Nguyễn Thị Dung,ntdung1964@ictu.edu.vn,TS,PGS,,,,0009-0003-2932-6901,True,0
+213,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-dung-5/,Nguyễn Thị Dung,ntdung1979@ictu.edu.vn,ThS,,,,,0009-0009-0874-6732,True,10
+214,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-dung/,Nguyễn Thị Dung,ntdung@ictu.edu.vn,ThS,,,,,0009-0002-1124-0256,True,3
+215,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-duyen/,Nguyễn Thị Duyên,duyennt@ictu.edu.vn,ThS,,,,,0009-0003-9082-3296,True,10
+216,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-hai-anh/,Nguyễn Thị Hải Anh,nthanh@ictu.edu.vn,,,,,,,True,0
+217,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-hang/,Nguyễn Thị Hằng,nthang@ictu.edu.vn,TS,,,,,0000-0003-2777-7023,True,3
+218,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-hong-hanh/,Nguyễn Thị Hồng Hạnh,nthhanh@ictu.edu.vn,ThS,,,,,0009-0005-2239-405X,True,0
+219,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-huyen-trang/,Nguyễn Thị Huyền Trang,nthtrang@ictu.edu.vn,ĐH,,,,,0009-0000-6680-6996,True,0
+220,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-kim-tuyen/,Nguyễn Thị Kim Tuyến,ntktuyen@ictu.edu.vn,ThS,,,,,0009-0001-9321-1434,True,1
+221,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-lan-anh/,Nguyễn Thị Lan Anh,anhntl@ictu.edu.vn,,,,,,,True,0
+222,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-linh-2/,Nguyễn Thị Linh,ntlinh@ictu.edu.vn,ThS,,,,,0009-0009-9432-5810,True,0
+223,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-linh/,Nguyễn Thị Linh,ngtlinh@ictu.edu.vn,ThS,,,,,0009-0009-9432-5810,True,0
+224,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-loan/,Nguyễn Thị Loan,ntloan@ictu.edu.vn,TS,,,,,0009-0006-8985-2139,True,0
+225,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-mai-phuong/,Nguyễn Thị Mai Phương,ntmphuong@ictu.edu.vn,TS,,,,,0000-0002-3966-810X,True,8
+226,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-minh-thuy/,Nguyễn Thị Minh Thùy,ntmthuy@ictu.edu.vn,ThS,,,,,0009-0005-6241-7682,True,0
+227,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-nga/,Nguyễn Thị Ngà,ntnga@ictu.edu.vn,ĐH,,,,,0009-0003-2005-3599,True,0
+228,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-ngan/,Nguyễn Thị Ngân,ntngan@ictu.edu.vn,ThS,,,,,0009-0001-6129-8272,True,0
+229,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-ngoc-tu/,Nguyễn Thị Ngọc Tú,ntntu@ictu.edu.vn,ThS,,,,,0009-0006-7227-6550,True,0
+230,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-ngoc-tuyet/,Nguyễn Thị Ngọc Tuyết,ntntuyet@ictu.edu.vn,Khác,,,,,0009-0003-8040-7600,True,0
+231,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-nhung/,Nguyễn Thị Nhung,ntnhung@ictu.edu.vn,ThS,,,,,0009-0003-4632-8175,True,0
+232,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-phuong-hoa/,Nguyễn Thị Phương Hoa,ntphoa@ictu.edu.vn,ThS,,,,,0009-0007-1754-5858,True,0
+233,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-phuong-thanh/,Nguyễn Thị Phương Thanh,ntpthanh@ictu.edu.vn,ThS,,,,,0000-0001-5103-6052,True,0
+234,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-song-loan/,Nguyễn Thị Song Loan,ntsloan@ictu.edu.vn,ĐH,,,,,0009-0001-1486-0963,True,0
+235,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-binh/,Nguyễn Thị Thanh Bình,nttbinh@ictu.edu.vn,TS,,,,,0009-0000-8107-3022,True,0
+236,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-giang/,Nguyễn Thị Thanh Giang,nttgiang@ictu.edu.vn,ThS,,,,,0009-0006-8171-6378,True,0
+237,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-hoa/,Nguyễn Thị Thanh Hoa,ntthoa@ictu.edu.vn,ĐH,,,,,0009-0004-6805-5590,True,0
+238,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-huyen-2/,Nguyễn Thị Thanh Huyền,ntthuyen1981@ictu.edu.vn,Khác,,,,,0009-0009-2825-6247,True,0
+239,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-huyen-3/,Nguyễn Thị Thanh Huyền,ntthuyen@ictu.edu.vn,ThS,,,,,0009-0002-0535-891X,True,0
+240,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-huyen/,Nguyễn Thị Thanh Huyền,huyenntt@ictu.edu.vn,ThS,,,,,0009-0002-0535-891X,True,0
+241,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-loan/,Nguyễn Thị Thanh Loan,nttloan@ictu.edu.vn,ĐH,,,,,0009-0005-7438-7185,True,0
+242,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-mai/,Nguyễn Thị Thanh Mai,nttmai@ictu.edu.vn,TS,,,,,0009-0005-0123-2537,True,0
+243,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-nhan/,Nguyễn Thị Thanh Nhàn,nttnhan@ictu.edu.vn,TS,,,,,0009-0009-3019-4997,True,11
+244,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-thuy-2/,Nguyễn Thị Thanh Thủy,nttthuy.thkt@ictu.edu.vn,ThS,,,,,0009-0003-4197-0433,True,0
+245,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-thuy/,Nguyễn Thị Thanh Thủy,nttthuy@ictu.edu.vn,ThS,,,,,0009-0003-4197-0433,True,0
+246,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-van/,Nguyễn Thị Thanh Vân,nttvan@ictu.edu.vn,ĐH,,,,,0009-0008-9646-6986,True,0
+247,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thanh-xuan/,Nguyễn Thị Thanh Xuân,nttxuan@ictu.edu.vn,ĐH,,,,,0009-0007-1858-2415,True,0
+248,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thao/,Nguyễn Thị Thảo,ntthao@ictu.edu.vn,ĐH,,,,,0009-0007-9016-2263,True,0
+249,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-them/,Nguyễn Thị Thêm,ntthem@ictu.edu.vn,Khác,,,,,0009-0007-7982-369X,True,0
+250,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thu-hang/,Nguyễn Thị Thu Hằng,ntthang@ictu.edu.vn,ThS,,,,,0009-0009-3808-8988,True,9
+251,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thu-hien/,Nguyễn Thị Thu Hiền,ntthien@ictu.edu.vn,ThS,,,,,0009-0009-4890-247X,True,0
+252,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thu-huyen/,Nguyễn Thị Thu Huyền,ntt.huyen@ictu.edu.vn,TS,,,,,0009-0006-7311-9696,True,0
+253,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thuy-duong-2/,Nguyễn Thị Thùy Dương,nttduong@ictu.edu.vn,,,,,,,True,0
+254,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thuy-duong/,Nguyễn Thị Thuỳ Dương,nttduong1997@ictu.edu.vn,ThS,,,,,0009-0004-8967-1958,True,0
+255,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-thuy-lan/,Nguyễn Thị Thúy Lan,nttlan@ictu.edu.vn,ThS,,,,,0009-0008-5402-4194,True,0
+256,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-tuyen/,Nguyễn Thị Tuyển,nttuyen@ictu.edu.vn,ThS,,,,,0009-0002-1669-2366,True,10
+257,https://repository.ictu.edu.vn/giang-vien/nguyen-thi-van/,Nguyễn Thị Vân,ntvan@ictu.edu.vn,ĐH,,,,,0009-0009-2199-0553,True,0
+258,https://repository.ictu.edu.vn/giang-vien/nguyen-thu-hang/,Nguyễn Thu Hằng,nthangtmdt@ictu.edu.vn,ThS,,,,,0009-0009-1157-8995,True,0
+259,https://repository.ictu.edu.vn/giang-vien/nguyen-thu-huong-2/,Nguyễn Thu Hương,nthuongqttb@ictu.edu.vn,ThS,,,,,0009-0001-4875-2207,True,0
+260,https://repository.ictu.edu.vn/giang-vien/nguyen-thu-huong-88-2/,Nguyễn Thu Hương (88),nthuong@ictu.edu.vn,TS,,,,,0000-0002-7009-2815,True,0
+261,https://repository.ictu.edu.vn/giang-vien/nguyen-thu-huong-88/,Nguyễn Thu Hương (88),nthuongcntt@ictu.edu.vn,TS,,,,,0000-0002-7009-2815,True,0
+262,https://repository.ictu.edu.vn/giang-vien/nguyen-thu-phuong/,Nguyễn Thu Phương,ntphuong@ictu.edu.vn,ThS,,,,,0009-0004-3159-4961,True,13
+263,https://repository.ictu.edu.vn/giang-vien/nguyen-thuy-dung-2/,Nguyễn Thùy Dung,ntdung1989@ictu.edu.vn,ThS,,,,,0009-0003-3646-0172,True,0
+264,https://repository.ictu.edu.vn/giang-vien/nguyen-thuy-dung/,Nguyễn Thuỳ Dung,ntdung.cndt@ictu.edu.vn,,,,,,,True,0
+265,https://repository.ictu.edu.vn/giang-vien/nguyen-thuy-hoa/,Nguyễn Thúy Hòa,hoant@ictu.edu.vn,ThS,,,,,0009-0006-2575-1937,True,0
+266,https://repository.ictu.edu.vn/giang-vien/nguyen-thuy-linh/,Nguyễn Thùy Linh,linhnt@ictu.edu.vn,TS,,,,,0009-0005-0648-5816,True,0
+267,https://repository.ictu.edu.vn/giang-vien/nguyen-tien-anh/,Nguyễn Tiến Anh,ntanh2001@ictu.edu.vn,ĐH,,,,,0009-0002-9887-2415,True,0
+268,https://repository.ictu.edu.vn/giang-vien/nguyen-tien-manh/,Nguyễn Tiến Mạnh,ntmanh@ictu.edu.vn,ThS,,,,,0009-0007-1493-6298,True,0
+269,https://repository.ictu.edu.vn/giang-vien/nguyen-toan-thang/,Nguyễn Toàn Thắng,thangnt@ictu.edu.vn,TS,,,,,0009-0007-6666-2831,True,21
+270,https://repository.ictu.edu.vn/giang-vien/nguyen-tran-anh/,Nguyễn Trần Ánh,ntanh@ictu.edu.vn,ThS,,,,,0009-0008-2276-3267,True,0
+271,https://repository.ictu.edu.vn/giang-vien/nguyen-tu-an/,Nguyễn Tú An,ntan@ictu.edu.vn,,,,,,,True,0
+272,https://repository.ictu.edu.vn/giang-vien/nguyen-tuan-anh/,Nguyễn Tuấn Anh,anhnt@ictu.edu.vn,TS,,,,,0009-0004-1070-4068,True,13
+273,https://repository.ictu.edu.vn/giang-vien/nguyen-tuan-linh/,Nguyễn Tuấn Linh,ntlinh.khmt@ictu.edu.vn,TS,,,,,0009-0007-2737-2225,True,9
+274,https://repository.ictu.edu.vn/giang-vien/nguyen-van-binh/,Nguyễn Văn Bình,nvbinh@ictu.edu.vn,ThS,,,,,0009-0003-9891-3368,True,0
+275,https://repository.ictu.edu.vn/giang-vien/nguyen-van-canh/,Nguyễn Văn Cảnh,nvcanh@ictu.edu.vn,ĐH,,,,,0009-0001-2768-9632,True,0
+276,https://repository.ictu.edu.vn/giang-vien/nguyen-van-cuong/,Nguyễn Văn Cường,nvcuong@ictu.edu.vn,TS,,,,,0000-0003-1268-0640,True,0
+277,https://repository.ictu.edu.vn/giang-vien/nguyen-van-giap/,Nguyễn Văn Giáp,nvgiap@ictu.edu.vn,TS,,,,,0000-0002-4035-2516,True,1
+278,https://repository.ictu.edu.vn/giang-vien/nguyen-van-huan/,Nguyễn Văn Huân,nvhuan@ictu.edu.vn,TS,PGS,,,,0000-0003-0120-6804,True,12
+279,https://repository.ictu.edu.vn/giang-vien/nguyen-van-hung/,Nguyễn Văn Hưng,nvhung@ictu.edu.vn,Khác,,,,,0009-0004-7953-5856,True,0
+280,https://repository.ictu.edu.vn/giang-vien/nguyen-van-linh/,Nguyễn Văn Linh,nvlinh@ictu.edu.vn,TS,,,,,0000-0002-3472-0108,True,0
+281,https://repository.ictu.edu.vn/giang-vien/nguyen-van-nui/,Nguyễn Văn Núi,nvnui@ictu.edu.vn,TS,PGS,,,,0009-0008-5150-6825,True,20
+282,https://repository.ictu.edu.vn/giang-vien/nguyen-van-su/,Nguyễn Văn Sự,nvsu@ictu.edu.vn,ThS,,,,,0009-0000-7243-1932,True,0
+283,https://repository.ictu.edu.vn/giang-vien/nguyen-van-tao/,Nguyễn Văn Tảo,nvtao@ictu.edu.vn,TS,,,,,0000-0003-3045-8621,True,16
+284,https://repository.ictu.edu.vn/giang-vien/nguyen-van-thinh/,Nguyễn Văn Thịnh,nvthinh@ictu.edu.vn,Khác,,,,,0009-0006-1441-7554,True,0
+285,https://repository.ictu.edu.vn/giang-vien/nguyen-van-viet/,Nguyễn Văn Việt,nvviet@ictu.edu.vn,ThS,,,,,0009-0007-5854-5504,True,46
+286,https://repository.ictu.edu.vn/giang-vien/nguyen-viet-dung/,Nguyễn Viết Dũng,nvdung@ictu.edu.vn,Khác,,,,,0009-0004-1011-7445,True,0
+287,https://repository.ictu.edu.vn/giang-vien/nguyen-viet-hoang/,Nguyễn Việt Hoàng,nvhoang@ictu.edu.vn,Khác,,,,,0009-0001-6650-0345,True,0
+288,https://repository.ictu.edu.vn/giang-vien/nguyen-von-dim/,Nguyễn Vôn Dim,nvdim@ictu.edu.vn,TS,,,,,0009-0006-2392-8209,True,1
+289,https://repository.ictu.edu.vn/giang-vien/nguyen-vu-kieu-van/,Nguyễn Vũ Kiều Vân,nvkvan@ictu.edu.vn,ThS,,,,,0009-0007-1505-8810,True,0
+290,https://repository.ictu.edu.vn/giang-vien/nguyen-xuan-huong/,Nguyễn Xuân Hương,nxhuong@ictu.edu.vn,ThS,,,,,0009-0009-8606-9781,True,0
+291,https://repository.ictu.edu.vn/giang-vien/nguyen-xuan-kien/,Nguyễn Xuân Kiên,nxkien@ictu.edu.vn,ThS,,,,,0009-0007-4051-972X,True,0
+292,https://repository.ictu.edu.vn/giang-vien/nong-van-dong/,Nông Văn Đồng,nvdong@ictu.edu.vn,ThS,,,,,0009-0001-4875-7120,True,0
+293,https://repository.ictu.edu.vn/giang-vien/pham-ba-kien/,Phạm Bá Kiên,pbkien@ictu.edu.vn,ĐH,,,,,0009-0004-6194-7860,True,0
+294,https://repository.ictu.edu.vn/giang-vien/pham-ba-truong/,Phạm Bá Trường,pbtruong@ictu.edu.vn,ThS,,,,,0009-0004-4425-8561,True,0
+295,https://repository.ictu.edu.vn/giang-vien/pham-cong-hung/,Phạm Công Hùng,pchung@ictu.edu.vn,ĐH,,,,,0009-0007-1810-6451,True,0
+296,https://repository.ictu.edu.vn/giang-vien/pham-duc-long/,Phạm Đức Long,pdlong@ictu.edu.vn,TS,,,,,,True,8
+297,https://repository.ictu.edu.vn/giang-vien/pham-minh-tam/,Phạm Minh Tâm,pmtam@ictu.edu.vn,TS,,,,,0009-0002-8987-681X,True,0
+298,https://repository.ictu.edu.vn/giang-vien/pham-thanh-nam/,Phạm Thành Nam,ptnam@ictu.edu.vn,TS,,,,,0000-0001-8119-3585,True,7
+299,https://repository.ictu.edu.vn/giang-vien/pham-thi-diep/,Phạm Thị Diệp,ptdiep@ictu.edu.vn,ĐH,,,,,0009-0008-3715-1458,True,0
+300,https://repository.ictu.edu.vn/giang-vien/pham-thi-hoang-nuong/,Phạm Thị Hoàng Nương,pthnuong@ictu.edu.vn,ThS,,,,,0009-0003-0477-4716,True,0
+301,https://repository.ictu.edu.vn/giang-vien/pham-thi-hong-anh/,Phạm Thị Hồng Anh,pthanh@ictu.edu.vn,ThS,,,,,0009-0003-0606-1381,True,0
+302,https://repository.ictu.edu.vn/giang-vien/pham-thi-hong-nhung/,Phạm Thị Hồng Nhung,pthnhung@ictu.edu.vn,ThS,,,,,0009-0001-5971-5567,True,0
+303,https://repository.ictu.edu.vn/giang-vien/pham-thi-hong-tham/,Phạm Thị Hồng Thắm,pththam@ictu.edu.vn,Khác,,,,,0009-0001-5945-9890,True,0
+304,https://repository.ictu.edu.vn/giang-vien/pham-thi-huong/,Phạm Thị Hường,pthuong@ictu.edu.vn,ThS,,,,,0009-0008-9115-0069,True,0
+305,https://repository.ictu.edu.vn/giang-vien/pham-thi-lan-huong/,Phạm Thị Lan Hương,ptlhuong@ictu.edu.vn,Khác,,,,,0009-0008-8238-9107,True,0
+306,https://repository.ictu.edu.vn/giang-vien/pham-thi-lien/,Phạm Thị Liên,ptlien@ictu.edu.vn,ThS,,,,,0009-0009-4566-4779,True,7
+307,https://repository.ictu.edu.vn/giang-vien/pham-thi-mai-huong/,Phạm Thị Mai Hương,ptmhuong@ictu.edu.vn,ThS,,,,,0009-0005-3942-9327,True,0
+308,https://repository.ictu.edu.vn/giang-vien/pham-thi-ngoc-anh/,Phạm Thị Ngọc Anh,ptnanh@ictu.edu.vn,ThS,,,,,0009-0000-1624-4972,True,0
+309,https://repository.ictu.edu.vn/giang-vien/pham-thi-thanh-phuong/,Phạm Thị Thanh Phương,pttphuong@ictu.edu.vn,TS,,,,,0009-0003-3109-832X,True,0
+310,https://repository.ictu.edu.vn/giang-vien/pham-thi-thuong/,Phạm Thị Thương,ptthuong@ictu.edu.vn,ThS,,,,,0009-0001-1039-6737,True,13
+311,https://repository.ictu.edu.vn/giang-vien/pham-thuy-hang/,Phạm Thúy Hằng,pthang@ictu.edu.vn,ThS,,,,,0009-0004-5343-1098,True,0
+312,https://repository.ictu.edu.vn/giang-vien/pham-van-hao/,Phạm Văn Hảo,pvhao@ictu.edu.vn,TS,,,,,0009-0009-0609-7839,True,0
+313,https://repository.ictu.edu.vn/giang-vien/pham-van-ngoc/,Phạm Văn Ngọc,pvngoc@ictu.edu.vn,ThS,,,,,0009-0009-8280-8065,True,0
+314,https://repository.ictu.edu.vn/giang-vien/pham-viet-cuong/,Phạm Việt Cường,pvcuong@ictu.edu.vn,ĐH,,,,,0009-0000-0531-5245,True,0
+315,https://repository.ictu.edu.vn/giang-vien/pham-viet-thang/,Phạm Việt Thắng,pvthang@ictu.edu.vn,ĐH,,,,,0009-0002-8934-7221,True,0
+316,https://repository.ictu.edu.vn/giang-vien/pham-xuan-kien/,Phạm Xuân Kiên,pxkien@ictu.edu.vn,ThS,,,,,0009-0004-3204-809X,True,10
+317,https://repository.ictu.edu.vn/giang-vien/phan-thi-cuc/,Phan Thị Cúc,ptcuc@ictu.edu.vn,ThS,,,,,0009-0001-4770-1352,True,2
+318,https://repository.ictu.edu.vn/giang-vien/phan-thi-hien/,Phan Thị Hiền,pthien@ictu.edu.vn,ThS,,,,,0009-0009-4070-5519,True,0
+319,https://repository.ictu.edu.vn/giang-vien/phan-thi-nhu-quynh/,Phan Thị Như Quỳnh,ptnquynh@ictu.edu.vn,ThS,,,,,0009-0004-9667-3775,True,0
+320,https://repository.ictu.edu.vn/giang-vien/phan-thi-thanh-huyen/,Phan Thị Thanh Huyền,ptthuyen@ictu.edu.vn,ThS,,,,,0009-0008-8458-6024,True,0
+321,https://repository.ictu.edu.vn/giang-vien/phan-thi-van-giang/,Phan Thị Vân Giang,ptvgiang@ictu.edu.vn,TS,,,,,0009-0006-4718-2499,True,1
+322,https://repository.ictu.edu.vn/giang-vien/phung-thanh-hoa/,Phùng Thanh Hoa,pthoa@ictu.edu.vn,ThS,,,,,0009-0003-7865-5752,True,0
+323,https://repository.ictu.edu.vn/giang-vien/phung-the-huan/,Phùng Thế Huân,pthuan@ictu.edu.vn,TS,,,,,0009-0009-8026-1123,True,1
+324,https://repository.ictu.edu.vn/giang-vien/phung-trung-nghia/,Phùng Trung Nghĩa,ptnghia@ictu.edu.vn,TS,PGS,,,,0000-0003-0075-3427,True,49
+325,https://repository.ictu.edu.vn/giang-vien/phuong-t-dam/,Phương T. Đàm,ptdam@ictu.edu.vn,,,,,,,True,0
+326,https://repository.ictu.edu.vn/giang-vien/quach-thi-mai-lien/,Quách Thị Mai Liên,qtmlien@ictu.edu.vn,,,,,,,True,0
+327,https://repository.ictu.edu.vn/giang-vien/quach-xuan-truong/,Quách Xuân Trưởng,qxtruong@ictu.edu.vn,TS,,,,,0000-0003-1402-0830,True,17
+328,https://repository.ictu.edu.vn/giang-vien/quan-thi-to-quyen/,Quản Thị Tố Quyên,qttquyen@ictu.edu.vn,ThS,,,,,0009-0001-2216-9427,True,0
+329,https://repository.ictu.edu.vn/giang-vien/ta-quang-chien/,Tạ Quang Chiến,tqchien@ictu.edu.vn,ĐH,,,,,0009-0006-8136-6603,True,0
+330,https://repository.ictu.edu.vn/giang-vien/ta-thi-thao/,Tạ Thị Thảo,ttthao@ictu.edu.vn,ThS,,,,,0009-0009-3469-5895,True,0
+331,https://repository.ictu.edu.vn/giang-vien/thai-thi-loan/,Thái Thị Loan,ttloan@ictu.edu.vn,ĐH,,,,,0009-0002-6448-0528,True,0
+332,https://repository.ictu.edu.vn/giang-vien/to-huu-nguyen/,Tô Hữu Nguyên,thnguyen@ictu.edu.vn,TS,,,,,0009-0009-1780-456X,True,12
+333,https://repository.ictu.edu.vn/giang-vien/to-thi-huong-thuy/,Tô Thị Hương Thủy,tththuy@ictu.edu.vn,ĐH,,,,,0009-0005-1642-0071,True,0
+334,https://repository.ictu.edu.vn/giang-vien/tran-duc-hoang/,Trần Đức Hoàng,tdhoang@ictu.edu.vn,ThS,,,,,0009-0005-1368-3124,True,1
+335,https://repository.ictu.edu.vn/giang-vien/tran-duy-hung/,Trần Duy Hưng,tdhung@ictu.edu.vn,ĐH,,,,,0009-0002-7099-7793,True,0
+336,https://repository.ictu.edu.vn/giang-vien/tran-duy-minh/,Trần Duy Minh,tdminh@ictu.edu.vn,ThS,,,,,0009-0008-4985-3676,True,6
+337,https://repository.ictu.edu.vn/giang-vien/tran-hai-thanh/,Trần Hải Thanh,ththanh@ictu.edu.vn,ThS,,,,,0009-0005-1078-1394,True,6
+338,https://repository.ictu.edu.vn/giang-vien/tran-hong-anh/,Trần Hồng Anh,thanh@ictu.edu.vn,ThS,,,,,0009-0000-7161-0891,True,5
+339,https://repository.ictu.edu.vn/giang-vien/tran-hong-thai/,Trần Hồng Thái,ththai@ictu.edu.vn,,,,,,,True,0
+340,https://repository.ictu.edu.vn/giang-vien/tran-huy-kiem/,Trần Huy Kiểm,thkiem@ictu.edu.vn,,,,,,,True,0
+341,https://repository.ictu.edu.vn/giang-vien/tran-kim-anh/,Trần Kim Anh,tkanh@ictu.edu.vn,,,,,,,True,0
+342,https://repository.ictu.edu.vn/giang-vien/tran-le-duy/,Trần Lê Duy,tlduy@ictu.edu.vn,TS,,,,,0009-0003-6056-5484,True,1
+343,https://repository.ictu.edu.vn/giang-vien/tran-minh-lien/,Trần Minh Liên,tmlien@ictu.edu.vn,ThS,,,,,,True,0
+344,https://repository.ictu.edu.vn/giang-vien/tran-minh-thanh/,Trần Minh Thành,tmthanh@ictu.edu.vn,TS,,,,,0000-0002-2133-9914,True,0
+345,https://repository.ictu.edu.vn/giang-vien/tran-ngoc-an/,Trần Ngọc Ân,tnan@ictu.edu.vn,ĐH,,,,,0009-0004-6450-7879,True,0
+346,https://repository.ictu.edu.vn/giang-vien/tran-nguyen-duy-trung/,Trần Nguyễn Duy Trung,tndtrung@ictu.edu.vn,ThS,,,,,0009-0005-3421-6111,True,0
+347,https://repository.ictu.edu.vn/giang-vien/tran-nhuan-kien/,Trần Nhuận Kiên,tnkien@ictu.edu.vn,TS,PGS,,,,0009-0003-1814-853X,True,0
+348,https://repository.ictu.edu.vn/giang-vien/tran-quang-huy/,Trần Quang Huy,tqhuy@ictu.edu.vn,ThS,,,,,0009-0009-5354-9252,True,0
+349,https://repository.ictu.edu.vn/giang-vien/tran-quang-quy/,Trần Quang Quý,tqquy@ictu.edu.vn,TS,,,,,0009-0005-5521-5863,True,17
+350,https://repository.ictu.edu.vn/giang-vien/tran-thi-hoa/,Trần Thị Hòa,tthoa@ictu.edu.vn,ThS,,,,,0009-0005-3251-4668,True,0
+351,https://repository.ictu.edu.vn/giang-vien/tran-thi-hue/,Trần Thị Huệ,tthue@ictu.edu.vn,ThS,,,,,0009-0009-7881-0269,True,0
+352,https://repository.ictu.edu.vn/giang-vien/tran-thi-le-thi/,Trần Thị Lệ Thi,ttlthi@ictu.edu.vn,Khác,,,,,0009-0005-2020-5972,True,0
+353,https://repository.ictu.edu.vn/giang-vien/tran-thi-thanh-huong/,Trần Thị Thanh Hương,ttthuong@ictu.edu.vn,ThS,,,,,0009-0007-7823-7197,True,0
+354,https://repository.ictu.edu.vn/giang-vien/tran-thi-thu-huyen/,Trần Thị Thu Huyền,ttthuyen@ictu.edu.vn,TS,,,,,0009-0002-3885-9593,True,0
+355,https://repository.ictu.edu.vn/giang-vien/tran-thi-thu-trang/,Trần Thị Thu Trang,ttttrang@ictu.edu.vn,ThS,,,,,0009-0003-0599-5078,True,0
+356,https://repository.ictu.edu.vn/giang-vien/tran-thi-thuy-an-2/,Trần Thị Thuý An,tttan@ictu.edu.vn,,,,,,,True,0
+357,https://repository.ictu.edu.vn/giang-vien/tran-thi-thuy-an/,Trần Thị Thúy An,tttan1989@ictu.edu.vn,ThS,,,,,0009-0005-7215-9541,True,0
+358,https://repository.ictu.edu.vn/giang-vien/tran-thi-tuyet/,Trần Thị Tuyết,tttuyet@ictu.edu.vn,ThS,,,,,0009-0001-4498-7076,True,0
+359,https://repository.ictu.edu.vn/giang-vien/tran-thi-xuan/,Trần Thị Xuân,ttxuan@ictu.edu.vn,TS,,,,,0000-0002-0920-5075,True,13
+360,https://repository.ictu.edu.vn/giang-vien/tran-thu-phuong/,Trần Thu Phương,ttphuong@ictu.edu.vn,ThS,,,,,0009-0000-0882-4272,True,0
+361,https://repository.ictu.edu.vn/giang-vien/tran-thuy-linh/,Trần Thùy Linh,linhtt@ictu.edu.vn,TS,,,,,0009-0009-6749-976X,True,0
+362,https://repository.ictu.edu.vn/giang-vien/tran-tuan-viet/,Trần Tuấn Việt,ttviet@ictu.edu.vn,ThS,,,,,0009-0008-1048-1473,True,0
+363,https://repository.ictu.edu.vn/giang-vien/tran-van-dung/,Trần Văn Dũng,tvdung@ictu.edu.vn,ThS,,,,,0009-0007-1730-6507,True,0
+364,https://repository.ictu.edu.vn/giang-vien/tran-van-khanh/,Trần Văn Khánh,tvkhanh@ictu.edu.vn,TS,,,,,0000-0002-3445-2596,True,11
+365,https://repository.ictu.edu.vn/giang-vien/tran-vu-minh/,Trần Vũ Minh,tvminh@ictu.edu.vn,ThS,,,,,0009-0003-6405-2336,True,0
+366,https://repository.ictu.edu.vn/giang-vien/tran-xuan-giang/,Trần Xuân Giang,txgiang@ictu.edu.vn,ThS,,,,,0009-0005-6847-4661,True,0
+367,https://repository.ictu.edu.vn/giang-vien/tran-xuan-trong/,Trần Xuân Trọng,txtrong@ictu.edu.vn,ThS,,,,,0009-0004-4698-8736,True,0
+368,https://repository.ictu.edu.vn/giang-vien/trieu-thi-man/,Triệu Thị Mận,ttman@ictu.edu.vn,ThS,,,,,0009-0008-1251-9527,True,0
+369,https://repository.ictu.edu.vn/giang-vien/trinh-minh-duc/,Trịnh Minh Đức,tmduc@ictu.edu.vn,ThS,,,,,,True,10
+370,https://repository.ictu.edu.vn/giang-vien/trinh-ngoc-ha/,Trịnh Ngọc Hà,tnha@ictu.edu.vn,ThS,,,,,0009-0007-6788-9333,True,0
+371,https://repository.ictu.edu.vn/giang-vien/trinh-ngoc-hien/,Trịnh Ngọc Hiến,tnhien@ictu.edu.vn,ThS,,,,,0009-0008-1515-3911,True,0
+372,https://repository.ictu.edu.vn/giang-vien/trinh-thi-ha-my/,Trịnh Thị Hà My,tthmy@ictu.edu.vn,ThS,,,,,0000-0002-1849-9554,True,0
+373,https://repository.ictu.edu.vn/giang-vien/trinh-thi-kim-thoa/,Trịnh Thị Kim Thoa,ttkthoa@ictu.edu.vn,TS,,,,,0009-0003-1272-5420,True,0
+374,https://repository.ictu.edu.vn/giang-vien/trinh-thi-thuy/,Trịnh Thị Thủy,ttthuyttkt@ictu.edu.vn,ThS,,,,,0009-0002-3688-6221,True,0
+375,https://repository.ictu.edu.vn/giang-vien/trinh-thuy-ha/,Trịnh Thúy Hà,ttha@ictu.edu.vn,ThS,,,,,0009-0001-9140-7222,True,0
+376,https://repository.ictu.edu.vn/giang-vien/trinh-van-giac/,Trịnh Văn Giác,tvgiac@ictu.edu.vn,ThS,,,,,0009-0005-0346-8770,True,0
+377,https://repository.ictu.edu.vn/giang-vien/trinh-van-ha/,Trịnh Văn Hà,tvha@ictu.edu.vn,ThS,,,,,0009-0009-4512-924X,True,8
+378,https://repository.ictu.edu.vn/giang-vien/truong-ha-hai/,Trương Hà Hải,thhai@ictu.edu.vn,TS,,,,,0000-0002-3673-8651,True,11
+379,https://repository.ictu.edu.vn/giang-vien/truong-manh-ha/,Trương Mạnh Hà,tmha@ictu.edu.vn,ThS,,,,,,True,0
+380,https://repository.ictu.edu.vn/giang-vien/truong-thi-hang-nga/,Trương Thị Hằng Nga,tthnga@ictu.edu.vn,ThS,,,,,0009-0006-0881-561X,True,0
+381,https://repository.ictu.edu.vn/giang-vien/truong-thi-phuong/,Trương Thị Phương,phuongtt@ictu.edu.vn,ThS,,,,,0009-0005-2619-9892,True,0
+382,https://repository.ictu.edu.vn/giang-vien/truong-thi-thu-hang/,Trương Thị Thu Hằng,ttthang@ictu.edu.vn,TS,,,,,,True,0
+383,https://repository.ictu.edu.vn/giang-vien/truong-thi-viet-phuong/,Trương Thị Việt Phương,ttvphuong@ictu.edu.vn,TS,,,,,0009-0001-3698-7885,True,1
+384,https://repository.ictu.edu.vn/giang-vien/truong-tuan-linh/,Trương Tuấn Linh,ttlinh@ictu.edu.vn,,,,,,,True,0
+385,https://repository.ictu.edu.vn/giang-vien/vi-thi-bich-ngoc/,Vi Thị Bích Ngọc,ngocvtb@ictu.edu.vn,ThS,,,,,0009-0001-3939-8656,True,0
+386,https://repository.ictu.edu.vn/giang-vien/vo-van-truong/,Võ Văn Trường,vvtruong@ictu.edu.vn,ThS,,,,,0009-0008-2701-4775,True,0
+387,https://repository.ictu.edu.vn/giang-vien/vu-chien-thang/,Vũ Chiến Thắng,vcthang@ictu.edu.vn,TS,,,,,0000-0002-7080-3808,True,16
+388,https://repository.ictu.edu.vn/giang-vien/vu-duc-quang/,Vũ Đức Quang,vdquang@ictu.edu.vn,TS,,,,,0000-0001-5458-3713,True,38
+389,https://repository.ictu.edu.vn/giang-vien/vu-duc-thai/,Vũ Đức Thái,vdthai@ictu.edu.vn,TS,,,,,0009-0001-5107-2544,True,19
+390,https://repository.ictu.edu.vn/giang-vien/vu-hai-yen-2/,Vũ Hải Yến,vhyen1984@ictu.edu.vn,Khác,,,,,0009-0008-5468-0095,True,0
+391,https://repository.ictu.edu.vn/giang-vien/vu-hai-yen/,Vũ Hải Yến,vhyen@ictu.edu.vn,ThS,,,,,0009-0004-3157-1559,True,0
+392,https://repository.ictu.edu.vn/giang-vien/vu-hoai-nam/,Vũ Hoài Nam,vhnam@ictu.edu.vn,,,,,,,True,0
+393,https://repository.ictu.edu.vn/giang-vien/vu-hoang-son/,Vũ Hoàng Sơn,vhson@ictu.edu.vn,ThS,,,,,0009-0006-6881-984X,True,0
+394,https://repository.ictu.edu.vn/giang-vien/vu-huy-luong/,Vũ Huy Lượng,vhluong@ictu.edu.vn,TS,,,,,0009-0000-1106-4673,True,13
+395,https://repository.ictu.edu.vn/giang-vien/vu-thach-duong/,Vũ Thạch Dương,vtduong@ictu.edu.vn,ThS,,,,,0009-0008-8430-6547,True,0
+396,https://repository.ictu.edu.vn/giang-vien/vu-thanh-hue/,Vũ Thanh Huế,vthue@ictu.edu.vn,ThS,,,,,0009-0001-1125-9662,True,0
+397,https://repository.ictu.edu.vn/giang-vien/vu-thi-bich-ngoc/,Vũ Thị Bích Ngọc,vtbngoc@ictu.edu.vn,ThS,,,,,0009-0009-5052-6426,True,0
+398,https://repository.ictu.edu.vn/giang-vien/vu-thi-hai-yen/,Vũ Thị Hải Yến,vthyen@ictu.edu.vn,,,,,,,True,0
+399,https://repository.ictu.edu.vn/giang-vien/vu-thi-hoa/,Vũ Thị Hoa,vthoa@ictu.edu.vn,ThS,,,,,0009-0004-6433-4066,True,0
+400,https://repository.ictu.edu.vn/giang-vien/vu-thi-nguyet/,Vũ Thị Nguyệt,vtnguyet@ictu.edu.vn,ThS,,,,,0009-0002-3001-7201,True,9
+401,https://repository.ictu.edu.vn/giang-vien/vu-thi-oanh/,Vũ Thị Oanh,vtoanh@ictu.edu.vn,ThS,,,,,0009-0005-0625-9261,True,0
+402,https://repository.ictu.edu.vn/giang-vien/vu-thi-quynh/,Vũ Thị Quỳnh,vtquynh@ictu.edu.vn,ThS,,,,,0009-0009-3067-0471,True,0
+403,https://repository.ictu.edu.vn/giang-vien/vu-thi-thu-thuy/,Vũ Thị Thu Thủy,vttthuy@ictu.edu.vn,ĐH,,,,,0009-0005-7201-0114,True,0
+404,https://repository.ictu.edu.vn/giang-vien/vu-thu-anh/,Vũ Thu Ánh,vtanh@ictu.edu.vn,ThS,,,,,0009-0002-9476-2630,True,0
+405,https://repository.ictu.edu.vn/giang-vien/vu-thuy-hang/,Vũ Thúy Hằng,vthang@ictu.edu.vn,ThS,,,,,0009-0002-8149-7719,True,0
+406,https://repository.ictu.edu.vn/giang-vien/vu-van-dam/,Vũ Văn Đam,vvdam@ictu.edu.vn,TS,,,,,0009-0009-4705-4632,True,0
+407,https://repository.ictu.edu.vn/giang-vien/vu-van-dien/,Vũ Văn Diện,vvdien@ictu.edu.vn,ThS,,,,,0000-0001-8463-6556,True,10
+408,https://repository.ictu.edu.vn/giang-vien/vu-viet-dung/,Vũ Việt Dũng,vvdung@ictu.edu.vn,ThS,,,,,0009-0000-8317-2454,True,8
+409,https://repository.ictu.edu.vn/giang-vien/vu-vinh-quang/,Vũ Vinh Quang,vvquang@ictu.edu.vn,TS,,,,,0009-0009-2890-1381,True,23
+410,https://repository.ictu.edu.vn/giang-vien/vu-xuan-nam/,Vũ Xuân Nam,vxnam@ictu.edu.vn,TS,,,,,0009-0006-1238-9035,True,5

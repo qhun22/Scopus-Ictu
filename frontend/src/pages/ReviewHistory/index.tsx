@@ -57,7 +57,7 @@ function ActionBadge({ action, copy }: { action: ReviewHistoryAction; copy: RowC
     REOPEN: copy.actionReopen.replace(/\s*\(REOPEN\)$/, ""),
   };
   return (
-    <Badge tone={REVIEW_ACTION_TONE[action]}>{labels[action]}</Badge>
+    <Badge tone={REVIEW_ACTION_TONE[action]} className="!rounded-[5px]">{labels[action]}</Badge>
   );
 }
 
@@ -72,7 +72,7 @@ function StatusBadge({ status, copy }: { status: string; copy: RowCopy }) {
   const labelKey = STATUS_BADGE_LABEL_KEY[status];
   const label = labelKey ? copy[labelKey] : status;
   return (
-    <Badge tone={CANDIDATE_STATUS_TONE[status as ReviewHistoryStatus] ?? "neutral"}>{label}</Badge>
+    <Badge tone={CANDIDATE_STATUS_TONE[status as ReviewHistoryStatus] ?? "neutral"} className="!rounded-[5px]">{label}</Badge>
   );
 }
 

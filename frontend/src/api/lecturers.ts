@@ -58,16 +58,16 @@ export interface LecturerUpdatePayload {
   //   * undefined         -> unchanged (field omitted)
   staff_code?: string | null;
   role?: string;
-  academic_degree?: string;
-  academic_rank?: string;
-  position?: string;
-  faculty?: string;
-  department?: string;
-  orcid?: string;
-  specialization?: string;
-  gender?: string;
-  date_of_birth?: string;
-  phone?: string;
+  academic_degree?: string | null;
+  academic_rank?: string | null;
+  position?: string | null;
+  faculty?: string | null;
+  department?: string | null;
+  orcid?: string | null;
+  specialization?: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  phone?: string | null;
   grant_account?: boolean;
   password?: string;
 }

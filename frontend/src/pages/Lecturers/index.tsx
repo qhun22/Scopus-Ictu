@@ -122,14 +122,16 @@ export default function LecturersPage() {
     setLoading(true);
     try {
       const isFilterMode = activeFilter && activeFilter !== "all";
+      // Load all pages when filter or position-sort is needed (position sort is client-side)
+      const needAllPages = isFilterMode || !appliedSearch.trim();
       const data = await getLecturers({
-        page: isFilterMode ? 1 : page,
-        page_size: isFilterMode ? 200 : pageSize,
+        page: needAllPages ? 1 : page,
+        page_size: needAllPages ? 200 : pageSize,
         search: appliedSearch.trim() || undefined,
       });
 
       let allItems = data.items;
-      if (isFilterMode && data.total > 200) {
+      if (needAllPages && data.total > 200) {
         const extraPages = Math.ceil((data.total - 200) / 200);
         const extras = await Promise.all(
           Array.from({ length: extraPages }, (_, i) =>
@@ -360,13 +362,13 @@ export default function LecturersPage() {
         full_name: editForm.full_name.trim(),
         email: (grantAccount ? grantEmail.trim() : editForm.email.trim()) || undefined,
         staff_code: trimmedStaffCode ? trimmedStaffCode : null,
-        academic_degree: editForm.academic_degree.trim() || undefined,
-        academic_rank: editForm.academic_rank.trim() || undefined,
-        position: editForm.position.trim() || undefined,
-        specialization: editForm.specialization.trim() || undefined,
-        gender: editForm.gender || undefined,
-        date_of_birth: editForm.date_of_birth || undefined,
-        phone: editForm.phone.trim() || undefined,
+        academic_degree: editForm.academic_degree.trim() || null,
+        academic_rank: editForm.academic_rank.trim() || null,
+        position: editForm.position.trim() || null,
+        specialization: editForm.specialization.trim() || null,
+        gender: editForm.gender || null,
+        date_of_birth: editForm.date_of_birth || null,
+        phone: editForm.phone.trim() || null,
         grant_account: grantAccount,
         password: grantAccount ? grantPassword : undefined,
         role: selectedLecturer.account || grantAccount ? grantRole : undefined,
@@ -521,6 +523,7 @@ export default function LecturersPage() {
     setSelectedLecturer(lec);
     setIsDeleteModalOpen(true);
   };
+  void handleOpenDeleteModal;
 
   // Confirm Delete
   const handleDeleteConfirm = async () => {
@@ -560,6 +563,7 @@ export default function LecturersPage() {
   const POSITION_ORDER: Record<string, number> = {
     "hiệu trưởng": 1,
     "phó hiệu trưởng": 2,
+    "hiệu phó": 2,
     "trưởng khoa": 3,
     "phó trưởng khoa": 4,
     "trưởng bộ môn": 5,
@@ -569,7 +573,13 @@ export default function LecturersPage() {
   };
   const positionRank = (pos: string | null): number => {
     if (!pos) return 99;
-    return POSITION_ORDER[pos.trim().toLowerCase()] ?? 10;
+    const normalized = pos.trim().toLowerCase().replace(/\s+/g, " ");
+    const exactRank = POSITION_ORDER[normalized];
+    if (exactRank !== undefined) return exactRank;
+    const matchedPosition = Object.keys(POSITION_ORDER).find((position) =>
+      normalized.includes(position),
+    );
+    return matchedPosition ? POSITION_ORDER[matchedPosition] : 99;
   };
 
   const filteredLecturers = (activeFilter && activeFilter !== "all"
@@ -581,7 +591,17 @@ export default function LecturersPage() {
         return true;
       })
     : lecturers
-  ).slice().sort((a, b) => positionRank(a.position) - positionRank(b.position));
+  ).slice().sort((a, b) => {
+    const positionDifference = positionRank(a.position) - positionRank(b.position);
+    if (positionDifference !== 0) return positionDifference;
+    return a.full_name.localeCompare(b.full_name, "vi");
+  });
+
+  // Slice theo trang khi không ở filter mode (filter mode hiển thị tất cả kết quả lọc)
+  const isFilterMode = activeFilter && activeFilter !== "all";
+  const pagedLecturers = isFilterMode
+    ? filteredLecturers
+    : filteredLecturers.slice((page - 1) * pageSize, page * pageSize);
 
   // Export JSON Handler
   const handleExportJson = async () => {
@@ -686,7 +706,7 @@ export default function LecturersPage() {
           }`}
         >
           <span className="text-xs font-medium text-emerald-600">
-            {locale === "vi" ? "Đã cấp tài khoản" : "Account Linked"}
+            {locale === "vi" ? "Đã có tài khoản" : "Account Linked"}
           </span>
           <p className="mt-1 text-2xl font-black text-emerald-600">
             {stats ? stats.account_linked : 0}
@@ -703,7 +723,7 @@ export default function LecturersPage() {
           }`}
         >
           <span className="text-xs font-medium text-slate-500">
-            {locale === "vi" ? "Chưa cấp tài khoản" : "No Account"}
+            {locale === "vi" ? "Chưa có tài khoản" : "No Account"}
           </span>
           <p className="mt-1 text-2xl font-black text-slate-700">
             {stats ? stats.account_not_linked : 0}
@@ -783,8 +803,8 @@ export default function LecturersPage() {
               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
               </svg>
-              {activeFilter === "linked" && (locale === "vi" ? "Đã cấp tài khoản" : "Account Linked")}
-              {activeFilter === "not_linked" && (locale === "vi" ? "Chưa cấp tài khoản" : "No Account")}
+              {activeFilter === "linked" && (locale === "vi" ? "Đã có tài khoản" : "Account Linked")}
+              {activeFilter === "not_linked" && (locale === "vi" ? "Chưa có tài khoản" : "No Account")}
               {activeFilter === "locked" && (locale === "vi" ? "Tài khoản bị khóa" : "Locked")}
               {activeFilter === "warning" && (locale === "vi" ? "Cảnh báo" : "Warnings")}
               <button
@@ -863,7 +883,7 @@ export default function LecturersPage() {
                   </td>
                 </tr>
               ) : (
-                filteredLecturers.map((lec) => {
+                pagedLecturers.map((lec) => {
                   const degreeRank = [lec.academic_rank, lec.academic_degree].filter(Boolean).join(" / ") || "—";
                   const facultyDept = [lec.faculty, lec.department].filter(Boolean).join(" / ") || lec.specialization || "—";
                   return (
@@ -878,7 +898,9 @@ export default function LecturersPage() {
                               {lec.full_name}
                             </span>
                             <span className="block text-[10px] text-slate-400 truncate">
-                              {lec.staff_code || lec.position || "—"}
+                              {lec.position
+                                ? lec.position
+                                : lec.staff_code || "—"}
                             </span>
                           </div>
                         </div>
@@ -900,12 +922,12 @@ export default function LecturersPage() {
                         {lec.account ? (
                           <span
                             title={getAccountRoleLabel(lec.account.role)}
-                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-bold text-violet-700"
+                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-violet-400 bg-white px-2.5 py-0.5 text-xs font-bold text-violet-700"
                           >
                             {getAccountRoleLabel(lec.account.role)}
                           </span>
                         ) : (
-                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-400">
+                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
                             {locale === "vi" ? "Chưa cấp" : "Not Linked"}
                           </span>
                         )}
@@ -916,48 +938,33 @@ export default function LecturersPage() {
                         {lec.account && !lec.account.is_active ? (
                           <span
                             title={locale === "vi" ? "Tài khoản đang bị khóa" : "Account locked"}
-                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700"
+                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-rose-300 bg-white px-2.5 py-0.5 text-xs font-bold text-rose-700"
                           >
                             <span>{locale === "vi" ? "Đã khóa" : "Locked"}</span>
                           </span>
                         ) : lec.has_warning ? (
                           <span
                             title={lec.warning_reason || (locale === "vi" ? "Cần rà soát trùng tên" : "Review duplicate")}
-                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700"
+                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700"
                           >
                             <span>{locale === "vi" ? "Cảnh báo" : "Warning"}</span>
                           </span>
                         ) : (
-                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 py-0.5 text-xs font-bold text-emerald-600">
                             <span>{locale === "vi" ? "Hoạt động" : "Active"}</span>
                           </span>
                         )}
                       </td>
 
-                      {/* Actions Column: [Chi tiết] [Xóa] — sticky right (UI-10 fix P11.5) */}
+                      {/* Actions Column: [Chi tiết] only — delete moved inside detail modal */}
                       <td className="sticky right-0 z-10 bg-white px-3 py-3.5 text-center align-middle whitespace-nowrap border-l border-slate-100">
-                        <div className="mx-auto grid w-52 grid-cols-2 gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDetailModal(lec)}
-                            className={buttonClass("tonal", "sm", true)}
-                          >
-                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            <span>{locale === "vi" ? "Chi tiết" : "Detail"}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenDeleteModal(lec)}
-                            className={"inline-flex h-7 w-full items-center justify-center gap-1 rounded-action border border-rose-200 bg-rose-50/80 px-2 text-[11px] font-semibold text-rose-600 transition-colors hover:bg-rose-100 cursor-pointer whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-danger/30 disabled:cursor-not-allowed disabled:opacity-50"}
-                          >
-                            <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            <span>{locale === "vi" ? "Xóa" : "Delete"}</span>
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDetailModal(lec)}
+                          className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors cursor-pointer"
+                        >
+                          {locale === "vi" ? "Chi tiết" : "Detail"}
+                        </button>
                       </td>
                     </tr>
                   );
@@ -980,7 +987,7 @@ export default function LecturersPage() {
                 </>
               ) : (
                 <>
-                  {t.lecturers.showing} <strong>{lecturers.length}</strong> {t.lecturers.of} {totalRecords} {locale === "vi" ? "giảng viên" : "lecturers"}
+                  {t.lecturers.showing} <strong>{pagedLecturers.length}</strong> {t.lecturers.of} {totalRecords} {locale === "vi" ? "giảng viên" : "lecturers"}
                 </>
               )}
             </span>
@@ -1544,13 +1551,20 @@ export default function LecturersPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
+                          <span className="font-semibold text-slate-600">{locale === "vi" ? "Phương thức đăng nhập" : "Login method"}</span>
+                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
+                            Email
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
                           <span className="font-semibold text-slate-600">{locale === "vi" ? "Trạng thái tài khoản" : "Account status"}</span>
                           {/* Same status label as the "Trạng thái" column of the list. */}
                           <span
-                            className={`inline-flex w-28 items-center justify-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-bold ${
+                            className={`inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border px-2.5 py-0.5 text-xs font-bold ${
                               selectedLecturer.account.is_active
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                : "border-rose-200 bg-rose-50 text-rose-700"
+                                ? "border-emerald-400 bg-white text-emerald-600"
+                                : "border-rose-300 bg-white text-rose-700"
                             }`}
                           >
                             {selectedLecturer.account.is_active
@@ -1626,18 +1640,6 @@ export default function LecturersPage() {
                             variant="secondary"
                           >
                             {locale === "vi" ? "Đặt lại mật khẩu" : "Reset password"}
-                          </Button>
-                          <Button
-                            type="button"
-                            disabled={isDetailBusy || isCurrentAccount}
-                            onClick={() =>
-                              setConfirmAction(selectedLecturer.account?.is_active ? "lock" : "unlock")
-                            }
-                            variant={selectedLecturer.account.is_active ? "danger" : "primary"}
-                          >
-                            {selectedLecturer.account.is_active
-                              ? (locale === "vi" ? "Khóa tài khoản" : "Lock account")
-                              : (locale === "vi" ? "Mở khóa tài khoản" : "Unlock account")}
                           </Button>
                         </div>
                       </div>
@@ -1715,25 +1717,49 @@ export default function LecturersPage() {
                   </section>
                 </div>
 
-                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
-                  <button
-                    type="button"
-                    disabled={isDetailBusy}
-                    onClick={() => setIsDetailModalOpen(false)}
-                    className={buttonClass("secondary")}
-                  >
-                    {t.common.cancel}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isDetailBusy}
-                    className={buttonClass("primary")}
-                  >
-                    {detailAction === "save" && (
-                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 bg-white px-4 py-3 sm:px-6">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isDetailBusy}
+                      onClick={() => setIsDeleteModalOpen(true)}
+                      className={buttonClass("danger")}
+                    >
+                      {locale === "vi" ? "Xóa giảng viên" : "Delete"}
+                    </button>
+                    {selectedLecturer.account && !isCurrentAccount && (
+                      <Button
+                        type="button"
+                        disabled={isDetailBusy}
+                        onClick={() => setConfirmAction(selectedLecturer.account?.is_active ? "lock" : "unlock")}
+                        variant={selectedLecturer.account.is_active ? "danger" : "primary"}
+                      >
+                        {selectedLecturer.account.is_active
+                          ? (locale === "vi" ? "Khóa tài khoản" : "Lock account")
+                          : (locale === "vi" ? "Mở khóa tài khoản" : "Unlock account")}
+                      </Button>
                     )}
-                    <span>{detailAction === "save" ? t.common.processing : (locale === "vi" ? "Lưu thay đổi" : "Save changes")}</span>
-                  </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={isDetailBusy}
+                      onClick={() => setIsDetailModalOpen(false)}
+                      className={buttonClass("secondary")}
+                    >
+                      {t.common.cancel}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isDetailBusy}
+                      className={buttonClass("primary")}
+                    >
+                      {detailAction === "save" && (
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      )}
+                      <span>{detailAction === "save" ? t.common.processing : (locale === "vi" ? "Lưu thay đổi" : "Save changes")}</span>
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>

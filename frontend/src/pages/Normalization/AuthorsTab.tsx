@@ -18,10 +18,16 @@ import { buttonClass } from "../../components/ui/Button";
 import { useToast } from "../../contexts/ToastContext";
 import ModalPortal from "../../components/common/ModalPortal";
 
+const badgeClassName =
+  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+const neutralDetailButtonClassName =
+  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50";
+
 interface AuthorsTabProps {
   scopusImports: ScopusImport[];
   locale: "vi" | "en";
   onRefresh: () => void;
+  onViewDetail: (item: ScopusImport) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +94,7 @@ function variantTypeLabel(vt: string, locale: string): string {
 // AuthorsTab Component
 // ---------------------------------------------------------------------------
 
-export default function AuthorsTab({ scopusImports, locale, onRefresh }: AuthorsTabProps) {
+export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDetail }: AuthorsTabProps) {
   const { t } = useI18n();
   // Destructure stable callbacks — avoid depending on the whole toast object
   // which changes identity when state (toast list) updates.
@@ -100,15 +106,45 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
   const [authorNormalizingId, setAuthorNormalizingId] = useState<string | null>(null);
 
   // Author list state
-  const [authorSearch, setAuthorSearch] = useState("");
+  const [authorSearchInput, setAuthorSearchInput] = useState("");
+  const [appliedAuthorSearch, setAppliedAuthorSearch] = useState("");
   const [authorPage, setAuthorPage] = useState(1);
   const [authorPageSize, setAuthorPageSize] = useState(10);
+
+  const handleApplyAuthorSearch = () => {
+    setAppliedAuthorSearch(authorSearchInput.trim());
+    setAuthorPage(1);
+  };
+
+  const handleResetAuthorSearch = () => {
+    setAuthorSearchInput("");
+    setAppliedAuthorSearch("");
+    setAuthorPage(1);
+  };
+
+  const isApplyAuthorDisabled = authorSearchInput.trim() === appliedAuthorSearch.trim();
+  const isResetAuthorDisabled = !authorSearchInput && !appliedAuthorSearch;
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(10);
   const [authorTotal, setAuthorTotal] = useState(0);
   const [authors, setAuthors] = useState<AuthorListItem[]>([]);
   const [authorsLoading, setAuthorsLoading] = useState(false);
   const [globalStats, setGlobalStats] = useState<AuthorStats | null>(null);
 
   const authorTotalPages = Math.max(1, Math.ceil(authorTotal / authorPageSize));
+  const authorHistory = useMemo(
+    () => scopusImports.filter(isAuthorCompleted),
+    [scopusImports],
+  );
+  const historyTotalPages = Math.max(1, Math.ceil(authorHistory.length / historyPageSize));
+  const paginatedHistory = useMemo(
+    () =>
+      authorHistory.slice(
+        (historyPage - 1) * historyPageSize,
+        historyPage * historyPageSize,
+      ),
+    [authorHistory, historyPage, historyPageSize],
+  );
 
   // Author detail modal
   const [selectedAuthor, setSelectedAuthor] = useState<AuthorDetail | null>(null);
@@ -155,14 +191,14 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
 
   // Reload author list AND global stats after a normalization action
   const reloadAuthorsAndStats = useCallback(async () => {
-    await loadAuthors(authorSearch, authorPage, authorPageSize);
+    await loadAuthors(appliedAuthorSearch, authorPage, authorPageSize);
     await loadStats();
-  }, [authorSearch, authorPage, authorPageSize, loadAuthors, loadStats]);
+  }, [appliedAuthorSearch, authorPage, authorPageSize, loadAuthors, loadStats]);
 
   useEffect(() => {
-    void loadAuthors(authorSearch, authorPage, authorPageSize);
+    void loadAuthors(appliedAuthorSearch, authorPage, authorPageSize);
     void loadStats();
-  }, [authorSearch, authorPage, authorPageSize, loadAuthors, loadStats]);
+  }, [appliedAuthorSearch, authorPage, authorPageSize, loadAuthors, loadStats]);
 
   // Handlers
   const handleNormalizePublication = async (item: ScopusImport) => {
@@ -233,20 +269,18 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
     return t.normalization.authorsTab.status.pending;
   };
 
-  const authorStatusColor = (status?: string, hasErrors?: boolean) => {
-    if (status === "COMPLETED") {
-      if (hasErrors) return "bg-amber-50 text-amber-700 border-amber-200";
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    }
-    if (status === "FAILED") return "bg-rose-50 text-rose-700 border-rose-200";
-    if (status === "NORMALIZING") return "bg-blue-50 text-blue-700 border-blue-200";
-    return "bg-slate-50 text-slate-600 border-slate-200";
-  };
-
   return (
     <div className="space-y-5">
       {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
+          <span className="text-xs font-medium text-slate-500">
+            {locale === "vi" ? "Tổng đợt nhập" : "Total imports"}
+          </span>
+          <p className="mt-1 text-2xl font-black text-slate-800">
+            {formatCount(summaryCards.pending.length + summaryCards.completed.length)}
+          </p>
+        </div>
         <div className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs">
           <span className="text-xs font-medium text-slate-500">
             {t.normalization.authorsTab.summary.pending}
@@ -281,7 +315,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
         </div>
       </div>
 
-      {/* SECTION 1: Cần xử lý */}
+      {/* SECTION 1: Chờ xử lý */}
       <section className="space-y-3">
         <div>
           <h2 className="text-base font-bold text-slate-800 sm:text-lg">
@@ -292,11 +326,28 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
           </p>
         </div>
 
+        <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+                <tr>
+                  <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Tên tệp</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Loại dữ liệu</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Thời gian</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Bản ghi</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Người thực hiện</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Trạng thái</th>
+                  <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
         {pendingImports.length === 0 ? (
-          <div className="rounded-[5px] border border-slate-200/80 bg-white p-8 text-center shadow-xs">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[5px] bg-emerald-50 text-emerald-600 mb-2.5 border border-emerald-100">
+          <tr>
+            <td colSpan={7} className="py-12 text-center text-slate-400">
+              <div className="flex flex-col items-center justify-center gap-1.5">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 text-slate-400 mb-2.5 border border-slate-200/80">
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
             <h3 className="text-sm font-bold text-slate-700">
@@ -306,9 +357,10 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
               {t.normalization.authorsTab.emptyPendingSub}
             </p>
           </div>
+            </td>
+          </tr>
         ) : (
-          <div className="space-y-2.5">
-            {pendingImports.map((item) => {
+            pendingImports.map((item) => {
               const authorSummary = item.normalization_summary?.authors;
               const authorStatus = authorSummary?.status;
               const needsPublicationNormalization =
@@ -317,19 +369,19 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
               const isAuthorNorm = authorNormalizingId === item.id;
 
               return (
-                <div
+                <tr
                   key={item.id}
-                  className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs"
+                  className="transition-colors hover:bg-slate-50/70"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     {/* Info */}
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-purple-50 text-[#3A5FC3] border border-purple-100/80 shrink-0">
+                    <td className="px-3 py-3.5 align-middle whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100 text-slate-600 border border-slate-200/80 shrink-0">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 max-w-xs sm:max-w-sm">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className="font-bold text-slate-800 text-sm truncate max-w-xs sm:max-w-md"
@@ -338,70 +390,199 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                             {item.file_name}
                           </span>
                         </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                          <span>
-                            <strong className="text-slate-700">{formatCount(item.total_records)}</strong>{" "}
-                            {locale === "vi" ? "công bố" : "publications"}
-                          </span>
-                          <span>•</span>
-                          <span>{formatDate(item.created_at)}</span>
-                          {authorStatus && authorStatus !== "NORMALIZING" && (
-                            <>
-                              <span>•</span>
-                              <span className={`inline-flex items-center rounded-[5px] border px-2 py-0.5 text-[10px] font-bold ${authorStatusColor(authorStatus)}`}>
-                                {authorStatusLabel(authorStatus)}
-                              </span>
-                            </>
-                          )}
-                        </div>
                       </div>
-                    </div>
+                      </div>
+                    </td>
+
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={badgeClassName}>Scopus</span></td>
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">{formatDate(item.created_at)}</td>
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">{formatCount(item.total_records)}</td>
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={badgeClassName}>{item.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span></td>
+                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={badgeClassName}>{authorStatusLabel(authorStatus)}</span></td>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
+                      <div className="flex items-center justify-center gap-2">
                       {needsPublicationNormalization ? (
                         <button
                           type="button"
                           onClick={() => void handleNormalizePublication(item)}
                           disabled={isNorm}
-                          className={buttonClass("secondary", "sm")}
+                          className="inline-flex h-badge w-28 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-300/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {isNorm ? (
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-[#3A5FC3]" />
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
                           ) : (
                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                           )}
-                          {t.normalization.actions.normalize}
+                          {isNorm ? t.normalization.actions.normalizing : (locale === "vi" ? "Chuẩn hóa" : "Normalize")}
                         </button>
                       ) : (
                         <button
                           type="button"
                           onClick={() => void handleNormalizeAuthors(item)}
                           disabled={isAuthorNorm}
-                          className={buttonClass("primary", "sm")}
+                          className="inline-flex h-badge w-28 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-300/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 group"
                         >
                           {isAuthorNorm ? (
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
                           ) : (
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="h-3.5 w-3.5 transition-transform duration-150 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
                           )}
-                          {t.normalization.authorsTab.actions.normalizeAuthors}
+                          {isAuthorNorm
+                            ? t.normalization.actions.normalizing
+                            : (locale === "vi" ? "Bóc tách" : "Extract")}
                         </button>
                       )}
-                    </div>
-                  </div>
-                </div>
+                      </div>
+                    </td>
+                </tr>
               );
-            })}
-          </div>
+            })
         )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
-      {/* SECTION 2: Tác giả Scopus */}
+      {/* SECTION 2: Processed author extraction history */}
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-bold text-slate-800 sm:text-lg">
+            {t.normalization.authorsTab.historyTitle}
+          </h2>
+        </div>
+        <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+                <tr>
+                  <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Tên tệp</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Loại dữ liệu</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Thời gian</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Bản ghi</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Người thực hiện</th>
+                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Trạng thái</th>
+                  <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-1.5">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100/80 text-slate-400">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">
+                          {locale === "vi" ? "Không tìm thấy dữ liệu" : "No data found"}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          {locale === "vi" ? "Chưa có đợt nhập nào được bóc tách tác giả." : "No imports have had authors extracted yet."}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedHistory.map((item) => (
+                    <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
+                      <td className="px-3 py-3.5 align-middle whitespace-nowrap">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0">
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0 max-w-xs sm:max-w-sm">
+                            <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
+                              {item.file_name}
+                            </span>
+                            <span className="block text-[10px] font-mono text-slate-400 truncate">
+                              ID: {item.id}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={badgeClassName}>Scopus</span></td>
+                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">{formatDate(item.created_at)}</td>
+                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">{formatCount(item.total_records)}</td>
+                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={badgeClassName}>{item.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span></td>
+                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                        <span className={item.normalization_summary?.authors?.status === "COMPLETED" ? "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50" : badgeClassName}>
+                          {authorStatusLabel(item.normalization_summary?.authors?.status)}
+                        </span>
+                      </td>
+                      <td className="sticky right-0 z-[1] border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
+                        <button
+                          type="button"
+                          onClick={() => onViewDetail(item)}
+                          className="inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors cursor-pointer"
+                        >
+                          {t.normalization.authorsTab.actions.viewDetail}
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
+            <div className="flex items-center gap-3">
+              <span>
+                {locale === "vi" ? "Hiển thị" : "Showing"} <strong>{paginatedHistory.length}</strong> {locale === "vi" ? "trong" : "of"} {authorHistory.length} {locale === "vi" ? "đợt nhập" : "imports"}
+              </span>
+              <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+                <span>{locale === "vi" ? "Hiển thị:" : "Show:"}</span>
+                <select
+                  value={historyPageSize}
+                  onChange={(e) => {
+                    setHistoryPageSize(Number(e.target.value));
+                    setHistoryPage(1);
+                  }}
+                  className="h-6.5 cursor-pointer rounded-[5px] border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none"
+                >
+                  <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={50}>50 / {locale === "vi" ? "trang" : "page"}</option>
+                  <option value={100}>100 / {locale === "vi" ? "trang" : "page"}</option>
+                </select>
+              </div>
+            </div>
+            <nav aria-label="Pagination" className="flex items-center gap-1.5">
+              <button type="button" onClick={() => setHistoryPage((page) => Math.max(1, page - 1))} disabled={historyPage <= 1} className={buttonClass("secondary", "sm")}>
+                {locale === "vi" ? "Trang trước" : "Previous"}
+              </button>
+              <span className="px-0.5 text-slate-400">{locale === "vi" ? "Trang" : "Page"}</span>
+              <input
+                type="number"
+                aria-label={locale === "vi" ? "Đến trang" : "Go to page"}
+                min={1}
+                max={historyTotalPages}
+                value={historyPage}
+                onChange={(e) => {
+                  const value = Math.max(1, Math.min(historyTotalPages, parseInt(e.target.value, 10) || 1));
+                  setHistoryPage(value);
+                }}
+                className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="text-slate-400">/ <strong className="text-slate-600">{historyTotalPages}</strong></span>
+              <button type="button" onClick={() => setHistoryPage((page) => Math.min(historyTotalPages, page + 1))} disabled={historyPage >= historyTotalPages} className={buttonClass("secondary", "sm")}>
+                {locale === "vi" ? "Trang sau" : "Next"}
+              </button>
+            </nav>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3: Tác giả Scopus */}
       <section className="space-y-3">
         <div>
           <h2 className="text-base font-bold text-slate-800 sm:text-lg">
@@ -409,21 +590,56 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
           </h2>
         </div>
 
-        {/* Search */}
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            value={authorSearch}
-            onChange={(e) => {
-              setAuthorSearch(e.target.value);
-              setAuthorPage(1);
-            }}
-            placeholder={t.normalization.authorsTab.searchPlaceholder}
-            className="w-full rounded-[5px] border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-700 shadow-xs placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-          />
+        {/* Toolbar: Search input with Apply & Reset buttons */}
+        <div className="flex flex-col gap-3 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              aria-label={t.common.search}
+              value={authorSearchInput}
+              onChange={(e) => setAuthorSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleApplyAuthorSearch();
+                }
+              }}
+              placeholder={t.normalization.authorsTab.searchPlaceholder}
+              className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Nút Áp dụng */}
+            <button
+              type="button"
+              disabled={isApplyAuthorDisabled}
+              onClick={handleApplyAuthorSearch}
+              className={buttonClass("primary")}
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span className="truncate">{locale === "vi" ? "Áp dụng" : "Apply"}</span>
+            </button>
+
+            {/* Nút Đặt lại */}
+            <button
+              type="button"
+              onClick={handleResetAuthorSearch}
+              disabled={isResetAuthorDisabled}
+              className={buttonClass("secondary")}
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="truncate">{locale === "vi" ? "Đặt lại" : "Reset"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -444,7 +660,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                   <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
                     {t.normalization.authorsTab.table.variantCount}
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
+                  <th className="w-44 whitespace-nowrap border-l border-slate-200/80 px-4 py-3 text-center font-semibold text-slate-600">
                     {t.normalization.authorsTab.table.actions}
                   </th>
                 </tr>
@@ -493,23 +709,19 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
                       </td>
                       <td className="px-4 py-3 text-center">
                         {author.variant_count > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                          <span className="font-semibold text-slate-700">
                             {author.variant_count}
                           </span>
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="w-44 border-l border-slate-100 px-4 py-3 text-center">
                         <button
                           type="button"
                           onClick={() => void handleViewAuthorDetail(author)}
-                          className={buttonClass("tonal", "sm")}
+                          className={neutralDetailButtonClassName}
                         >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
                           {t.normalization.authorsTab.actions.viewDetail}
                         </button>
                       </td>
@@ -556,9 +768,20 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh }: Authors
               >
                 {locale === "vi" ? "Trang trước" : "Previous"}
               </button>
-              <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
-                {locale === "vi" ? "Trang" : "Page"} <strong>{authorPage}</strong> / {authorTotalPages}
-              </span>
+              <span className="px-0.5 text-slate-400">{locale === "vi" ? "Trang" : "Page"}</span>
+              <input
+                type="number"
+                aria-label={locale === "vi" ? "Đến trang" : "Go to page"}
+                min={1}
+                max={authorTotalPages}
+                value={authorPage}
+                onChange={(e) => {
+                  const value = Math.max(1, Math.min(authorTotalPages, parseInt(e.target.value, 10) || 1));
+                  setAuthorPage(value);
+                }}
+                className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="text-slate-400">/ <strong className="text-slate-600">{authorTotalPages}</strong></span>
               <button
                 type="button"
                 onClick={() => setAuthorPage((prev) => Math.min(authorTotalPages, prev + 1))}
