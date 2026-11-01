@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 CandidateStatus = Literal["PENDING", "ACCEPTED", "REJECTED", "SUPERSEDED"]
 ReviewAction = Literal["ACCEPT", "REJECT"]
@@ -23,6 +23,24 @@ class ReviewDecisionRequest(BaseModel):
     candidate_version: int = Field(..., ge=1)
     action: ReviewAction
     reason: str | None = Field(default=None, max_length=4000)
+
+
+class ReviewRevocationRequest(BaseModel):
+    """ADMIN-only compensation of an earlier ACCEPT. The reason is mandatory."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_version: int = Field(..., ge=1)
+    reason: str = Field(..., min_length=1, max_length=4000)
+
+
+class ReviewRevocationResponse(BaseModel):
+    review_id: uuid.UUID
+    candidate_id: uuid.UUID
+    candidate_status: Literal["PENDING"]
+    candidate_version: int
+    revoked_identity_id: uuid.UUID
+    identity_status: Literal["REVOKED"]
 
 
 class ReviewLecturerSummary(BaseModel):
@@ -119,6 +137,97 @@ class ReviewPublicationEvidenceResponse(BaseModel):
     candidate_scopus_author_id: uuid.UUID | None = None
     source_refs: list[Any] = Field(default_factory=list)
     evidence_fingerprint: str
+
+
+SourceClaimState = Literal["CURRENT", "WITHDRAWN", "NOT_OBSERVED", "AMBIGUOUS", "INVALID"]
+
+
+class ReviewSourceClaimTrace(BaseModel):
+    """Allowlisted provenance only: no raw row, claim key, e-mail or arbitrary JSON."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    capture_id: uuid.UUID
+    analysis_id: uuid.UUID
+    artifact_id: uuid.UUID
+    content_id: uuid.UUID
+    claim_id: uuid.UUID
+    record_id: uuid.UUID
+    contract_version: str = Field(min_length=1, max_length=20, pattern=r"^1\.[0-9]+$")
+    identity_rules_version: str = Field(min_length=1, max_length=100,
+                                       pattern=r"^[A-Za-z0-9._/+:-]+$")
+    normalization_version: str = Field(min_length=1, max_length=100,
+                                      pattern=r"^[A-Za-z0-9._/+:-]+$")
+    captured_at: datetime
+    completeness: Literal["COMPLETE", "PARTIAL"]
+    selection_status: Literal["ACTIVE_PROJECTION", "HISTORICAL_ONLY"]
+
+
+class ReviewSourceClaimHistory(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_id: uuid.UUID
+    observation_id: uuid.UUID
+    generation_run_id: uuid.UUID
+    rule_id: str = Field(min_length=1, max_length=100, pattern=r"^[A-Z0-9_]+$")
+    rule_version: str = Field(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._/+:-]+$")
+    recorded_state: SourceClaimState
+
+
+class ReviewSourceClaimEvidenceResponse(BaseModel):
+    """Future read contract. Presence and declaration weight never authorize a decision."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_kind: Literal["SOURCE_CLAIM"] = "SOURCE_CLAIM"
+    source_tier: Literal["INSTITUTION_DECLARED"] = "INSTITUTION_DECLARED"
+    evidence_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_system: Literal["ICTU_REPO_SCOPUS_GUIDE", "ICTU_REPO_PROFILES"]
+    scope_key: str = Field(pattern=r"^[0-9a-f]{64}$")
+    scopus_id: str = Field(pattern=r"^[0-9]+$")
+    subject_resolution: Literal["RESOLVED_SOURCE_ID", "RESOLVED_EMAIL"] | None
+    recorded_subject_resolutions: list[Literal["RESOLVED_SOURCE_ID", "RESOLVED_EMAIL"]]
+    selection_status: Literal["ACTIVE_PROJECTION", "HISTORICAL_ONLY"]
+    current_state: SourceClaimState | Literal["STALE"]
+    current_weight: Literal[0, 1]
+    is_primary_claimed: bool | None
+    listed: bool | None
+    temporal_ambiguity: bool
+    recorded_states: list[SourceClaimState]
+    recorded_conflict_codes: list[str]
+    history: list[ReviewSourceClaimHistory] = Field(min_length=1)
+    source_refs: list[ReviewSourceClaimTrace] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def consistent_authority(self):
+        historical = self.selection_status == "HISTORICAL_ONLY"
+        if historical != (self.current_state == "STALE"):
+            raise ValueError("Historical selection must be stale")
+        if self.current_weight != int(self.current_state == "CURRENT"):
+            raise ValueError("Only CURRENT declarations have usable declaration weight")
+        if self.temporal_ambiguity != (self.current_state == "AMBIGUOUS"):
+            raise ValueError("Temporal ambiguity cannot be authoritative")
+        if self.current_state == "CURRENT":
+            if self.listed is not True:
+                raise ValueError("CURRENT declaration must be listed")
+        elif self.is_primary_claimed is not None or self.listed is not None:
+            raise ValueError("Non-current flags cannot be presented as current facts")
+        if historical and any(r.selection_status == "ACTIVE_PROJECTION" for r in self.source_refs):
+            raise ValueError("Stale evidence has no active provenance")
+        return self
+
+
+class ReviewSourceClaimProjectionResponse(BaseModel):
+    """Offline contract only; no route or reviewer workflow activation in B2-A."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: uuid.UUID
+    candidate_status: CandidateStatus
+    reviewer_active: Literal[False] = False
+    decision_enabled: Literal[False] = False
+    release_gate: Literal["E3-P3-B2_REQUIRED"] = "E3-P3-B2_REQUIRED"
+    items: list[ReviewSourceClaimEvidenceResponse] = Field(default_factory=list)
 
 
 class ReviewOtherCandidateSummary(BaseModel):

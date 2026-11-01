@@ -131,7 +131,7 @@ def apply_ingestion(
     assert data is not None  # compute_preview already confirmed can_apply
 
     try:
-        apply_result = KnownPublicationIngestionService().apply(db, data.sources)
+        apply_result = KnownPublicationIngestionService().apply(db, data.sources, commit=False)
     except Exception as exc:
         db.rollback()
         db.add(
@@ -159,21 +159,36 @@ def apply_ingestion(
         "invalid_records": apply_result.invalid_records,
         "unmapped": len(apply_result.unmapped_lecturers),
     }
-    # apply() already committed the data write; this audit event is a
-    # separate, immediately-following transaction (never both-or-neither
-    # with the data), which is acceptable here because the event only
-    # records a fact about a write that has already durably happened.
-    db.add(
-        AuditEvent(
-            entity_type="craw_ingestion",
-            entity_id=run_id,
-            action=APPLIED_ACTION,
-            actor_type="USER",
-            actor_user_id=actor_user_id,
-            event_metadata={"fingerprint": fingerprint, "result": summary},
+    # G15: the data (flushed, not committed, by apply) and its success audit event commit in
+    # ONE transaction, so there is never durable data without its audit record or vice versa.
+    try:
+        db.add(
+            AuditEvent(
+                entity_type="craw_ingestion",
+                entity_id=run_id,
+                action=APPLIED_ACTION,
+                actor_type="USER",
+                actor_user_id=actor_user_id,
+                event_metadata={"fingerprint": fingerprint, "result": summary},
+            )
         )
-    )
-    db.commit()
+        db.commit()
+    except Exception as exc:
+        db.rollback()                       # neither the data nor the audit event is kept
+        db.add(
+            AuditEvent(
+                entity_type="craw_ingestion",
+                entity_id=run_id,
+                action=FAILED_ACTION,
+                actor_type="USER",
+                actor_user_id=actor_user_id,
+                event_metadata={"fingerprint": fingerprint, "error": type(exc).__name__},
+            )
+        )
+        db.commit()
+        raise CrawIngestionWorkflowError(
+            "CRAW_APPLY_FAILED", "Nạp Craw thất bại; không có dữ liệu nào được ghi.", 500
+        ) from exc
     return {"run_id": str(run_id), "fingerprint": fingerprint, "result": summary}
 
 

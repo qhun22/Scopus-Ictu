@@ -36,6 +36,7 @@ from app.models.publication import (
     ScopusAuthor,
     ScopusAuthorNameVariant,
 )
+from app.services.matching.candidate_generator import RULE_ORDER
 from app.services.matching.candidate_types import EnrichedLecturerScopusCandidate
 
 
@@ -47,12 +48,9 @@ PUBLICATION_RULE_SET_VERSION = "M2.7A-5"
 GENERATION_RULE_SET_ID = "M2.7A_CANDIDATE_EVIDENCE"
 GENERATION_RULE_SET_VERSION = "M2.7A-2+M2.7A-5"
 
-CANDIDATE_RULE_IDS = (
-    "RULE_EXACT_N0",
-    "RULE_TITLE_STRIPPED_N0",
-    "RULE_TITLE_STRIPPED_N2",
-    "RULE_TITLE_STRIPPED_N2_FORMAT",
-)
+# G16: the generator executes every rule in RULE_ORDER (seven, including RULE_N2_HYPHEN), so
+# run metadata is derived from it instead of a hand-kept, shorter list.
+CANDIDATE_RULE_IDS = tuple(RULE_ORDER)
 PUBLICATION_RULE_IDS = (
     "RULE_KNOWN_PUBLICATION_DOI_EXACT",
     "RULE_KNOWN_PUBLICATION_TITLE_EXACT",

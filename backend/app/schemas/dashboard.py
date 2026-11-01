@@ -42,6 +42,10 @@ class DashboardSummaryResponse(BaseModel):
 
     identity_counts: dict[IdentityStatus, int]
 
+    # G12: distinct publications of approved lecturers, minus per-lecturer exclusions.
+    # total_publications stays the whole-corpus count.
+    approved_ictu_publications: int = 0
+
     pending_review_count: int
 
     latest_scopus_import: LatestScopusImportSummary | None

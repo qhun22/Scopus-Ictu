@@ -23,6 +23,7 @@ from app.schemas.dashboard import (
 )
 from app.services.audit_queries import list_audits
 from app.services.candidate_review_queries import current_reviewable_candidates_subquery
+from app.services.publication_exclusions import not_excluded
 
 _ALL_IDENTITY_STATUSES = ("CANDIDATE", "APPROVED", "REJECTED", "REVOKED")
 
@@ -55,6 +56,18 @@ def get_dashboard_summary(session: Session) -> DashboardSummaryResponse:
         if row.status in identity_counts:
             identity_counts[row.status] = row.cnt
 
+    approved_ictu_publications = session.execute(
+        select(func.count(func.distinct(PublicationAuthor.publication_id)))
+        .join(
+            LecturerScopusIdentity,
+            LecturerScopusIdentity.scopus_author_id == PublicationAuthor.scopus_author_id,
+        )
+        .where(
+            LecturerScopusIdentity.status == "APPROVED",
+            not_excluded(LecturerScopusIdentity.lecturer_id, PublicationAuthor.publication_id),
+        )
+    ).scalar_one()
+
     reviewable = current_reviewable_candidates_subquery("PENDING")
     pending_review_count = session.execute(
         select(func.count()).select_from(reviewable)
@@ -77,6 +90,7 @@ def get_dashboard_summary(session: Session) -> DashboardSummaryResponse:
         active_lecturers=active_lecturers,
         total_scopus_authors=total_scopus_authors,
         identity_counts=identity_counts,
+        approved_ictu_publications=approved_ictu_publications,
         pending_review_count=pending_review_count,
         latest_scopus_import=latest_scopus_import,
         recent_audit_actions=recent_audit_actions,

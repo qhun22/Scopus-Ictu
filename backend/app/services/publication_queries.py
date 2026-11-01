@@ -260,6 +260,9 @@ def _override_read(row: PublicationAuthorAffiliationOverride) -> AffiliationOver
     )
 
 
+from app.services.publication_exclusions import not_excluded  # noqa: E402
+
+
 def _approved_lecturer_link_rows(
     session: Session, publication_id: uuid.UUID
 ) -> Sequence[tuple[uuid.UUID, int, str, str, str | None, str | None, str | None, str | None]]:
@@ -283,6 +286,7 @@ def _approved_lecturer_link_rows(
         .where(
             PublicationAuthor.publication_id == publication_id,
             LecturerScopusIdentity.status == "APPROVED",
+            not_excluded(LecturerScopusIdentity.lecturer_id, PublicationAuthor.publication_id),
         )
         .order_by(
             PublicationAuthor.author_order.asc(),

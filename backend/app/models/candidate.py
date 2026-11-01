@@ -66,12 +66,12 @@ class CandidateGenerationRun(Base):
         ),
         CheckConstraint("jsonb_typeof(source_state) = 'object'", name="source_state_object"),
         CheckConstraint(
-            "status IN ('RUNNING', 'COMPLETED', 'FAILED')", name="status"
+            "status IN ('RUNNING', 'COMPLETED', 'FAILED', 'STAGED')", name="status"
         ),
         CheckConstraint("version >= 1", name="version"),
         CheckConstraint(
             "(status = 'RUNNING' AND completed_at IS NULL) OR "
-            "(status IN ('COMPLETED', 'FAILED') AND completed_at IS NOT NULL)",
+            "(status IN ('COMPLETED', 'FAILED', 'STAGED') AND completed_at IS NOT NULL)",
             name="completion_consistency",
         ),
         Index("ix_candidate_generation_runs_status_created", "status", "created_at"),
@@ -216,7 +216,7 @@ class LecturerScopusCandidateEvidence(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "evidence_kind IN ('NAME', 'PUBLICATION')", name="evidence_kind"
+            "evidence_kind IN ('NAME', 'PUBLICATION', 'SOURCE_CLAIM')", name="evidence_kind"
         ),
         CheckConstraint("btrim(rule_id) <> ''", name="rule_id_not_empty"),
         CheckConstraint("btrim(rule_version) <> ''", name="rule_version_not_empty"),

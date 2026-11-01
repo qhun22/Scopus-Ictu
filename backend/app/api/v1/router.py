@@ -18,6 +18,7 @@ from app.api.v1.endpoints import (
     lecturers,
     matching,
     notifications,
+    publication_exclusions,
     publications,
     reviews,
     search,
@@ -38,6 +39,11 @@ router.include_router(
 )
 router.include_router(lecturers.router, prefix="/lecturers", tags=["lecturers"])
 router.include_router(imports.router, prefix="/imports", tags=["imports"])
+router.include_router(
+    publication_exclusions.router,
+    prefix="/publication-exclusions",
+    tags=["publication-exclusions"],
+)
 router.include_router(publications.router, prefix="/publications", tags=["publications"])
 router.include_router(authors.router, prefix="/authors", tags=["authors"])
 router.include_router(matching.router, prefix="/matching", tags=["matching"])

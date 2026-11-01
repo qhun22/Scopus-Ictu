@@ -63,6 +63,16 @@ class RejectCandidateCommand:
     reason: str  # required for REJECT per schema CHECK constraint
 
 
+@dataclass(frozen=True, slots=True)
+class RevokeIdentityCommand:
+    """ADMIN compensation of an earlier ACCEPT (G10). Reason is mandatory."""
+
+    candidate_id: uuid.UUID
+    candidate_version: int
+    admin_user_id: uuid.UUID
+    reason: str
+
+
 # ---------------------------------------------------------------------------
 # Typed result objects
 # ---------------------------------------------------------------------------
@@ -96,6 +106,14 @@ class RejectResult(ReviewResult):
     """Result of a candidate REJECT operation."""
 
     resulting_identity_id: None = field(default=None, compare=False)
+
+
+@dataclass(frozen=True, slots=True)
+class RevokeResult(ReviewResult):
+    """Result of an ADMIN revocation: identity REVOKED, candidate back to PENDING."""
+
+    resulting_identity_id: uuid.UUID
+    identity_status: str = "REVOKED"
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +216,24 @@ class ReviewReasonRequiredForWeakEvidenceError(InvalidReviewReasonError):
         )
 
 
+class CandidateNotAcceptedError(CandidateReviewError):
+    """Only an ACCEPTED candidate whose identity is APPROVED can be revoked."""
+
+    code = "CANDIDATE_NOT_ACCEPTED"
+
+
+class RevocationReasonRequiredError(InvalidReviewReasonError):
+    """A revocation always needs a real, non-blank reason."""
+
+    code = "REVOCATION_REASON_REQUIRED"
+
+
+class IdentityRevokedError(CandidateReviewError):
+    """The pair has a REVOKED identity; re-accepting it is not supported (fail closed)."""
+
+    code = "IDENTITY_REVOKED_REACCEPT_UNSUPPORTED"
+
+
 class EvidencePromotionUnsupportedError(CandidateReviewError):
     """Candidate evidence kind cannot be mapped to IdentityEvidence."""
 
@@ -238,6 +274,8 @@ def _map_publication_evidence_type(reconciliation: str) -> str:
 AUDIT_ACTION_CANDIDATE_ACCEPTED = "CANDIDATE_ACCEPTED"
 AUDIT_ACTION_CANDIDATE_REJECTED = "CANDIDATE_REJECTED"
 AUDIT_ACTION_IDENTITY_CREATED = "IDENTITY_CREATED_FROM_CANDIDATE"
+AUDIT_ACTION_IDENTITY_REVOKED = "IDENTITY_REVOKED"
+AUDIT_ACTION_CANDIDATE_REOPENED = "CANDIDATE_REOPENED_BY_REVOCATION"
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +317,10 @@ class CandidateReviewService:
         Returns RejectResult on success, raises a domain error on any failure.
         """
         return self._reject(cmd)
+
+    def revoke_identity(self, cmd: RevokeIdentityCommand) -> RevokeResult:
+        """ADMIN revokes an approved identity by appending a compensating review (G10)."""
+        return self._revoke(cmd)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -643,6 +685,11 @@ class CandidateReviewService:
                 LecturerScopusIdentity.scopus_author_id == candidate.scopus_author_id,
             )
         )
+        if preexisting_identity is not None and preexisting_identity.status == "REVOKED":
+            raise IdentityRevokedError(
+                f"Identity {preexisting_identity.id} for this pair was revoked; "
+                f"re-accepting a revoked pair is not supported"
+            )
         if preexisting_identity is not None:
             # Check if there's a matching CandidateReview
             review_for_identity = self._session.scalar(
@@ -800,6 +847,122 @@ class CandidateReviewService:
             resulting_identity_id=identity.id,
             name_evidence_promoted=name_count,
             publication_evidence_promoted=pub_count,
+        )
+
+    # ------------------------------------------------------------------
+    # REVOKE implementation (G10): append-only compensation, ADMIN only
+    # ------------------------------------------------------------------
+
+    def _revoke(self, cmd: RevokeIdentityCommand) -> RevokeResult:
+        now = datetime.now(UTC)
+        admin = self._session.get(User, cmd.admin_user_id)
+        if admin is None:
+            raise ReviewerNotFoundError(f"No user with id={cmd.admin_user_id}")
+        if not admin.is_active or admin.role != "ADMIN":
+            raise ReviewerNotAuthorizedError(
+                f"User {cmd.admin_user_id} may not revoke: only an active ADMIN can"
+            )
+        reason = normalize_reason(cmd.reason)
+        if reason is None:
+            raise RevocationReasonRequiredError("A non-blank reason is required to revoke")
+
+        candidate = self._load_and_lock_candidate(cmd.candidate_id)
+        if candidate.status != "ACCEPTED":
+            raise CandidateNotAcceptedError(
+                f"Candidate {cmd.candidate_id} has status {candidate.status!r}; "
+                f"only an ACCEPTED candidate can be revoked"
+            )
+        if candidate.version != cmd.candidate_version:
+            raise StaleCandidateVersionError(
+                f"Submitted version {cmd.candidate_version} does not match "
+                f"current version {candidate.version}"
+            )
+        accepted = self._session.scalar(
+            select(LecturerScopusCandidateReview)
+            .where(
+                LecturerScopusCandidateReview.candidate_id == candidate.id,
+                LecturerScopusCandidateReview.action == "ACCEPT",
+            )
+            .order_by(LecturerScopusCandidateReview.created_at.desc())
+            .limit(1)
+        )
+        identity = None
+        if accepted is not None and accepted.resulting_identity_id is not None:
+            identity = self._session.get(
+                LecturerScopusIdentity, accepted.resulting_identity_id, with_for_update=True
+            )
+        if identity is None or identity.status != "APPROVED":
+            raise CandidateNotAcceptedError(
+                f"Candidate {cmd.candidate_id} has no APPROVED identity to revoke"
+            )
+
+        identity_before = {"id": str(identity.id), "status": identity.status}
+        candidate_before = {
+            "id": str(candidate.id), "status": candidate.status, "version": candidate.version}
+        review = LecturerScopusCandidateReview(
+            id=uuid.uuid4(),
+            candidate_id=candidate.id,
+            observation_id=accepted.observation_id,
+            reviewer_user_id=admin.id,
+            action="REOPEN",
+            from_status="ACCEPTED",
+            to_status="PENDING",
+            candidate_version=candidate.version,
+            reason=reason,
+            evidence_snapshot={
+                "compensation": "REVOKE",
+                "compensates_review_id": str(accepted.id),
+                "identity_id": str(identity.id),
+            },
+            resulting_identity_id=identity.id,
+            created_at=now,
+        )
+        self._session.add(review)
+        identity.status = "REVOKED"          # row stays; the ACCEPT history is never edited
+        identity.updated_at = now
+        candidate.status = "PENDING"
+        candidate.version = candidate.version + 1
+        candidate.updated_at = now
+        self._session.flush()
+
+        meta = {
+            "candidate_id": str(candidate.id),
+            "identity_id": str(identity.id),
+            "review_id": str(review.id),
+            "compensates_review_id": str(accepted.id),
+        }
+        self._record_audit_events(
+            reviewer_user_id=admin.id,
+            action=AUDIT_ACTION_IDENTITY_REVOKED,
+            entity_type="lecturer_scopus_identity",
+            entity_id=identity.id,
+            event_metadata=meta,
+            before_state=identity_before,
+            after_state={"id": str(identity.id), "status": identity.status},
+            reason=reason,
+        )
+        self._record_audit_events(
+            reviewer_user_id=admin.id,
+            action=AUDIT_ACTION_CANDIDATE_REOPENED,
+            entity_type="lecturer_scopus_candidate",
+            entity_id=candidate.id,
+            event_metadata=meta,
+            before_state=candidate_before,
+            after_state={
+                "id": str(candidate.id), "status": candidate.status,
+                "version": candidate.version},
+            reason=reason,
+        )
+        self._session.commit()
+        return RevokeResult(
+            review_id=review.id,
+            candidate_id=candidate.id,
+            observation_id=review.observation_id,
+            action="REVOKE",
+            candidate_status="PENDING",
+            candidate_version=candidate.version,
+            idempotent=False,
+            resulting_identity_id=identity.id,
         )
 
     # ------------------------------------------------------------------

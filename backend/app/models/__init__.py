@@ -35,7 +35,10 @@ from app.models import (  # noqa: F401  (registration side effect)
     identity,
     master_lecturer,
     publication,
+    publication_exclusion,
     scopus_raw,
+    source_claim_hybrid,
+    source_staging,
 )
 
 __all__ = ["Base"]

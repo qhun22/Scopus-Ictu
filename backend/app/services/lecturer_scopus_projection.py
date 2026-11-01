@@ -28,6 +28,7 @@ from app.schemas.lecturer_scopus_projection import (
     LecturerPublicationRead,
     PaginatedLecturerPublicationsRead,
 )
+from app.services.publication_exclusions import not_excluded
 
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
@@ -182,6 +183,7 @@ class LecturerScopusProjectionService:
             .where(
                 LecturerScopusIdentity.lecturer_id == lecturer_id,
                 LecturerScopusIdentity.status == "APPROVED",
+                not_excluded(LecturerScopusIdentity.lecturer_id, Publication.id),
             )
             .distinct()
             .order_by(
@@ -212,6 +214,7 @@ class LecturerScopusProjectionService:
                 Publication.id.in_(publication_ids),
                 LecturerScopusIdentity.lecturer_id == lecturer_id,
                 LecturerScopusIdentity.status == "APPROVED",
+                not_excluded(LecturerScopusIdentity.lecturer_id, Publication.id),
             )
             .order_by(Publication.id.asc(), PublicationAuthor.author_order.asc())
         ).all()
@@ -324,6 +327,7 @@ class LecturerScopusProjectionService:
             .where(
                 LecturerScopusIdentity.lecturer_id == lecturer_id,
                 LecturerScopusIdentity.status == "APPROVED",
+                not_excluded(LecturerScopusIdentity.lecturer_id, Publication.id),
             )
             .distinct()
             .subquery("lecturer_scopus_publications")

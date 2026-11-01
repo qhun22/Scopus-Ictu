@@ -88,6 +88,9 @@ def _batch_authors(
     return result
 
 
+from app.services.publication_exclusions import not_excluded  # noqa: E402
+
+
 def _batch_lecturer_links(
     session: Session, publication_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, list[PublicationExportLecturerLink]]:
@@ -113,6 +116,7 @@ def _batch_lecturer_links(
         .where(
             PublicationAuthor.publication_id.in_(publication_ids),
             LecturerScopusIdentity.status == "APPROVED",
+            not_excluded(LecturerScopusIdentity.lecturer_id, PublicationAuthor.publication_id),
         )
         .order_by(
             PublicationAuthor.publication_id.asc(),

@@ -40,10 +40,10 @@ from app.schemas.review_api import (
     ReviewDecisionResponse,
     ReviewLecturerDetail,
     ReviewLecturerSummary,
-    ReviewNameEvidenceResponse,
     ReviewObservationResponse,
+    ReviewRevocationRequest,
+    ReviewRevocationResponse,
     ReviewOtherCandidateSummary,
-    ReviewPublicationEvidenceResponse,
     ReviewQueueItem,
     ReviewQueueResponse,
 )
@@ -55,6 +55,10 @@ from app.services.candidate_review_queries import (
 from app.services.candidate_review_service import (
     AcceptCandidateCommand,
     CandidateAlreadyDecidedError,
+    CandidateNotAcceptedError,
+    IdentityRevokedError,
+    RevocationReasonRequiredError,
+    RevokeIdentityCommand,
     CandidateNotFoundError,
     CandidateReviewError,
     CandidateReviewService,
@@ -71,6 +75,7 @@ from app.services.candidate_review_service import (
     StaleCandidateObservationError,
     StaleCandidateVersionError,
 )
+from app.services.candidate_evidence_read import serialize_review_evidence
 from app.services.review_reason_policy import accept_reason_policy
 
 router = APIRouter()
@@ -221,6 +226,9 @@ def _domain_error_response(exc: CandidateReviewError) -> APIError:
         InvalidReviewReasonError: 422,
         ReviewReasonRequiredForWeakEvidenceError: 422,
         EvidencePromotionUnsupportedError: 409,
+        CandidateNotAcceptedError: 409,
+        IdentityRevokedError: 409,
+        RevocationReasonRequiredError: 422,
     }
     data: dict[str, object] = {}
     if isinstance(exc, ReviewReasonRequiredForWeakEvidenceError):
@@ -459,51 +467,7 @@ def review_candidate_detail(
             ).all()
         }
 
-    name_evidence = []
-    publication_evidence = []
-    for ev in evidence_rows:
-        payload = ev.payload if isinstance(ev.payload, dict) else {}
-        source_refs = list(ev.source_refs or [])
-        refs = _source_ref_ids(source_refs)
-        if ev.evidence_kind == "NAME":
-            name_evidence.append(
-                ReviewNameEvidenceResponse(
-                    evidence_id=ev.id,
-                    evidence_kind="NAME",
-                    rule_id=ev.rule_id,
-                    rule_version=ev.rule_version,
-                    lecturer_source_value=payload.get("lecturer_source_value"),
-                    lecturer_comparison_value=payload.get("lecturer_comparison_value"),
-                    scopus_surface_type=payload.get("scopus_surface_type"),
-                    scopus_surface_value=payload.get("scopus_surface_value"),
-                    scopus_comparison_value=payload.get("scopus_comparison_value"),
-                    source_refs=source_refs,
-                    evidence_fingerprint=ev.evidence_fingerprint,
-                )
-            )
-            continue
-        canonical_id = refs.get("publication")
-        publication = publications.get(canonical_id)
-        publication_evidence.append(
-            ReviewPublicationEvidenceResponse(
-                evidence_id=ev.id,
-                evidence_kind="PUBLICATION",
-                rule_id=ev.rule_id,
-                rule_version=ev.rule_version,
-                reconciliation=payload.get("reconciliation"),
-                known_publication_id=refs.get("lecturer_known_publication"),
-                lecturer_source_snapshot_id=refs.get("lecturer_source_snapshot"),
-                canonical_publication_id=canonical_id,
-                title=(publication.title if publication else payload.get("canonical_publication_title")),
-                doi=(publication.doi if publication else payload.get("canonical_publication_doi")),
-                eid=(publication.eid if publication else payload.get("canonical_publication_eid")),
-                candidate_scopus_author_id=_serialize_uuid(
-                    payload.get("candidate_scopus_author_id")
-                ),
-                source_refs=source_refs,
-                evidence_fingerprint=ev.evidence_fingerprint,
-            )
-        )
+    name_evidence, publication_evidence = serialize_review_evidence(evidence_rows, publications)
 
     candidate_count = len(other_candidates) + 1
     reason_policy = accept_reason_policy(
@@ -630,6 +594,51 @@ def decide_review_candidate(
         candidate_version=result.candidate_version,
         resulting_identity_id=result.resulting_identity_id,
         idempotent=result.idempotent,
+    )
+
+
+AdminUser = Annotated[User, Depends(require_role("ADMIN"))]
+
+
+@router.post(
+    "/candidates/{candidate_id}/revocation",
+    response_model=ReviewRevocationResponse,
+    summary="ADMIN revokes an approved identity (append-only compensation)",
+)
+def revoke_review_candidate(
+    candidate_id: uuid.UUID,
+    request: ReviewRevocationRequest,
+    admin: AdminUser,
+    db: DatabaseSession,
+) -> ReviewRevocationResponse:
+    """Re-check ADMIN and delegate; history is appended, never edited."""
+
+    try:
+        result = CandidateReviewService(db).revoke_identity(
+            RevokeIdentityCommand(
+                candidate_id=candidate_id,
+                candidate_version=request.candidate_version,
+                admin_user_id=admin.id,
+                reason=request.reason,
+            )
+        )
+    except CandidateReviewError as exc:
+        db.rollback()
+        raise _domain_error_response(exc) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise APIError(
+            status_code=409,
+            detail="Revocation conflicted with current persisted state.",
+            code="REVIEW_PERSISTENCE_CONFLICT",
+        ) from exc
+    return ReviewRevocationResponse(
+        review_id=result.review_id,
+        candidate_id=result.candidate_id,
+        candidate_status="PENDING",
+        candidate_version=result.candidate_version,
+        revoked_identity_id=result.resulting_identity_id,
+        identity_status="REVOKED",
     )
 
 
