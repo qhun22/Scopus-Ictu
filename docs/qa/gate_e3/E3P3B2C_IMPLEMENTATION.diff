@@ -1,0 +1,1013 @@
+diff --git a/backend/app/services/source_claim_hybrid.py b/backend/app/services/source_claim_hybrid.py
+--- /dev/null
++++ b/backend/app/services/source_claim_hybrid.py
+@@ -0,0 +1,435 @@
++"""SOURCE_CLAIM HYBRID V1: read-only drafts, never production decisions.
++
++No production authority adapter exists. Default deny; test authorities are synthetic.
++No route, persistence, evidence promotion, activation flag or canonical mutation.
++"""
++from __future__ import annotations
++
++import json
++import re
++import uuid
++from dataclasses import asdict, dataclass
++from datetime import UTC, datetime
++from enum import StrEnum
++from typing import Protocol
++
++from sqlalchemy.orm import Session
++
++from app.core.exceptions import APIError
++from app.models.source_staging import SourceArtifact, SourceCapture, SourceClaim, SourceRecord
++from app.services.matching.candidate_persistence import canonical_json, sha256_json
++from app.services.source_claim_decision_boundary import (
++    PreparedSourceClaimDecision,
++    SourceClaimAcceptContext,
++    SourceClaimDecisionBoundary,
++    _authorize,
++)
++
++POLICY_ID = "SOURCE_CLAIM_HYBRID_V1"
++POLICY_VERSION = 1
++RISK_ACKNOWLEDGMENT = "INSTITUTIONAL_DECLARATION_IS_NOT_INDEPENDENT_VERIFICATION"
++# These are existing vocabulary references, never automatic qualification rules.
++_STRONG_TYPES = {"ORCID_EXACT", "DOI_EXACT", "PUBLICATION_OVERLAP", "COAUTHOR_CONFIRMED"}
++_HEX = re.compile(r"^[0-9a-f]{64}$")
++
++
++class ReviewBranch(StrEnum):
++    STANDARD_INDEPENDENT = "STANDARD_INDEPENDENT"
++    INSTITUTIONAL_EXCEPTION = "INSTITUTIONAL_EXCEPTION"
++
++
++class AssuranceBasis(StrEnum):
++    INDEPENDENT_VERIFIED = "INDEPENDENT_VERIFIED"
++    INSTITUTIONAL_EXCEPTION = "INSTITUTIONAL_EXCEPTION"
++
++
++class AssessmentState(StrEnum):
++    QUALIFYING = "QUALIFYING"
++    INSUFFICIENT = "INSUFFICIENT"
++    INVALID = "INVALID"
++    WITHDRAWN = "WITHDRAWN"
++    CONTRADICTORY = "CONTRADICTORY"
++
++
++class Grant(StrEnum):
++    PROPOSE_EXCEPTION = "SOURCE_CLAIM_EXCEPTION_PROPOSE"
++    APPROVE_EXCEPTION = "SOURCE_CLAIM_EXCEPTION_APPROVE"
++
++
++class SourceAuthenticityState(StrEnum):
++    CURRENT = "CURRENT"
++    UNVERIFIED = "UNVERIFIED"
++    REVOKED = "REVOKED"
++
++
++class DenialReason(StrEnum):
++    INDEPENDENT_MISSING = "INDEPENDENT_EVIDENCE_INSUFFICIENT"
++    INDEPENDENT_INVALID = "INDEPENDENT_EVIDENCE_INVALID"
++    INDEPENDENT_WITHDRAWN = "INDEPENDENT_EVIDENCE_WITHDRAWN"
++    HARD_CONFLICT = "UNRESOLVED_HARD_CONFLICT"
++    PROVENANCE_UNVERIFIED = "INSTITUTIONAL_PROVENANCE_UNVERIFIED"
++
++
++@dataclass(frozen=True, slots=True)
++class IndependentAssessment:
++    """Trusted verifier OUTPUT, not a request DTO or an IdentityEvidence writer."""
++    receipt_id: uuid.UUID
++    receipt_digest: str
++    evidence_type: str
++    state: AssessmentState
++    independently_verified: bool
++
++
++@dataclass(frozen=True, slots=True)
++class HumanAuthority:
++    user_id: uuid.UUID
++    human_principal_id: uuid.UUID | None
++    auth_version: int
++    current: bool
++    grants: tuple[Grant, ...]
++    attestation_id: uuid.UUID
++    revision_digest: str
++
++
++@dataclass(frozen=True, slots=True)
++class SourceAuthenticity:
++    artifact_id: uuid.UUID
++    artifact_digest: str
++    issuing_organization: str
++    state: SourceAuthenticityState
++    verification_id: uuid.UUID
++    verification_digest: str
++    verification_method: str
++
++
++@dataclass(frozen=True, slots=True)
++class AuthorityFacts:
++    context_digest: str
++    revision_digest: str
++    independent: tuple[IndependentAssessment, ...] = ()
++    humans: tuple[HumanAuthority, ...] = ()
++    authenticity: tuple[SourceAuthenticity, ...] = ()
++    hard_conflicts: tuple[DenialReason, ...] = ()
++
++
++class HybridAuthority(Protocol):
++    def load(self, view: Session, context_digest: str) -> AuthorityFacts:
++        """Resolve CURRENT authoritative facts, never caller-supplied facts.
++
++        Must be read-only and must authenticate institutional issuance, verifier
++        receipts, human linkage and explicit grants. No production implementation
++        is supplied by this gate; the repository lacks these capabilities.
++        """
++        ...
++
++
++class UnavailableAuthority:
++    def load(self, view, context_digest):
++        raise _deny("HYBRID_AUTHORITY_UNAVAILABLE")
++
++
++@dataclass(frozen=True, slots=True)
++class InstitutionalProvenance:
++    source_system: str
++    source_record_id: uuid.UUID
++    lecturer_id: uuid.UUID
++    scopus_author_id: uuid.UUID
++    claimed_scopus_id: str
++    capture_id: uuid.UUID
++    artifact_id: uuid.UUID
++    analysis_id: uuid.UUID
++    claim_id: uuid.UUID
++    captured_at: str
++    source_revision: str
++    source_record_digest: str
++    immutable_snapshot_digest: str
++    validity: str
++    verification: SourceAuthenticity | None
++    source_tier: str = "INSTITUTION_DECLARED"
++    evidence_kind: str = "SOURCE_CLAIM"
++
++
++@dataclass(frozen=True, slots=True)
++class HybridEligibility:
++    standard_eligible: bool
++    exception_proposal_eligible: bool
++    standard_denials: tuple[DenialReason, ...]
++    exception_denials: tuple[DenialReason, ...]
++
++
++@dataclass(frozen=True, slots=True)
++class HybridCommand:
++    source: SourceClaimAcceptContext
++    branch: ReviewBranch = ReviewBranch.STANDARD_INDEPENDENT
++    policy_id: str = POLICY_ID
++    policy_version: int = POLICY_VERSION
++    risk_acknowledgment: str | None = None
++
++
++def _deny(code, status=409):
++    return APIError(status_code=status, code=code,
++                    detail="Hybrid SOURCE_CLAIM context is unavailable or not authorized.")
++
++
++def _require(condition, code="HYBRID_AUTHORITY_FACTS_INVALID"):
++    if not condition:
++        raise _deny(code)
++
++
++def _hex(value):
++    return isinstance(value, str) and bool(_HEX.fullmatch(value))
++
++
++def _moment(value):
++    _require(isinstance(value, datetime) and value.utcoffset() is not None,
++             "HYBRID_TIMESTAMP_INVALID")
++    return value.astimezone(UTC)
++
++
++def _facts(value, context_digest):
++    _require(isinstance(value, AuthorityFacts))
++    _require(value.context_digest == context_digest and _hex(value.revision_digest),
++             "HYBRID_AUTHORITY_CONTEXT_MISMATCH")
++    for items, kind, key in ((value.independent, IndependentAssessment, "receipt_id"),
++                             (value.humans, HumanAuthority, "user_id"),
++                             (value.authenticity, SourceAuthenticity, "artifact_id")):
++        _require(isinstance(items, tuple) and all(isinstance(i, kind) for i in items))
++        _require(all(isinstance(getattr(i, key), uuid.UUID) for i in items))
++        _require(len({getattr(i, key) for i in items}) == len(items))
++    _require(isinstance(value.hard_conflicts, tuple) and all(
++        isinstance(c, DenialReason) and c == DenialReason.HARD_CONFLICT
++        for c in value.hard_conflicts))
++    for item in value.independent:
++        _require(_hex(item.receipt_digest) and isinstance(item.evidence_type, str)
++                 and isinstance(item.state, AssessmentState)
++                 and type(item.independently_verified) is bool)
++    for item in value.humans:
++        _require((item.human_principal_id is None
++                  or isinstance(item.human_principal_id, uuid.UUID))
++                 and type(item.auth_version) is int and item.auth_version >= 1
++                 and type(item.current) is bool and isinstance(item.grants, tuple)
++                 and all(isinstance(g, Grant) for g in item.grants)
++                 and len(set(item.grants)) == len(item.grants)
++                 and isinstance(item.attestation_id, uuid.UUID) and _hex(item.revision_digest))
++    for item in value.authenticity:
++        _require(_hex(item.artifact_digest) and _hex(item.verification_digest)
++                 and isinstance(item.verification_id, uuid.UUID)
++                 and isinstance(item.state, SourceAuthenticityState)
++                 and item.issuing_organization == "ICTU"
++                 and item.verification_method == "FORMALLY_VERIFIED_ISSUANCE_V1")
++    return value
++
++
++def evaluate_hybrid_policy(independent, *, provenance_verified, hard_conflicts=()):
++    """Pure policy over validated authority OUTPUT; not an evidence verifier.
++
++    A type/DOI/ORCID/string alone never qualifies. Invalid, withdrawn and
++    contradictory assessments are not a lack-of-evidence exception.
++    """
++    _require(isinstance(independent, tuple)
++             and all(isinstance(i, IndependentAssessment) for i in independent)
++             and type(provenance_verified) is bool
++             and isinstance(hard_conflicts, tuple)
++             and all(c == DenialReason.HARD_CONFLICT for c in hard_conflicts))
++    common = set(hard_conflicts)
++    qualifies = False
++    for item in independent:
++        _require(isinstance(item.state, AssessmentState)
++                 and type(item.independently_verified) is bool)
++        if item.state == AssessmentState.CONTRADICTORY:
++            common.add(DenialReason.HARD_CONFLICT)
++        elif item.state == AssessmentState.INVALID:
++            common.add(DenialReason.INDEPENDENT_INVALID)
++        elif item.state == AssessmentState.WITHDRAWN:
++            common.add(DenialReason.INDEPENDENT_WITHDRAWN)
++        elif item.state == AssessmentState.QUALIFYING:
++            if item.independently_verified and item.evidence_type in _STRONG_TYPES:
++                qualifies = True
++            else:
++                common.add(DenialReason.INDEPENDENT_INVALID)
++    standard, exception = set(common), set(common)
++    if not qualifies and not common:
++        standard.add(DenialReason.INDEPENDENT_MISSING)
++    if not provenance_verified:
++        exception.add(DenialReason.PROVENANCE_UNVERIFIED)
++    return HybridEligibility(not standard, not exception,
++                             tuple(sorted(standard)), tuple(sorted(exception)))
++
++
++def _human(facts, actor, *, grant=None):
++    human = next((h for h in facts.humans if h.user_id == actor.user_id), None)
++    _require(human is not None and human.current
++             and human.auth_version == actor.auth_version
++             and human.human_principal_id is not None, "HYBRID_HUMAN_AUTHORIZATION_REQUIRED")
++    if grant is not None:
++        _require(grant in human.grants, "HYBRID_EXCEPTION_PERMISSION_REQUIRED")
++    return human
++
++
++def _provenance(view, base, authenticity):
++    snapshot = json.loads(base.snapshot_json)
++    pair = snapshot["candidate"]
++    authorizations = {a.artifact_id: a for a in authenticity}
++    result = {}
++    for item in snapshot["evidence"]:
++        for ref in item["source_refs"]:
++            if ref["selection_status"] != "ACTIVE_PROJECTION":
++                continue
++            artifact_id = uuid.UUID(ref["artifact_id"])
++            artifact = view.get(SourceArtifact, artifact_id)
++            capture = view.get(SourceCapture, uuid.UUID(ref["capture_id"]))
++            record = view.get(SourceRecord, uuid.UUID(ref["record_id"]))
++            claim = view.get(SourceClaim, uuid.UUID(ref["claim_id"]))
++            _require(all(r is not None for r in (artifact, capture, record, claim)),
++                     "HYBRID_PROVENANCE_INVALID")
++            _require(artifact.capture_id == capture.id
++                     and artifact.content_id == capture.content_id
++                     and record.analysis_id == claim.analysis_id == uuid.UUID(ref["analysis_id"])
++                     and claim.record_id == record.id and claim.claim_type == "SCOPUS_ID_OWNED"
++                     and claim.value_normalized == item["scopus_id"]
++                     and record.validation_status != "INVALID"
++                     and capture.source_system == item["source_system"]
++                     and _hex(artifact.artifact_bytes_sha256) and _hex(record.record_hash),
++                     "HYBRID_PROVENANCE_INVALID")
++            verification = authorizations.get(artifact_id)
++            if verification is not None:
++                _require(verification.artifact_digest == artifact.artifact_bytes_sha256,
++                         "HYBRID_PROVENANCE_INVALID")
++            provenance = InstitutionalProvenance(
++                item["source_system"], record.id, uuid.UUID(pair["lecturer_id"]),
++                uuid.UUID(pair["scopus_author_id"]), item["scopus_id"], capture.id, artifact.id,
++                uuid.UUID(ref["analysis_id"]), claim.id, ref["captured_at"],
++                artifact.artifact_bytes_sha256, record.record_hash,
++                artifact.artifact_bytes_sha256, item["current_state"], verification)
++            result[canonical_json(asdict(provenance))] = provenance
++    _require(bool(result), "HYBRID_PROVENANCE_MISSING")
++    return tuple(result[k] for k in sorted(result))
++
++
++def _receipt(snapshot):
++    return PreparedSourceClaimDecision(canonical_json(snapshot), sha256_json(snapshot))
++
++
++def _compare(supplied, trusted):
++    try:
++        _require(isinstance(supplied, PreparedSourceClaimDecision), "HYBRID_REPLAY_INVALID")
++        value = json.loads(supplied.snapshot_json)
++        _require(isinstance(value, dict)
++                 and sha256_json(value) == supplied.snapshot_hash == trusted.snapshot_hash
++                 and canonical_json(value) == trusted.snapshot_json, "HYBRID_REPLAY_INVALID")
++    except (TypeError, ValueError) as exc:
++        raise _deny("HYBRID_REPLAY_INVALID") from exc
++    return trusted
++
++
++class HybridSourceClaimCompatibility:
++    """Offline port only. No production adapter, grant storage or finalization."""
++
++    def __init__(self, session: Session, *, authority: HybridAuthority | None = None):
++        self.session = session
++        self.authority = authority if authority is not None else UnavailableAuthority()
++
++    def _prepare(self, view, actor, command, proposed_at):
++        _require(isinstance(command, HybridCommand)
++                 and command.policy_id == POLICY_ID
++                 and type(command.policy_version) is int
++                 and command.policy_version == POLICY_VERSION, "HYBRID_POLICY_VERSION_MISMATCH")
++        _require(isinstance(command.branch, ReviewBranch)
++                 and isinstance(command.source, SourceClaimAcceptContext), "HYBRID_COMMAND_INVALID")
++        reason = command.source.reason
++        _require(isinstance(reason, str) and bool(reason.strip()) and len(reason) <= 4000
++                 and not any(ord(c) < 32 or ord(c) == 127 for c in reason), "HYBRID_REASON_INVALID")
++        moment = _moment(proposed_at)
++        user = _authorize(view, actor)
++        base = SourceClaimDecisionBoundary._prepare(view, user, command.source)
++        facts = _facts(self.authority.load(view, base.snapshot_hash), base.snapshot_hash)
++        reviewer = _human(facts, actor, grant=(
++            Grant.PROPOSE_EXCEPTION if command.branch == ReviewBranch.INSTITUTIONAL_EXCEPTION
++            else None))
++        provenance = _provenance(view, base, facts.authenticity)
++        _require(not any(p.verification is not None
++                         and p.verification.state == SourceAuthenticityState.REVOKED
++                         for p in provenance), "HYBRID_SOURCE_REVOKED")
++        verified = all(p.verification is not None
++                       and p.verification.state == SourceAuthenticityState.CURRENT
++                       for p in provenance)
++        independent = tuple(sorted(facts.independent, key=lambda i: str(i.receipt_id)))
++        eligibility = evaluate_hybrid_policy(
++            independent, provenance_verified=verified, hard_conflicts=facts.hard_conflicts)
++        if command.branch == ReviewBranch.INSTITUTIONAL_EXCEPTION:
++            _require(command.risk_acknowledgment == RISK_ACKNOWLEDGMENT,
++                     "HYBRID_RISK_ACKNOWLEDGMENT_REQUIRED")
++            _require(eligibility.exception_proposal_eligible,
++                     (eligibility.exception_denials or (DenialReason.HARD_CONFLICT,))[0])
++            assurance = AssuranceBasis.INSTITUTIONAL_EXCEPTION
++        else:
++            _require(command.risk_acknowledgment is None, "HYBRID_COMMAND_INVALID")
++            _require(eligibility.standard_eligible, eligibility.standard_denials[0]
++                     if eligibility.standard_denials else DenialReason.HARD_CONFLICT)
++            assurance = AssuranceBasis.INDEPENDENT_VERIFIED
++        snapshot = {
++            "schema_version": 1, "policy_id": POLICY_ID, "policy_version": POLICY_VERSION,
++            "branch": command.branch, "assurance_basis": assurance,
++            "outcome": "OFFLINE_PROPOSAL_PREPARED", "workflow_active": False,
++            "decision_enabled": False, "final_acceptance": False, "simulation_only": True,
++            "proposed_at": moment.isoformat(), "approved_at": None,
++            "reviewer": asdict(reviewer), "approver": None, "reason": reason.strip(),
++            "risk_acknowledgment": command.risk_acknowledgment,
++            "source_context_hash": base.snapshot_hash,
++            "source_context": json.loads(base.snapshot_json),
++            "authority_revision_digest": facts.revision_digest,
++            "institutional_provenance": [asdict(p) for p in provenance],
++            "independent_assessments": [asdict(i) for i in independent],
++            "conflict_evaluation": {"hard_conflicts": sorted(set(facts.hard_conflicts)),
++                                    "eligibility": asdict(eligibility)},
++            "revocation_or_supersession_ref": None,
++        }
++        return _receipt(snapshot), facts, reviewer
++
++    def prepare_proposal(self, actor, command, *, proposed_at):
++        with self.session.no_autoflush:
++            with Session(bind=self.session.connection(), autoflush=False,
++                         join_transaction_mode="create_savepoint") as view:
++                receipt, _, _ = self._prepare(view, actor, command, proposed_at)
++                return receipt
++
++    def verify_proposal(self, actor, command, receipt, *, proposed_at):
++        return _compare(receipt, self.prepare_proposal(actor, command, proposed_at=proposed_at))
++
++    def prepare_exception_approval(self, reviewer_actor, approver_actor, command, proposal,
++                                   *, proposed_at, approved_at):
++        """A distinct human validates an offline draft; no state/decision write."""
++        _require(isinstance(command, HybridCommand)
++                 and command.branch == ReviewBranch.INSTITUTIONAL_EXCEPTION,
++                 "HYBRID_APPROVAL_NOT_APPLICABLE")
++        with self.session.no_autoflush:
++            with Session(bind=self.session.connection(), autoflush=False,
++                         join_transaction_mode="create_savepoint") as view:
++                # Fresh stored authorization for BOTH humans at this action boundary.
++                _authorize(view, approver_actor)
++                trusted, facts, reviewer = self._prepare(
++                    view, reviewer_actor, command, proposed_at)
++                _compare(proposal, trusted)
++                approver = _human(facts, approver_actor, grant=Grant.APPROVE_EXCEPTION)
++                _require(approver.user_id != reviewer.user_id
++                         and approver.human_principal_id != reviewer.human_principal_id,
++                         "HYBRID_SELF_APPROVAL_FORBIDDEN")
++                moment = _moment(approved_at)
++                _require(moment >= _moment(proposed_at), "HYBRID_TIMESTAMP_INVALID")
++                snapshot = json.loads(trusted.snapshot_json)
++                snapshot.update(outcome="OFFLINE_APPROVAL_VALIDATED",
++                                approved_at=moment.isoformat(),
++                                approver=asdict(approver), proposal_digest=trusted.snapshot_hash)
++                return _receipt(snapshot)
++
++    def verify_exception_approval(self, reviewer_actor, approver_actor, command, proposal, approval,
++                                  *, proposed_at, approved_at):
++        trusted = self.prepare_exception_approval(
++            reviewer_actor, approver_actor, command, proposal,
++            proposed_at=proposed_at, approved_at=approved_at)
++        return _compare(approval, trusted)
++
++    def submit(self, *args, **kwargs):
++        """No draft/authority/direct function can enable production acceptance."""
++        raise _deny("SOURCE_CLAIM_WORKFLOW_INACTIVE")
++
+diff --git a/backend/tests/unit/test_source_claim_hybrid.py b/backend/tests/unit/test_source_claim_hybrid.py
+--- /dev/null
++++ b/backend/tests/unit/test_source_claim_hybrid.py
+@@ -0,0 +1,570 @@
++"""HYBRID offline contract tests. All authority attestations below are SYNTHETIC.
++
++They do not authenticate a real institution, verifier, human or exception grant.
++SQLite is not PostgreSQL validation. No real/SOURCE_CLAIM decision is executed.
++"""
++from __future__ import annotations
++
++import json
++from dataclasses import FrozenInstanceError, replace
++from datetime import UTC, datetime, timedelta
++
++import pytest
++from sqlalchemy import event, select, update
++from sqlalchemy.exc import IntegrityError
++
++from app.core.exceptions import APIError
++from app.models.candidate import LecturerScopusCandidate, LecturerScopusCandidateReview
++from app.models.governance import User
++from app.models.identity import IdentityEvidence, LecturerScopusIdentity
++from app.models.publication import ScopusAuthor
++from app.models.source_staging import SourceArtifact
++from app.services.matching.candidate_persistence import sha256_json
++from app.services.source_claim_decision_boundary import (
++    PreparedSourceClaimDecision,
++    ReviewerContext,
++    SourceClaimDecisionBoundary,
++)
++from app.services.source_claim_hybrid import (
++    POLICY_ID,
++    RISK_ACKNOWLEDGMENT,
++    AssessmentState,
++    AssuranceBasis,
++    AuthorityFacts,
++    DenialReason,
++    Grant,
++    HumanAuthority,
++    HybridCommand,
++    HybridSourceClaimCompatibility,
++    IndependentAssessment,
++    ReviewBranch,
++    SourceAuthenticity,
++    SourceAuthenticityState,
++    evaluate_hybrid_policy,
++)
++from tests.source_staging_fixtures import multi_row, sid
++from tests.unit.test_source_claim_candidate_persistence import guide, uid, write
++from tests.unit.test_source_claim_candidate_persistence import world as world
++from tests.unit.test_source_claim_decision_boundary import assert_error, context, reviewer
++
++AT = datetime(2026, 10, 30, 10, tzinfo=UTC)
++LATER = AT + timedelta(minutes=5)
++
++
++class SyntheticAuthority:
++    """Mutable test-only server authority; stored original context is NOT rebound."""
++    def __init__(self, facts):
++        self.facts = facts
++        self.calls = 0
++
++    def load(self, view, context_digest):
++        assert view.autoflush is False
++        self.calls += 1
++        return self.facts
++
++
++def independent(*, state=AssessmentState.QUALIFYING, kind="ORCID_EXACT", verified=True):
++    # This is a verifier-output fixture, NOT inference from a source ORCID or enum.
++    return IndependentAssessment(uid(820), "1" * 64, kind, state, verified)
++
++
++@pytest.fixture
++def setup(world):
++    db = world[0]
++    user = reviewer(db)
++    other = User(id=uid(751), email="approver@example.invalid", password_hash="synthetic",
++                 display_name="Synthetic approver", role="REVIEWER", is_active=True,
++                 version=1, auth_version=1)
++    db.add(other)
++    db.flush()
++    guide(world)
++    write(world)
++    actor, approver = ReviewerContext(user.id, 1), ReviewerContext(other.id, 1)
++    source_command = context(world)
++    base = SourceClaimDecisionBoundary(db).prepare(actor, source_command)
++    humans = tuple(HumanAuthority(
++        u.id, uid(900 + n), 1, True, (Grant.PROPOSE_EXCEPTION, Grant.APPROVE_EXCEPTION),
++        uid(800 + n), "2" * 64) for n, u in enumerate((user, other)))
++    authenticity = tuple(SourceAuthenticity(
++        a.id, a.artifact_bytes_sha256, "ICTU", SourceAuthenticityState.CURRENT,
++        uid(810 + n), "3" * 64, "FORMALLY_VERIFIED_ISSUANCE_V1")
++        for n, a in enumerate(db.scalars(select(SourceArtifact)).all()))
++    authority = SyntheticAuthority(AuthorityFacts(base.snapshot_hash, "4" * 64,
++                                                 (), humans, authenticity))
++    boundary = HybridSourceClaimCompatibility(db, authority=authority)
++    command = HybridCommand(source_command, ReviewBranch.INSTITUTIONAL_EXCEPTION,
++                            risk_acknowledgment=RISK_ACKNOWLEDGMENT)
++    return world, boundary, authority, actor, approver, command
++
++
++def proposal(setup):
++    _, boundary, _, actor, _, command = setup
++    return boundary.prepare_proposal(actor, command, proposed_at=AT)
++
++
++def approve(setup, receipt=None):
++    _, boundary, _, actor, approver, command = setup
++    return boundary.prepare_exception_approval(
++        actor, approver, command, receipt or proposal(setup), proposed_at=AT, approved_at=LATER)
++
++
++def receipt(value):
++    return PreparedSourceClaimDecision(json.dumps(value), sha256_json(value))
++
++
++def standard(command):
++    return replace(command, branch=ReviewBranch.STANDARD_INDEPENDENT, risk_acknowledgment=None)
++
++
++def test_default_authority_is_unavailable_and_no_admin_fallback_exists(setup):
++    world, _, _, actor, _, command = setup
++    world[0].execute(update(User).where(User.id == actor.user_id).values(role="ADMIN"))
++    assert_error("HYBRID_AUTHORITY_UNAVAILABLE", lambda: HybridSourceClaimCompatibility(
++        world[0]).prepare_proposal(actor, command, proposed_at=AT))
++
++
++def test_standard_requires_a_separately_qualified_independent_assessment(setup):
++    _, boundary, authority, actor, _, command = setup
++    authority.facts = replace(authority.facts, independent=(independent(),))
++    prepared = boundary.prepare_proposal(actor, standard(command), proposed_at=AT)
++    value = json.loads(prepared.snapshot_json)
++    assert value["assurance_basis"] == AssuranceBasis.INDEPENDENT_VERIFIED
++    assert value["outcome"] == "OFFLINE_PROPOSAL_PREPARED"
++    assert value["final_acceptance"] is False
++    assert value["source_context"]["review_policy"]["accept_reason_required"] is True
++    assert value["institutional_provenance"][0]["evidence_kind"] == "SOURCE_CLAIM"
++    assert value["institutional_provenance"][0]["source_tier"] == "INSTITUTION_DECLARED"
++    assert value["source_context"]["identity_evidence_promotion"] == "BLOCKED_OWNER_POLICY_REQUIRED"
++
++
++@pytest.mark.parametrize("assessments", [(), (independent(state=AssessmentState.INSUFFICIENT),)])
++def test_institutional_claim_alone_or_insufficient_assessment_never_qualifies_standard(
++    setup, assessments,
++):
++    _, boundary, authority, actor, _, command = setup
++    authority.facts = replace(authority.facts, independent=assessments)
++    assert_error(DenialReason.INDEPENDENT_MISSING, lambda: boundary.prepare_proposal(
++        actor, standard(command), proposed_at=AT))
++    assert proposal(setup)  # Lack is eligible only for a nonfinal institutional proposal.
++
++
++@pytest.mark.parametrize(("state", "expected"), [
++    (AssessmentState.INVALID, DenialReason.INDEPENDENT_INVALID),
++    (AssessmentState.WITHDRAWN, DenialReason.INDEPENDENT_WITHDRAWN),
++    (AssessmentState.CONTRADICTORY, DenialReason.HARD_CONFLICT),
++])
++@pytest.mark.parametrize("branch", list(ReviewBranch))
++def test_invalid_withdrawn_and_contradictory_assessments_block_both_branches(
++    setup, state, expected, branch,
++):
++    _, boundary, authority, actor, _, command = setup
++    authority.facts = replace(authority.facts, independent=(independent(state=state),))
++    command = standard(command) if branch == ReviewBranch.STANDARD_INDEPENDENT else command
++    assert_error(expected, lambda: boundary.prepare_proposal(actor, command, proposed_at=AT))
++
++
++@pytest.mark.parametrize(("kind", "verified"), [
++    ("SOURCE_CLAIM", True), ("NAME_SIMILARITY", True), ("ORCID_EXACT", False),
++])
++def test_type_or_source_label_is_not_independent_verification(setup, kind, verified):
++    _, boundary, authority, actor, _, command = setup
++    authority.facts = replace(authority.facts, independent=(
++        independent(kind=kind, verified=verified),))
++    assert_error(DenialReason.INDEPENDENT_INVALID, lambda: boundary.prepare_proposal(
++        actor, standard(command), proposed_at=AT))
++
++
++def test_valid_provenance_only_prepares_exception_and_retains_distinct_assurance(setup):
++    world, _, _, _, _, _ = setup
++    prepared = proposal(setup)
++    value = json.loads(prepared.snapshot_json)
++    assert value["policy_id"] == POLICY_ID and value["policy_version"] == 1
++    assert value["assurance_basis"] == AssuranceBasis.INSTITUTIONAL_EXCEPTION
++    assert value["independent_assessments"] == []
++    assert value["final_acceptance"] is False and value["simulation_only"] is True
++    assert value["workflow_active"] is False and value["decision_enabled"] is False
++    assert value["approved_at"] is None and value["approver"] is None
++    provenance, = value["institutional_provenance"]
++    assert provenance["claimed_scopus_id"] == sid(1)
++    assert provenance["lecturer_id"] == str(uid(1))
++    assert provenance["scopus_author_id"] == str(uid(101))
++    assert provenance["captured_at"].endswith(("+00:00", "Z"))
++    assert provenance["source_revision"] == provenance["immutable_snapshot_digest"]
++    assert provenance["verification"]["issuing_organization"] == "ICTU"
++    assert provenance["verification"]["verification_method"] == "FORMALLY_VERIFIED_ISSUANCE_V1"
++    assert world[0].scalars(select(IdentityEvidence)).all() == []
++    assert world[0].scalars(select(LecturerScopusIdentity)).all() == []
++    with pytest.raises(FrozenInstanceError):
++        prepared.snapshot_hash = "changed"
++
++
++@pytest.mark.parametrize("state", [None, SourceAuthenticityState.UNVERIFIED,
++                                  SourceAuthenticityState.REVOKED])
++def test_missing_unverified_or_revoked_institutional_authenticity_blocks_exception(setup, state):
++    _, _, authority, _, _, _ = setup
++    authority.facts = replace(authority.facts, authenticity=(
++        () if state is None else tuple(
++            replace(a, state=state) for a in authority.facts.authenticity)))
++    with pytest.raises(APIError):
++        proposal(setup)
++
++
++@pytest.mark.parametrize("field", ["artifact_digest", "verification_digest", "issuing_organization",
++                                   "verification_method"])
++def test_malformed_or_substituted_source_attestation_fails_closed(setup, field):
++    _, _, authority, _, _, _ = setup
++    item = authority.facts.authenticity[0]
++    changed = "0" * 64 if field == "artifact_digest" else "untrusted"
++    authority.facts = replace(authority.facts, authenticity=(replace(item, **{field: changed}),))
++    with pytest.raises(APIError):
++        proposal(setup)
++
++
++def test_distinct_authorized_humans_validate_offline_approval_only(setup):
++    world, boundary, _, actor, approver, command = setup
++    prepared = proposal(setup)
++    approval = approve(setup, prepared)
++    value = json.loads(approval.snapshot_json)
++    assert value["outcome"] == "OFFLINE_APPROVAL_VALIDATED"
++    assert value["proposal_digest"] == prepared.snapshot_hash
++    assert value["reviewer"]["user_id"] != value["approver"]["user_id"]
++    assert value["reviewer"]["human_principal_id"] != value["approver"]["human_principal_id"]
++    assert value["assurance_basis"] == AssuranceBasis.INSTITUTIONAL_EXCEPTION
++    assert value["final_acceptance"] is False
++    assert boundary.verify_exception_approval(
++        actor, approver, command, prepared, approval, proposed_at=AT, approved_at=LATER) == approval
++    assert world[0].scalars(select(LecturerScopusIdentity)).all() == []
++
++
++@pytest.mark.parametrize("same_account", [True, False])
++def test_same_account_or_two_accounts_for_the_same_human_cannot_approve(setup, same_account):
++    _, boundary, authority, actor, approver, command = setup
++    prepared = proposal(setup)
++    if same_account:
++        approver = actor
++    else:
++        first, second = authority.facts.humans
++        authority.facts = replace(authority.facts, humans=(
++            first, replace(second, human_principal_id=first.human_principal_id)))
++    assert_error("HYBRID_SELF_APPROVAL_FORBIDDEN", lambda: boundary.prepare_exception_approval(
++        actor, approver, command, prepared, proposed_at=AT, approved_at=LATER))
++
++
++@pytest.mark.parametrize("which", [0, 1])
++@pytest.mark.parametrize("failure", ["inactive", "session", "role", "grant", "service", "revoked"])
++def test_both_humans_are_freshly_reauthorized_and_generic_admin_does_not_imply_grants(
++    setup, which, failure,
++):
++    world, boundary, authority, actor, approver, command = setup
++    prepared = proposal(setup)
++    human = authority.facts.humans[which]
++    if failure in {"inactive", "session", "role"}:
++        values = ({"is_active": False} if failure == "inactive" else
++                  {"auth_version": 2} if failure == "session" else {"role": "LECTURER"})
++        world[0].execute(update(User).where(User.id == human.user_id).values(**values)
++                         .execution_options(synchronize_session=False))
++    else:
++        change = ({"grants": ()} if failure == "grant" else
++                  {"human_principal_id": None} if failure == "service" else {"current": False})
++        if failure == "grant":
++            world[0].execute(update(User).where(User.id == human.user_id).values(role="ADMIN"))
++        humans = list(authority.facts.humans)
++        humans[which] = replace(human, **change)
++        authority.facts = replace(authority.facts, humans=tuple(humans))
++    with pytest.raises(APIError):
++        boundary.prepare_exception_approval(
++            actor, approver, command, prepared, proposed_at=AT, approved_at=LATER)
++
++
++@pytest.mark.parametrize("reason", [None, "", "   ", "x" * 4001, "has\ncontrol", 123])
++def test_reason_required_validated_and_never_identity_evidence(setup, reason):
++    _, boundary, _, actor, _, command = setup
++    command = replace(command, source=replace(command.source, reason=reason))
++    assert_error("HYBRID_REASON_INVALID", lambda: boundary.prepare_proposal(
++        actor, command, proposed_at=AT))
++
++
++@pytest.mark.parametrize("risk", [None, "", True, "I accept"])
++def test_risk_acknowledgment_must_be_explicit_and_exact(setup, risk):
++    _, boundary, _, actor, _, command = setup
++    command = replace(command, risk_acknowledgment=risk)
++    assert_error("HYBRID_RISK_ACKNOWLEDGMENT_REQUIRED", lambda: boundary.prepare_proposal(
++        actor, command, proposed_at=AT))
++
++
++def test_hard_conflict_cannot_be_overridden_by_an_institutional_exception(setup):
++    _, _, authority, _, _, _ = setup
++    authority.facts = replace(authority.facts, hard_conflicts=(DenialReason.HARD_CONFLICT,))
++    assert_error(DenialReason.HARD_CONFLICT, lambda: proposal(setup))
++
++
++def test_actual_competing_source_ownership_remains_blocking_before_authority(setup):
++    world, boundary, authority, actor, _, command = setup
++    guide(world, [multi_row(1, [sid(1)]), multi_row(2, [sid(1)])],
++          ts="2026-10-30T00:00:00Z")
++    write(world, 501)
++    command = replace(command, source=context(world, 501))
++    assert_error("SOURCE_CLAIM_OWNERSHIP_CONFLICT", lambda: boundary.prepare_proposal(
++        actor, command, proposed_at=AT))
++    assert authority.calls == 0
++
++
++@pytest.mark.parametrize("status", ["REJECTED", "ACCEPTED", "SUPERSEDED"])
++def test_negative_and_terminal_history_is_not_automatically_reassessed(setup, status):
++    world, boundary, _, actor, _, command = setup
++    world[0].execute(update(LecturerScopusCandidate).where(
++        LecturerScopusCandidate.id == command.source.candidate_id).values(status=status))
++    assert_error("CANDIDATE_ALREADY_DECIDED_CONFLICT", lambda: boundary.prepare_proposal(
++        actor, command, proposed_at=AT))
++
++
++@pytest.mark.parametrize("version", [0, 2, True, "1"])
++def test_policy_version_mismatch_fails_closed(setup, version):
++    _, boundary, _, actor, _, command = setup
++    assert_error("HYBRID_POLICY_VERSION_MISMATCH", lambda: boundary.prepare_proposal(
++        actor, replace(command, policy_version=version), proposed_at=AT))
++
++
++@pytest.mark.parametrize("field", ["policy_id", "policy_version", "assurance_basis", "proposed_at",
++                                   "source_revision", "reviewer", "final_acceptance"])
++def test_rehashed_proposal_tampering_is_not_authoritative_replay(setup, field):
++    _, boundary, _, actor, _, command = setup
++    value = json.loads(proposal(setup).snapshot_json)
++    if field == "source_revision":
++        value["institutional_provenance"][0]["source_revision"] = "0" * 64
++    elif field == "reviewer":
++        value["reviewer"]["user_id"] = str(uid(999))
++    else:
++        value[field] = "tampered"
++    assert_error("HYBRID_REPLAY_INVALID", lambda: boundary.verify_proposal(
++        actor, command, receipt(value), proposed_at=AT))
++
++
++@pytest.mark.parametrize("field", ["approver", "proposal_digest", "approved_at", "assurance_basis"])
++def test_rehashed_approval_or_cross_proposal_substitution_is_refused(setup, field):
++    _, boundary, _, actor, approver, command = setup
++    prepared = proposal(setup)
++    value = json.loads(approve(setup, prepared).snapshot_json)
++    value[field] = "substituted"
++    assert_error("HYBRID_REPLAY_INVALID", lambda: boundary.verify_exception_approval(
++        actor, approver, command, prepared, receipt(value), proposed_at=AT, approved_at=LATER))
++
++
++def test_newer_independent_facts_do_not_replace_an_old_proposal(setup):
++    _, boundary, authority, actor, _, command = setup
++    prepared = proposal(setup)
++    authority.facts = replace(authority.facts, independent=(independent(),))
++    assert_error("HYBRID_REPLAY_INVALID", lambda: boundary.verify_proposal(
++        actor, command, prepared, proposed_at=AT))
++
++
++def test_authority_context_cannot_be_reused_for_a_different_candidate_or_reason(setup):
++    _, boundary, _, actor, _, command = setup
++    command = replace(command, source=replace(command.source, reason="Another review context"))
++    assert_error("HYBRID_AUTHORITY_CONTEXT_MISMATCH", lambda: boundary.prepare_proposal(
++        actor, command, proposed_at=AT))
++
++
++def test_source_withdrawal_and_new_capture_invalidate_old_proposal(setup):
++    world, boundary, _, actor, _, command = setup
++    prepared = proposal(setup)
++    guide(world, rows=[], ts="2026-10-30T00:00:00Z")
++    assert_error("STALE_SOURCE_CLAIM_DECISION_CONTEXT", lambda: boundary.verify_proposal(
++        actor, command, prepared, proposed_at=AT))
++    write(world, 501)
++    assert_error("SOURCE_CLAIM_DECISION_NOT_CURRENT", lambda: boundary.prepare_proposal(
++        actor, replace(command, source=context(world, 501)), proposed_at=AT))
++
++
++def test_permission_revocation_invalidates_already_prepared_approval(setup):
++    _, boundary, authority, actor, approver, command = setup
++    prepared = proposal(setup)
++    approval = approve(setup, prepared)
++    first, second = authority.facts.humans
++    authority.facts = replace(authority.facts, humans=(first, replace(second, grants=())))
++    assert_error("HYBRID_EXCEPTION_PERMISSION_REQUIRED", lambda: boundary.verify_exception_approval(
++        actor, approver, command, prepared, approval, proposed_at=AT, approved_at=LATER))
++
++
++def test_duplicate_preparation_is_deterministic_and_creates_no_decisions(setup):
++    world, _, authority, _, _, _ = setup
++    first, second = proposal(setup), proposal(setup)
++    assert first == second
++    assert approve(setup, first) == approve(setup, second)
++    assert authority.calls >= 4
++    for model in (LecturerScopusIdentity, IdentityEvidence, LecturerScopusCandidateReview):
++        assert world[0].scalars(select(model)).all() == []
++
++
++@pytest.mark.parametrize("value", [None, "{}", [], PreparedSourceClaimDecision("[]", "0" * 64)])
++def test_malformed_receipts_have_controlled_replay_failure(setup, value):
++    _, boundary, _, actor, _, command = setup
++    assert_error("HYBRID_REPLAY_INVALID", lambda: boundary.verify_proposal(
++        actor, command, value, proposed_at=AT))
++
++
++def test_caller_pending_state_and_prior_writes_survive_success_failure_and_retry(setup):
++    world, boundary, authority, actor, _, command = setup
++    db = world[0]
++    earlier = ScopusAuthor(id=uid(999), scopus_id=sid(999), preferred_name="Caller-owned")
++    db.add(earlier)
++    db.flush()
++    pending = ScopusAuthor(id=uid(998), scopus_id=None, preferred_name="Invalid pending")
++    db.add(pending)
++    assert proposal(setup)
++    authority.facts = replace(authority.facts, hard_conflicts=(DenialReason.HARD_CONFLICT,))
++    assert_error(DenialReason.HARD_CONFLICT, lambda: proposal(setup))
++    authority.facts = replace(authority.facts, hard_conflicts=())
++    assert proposal(setup)
++    assert pending in db.new and db.in_transaction() and db.is_active
++    with db.no_autoflush:
++        assert db.get(ScopusAuthor, earlier.id) is earlier
++    db.rollback()  # Only owner controls outer rollback.
++    assert db.get(ScopusAuthor, uid(999)) is None
++
++
++def test_unexpected_authority_integrity_error_preserves_caller_transaction(setup, monkeypatch):
++    world, _, authority, _, _, _ = setup
++    earlier = ScopusAuthor(id=uid(999), scopus_id=sid(999), preferred_name="Caller-owned")
++    world[0].add(earlier)
++    world[0].flush()
++    original = authority.load
++
++    def fail(*args):
++        raise IntegrityError("Synthetic read error", {}, RuntimeError("unexpected"))
++
++    monkeypatch.setattr(authority, "load", fail)
++    with pytest.raises(IntegrityError):
++        proposal(setup)
++    assert world[0].in_transaction() and world[0].get(ScopusAuthor, earlier.id) is earlier
++    monkeypatch.setattr(authority, "load", original)
++    assert proposal(setup)
++
++
++def test_proposals_approvals_and_all_submit_boundaries_never_emit_decision_dml(setup):
++    world, boundary, _, actor, _, command = setup
++    statements = []
++
++    def capture(conn, cursor, statement, *args):
++        statements.append(statement.lstrip().upper())
++
++    event.listen(world[0].get_bind(), "before_cursor_execute", capture)
++    try:
++        prepared = proposal(setup)
++        approved = approve(setup, prepared)
++        assert_error("SOURCE_CLAIM_WORKFLOW_INACTIVE", lambda: boundary.submit(approved))
++        assert_error("SOURCE_CLAIM_WORKFLOW_INACTIVE", lambda: boundary.submit())
++        base_boundary = SourceClaimDecisionBoundary(world[0])
++        base = base_boundary.prepare(actor, command.source)
++        assert_error("SOURCE_CLAIM_WORKFLOW_INACTIVE", lambda: base_boundary.submit(
++            actor, command.source, base.snapshot_json, base.snapshot_hash))
++    finally:
++        event.remove(world[0].get_bind(), "before_cursor_execute", capture)
++    assert any(s.startswith("SAVEPOINT") for s in statements)
++    assert any(s.startswith("ROLLBACK TO SAVEPOINT") for s in statements)
++    assert not any(s.startswith(("INSERT", "UPDATE", "DELETE", "COMMIT")) for s in statements)
++
++
++def test_safe_snapshot_has_no_raw_source_rows_or_account_secrets(setup):
++    text = approve(setup).snapshot_json
++    for private in ("password_hash", "record_raw", "record_email", "gv1@example.invalid",
++                    "approver@example.invalid", "upstream_storage_ref"):
++        assert private not in text
++
++
++@pytest.mark.parametrize("moment", [None, AT.replace(tzinfo=None), "2026-10-30"])
++def test_naive_or_invalid_proposal_time_is_rejected(setup, moment):
++    _, boundary, _, actor, _, command = setup
++    assert_error("HYBRID_TIMESTAMP_INVALID", lambda: boundary.prepare_proposal(
++        actor, command, proposed_at=moment))
++
++
++def test_approval_cannot_predate_proposal(setup):
++    _, boundary, _, actor, approver, command = setup
++    assert_error("HYBRID_TIMESTAMP_INVALID", lambda: boundary.prepare_exception_approval(
++        actor, approver, command, proposal(setup),
++        proposed_at=AT, approved_at=AT-timedelta(days=1)))
++
++
++def test_pure_evaluator_distinguishes_insufficiency_from_conflict():
++    missing = evaluate_hybrid_policy((), provenance_verified=True)
++    assert missing.standard_denials == (DenialReason.INDEPENDENT_MISSING,)
++    assert missing.exception_proposal_eligible
++    conflict = evaluate_hybrid_policy(
++        (independent(state=AssessmentState.CONTRADICTORY),), provenance_verified=True)
++    assert conflict.exception_denials == (DenialReason.HARD_CONFLICT,)
++    assert not conflict.standard_eligible and not conflict.exception_proposal_eligible
++
++
++@pytest.mark.parametrize("kind", ["default", "wrong_context", "duplicate", "untyped_state"])
++def test_malformed_authority_output_cannot_be_used_as_an_attestation(setup, kind):
++    _, _, authority, _, _, _ = setup
++    if kind == "default":
++        authority.facts = None
++    elif kind == "wrong_context":
++        authority.facts = replace(authority.facts, context_digest="0" * 64)
++    elif kind == "duplicate":
++        authority.facts = replace(authority.facts, humans=authority.facts.humans * 2)
++    else:
++        authority.facts = replace(authority.facts, independent=(
++            replace(independent(), state="QUALIFYING"),))
++    with pytest.raises(APIError):
++        proposal(setup)
++
++
++def test_revoked_institutional_source_blocks_even_independently_supported_standard(setup):
++    _, boundary, authority, actor, _, command = setup
++    authority.facts = replace(
++        authority.facts, independent=(independent(),), authenticity=tuple(
++            replace(a, state=SourceAuthenticityState.REVOKED)
++            for a in authority.facts.authenticity))
++    assert_error("HYBRID_SOURCE_REVOKED", lambda: boundary.prepare_proposal(
++        actor, standard(command), proposed_at=AT))
++
++
++def test_new_authenticity_verification_does_not_rewrite_a_captured_proposal(setup):
++    _, boundary, authority, actor, _, command = setup
++    prepared = proposal(setup)
++    authority.facts = replace(authority.facts, authenticity=tuple(
++        replace(a, verification_digest="8" * 64) for a in authority.facts.authenticity))
++    assert_error("HYBRID_REPLAY_INVALID", lambda: boundary.verify_proposal(
++        actor, command, prepared, proposed_at=AT))
++
++
++@pytest.mark.parametrize("another_lecturer", [False, True])
++def test_approval_is_bound_to_exact_candidate_pair_and_source_context(setup, another_lecturer):
++    world, boundary, authority, actor, approver, command = setup
++    db = world[0]
++    lecturer_number = 2 if another_lecturer else 1
++    guide(world, [multi_row(1, [sid(1)]), multi_row(lecturer_number, [sid(2)])],
++          ts="2026-10-30T00:00:00Z")
++    write(world, 501)
++    artifacts = db.scalars(select(SourceArtifact)).all()
++    template = authority.facts.authenticity[0]
++    authority.facts = replace(authority.facts, authenticity=tuple(
++        replace(template, artifact_id=a.id, artifact_digest=a.artifact_bytes_sha256)
++        for a in artifacts))
++    command = replace(command, source=context(world, 501))
++    base = SourceClaimDecisionBoundary(db).prepare(actor, command.source)
++    authority.facts = replace(authority.facts, context_digest=base.snapshot_hash)
++    original_proposal = boundary.prepare_proposal(actor, command, proposed_at=AT)
++    original_approval = boundary.prepare_exception_approval(
++        actor, approver, command, original_proposal, proposed_at=AT, approved_at=LATER)
++    # Resolve the other root's observation from stored source output, not a name match.
++    from app.models.candidate import LecturerScopusCandidateObservation
++
++    root = db.scalar(select(LecturerScopusCandidate).where(
++        LecturerScopusCandidate.lecturer_id == uid(lecturer_number),
++        LecturerScopusCandidate.scopus_author_id == uid(102)))
++    obs = db.scalar(select(LecturerScopusCandidateObservation).where(
++        LecturerScopusCandidateObservation.candidate_id == root.id,
++        LecturerScopusCandidateObservation.generation_run_id == uid(501)))
++    other_command = replace(command, source=replace(command.source, candidate_id=root.id,
++                                                   observation_id=obs.id))
++    other_base = SourceClaimDecisionBoundary(db).prepare(actor, other_command.source)
++    authority.facts = replace(authority.facts, context_digest=other_base.snapshot_hash)
++    other_proposal = boundary.prepare_proposal(actor, other_command, proposed_at=AT)
++    assert_error("HYBRID_REPLAY_INVALID", lambda: boundary.verify_exception_approval(
++        actor, approver, other_command, other_proposal, original_approval,
++        proposed_at=AT, approved_at=LATER))
++

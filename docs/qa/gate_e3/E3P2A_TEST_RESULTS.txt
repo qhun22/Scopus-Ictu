@@ -1,0 +1,659 @@
+E3-P2-A - TEST RESULTS
+Date: 2026-10-29  Python 3.12.10  pytest 9.2.0  ruff 0.17.3  jsonschema 4.26.0
+
+========================================================================
+1. ADAPTER SUITE
+$ cd backend
+  python -m pytest tests/unit/test_source_claims_adapters.py --noconftest -v -p no:cacheprovider -W ignore::DeprecationWarning
+  exit code 0
+------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.1
+collecting ... collected 54 items
+
+tests/unit/test_source_claims_adapters.py::test_every_profile_is_kept_including_those_without_publications PASSED [  1%]
+tests/unit/test_source_claims_adapters.py::test_institutional_email_is_mapped_and_raw_labels_are_kept_verbatim PASSED [  3%]
+tests/unit/test_source_claims_adapters.py::test_personal_fields_never_reach_the_artifact PASSED [  5%]
+tests/unit/test_source_claims_adapters.py::test_observation_metadata_goes_to_capture_not_content PASSED [  7%]
+tests/unit/test_source_claims_adapters.py::test_unclassified_profile_field_fails_closed PASSED [  9%]
+tests/unit/test_source_claims_adapters.py::test_names_are_never_keys PASSED [ 11%]
+tests/unit/test_source_claims_adapters.py::test_same_content_recaptured_keeps_content_hash_and_changes_capture_hash PASSED [ 12%]
+tests/unit/test_source_claims_adapters.py::test_identical_upstream_gives_identical_artifact_bytes PASSED [ 14%]
+tests/unit/test_source_claims_adapters.py::test_reordered_equivalent_json_objects_hash_identically PASSED [ 16%]
+tests/unit/test_source_claims_adapters.py::test_profile_order_changes_positions_not_record_hashes PASSED [ 18%]
+tests/unit/test_source_claims_adapters.py::test_orcid_collision_keeps_both_profiles_and_claims PASSED [ 20%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs0-crawl0-COMPLETE] PASSED [ 22%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs1-crawl1-COMPLETE] PASSED [ 24%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs2-crawl2-PARTIAL] PASSED [ 25%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs3-crawl3-PARTIAL] PASSED [ 27%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs4-crawl4-PARTIAL] PASSED [ 29%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs5-crawl5-PARTIAL] PASSED [ 31%]
+tests/unit/test_source_claims_adapters.py::test_missing_profile_is_a_source_count_discrepancy PASSED [ 33%]
+tests/unit/test_source_claims_adapters.py::test_partial_harvest_never_proves_withdrawal PASSED [ 35%]
+tests/unit/test_source_claims_adapters.py::test_complete_harvests_report_withdrawal PASSED [ 37%]
+tests/unit/test_source_claims_adapters.py::test_malformed_profile_items_are_kept_and_flagged PASSED [ 38%]
+tests/unit/test_source_claims_adapters.py::test_extracted_values_not_traceable_to_page_text_are_reported PASSED [ 40%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-LECTURERS_NOT_LIST] PASSED [ 42%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID0] PASSED [ 44%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID1] PASSED [ 46%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID2] PASSED [ 48%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID3] PASSED [ 50%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-ORIGIN_URL_INVALID0] PASSED [ 51%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-ORIGIN_URL_INVALID1] PASSED [ 53%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-CRAWL_REPORT_INVALID] PASSED [ 55%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-UPSTREAM_SHA256_INVALID] PASSED [ 57%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-NON_CANONICAL_VALUE] PASSED [ 59%]
+tests/unit/test_source_claims_adapters.py::test_tables_snapshot_maps_sections_headers_and_rows PASSED [ 61%]
+tests/unit/test_source_claims_adapters.py::test_multi_id_rows_snapshot_uses_fixed_layout_and_emits_owned_and_email_claims PASSED [ 62%]
+tests/unit/test_source_claims_adapters.py::test_three_id_categories_stay_distinct_across_captures PASSED [ 64%]
+tests/unit/test_source_claims_adapters.py::test_duplicate_scopus_ids_are_kept_and_flagged PASSED [ 66%]
+tests/unit/test_source_claims_adapters.py::test_reclassified_id_between_comparable_captures PASSED [ 68%]
+tests/unit/test_source_claims_adapters.py::test_partial_guide_capture_never_proves_withdrawal PASSED [ 70%]
+tests/unit/test_source_claims_adapters.py::test_guide_count_discrepancy_is_kept_not_corrected PASSED [ 72%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_rows_are_kept PASSED [ 74%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLE_KIND_UNRESOLVED] PASSED [ 75%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLE_KIND_DUPLICATED] PASSED [ 77%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-HEADER_ROW_MISSING] PASSED [ 79%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-SECTION_HEADINGS_MISSING] PASSED [ 81%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLES_MISSING] PASSED [ 83%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-ORIGIN_URL_INVALID] PASSED [ 85%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-COMPLETENESS_INVALID] PASSED [ 87%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-DECLARED_COUNT_FOR_ABSENT_TABLE0] PASSED [ 88%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-SNAPSHOT_ROW_COUNT_MISMATCH] PASSED [ 90%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-DECLARED_COUNT_FOR_ABSENT_TABLE1] PASSED [ 92%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-UPSTREAM_SHA256_INVALID] PASSED [ 94%]
+tests/unit/test_source_claims_adapters.py::test_every_adapter_output_validates_against_the_json_schema PASSED [ 96%]
+tests/unit/test_source_claims_adapters.py::test_adapter_output_carries_no_identity_decision PASSED [ 98%]
+tests/unit/test_source_claims_adapters.py::test_adapters_import_no_database_app_or_network_modules PASSED [100%]
+
+============================= 54 passed in 0.28s ==============================
+
+========================================================================
+2. E3-P1 + ADAPTER SUITES TOGETHER
+$ python -m pytest tests/unit/test_source_claims.py tests/unit/test_source_claims_adapters.py --noconftest -q ...
+  exit code 0
+------------------------------------------------------------------------
+........................................................................ [ 41%]
+........................................................................ [ 83%]
+............................                                             [100%]
+172 passed in 0.61s
+
+========================================================================
+3. FOCUSED (replay, reorder, ORCID, duplicate IDs, missing profiles, partial, reclassified, discrepancy, malformed)
+$ same as 1 with -k "replay or recaptured or reordered or orcid_collision or duplicate_scopus or missing_profile or partial or reclassified or discrepancy or malformed"
+  exit code 0
+------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.1
+collecting ... collected 54 items / 18 deselected / 36 selected
+
+tests/unit/test_source_claims_adapters.py::test_same_content_recaptured_keeps_content_hash_and_changes_capture_hash PASSED [  2%]
+tests/unit/test_source_claims_adapters.py::test_reordered_equivalent_json_objects_hash_identically PASSED [  5%]
+tests/unit/test_source_claims_adapters.py::test_orcid_collision_keeps_both_profiles_and_claims PASSED [  8%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs2-crawl2-PARTIAL] PASSED [ 11%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs3-crawl3-PARTIAL] PASSED [ 13%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs4-crawl4-PARTIAL] PASSED [ 16%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs5-crawl5-PARTIAL] PASSED [ 19%]
+tests/unit/test_source_claims_adapters.py::test_missing_profile_is_a_source_count_discrepancy PASSED [ 22%]
+tests/unit/test_source_claims_adapters.py::test_partial_harvest_never_proves_withdrawal PASSED [ 25%]
+tests/unit/test_source_claims_adapters.py::test_malformed_profile_items_are_kept_and_flagged PASSED [ 27%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-LECTURERS_NOT_LIST] PASSED [ 30%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID0] PASSED [ 33%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID1] PASSED [ 36%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID2] PASSED [ 38%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID3] PASSED [ 41%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-ORIGIN_URL_INVALID0] PASSED [ 44%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-ORIGIN_URL_INVALID1] PASSED [ 47%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-CRAWL_REPORT_INVALID] PASSED [ 50%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-UPSTREAM_SHA256_INVALID] PASSED [ 52%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-NON_CANONICAL_VALUE] PASSED [ 55%]
+tests/unit/test_source_claims_adapters.py::test_duplicate_scopus_ids_are_kept_and_flagged PASSED [ 58%]
+tests/unit/test_source_claims_adapters.py::test_reclassified_id_between_comparable_captures PASSED [ 61%]
+tests/unit/test_source_claims_adapters.py::test_partial_guide_capture_never_proves_withdrawal PASSED [ 63%]
+tests/unit/test_source_claims_adapters.py::test_guide_count_discrepancy_is_kept_not_corrected PASSED [ 66%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_rows_are_kept PASSED [ 69%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLE_KIND_UNRESOLVED] PASSED [ 72%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLE_KIND_DUPLICATED] PASSED [ 75%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-HEADER_ROW_MISSING] PASSED [ 77%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-SECTION_HEADINGS_MISSING] PASSED [ 80%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLES_MISSING] PASSED [ 83%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-ORIGIN_URL_INVALID] PASSED [ 86%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-COMPLETENESS_INVALID] PASSED [ 88%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-DECLARED_COUNT_FOR_ABSENT_TABLE0] PASSED [ 91%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-SNAPSHOT_ROW_COUNT_MISMATCH] PASSED [ 94%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-DECLARED_COUNT_FOR_ABSENT_TABLE1] PASSED [ 97%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-UPSTREAM_SHA256_INVALID] PASSED [100%]
+
+====================== 36 passed, 18 deselected in 0.17s ======================
+
+========================================================================
+4. WITH PROJECT conftest.py (environment note)
+$ python -m pytest <both files> -q
+  exit code 4: tests/conftest.py requires an allowlisted TEST_DATABASE_URL; no DB was used
+------------------------------------------------------------------------
+ImportError while loading conftest 'D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\conftest.py'.
+tests\conftest.py:69: in <module>
+    pytest.exit(
+E   _pytest.outcomes.Exit: TEST ISOLATION BLOCKER: TEST_DATABASE_URL must point to an available, allowlisted PostgreSQL test database (see tests/db_safety_guard.py). There is no override � add the exact database name to ALLOWED_TEST_DATABASE_NAMES only after confirming it is disposable and never used for manual UI/E2E testing.
+
+========================================================================
+5. RUFF (scoped)
+$ python -m ruff check app/services/source_claims tests/unit/test_source_claims.py tests/unit/test_source_claims_adapters.py
+------------------------------------------------------------------------
+ruff 0.17.3
+All checks passed!
+exit=0
+
+========================================================================
+6. JSONSCHEMA (now a declared dev dependency)
+$ importlib.metadata.version('jsonschema')
+------------------------------------------------------------------------
+jsonschema 4.26.0
+
+========================================================================
+7. REAL-SOURCE RUN (read-only, aggregates only: counts, codes, hash prefixes)
+$ python -I -X utf8 real_run.py   (adapters -> artifact_bytes -> parse_artifact_bytes; nothing written)
+------------------------------------------------------------------------
+{
+ "PROFILES (Craw lecturers.json)": {
+  "schema_valid": true,
+  "bytes_stable_on_reencode": true,
+  "completeness": "COMPLETE",
+  "tables_or_profiles": [
+   "PROFILES"
+  ],
+  "records": 410,
+  "records_by_kind": {
+   "PROFILE": 410
+  },
+  "validation_status": {
+   "VALID": 410
+  },
+  "key_method_strength": {
+   "PROFILE_SOURCE_ID_V1/STRONG": 410
+  },
+  "record_issue_codes": {},
+  "artifact_issue_codes": [],
+  "declared_vs_actual": {
+   "PROFILES": {
+    "declared": 410,
+    "actual": 410,
+    "consistent": true
+   }
+  },
+  "claims_by_type": {
+   "EMAIL_DECLARED": 410,
+   "ORCID_DECLARED": 372
+  },
+  "claims_invalid": 0,
+  "distinct_scopus_ids": {
+   "ALL": 0
+  },
+  "scopus_collisions": {},
+  "orcid_collision_groups": 10,
+  "orcid_rows_in_collisions": 20,
+  "email_collision_groups": 0,
+  "content_hash": "ca03511cf6a9c019",
+  "capture_hash": "fce50247ca3b94cb",
+  "scope_key": "43a1256c0fb465fc",
+  "artifact_bytes_sha256": "da26092f99ac0384",
+  "artifact_bytes": 890088,
+  "excluded": {
+   "field:extra_fields": 410,
+   "source_field_label:Giới tính": 383,
+   "source_field_label:Ngày sinh": 392,
+   "source_field_label:Điện thoại": 330
+  },
+  "checks": {},
+  "completeness_basis": {
+   "profiles_in_file": 410,
+   "source_card_count": 410,
+   "lecturer_count": 410,
+   "crawl_report_present": true,
+   "source_drift_detected": false,
+   "entity_failure_types": [
+    "master_thesis"
+   ]
+  }
+ },
+ "GUIDE tables (Gate D4 snapshot)": {
+  "schema_valid": true,
+  "bytes_stable_on_reencode": true,
+  "completeness": "COMPLETE",
+  "tables_or_profiles": [
+   "AMBIGUOUS",
+   "UNASSIGNED"
+  ],
+  "records": 69,
+  "records_by_kind": {
+   "AMBIGUOUS_ID_ROW": 10,
+   "UNASSIGNED_ID_ROW": 59
+  },
+  "validation_status": {
+   "VALID": 69
+  },
+  "key_method_strength": {
+   "SCOPUS_ID_V1/STRONG": 69
+  },
+  "record_issue_codes": {},
+  "artifact_issue_codes": [],
+  "declared_vs_actual": {
+   "AMBIGUOUS_IDS": {
+    "declared": 10,
+    "actual": 10,
+    "consistent": true
+   },
+   "UNASSIGNED_IDS": {
+    "declared": 59,
+    "actual": 59,
+    "consistent": true
+   }
+  },
+  "claims_by_type": {
+   "SCOPUS_ID_AMBIGUOUS": 10,
+   "SCOPUS_ID_UNASSIGNED": 59
+  },
+  "claims_invalid": 0,
+  "distinct_scopus_ids": {
+   "SCOPUS_ID_AMBIGUOUS": 10,
+   "SCOPUS_ID_UNASSIGNED": 59,
+   "ALL": 69
+  },
+  "scopus_collisions": {},
+  "orcid_collision_groups": 0,
+  "orcid_rows_in_collisions": 0,
+  "email_collision_groups": 0,
+  "content_hash": "349ee726c2497bf9",
+  "capture_hash": "0714704ed4e0ab98",
+  "scope_key": "a751d0a315b348c9",
+  "artifact_bytes_sha256": "422d5be6911f26fa",
+  "artifact_bytes": 4729,
+  "excluded": null,
+  "checks": {},
+  "completeness_basis": null
+ },
+ "GUIDE multi-ID rows (Gate D3 snapshot)": {
+  "schema_valid": true,
+  "bytes_stable_on_reencode": true,
+  "completeness": "PARTIAL",
+  "tables_or_profiles": [
+   "MULTI_ID"
+  ],
+  "records": 34,
+  "records_by_kind": {
+   "MULTI_ID_ROW": 34
+  },
+  "validation_status": {
+   "VALID": 34
+  },
+  "key_method_strength": {
+   "EMAIL_V1/MEDIUM": 34
+  },
+  "record_issue_codes": {},
+  "artifact_issue_codes": [],
+  "declared_vs_actual": {
+   "MULTI_ID_LECTURERS": {
+    "declared": null,
+    "actual": 34,
+    "consistent": true
+   }
+  },
+  "claims_by_type": {
+   "EMAIL_DECLARED": 34,
+   "SCOPUS_ID_OWNED": 83
+  },
+  "claims_invalid": 0,
+  "distinct_scopus_ids": {
+   "SCOPUS_ID_OWNED": 83,
+   "ALL": 83
+  },
+  "scopus_collisions": {},
+  "orcid_collision_groups": 0,
+  "orcid_rows_in_collisions": 0,
+  "email_collision_groups": 0,
+  "content_hash": "9326ccd38f2d7177",
+  "capture_hash": "9cc874faaf22cc55",
+  "scope_key": "b51e1db4460de2be",
+  "artifact_bytes_sha256": "abd0bdb29407ffdb",
+  "artifact_bytes": 4687,
+  "excluded": null,
+  "checks": {},
+  "completeness_basis": null
+ },
+ "cross_capture": {
+  "owned_ids_also_in_ambiguous_or_unassigned": 0,
+  "comparable_guide_captures": false,
+  "reasons": [
+   "PREVIOUS_NOT_COMPLETE",
+   "SCOPE_DIFFERS"
+  ]
+ },
+ "upstream": {
+  "lecturers_json_sha256": "c12252e02cbf73c5",
+  "d4_snapshot_sha256": "2ae4301fcca590c1",
+  "d3_snapshot_sha256": "5676e6b0d39a7797"
+ }
+}
+
+========================================================================
+8. STORAGE CLAIMS OF THE SCHEMA PROPOSAL (real artifacts)
+$ python -I -X utf8 verify_storage.py
+------------------------------------------------------------------------
+{
+ "PROFILES": {
+  "artifact_bytes_rebuilt_from_content_and_capture_json": true,
+  "record_hash_recomputable_from_decoded_raw": true,
+  "content_json_bytes": 481963,
+  "capture_json_bytes": 408008,
+  "records": 410,
+  "claims": 782
+ },
+ "GUIDE_TABLES": {
+  "artifact_bytes_rebuilt_from_content_and_capture_json": true,
+  "record_hash_recomputable_from_decoded_raw": true,
+  "content_json_bytes": 3992,
+  "capture_json_bytes": 584,
+  "records": 69,
+  "claims": 69
+ },
+ "GUIDE_MULTI_ID": {
+  "artifact_bytes_rebuilt_from_content_and_capture_json": true,
+  "record_hash_recomputable_from_decoded_raw": true,
+  "content_json_bytes": 3859,
+  "capture_json_bytes": 678,
+  "records": 34,
+  "claims": 117
+ }
+}
+
+========================================================================
+9. REAL-RUN DETERMINISM (sha256 prefix of the full aggregate output per PYTHONHASHSEED)
+$ PYTHONHASHSEED=<seed> python -X utf8 real_run.py
+------------------------------------------------------------------------
+0 c9fd1208a4ff2613
+1 c9fd1208a4ff2613
+4242 c9fd1208a4ff2613
+random c9fd1208a4ff2613
+
+========================================================================
+10. DIFF, REPLAY, WHITESPACE, E3-P1 PRESERVATION
+$ python -I p2a_evidence.py
+------------------------------------------------------------------------
+{
+  "diff_sha256": "84dd5a72eb0b8411f4782f55d3313c8c02a49e9f587c47e3f6e3b8b1e82b8a48",
+  "diff_stats": {
+    "backend/app/services/source_claims/adapters.py": {
+      "added": 388,
+      "removed": 0
+    },
+    "backend/pyproject.toml": {
+      "added": 1,
+      "removed": 0
+    },
+    "backend/tests/unit/test_source_claims_adapters.py": {
+      "added": 532,
+      "removed": 0
+    }
+  },
+  "whitespace_check": "clean",
+  "replay_steps": {
+    "E3P1_IMPLEMENTATION.diff": "OK",
+    "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+    "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK",
+    "E3P2A_IMPLEMENTATION.diff": "OK"
+  },
+  "replay_matches_workspace": {
+    "backend/app/services/source_claims/adapters.py": true,
+    "backend/tests/unit/test_source_claims_adapters.py": true,
+    "backend/pyproject.toml": true
+  },
+  "reverse_check": "OK",
+  "p1_files_unchanged_vs_closeout": {
+    "backend/app/services/source_claims/__init__.py": true,
+    "backend/app/services/source_claims/contract.py": true,
+    "backend/app/services/source_claims/canonical.py": true,
+    "backend/app/services/source_claims/parser.py": true,
+    "backend/app/services/source_claims/analysis.py": true,
+    "data/source_claims/schema/ictu_source_claims.schema.json": true,
+    "backend/tests/unit/test_source_claims.py": true
+  },
+  "files": {
+    "backend/app/services/source_claims/adapters.py": {
+      "sha256_lf": "03dd829b88cf1c0c58b55543bd593d5b19ee0953ee7e25ad2ab35ee5c7b4c26d",
+      "sha256_on_disk": "03dd829b88cf1c0c58b55543bd593d5b19ee0953ee7e25ad2ab35ee5c7b4c26d",
+      "crlf_on_disk": false,
+      "lines": 388
+    },
+    "backend/tests/unit/test_source_claims_adapters.py": {
+      "sha256_lf": "2e258362ea84c8446fe25d6f6a993641aa38f1c0947029256782fec425e976ca",
+      "sha256_on_disk": "2e258362ea84c8446fe25d6f6a993641aa38f1c0947029256782fec425e976ca",
+      "crlf_on_disk": false,
+      "lines": 532
+    },
+    "backend/pyproject.toml": {
+      "sha256_lf": "fb90d358d847d0719f83b3cefc221a842badb72c1a053ed6161457d75a1eae87",
+      "sha256_on_disk": "638cfc11210917e6dbdcbc183c356303e2ea07e476dd9ad128bc8fba99545334",
+      "crlf_on_disk": true,
+      "lines": 60
+    }
+  }
+}
+
+========================================================================
+11. G01-G04 RE-HASH (latest recorded SHA-256 per file)
+$ python -I g_rehash.py
+------------------------------------------------------------------------
+{
+ "backend/app/services/affiliation_import.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/affiliation_import.py",
+  "match": true
+ },
+ "backend/app/services/affiliation_sources.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/affiliation_sources.py",
+  "match": true
+ },
+ "backend/app/services/author_affiliation.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/author_affiliation.py",
+  "match": true
+ },
+ "backend/app/services/lecturer_dataset/known_publication_ingestion.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/lecturer_dataset/known_publication_ingestion.py",
+  "match": true
+ },
+ "backend/app/services/normalization/scopus_author_normalizer.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/app/services/normalization/scopus_author_normalizer.py",
+  "match": true
+ },
+ "backend/tests/integration/test_affiliation_workflow_api.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/integration/test_affiliation_workflow_api.py",
+  "match": true
+ },
+ "backend/tests/integration/test_author_normalizer_transactions_pg.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/integration/test_author_normalizer_transactions_pg.py",
+  "match": true
+ },
+ "backend/tests/integration/test_import_author_affiliations_cli.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/integration/test_import_author_affiliations_cli.py",
+  "match": true
+ },
+ "backend/tests/unit/test_affiliation_provenance.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_affiliation_provenance.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_affiliation.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_author_affiliation.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_normalizer_transactions.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/unit/test_author_normalizer_transactions.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_position_drift.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/unit/test_author_position_drift.py",
+  "match": true
+ },
+ "backend/tests/unit/test_known_publication_ingestion.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_known_publication_ingestion.py",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_CLARIFICATION_MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_CLARIFICATION_MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_CLARIFICATION_VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_CLARIFICATION_VALIDATION.json",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_DOCUMENTATION_CLARIFICATION.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_DOCUMENTATION_CLARIFICATION.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_VALIDATION.json",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/G04_IMPLEMENTATION.diff": {
+  "latest_record": "G04",
+  "field": "artifacts/G04_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G04_TEST_RESULTS.txt": {
+  "latest_record": "G04",
+  "field": "artifacts/G04_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/VALIDATION.json",
+  "match": true
+ }
+}
+files: 31 match: 31
+
+========================================================================
+12. GIT STATUS
+$ git status --short
+------------------------------------------------------------------------
+== tracked modified
+ M backend/app/services/affiliation_import.py
+ M backend/app/services/affiliation_sources.py
+ M backend/app/services/author_affiliation.py
+ M backend/app/services/lecturer_dataset/known_publication_ingestion.py
+ M backend/app/services/normalization/scopus_author_normalizer.py
+ M backend/pyproject.toml
+ M backend/tests/integration/test_affiliation_workflow_api.py
+ M backend/tests/integration/test_import_author_affiliations_cli.py
+ M backend/tests/unit/test_author_affiliation.py
+ M backend/tests/unit/test_known_publication_ingestion.py
+ M docs/qa/gate_d2/batch3_browser_evidence.json
+ M docs/qa/gate_d2/batch4_browser_evidence.json
+ M docs/qa/gate_d2/validate_gate_d2.py
+ M docs/research/01_RESEARCH_KNOWLEDGE.md
+ M docs/research/02_ICTU_DATA_FINDINGS.md
+ M docs/research/03_THESIS_DEFENSE_NOTES.md
+== untracked
+?? backend/app/services/source_claims/
+?? backend/tests/integration/test_author_normalizer_transactions_pg.py
+?? backend/tests/unit/test_affiliation_provenance.py
+?? backend/tests/unit/test_author_normalizer_transactions.py
+?? backend/tests/unit/test_author_position_drift.py
+?? backend/tests/unit/test_source_claims.py
+?? backend/tests/unit/test_source_claims_adapters.py
+?? data/source_claims/
+?? docs/qa/gate_d2/MANIFEST_v4.txt
+?? docs/qa/gate_d2/VALIDATION_REPORT_FINAL_20261028.md
+?? docs/qa/gate_d2/gate_d2_batch3to5_final_closeout_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_fixed_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip.sha256
+?? docs/qa/gate_d2/neg_test_evidence.py
+?? docs/qa/gate_d2/neg_test_evidence_20261028.json
+?? docs/qa/gate_d2/validate_v4_run_log.txt
+?? docs/qa/gate_d3/
+?? docs/qa/gate_d4/
+?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip
+?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip.sha256
+?? docs/qa/gate_d4_evidence_errata_20261029.zip
+?? docs/qa/gate_d4_evidence_errata_20261029.zip.sha256
+?? docs/qa/gate_e1/
+?? docs/qa/gate_e2/
+?? docs/qa/gate_e3/
+== alembic/models/api/frontend changes: 0

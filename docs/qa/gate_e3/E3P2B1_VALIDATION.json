@@ -1,0 +1,239 @@
+{
+  "gate": "E.3",
+  "phase": "P2-B1",
+  "title": "Source-claim staging schema, models and migration",
+  "date": "2026-10-29",
+  "status": "B1_DELIVERED_STOPPED_FOR_INDEPENDENT_REVIEW",
+  "migration_execution": "NOT_EXECUTED (no TEST_DATABASE_URL / allowlisted disposable PostgreSQL)",
+  "postgresql_integration_tests": "NOT_EXECUTED",
+  "scope": {
+    "application_db_connected": false,
+    "migration_executed": false,
+    "api": 0,
+    "service": 0,
+    "real_import": false,
+    "reviewer_actions": 0,
+    "g01_g04_modified": false,
+    "gate_d_or_research_modified": false,
+    "accepted_e3_files_modified": false,
+    "commit": false,
+    "push": false,
+    "b2_started": false
+  },
+  "files": {
+    "backend/app/models/source_staging.py": {
+      "sha256": "225f27eab45f5c370355d323fb39ad3ffa106a88252800612ae77bf464582572",
+      "lines": 378,
+      "crlf_on_disk": false
+    },
+    "backend/alembic/versions/a77e01c33ee1_e3_p2b1_source_claim_staging.py": {
+      "sha256": "a06631c61aa45aff8f16ee4f5176e07f0a087f55cd91885949b112ac5ad0e8ce",
+      "lines": 331,
+      "crlf_on_disk": false
+    },
+    "backend/app/services/source_claims/provenance.py": {
+      "sha256": "9e5c2d8d07d69b59f3c6a2efe56c2de66ed8abecc9186c9b249a04f28d1bd062",
+      "lines": 117,
+      "crlf_on_disk": false
+    },
+    "backend/tests/unit/test_source_staging_schema.py": {
+      "sha256": "12c01f685c6b07bc945d9923e4f7c2e87ec8d7afc155ddba0150ad0a5de495b1",
+      "lines": 656,
+      "crlf_on_disk": false
+    },
+    "backend/tests/unit/test_source_claims_provenance.py": {
+      "sha256": "2bde8887827a4c4c39630734ac27dcf5812c6ede5d8860ca76d9da7341c5db09",
+      "lines": 180,
+      "crlf_on_disk": false
+    },
+    "backend/app/models/__init__.py": {
+      "sha256": "949c6f0359e81c6d69943a3684ddf47e7a1b260c1de6b2b3694acd63c5d09cc9",
+      "lines": 42,
+      "crlf_on_disk": true
+    }
+  },
+  "migration": {
+    "revision": "a77e01c33ee1",
+    "down_revision": "a1b2c3d4e5f6",
+    "single_head": true,
+    "offline_sql": {
+      "upgrade": {
+        "create_table": 7,
+        "create_index": 11,
+        "create_view": 2,
+        "drop_table": 0,
+        "drop_index": 0,
+        "drop_view": 0,
+        "sha256": "ad7218b1abc977dab35e6e60ddd9284fa2579a13c9dd76ddd2664fd2ce179fdb"
+      },
+      "downgrade": {
+        "create_table": 0,
+        "create_index": 0,
+        "create_view": 0,
+        "drop_table": 7,
+        "drop_index": 11,
+        "drop_view": 2,
+        "sha256": "206f2aabd85b293ef353dc02e7efe5efbd1a33e9be5f8614df81c9caf529188c"
+      }
+    }
+  },
+  "tables": [
+    "source_rule_sets",
+    "source_contents",
+    "source_captures",
+    "source_artifacts",
+    "source_analyses",
+    "source_records",
+    "source_claims"
+  ],
+  "views": [
+    "source_capture_analyses",
+    "source_claim_observations"
+  ],
+  "resolution_A_reanalysis": {
+    "change_from_rev2": "source_artifacts.analysis_id removed; analyses found by UNIQUE(content, version, rules)",
+    "lifecycle": "content -> capture -> artifact -> analysis, each on its own key; no early return",
+    "outcomes": {
+      "CREATED": "content new",
+      "REUSED": "capture new",
+      "ARTIFACT_ADDED": "artifact new",
+      "REANALYSED": "only analysis new",
+      "ALREADY_INGESTED": "all four layers exist"
+    },
+    "rule_activation": "append-only source_rule_sets; highest sequence_no active",
+    "tests": [
+      "test_rule_version_change_reanalyses_an_existing_artifact",
+      "test_reanalysis_from_stored_rows_needs_no_upstream_input",
+      "test_switching_back_to_an_older_rule_set_reselects_its_analysis",
+      "test_re_ingesting_the_same_artifact_writes_nothing"
+    ]
+  },
+  "resolution_B_view": {
+    "selection": "ROW_NUMBER() OVER (PARTITION BY capture_id ORDER BY is_active_rule_set DESC, numeric minor DESC, analysis_created_at DESC, analysis_id)",
+    "observations_filter": "selection_rank = 1 AND is_active_rule_set = 1",
+    "uniqueness_basis": [
+      "one rank-1 analysis per capture",
+      "claim belongs to one analysis",
+      "UNIQUE(capture_id, contract_version) on artifacts"
+    ],
+    "history": "source_capture_analyses lists every compatible (capture, analysis) with rank",
+    "tests": [
+      "test_two_minor_versions_share_one_capture_and_are_observed_once",
+      "test_a_naive_capture_artifact_analysis_join_would_double_count",
+      "test_recaptured_content_is_observed_per_capture"
+    ],
+    "mutation_probes": {
+      "no_rank_filter": "4 failed",
+      "no_active_filter": "2 failed"
+    }
+  },
+  "trust_boundary": {
+    "module": "app/services/source_claims/provenance.py (pure)",
+    "binds": [
+      "bytes <-> declared sha256",
+      "decoded lecturers <-> manifest semantic hash",
+      "lecturers + manifest <-> every replay pass",
+      "crawl report <-> manifest"
+    ],
+    "real_files": {
+      "bound": true,
+      "profiles": 410,
+      "lecturers_sha256_prefix": "c12252e02cbf73c5",
+      "lecturers_semantic_matches_manifest": true,
+      "adapter_completeness_on_bound_objects": "COMPLETE",
+      "wrong_declared_sha_rejected": "BYTES_SHA256_MISMATCH"
+    },
+    "residual": "volatile timestamps bound only by the byte hash; no cryptographic signature"
+  },
+  "tests": {
+    "full": {
+      "passed": 230,
+      "skipped": 0,
+      "xfailed": 0
+    },
+    "focused_b1": {
+      "passed": 38
+    },
+    "project_conftest": "exit 4 (no TEST_DATABASE_URL; no DB used)"
+  },
+  "ruff": {
+    "version": "0.17.3",
+    "b1_files_exit": 0,
+    "preexisting": "app/models/__init__.py I001 present at HEAD; B1 adds one import line"
+  },
+  "diff": {
+    "diff_sha256": "824b34302562e039dd659e504a8583d062cde4f0a2b452f2a7584e793c66376f",
+    "diff_stats": {
+      "backend/alembic/versions/a77e01c33ee1_e3_p2b1_source_claim_staging.py": {
+        "added": 331,
+        "removed": 0
+      },
+      "backend/app/models/__init__.py": {
+        "added": 1,
+        "removed": 0
+      },
+      "backend/app/models/source_staging.py": {
+        "added": 378,
+        "removed": 0
+      },
+      "backend/app/services/source_claims/provenance.py": {
+        "added": 117,
+        "removed": 0
+      },
+      "backend/tests/unit/test_source_claims_provenance.py": {
+        "added": 180,
+        "removed": 0
+      },
+      "backend/tests/unit/test_source_staging_schema.py": {
+        "added": 656,
+        "removed": 0
+      }
+    },
+    "whitespace_check": "clean",
+    "replay_steps": {
+      "E3P1_IMPLEMENTATION.diff": "OK",
+      "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+      "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK",
+      "E3P2A_IMPLEMENTATION.diff": "OK",
+      "E3P2A_CORRECTION.diff": "OK",
+      "E3P2B1_IMPLEMENTATION.diff": "OK"
+    },
+    "replay_matches_workspace": {
+      "backend/app/models/source_staging.py": true,
+      "backend/alembic/versions/a77e01c33ee1_e3_p2b1_source_claim_staging.py": true,
+      "backend/app/services/source_claims/provenance.py": true,
+      "backend/tests/unit/test_source_staging_schema.py": true,
+      "backend/tests/unit/test_source_claims_provenance.py": true,
+      "backend/app/models/__init__.py": true
+    },
+    "reverse_check": "OK"
+  },
+  "preservation": {
+    "accepted_e3_files_unchanged": true,
+    "accepted_e3_files": 10,
+    "g01_g04_files_rehashed": 31,
+    "g01_g04_all_match": true
+  },
+  "risks": [
+    "PostgreSQL-specific DDL and views not executed",
+    "integration create_all creates tables but not views",
+    "active rule set must be seeded by B2",
+    "parser_build not part of analysis uniqueness",
+    "CLAUDE.md migration head outdated (now a77e01c33ee1)",
+    "G04 PostgreSQL pending; O-2/O-7 pending"
+  ],
+  "artifacts": {
+    "E3P2B1_HANDOVER.md": {
+      "sha256": "a4fda23522ecb0c6cd6f49903305a8f65e2420e978edb882b496bea589e34a9e",
+      "bytes": 12869
+    },
+    "E3P2B1_IMPLEMENTATION.diff": {
+      "sha256": "824b34302562e039dd659e504a8583d062cde4f0a2b452f2a7584e793c66376f",
+      "bytes": 82640
+    },
+    "E3P2B1_TEST_RESULTS.txt": {
+      "sha256": "0b30191861be030bf02c3e3c38b7b8b69cb9045c02602cd6f0aa42edacd8b707",
+      "bytes": 61837
+    }
+  }
+}

@@ -1,0 +1,927 @@
+# E3-P3-A implementation diff: 3 new files (pure bridge + tests). No existing file is
+# modified: matching engine, candidate persistence, review services, models and all
+# accepted E3 code are unchanged.
+diff --git b/backend/app/services/source_claim_matching/__init__.py b/backend/app/services/source_claim_matching/__init__.py
+new file mode 100644
+index 0000000..1f12308
+--- /dev/null
++++ b/backend/app/services/source_claim_matching/__init__.py
+@@ -0,0 +1 @@
++"""Pure bridge: staged ICTU source claims to lecturer/Scopus-author evidence (Gate E.3 / P3-A)."""
+diff --git b/backend/app/services/source_claim_matching/bridge.py b/backend/app/services/source_claim_matching/bridge.py
+new file mode 100644
+index 0000000..e4d15c4
+--- /dev/null
++++ b/backend/app/services/source_claim_matching/bridge.py
+@@ -0,0 +1,489 @@
++"""Turn staged source-claim observations into evidence for lecturer ↔ Scopus-author pairs.
++
++Pure (standard library + ``source_claims``): no database, network or identity writes. A source
++declaration is evidence, never approval; subjects are resolved only through the profile source
++URL or the e-mail, never by name; reviewer decisions are inputs that are echoed, never changed.
++The input must be the observation view's projection (one analysis per capture, one rule set).
++"""
++
++from __future__ import annotations
++
++from collections import defaultdict
++from collections.abc import Iterable
++from dataclasses import dataclass
++from datetime import datetime
++from enum import StrEnum
++from typing import Any
++from uuid import UUID
++
++from app.services.source_claims.canonical import (
++    normalize_email,
++    normalize_orcid,
++    normalize_source_id,
++    sha256_json,
++)
++from app.services.source_claims.contract import ParsedSnapshot
++
++BRIDGE_RULE_ID = "RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID"
++BRIDGE_RULE_VERSION = "E3-P3A-1"
++# R-02 lists PUBLISHER / REGISTRY / AGGREGATOR_*; an institution's own declaration is none of
++# them, so it gets its own tier (proposed vocabulary addition, see E3P3A_MATCHING_MAPPING).
++SOURCE_TIER = "INSTITUTION_DECLARED"
++OWNED = "SCOPUS_ID_OWNED"
++AMBIGUOUS_ID, UNASSIGNED_ID = "SCOPUS_ID_AMBIGUOUS", "SCOPUS_ID_UNASSIGNED"
++ORCID_DECLARED, EMAIL_DECLARED = "ORCID_DECLARED", "EMAIL_DECLARED"
++# Stored vocabularies (models/candidate.py, models/identity.py); only a reviewer can change them.
++NEGATIVE_CANDIDATE_STATUSES = frozenset({"REJECTED", "SUPERSEDED"})
++NEGATIVE_IDENTITY_STATUSES = frozenset({"REJECTED", "REVOKED"})
++
++
++class BridgeError(ValueError):
++    def __init__(self, code: str, message: str) -> None:
++        super().__init__(f"{code}: {message}")
++        self.code = code
++
++
++class Resolution(StrEnum):
++    RESOLVED_SOURCE_ID = "RESOLVED_SOURCE_ID"   # profile URL equals one lecturer's profile URL
++    RESOLVED_EMAIL = "RESOLVED_EMAIL"           # e-mail equals one lecturer's e-mail
++    AMBIGUOUS = "AMBIGUOUS"                     # several lecturers share the key
++    CONFLICT = "CONFLICT"                       # URL and e-mail point at different lecturers
++    UNRESOLVED = "UNRESOLVED"                   # no lecturer carries the key (R-15)
++    WEAK_SOURCE_KEY = "WEAK_SOURCE_KEY"         # content-keyed record: never resolved
++
++
++class PairClass(StrEnum):
++    VERIFIED_ASSOCIATION = "VERIFIED_ASSOCIATION"   # an APPROVED identity already exists
++    PLAUSIBLE_CANDIDATE = "PLAUSIBLE_CANDIDATE"
++    CONFLICTING_EVIDENCE = "CONFLICTING_EVIDENCE"
++    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
++
++
++class Presence(StrEnum):
++    CURRENT = "CURRENT"              # observed in the latest capture of its scope
++    NOT_OBSERVED = "NOT_OBSERVED"    # absent, but absence proves nothing (PARTIAL, weak key)
++    WITHDRAWN = "WITHDRAWN"          # absent from a later COMPLETE capture of the same scope
++
++
++# ---------------------------------------------------------------------------
++# Inputs (built by P3-B from the staging rows; tests build them from parsed snapshots)
++# ---------------------------------------------------------------------------
++
++@dataclass(frozen=True, slots=True)
++class CaptureRef:
++    capture_id: UUID
++    source_system: str
++    scope_key: str
++    projection_version: str
++    captured_at: str
++    completeness: str
++
++
++@dataclass(frozen=True, slots=True)
++class ObservedClaim:
++    """One row of ``source_claim_observations`` plus its record's identity fields."""
++
++    capture_id: UUID
++    analysis_id: UUID
++    contract_version: str
++    identity_rules_version: str
++    normalization_version: str
++    claim_id: UUID
++    record_id: UUID
++    claim_type: str
++    subject_key: str | None
++    value_raw: str | None
++    value_normalized: str | None
++    claim_key: str
++    flags: tuple[tuple[str, Any], ...]
++    record_key: str
++    key_method: str
++    key_strength: str
++    record_validation_status: str
++    record_source_id: str | None
++    record_email: str | None
++
++    def flag(self, name: str, default: Any = None) -> Any:
++        return dict(self.flags).get(name, default)
++
++
++@dataclass(frozen=True, slots=True)
++class LecturerRef:
++    lecturer_id: UUID
++    repository_profile_url: str | None
++    email: str | None
++    orcid: str | None
++
++
++@dataclass(frozen=True, slots=True)
++class ScopusAuthorRef:
++    scopus_author_id: UUID
++    scopus_id: str
++
++
++@dataclass(frozen=True, slots=True)
++class DecisionRef:
++    """Existing review state of a pair: candidate status and/or identity status, as stored."""
++
++    lecturer_id: UUID
++    scopus_author_id: UUID
++    candidate_status: str | None = None   # PENDING | ACCEPTED | REJECTED | SUPERSEDED
++    identity_status: str | None = None    # CANDIDATE | APPROVED | REJECTED | REVOKED
++
++
++# ---------------------------------------------------------------------------
++# Outputs
++# ---------------------------------------------------------------------------
++
++@dataclass(frozen=True, slots=True)
++class ObservationRef:
++    capture_id: UUID
++    captured_at: str
++    completeness: str
++    analysis_id: UUID
++    contract_version: str
++    claim_id: UUID
++    record_id: UUID
++
++
++@dataclass(frozen=True, slots=True)
++class SourceClaimEvidence:
++    """One real-world source claim supporting one pair; repeated observations do not multiply it."""
++
++    evidence_key: tuple[str, ...]
++    fingerprint: str
++    rule_id: str
++    rule_version: str
++    source_tier: str
++    lecturer_id: UUID
++    scopus_author_id: UUID
++    scopus_id: str
++    source_system: str
++    scope_key: str
++    claim_key: str
++    subject_resolution: Resolution
++    is_primary_claimed: bool
++    listed: bool
++    presence: Presence
++    identity_rules_version: str
++    normalization_version: str
++    observed_in: tuple[ObservationRef, ...]
++
++
++@dataclass(frozen=True, slots=True)
++class PairAssessment:
++    lecturer_id: UUID
++    scopus_author_id: UUID
++    scopus_id: str
++    classification: PairClass
++    reasons: tuple[str, ...]
++    evidence_fingerprints: tuple[str, ...]
++    existing_candidate_status: str | None
++    existing_identity_status: str | None
++    decision_preserved: bool                # the bridge never changes a stored decision
++    accept_reason_required: bool            # R-05: source listing alone never auto-accepts
++
++
++@dataclass(frozen=True, slots=True)
++class Finding:
++    code: str
++    source_system: str
++    scope_key: str
++    claim_key: str
++    lecturer_id: UUID | None
++    scopus_id: str | None
++    detail: tuple[tuple[str, Any], ...] = ()
++
++
++@dataclass(frozen=True, slots=True)
++class BridgeResult:
++    evidence: tuple[SourceClaimEvidence, ...]
++    pairs: tuple[PairAssessment, ...]
++    findings: tuple[Finding, ...]
++    identity_rules_version: str | None
++    normalization_version: str | None
++
++
++# ---------------------------------------------------------------------------
++# Building inputs from a parsed snapshot (pure; P3-B maps the same fields from staging rows)
++# ---------------------------------------------------------------------------
++
++def observations_from_snapshot(snapshot: ParsedSnapshot, *, capture_id: UUID, analysis_id: UUID,
++                               ids: dict[str, UUID]) -> tuple[ObservedClaim, ...]:
++    """``ids`` maps ``record_ref`` and ``record_ref/claim_key`` to stable row ids."""
++    records = {r.ref: r for r in snapshot.records}
++    observed = []
++    for claim in snapshot.claims:
++        record = records[claim.record_ref]
++        normalized = {name: dict(value) for name, value in record.normalized}
++        observed.append(ObservedClaim(
++            capture_id=capture_id, analysis_id=analysis_id,
++            contract_version=snapshot.contract_version,
++            identity_rules_version=snapshot.identity_rules_version,
++            normalization_version=snapshot.normalization_version,
++            claim_id=ids[f"{claim.record_ref}/{claim.claim_key}"], record_id=ids[claim.record_ref],
++            claim_type=claim.claim_type.value, subject_key=claim.subject_key,
++            value_raw=claim.value.raw, value_normalized=claim.value.normalized,
++            claim_key=claim.claim_key, flags=claim.flags, record_key=record.record_key.value,
++            key_method=record.record_key.method.value,
++            key_strength=record.record_key.strength.value,
++            record_validation_status=record.validation_status.value,
++            record_source_id=(normalized.get("source_id") or {}).get("normalized"),
++            record_email=(normalized.get("email") or {}).get("normalized")))
++    return tuple(observed)
++
++
++# ---------------------------------------------------------------------------
++# The bridge
++# ---------------------------------------------------------------------------
++
++def _validate(observations: tuple[ObservedClaim, ...],
++              captures: dict[UUID, CaptureRef]) -> tuple[str | None, str | None]:
++    """Fail closed unless the input is one rule set and one analysis per capture."""
++    rules = {(o.identity_rules_version, o.normalization_version) for o in observations}
++    if len(rules) > 1:
++        raise BridgeError("MIXED_RULE_VERSIONS", f"observations span rule sets {sorted(rules)}")
++    analyses: dict[UUID, set[UUID]] = defaultdict(set)
++    seen: set[tuple[UUID, UUID]] = set()
++    for o in observations:
++        if o.capture_id not in captures:
++            raise BridgeError("UNKNOWN_CAPTURE", f"capture {o.capture_id} has no CaptureRef")
++        analyses[o.capture_id].add(o.analysis_id)
++        if (o.capture_id, o.claim_id) in seen:
++            raise BridgeError("DUPLICATE_OBSERVATION", f"claim {o.claim_id} twice in one capture")
++        seen.add((o.capture_id, o.claim_id))
++    crowded = sorted(str(c) for c, a in analyses.items() if len(a) > 1)
++    if crowded:
++        raise BridgeError("MULTIPLE_ANALYSES_PER_CAPTURE",
++                          f"captures {crowded} carry several analyses (artifact versions or rules)")
++    return next(iter(rules)) if rules else (None, None)
++
++
++def _lecturer_index(lecturers: Iterable[LecturerRef]):
++    by_url: dict[str, set[UUID]] = defaultdict(set)
++    by_email: dict[str, set[UUID]] = defaultdict(set)
++    by_id: dict[UUID, LecturerRef] = {}
++    for lecturer in lecturers:
++        by_id[lecturer.lecturer_id] = lecturer
++        url = normalize_source_id(lecturer.repository_profile_url).normalized \
++            if lecturer.repository_profile_url else None
++        email = normalize_email(lecturer.email).normalized if lecturer.email else None
++        if url:
++            by_url[url].add(lecturer.lecturer_id)
++        if email:
++            by_email[email].add(lecturer.lecturer_id)
++    return by_url, by_email, by_id
++
++
++def _resolve(o: ObservedClaim, by_url, by_email) -> tuple[Resolution, UUID | None]:
++    if o.key_strength == "WEAK":
++        return Resolution.WEAK_SOURCE_KEY, None
++    url_hits = by_url.get(o.record_source_id, set()) if o.record_source_id else set()
++    email_hits = by_email.get(o.record_email, set()) if o.record_email else set()
++    if len(url_hits) > 1:
++        return Resolution.AMBIGUOUS, None
++    if url_hits:
++        if email_hits and email_hits != url_hits:
++            return Resolution.CONFLICT, None
++        return Resolution.RESOLVED_SOURCE_ID, next(iter(url_hits))
++    if len(email_hits) > 1:
++        return Resolution.AMBIGUOUS, None
++    if email_hits:
++        return Resolution.RESOLVED_EMAIL, next(iter(email_hits))
++    return Resolution.UNRESOLVED, None
++
++
++def _moment(capture: CaptureRef) -> tuple[datetime, str]:
++    return (datetime.fromisoformat(capture.captured_at.replace("Z", "+00:00")),
++            str(capture.capture_id))
++
++
++def _latest(capture_list: list[CaptureRef]) -> CaptureRef:
++    return max(capture_list, key=_moment)
++
++
++def _presence(observed: list[ObservedClaim], scope_captures: list[CaptureRef],
++              captures: dict[UUID, CaptureRef]) -> Presence:
++    """Withdrawal needs a later COMPLETE capture of the same scope and projection after a
++    COMPLETE capture that listed the claim, and a non-weak subject key (P1 semantics)."""
++    latest = _latest(scope_captures)
++    seen_in = {o.capture_id for o in observed}
++    if latest.capture_id in seen_in:
++        return Presence.CURRENT
++    last_seen = _latest([captures[c] for c in seen_in])
++    weak = any(o.key_strength == "WEAK" for o in observed)
++    if latest.completeness == "COMPLETE" and last_seen.completeness == "COMPLETE" and not weak \
++            and _moment(last_seen) < _moment(latest):
++        return Presence.WITHDRAWN
++    return Presence.NOT_OBSERVED
++
++
++def _finding(code, scope, claim_key, lecturer_id=None, scopus_id=None, **detail) -> Finding:
++    return Finding(code, scope[0], scope[1], claim_key, lecturer_id, scopus_id,
++                   tuple(sorted(detail.items())))
++
++
++def bridge_source_claims(
++    observations: Iterable[ObservedClaim], captures: Iterable[CaptureRef],
++    lecturers: Iterable[LecturerRef], scopus_authors: Iterable[ScopusAuthorRef],
++    decisions: Iterable[DecisionRef] = (),
++) -> BridgeResult:
++    observations = tuple(observations)
++    capture_map = {c.capture_id: c for c in captures}
++    rules = _validate(observations, capture_map)
++    by_url, by_email, lecturer_by_id = _lecturer_index(lecturers)
++    author_by_scopus_id = {a.scopus_id: a for a in scopus_authors}
++    decision_by_pair = {(d.lecturer_id, d.scopus_author_id): d for d in decisions}
++    approved_owner: dict[UUID, set[UUID]] = defaultdict(set)
++    for d in decision_by_pair.values():
++        if d.identity_status == "APPROVED":
++            approved_owner[d.scopus_author_id].add(d.lecturer_id)
++
++    captures_by_scope: dict[tuple[str, str, str], list[CaptureRef]] = defaultdict(list)
++    for c in capture_map.values():
++        captures_by_scope[(c.source_system, c.scope_key, c.projection_version)].append(c)
++
++    # Real-world claim identity: (source system, scope, projection, claim_key). Repeated captures,
++    # artifact versions and analyses of the same claim collapse onto it; other sources stay apart.
++    grouped: dict[tuple[str, str, str, str], list[ObservedClaim]] = defaultdict(list)
++    for o in observations:
++        c = capture_map[o.capture_id]
++        grouped[(c.source_system, c.scope_key, c.projection_version, o.claim_key)].append(o)
++
++    findings: list[Finding] = []
++    evidence: list[SourceClaimEvidence] = []
++    current_unowned: dict[str, set[str]] = defaultdict(set)     # scopus_id -> claim types
++    orcid_records: dict[str, set[tuple[str, str]]] = defaultdict(set)
++
++    for claim_identity in sorted(grouped):
++        source_system, scope_key, projection, claim_key = claim_identity
++        group = sorted(grouped[claim_identity],
++                       key=lambda o: (capture_map[o.capture_id].captured_at, str(o.capture_id)))
++        scope = (source_system, scope_key)
++        latest_obs = group[-1]
++        presence = _presence(group, captures_by_scope[(source_system, scope_key, projection)],
++                             capture_map)
++        value = latest_obs.value_normalized
++        if value is None:
++            findings.append(_finding("INVALID_CLAIM_VALUE", scope, claim_key,
++                                     claim_type=latest_obs.claim_type,
++                                     value_raw=latest_obs.value_raw))
++            continue
++
++        if latest_obs.claim_type in (AMBIGUOUS_ID, UNASSIGNED_ID):
++            if presence is Presence.CURRENT:
++                current_unowned[value].add(latest_obs.claim_type)
++            findings.append(_finding("UNOWNED_SCOPUS_ID_LISTED", scope, claim_key, scopus_id=value,
++                                     claim_type=latest_obs.claim_type,
++                                     in_catalog=value in author_by_scopus_id,
++                                     presence=presence.value))
++            continue
++
++        resolution, lecturer_id = _resolve(latest_obs, by_url, by_email)
++        if latest_obs.claim_type == ORCID_DECLARED:
++            orcid_records[value].add((source_system, latest_obs.record_key))
++            if lecturer_id is not None:
++                stored = normalize_orcid(lecturer_by_id[lecturer_id].orcid).normalized \
++                    if lecturer_by_id[lecturer_id].orcid else None
++                code = ("ORCID_DECLARED_MATCHES_LECTURER" if stored == value
++                        else "ORCID_DECLARED_DIFFERS_FROM_LECTURER" if stored
++                        else "ORCID_DECLARED_LECTURER_HAS_NONE")
++                findings.append(_finding(code, scope, claim_key, lecturer_id, evidence_tier=
++                                         "SOURCE_DECLARED_NOT_SLOT_VERIFIED"))
++            continue
++        if latest_obs.claim_type == EMAIL_DECLARED:
++            if resolution is Resolution.RESOLVED_SOURCE_ID:
++                stored = normalize_email(lecturer_by_id[lecturer_id].email).normalized \
++                    if lecturer_by_id[lecturer_id].email else None
++                if stored != value:
++                    findings.append(_finding("EMAIL_DECLARED_DIFFERS_FROM_LECTURER", scope,
++                                             claim_key, lecturer_id))
++            continue
++
++        # SCOPUS_ID_OWNED
++        if lecturer_id is None:
++            findings.append(_finding(f"SUBJECT_{resolution.value}", scope, claim_key,
++                                     scopus_id=value, record_key_method=latest_obs.key_method))
++            continue
++        author = author_by_scopus_id.get(value)
++        if author is None:
++            findings.append(_finding("SCOPUS_AUTHOR_NOT_IN_CATALOG", scope, claim_key,
++                                     lecturer_id, value))
++            continue
++        evidence_key = (str(lecturer_id), str(author.scopus_author_id), BRIDGE_RULE_ID,
++                        BRIDGE_RULE_VERSION, source_system, scope_key, projection, claim_key)
++        evidence.append(SourceClaimEvidence(
++            evidence_key=evidence_key, fingerprint=sha256_json(list(evidence_key)),
++            rule_id=BRIDGE_RULE_ID, rule_version=BRIDGE_RULE_VERSION, source_tier=SOURCE_TIER,
++            lecturer_id=lecturer_id, scopus_author_id=author.scopus_author_id, scopus_id=value,
++            source_system=source_system, scope_key=scope_key, claim_key=claim_key,
++            subject_resolution=resolution,
++            is_primary_claimed=bool(latest_obs.flag("is_primary_claimed", False)),
++            listed=bool(latest_obs.flag("listed", True)), presence=presence,
++            identity_rules_version=latest_obs.identity_rules_version,
++            normalization_version=latest_obs.normalization_version,
++            observed_in=tuple(ObservationRef(
++                o.capture_id, capture_map[o.capture_id].captured_at,
++                capture_map[o.capture_id].completeness, o.analysis_id, o.contract_version,
++                o.claim_id, o.record_id) for o in group)))
++
++    for orcid, holders in sorted(orcid_records.items()):
++        if len(holders) > 1:   # R-14: kept and flagged, never resolved automatically
++            findings.append(Finding("ORCID_DECLARED_BY_MULTIPLE_RECORDS", "*", "*",
++                                    f"ORCID_DECLARED|*|{orcid}", None, None,
++                                    (("orcid", orcid), ("records", tuple(sorted(holders))))))
++
++    pairs = _assess_pairs(evidence, decision_by_pair, approved_owner, current_unowned, findings)
++    evidence.sort(key=lambda e: e.evidence_key)
++    findings.sort(key=lambda f: (f.code, f.source_system, f.scope_key, f.claim_key,
++                                 str(f.lecturer_id), f.scopus_id or ""))
++    return BridgeResult(tuple(evidence), pairs, tuple(findings), *rules)
++
++
++def _assess_pairs(evidence, decision_by_pair, approved_owner, current_unowned, findings):
++    by_pair: dict[tuple[UUID, UUID], list[SourceClaimEvidence]] = defaultdict(list)
++    for item in evidence:
++        by_pair[(item.lecturer_id, item.scopus_author_id)].append(item)
++    owners_now: dict[UUID, set[UUID]] = defaultdict(set)
++    for (lecturer_id, author_id), items in by_pair.items():
++        if any(i.presence is not Presence.WITHDRAWN for i in items):
++            owners_now[author_id].add(lecturer_id)
++
++    pairs = []
++    for (lecturer_id, author_id), items in sorted(by_pair.items(),
++                                                  key=lambda p: (str(p[0][0]), str(p[0][1]))):
++        decision = decision_by_pair.get((lecturer_id, author_id))
++        scopus_id = items[0].scopus_id
++        live = [i for i in items if i.presence is not Presence.WITHDRAWN]
++        reasons = []
++        if decision is not None and (decision.candidate_status in NEGATIVE_CANDIDATE_STATUSES
++                                     or decision.identity_status in NEGATIVE_IDENTITY_STATUSES):
++            reasons.append("PRIOR_NEGATIVE_DECISION_REVIEWER_REOPEN_REQUIRED")
++        if approved_owner[author_id] - {lecturer_id}:
++            reasons.append("SCOPUS_ID_APPROVED_FOR_OTHER_LECTURER")
++        if len(owners_now[author_id]) > 1:
++            reasons.append("SCOPUS_ID_DECLARED_FOR_SEVERAL_LECTURERS")
++        if scopus_id in current_unowned:
++            reasons.append("SCOPUS_ID_ALSO_LISTED_AS_" + "_AND_".join(
++                sorted(t.removeprefix("SCOPUS_ID_") for t in current_unowned[scopus_id])))
++        if not live:
++            reasons.append("CLAIM_WITHDRAWN_FROM_SOURCE")
++        if decision is not None and decision.identity_status == "APPROVED":
++            classification = PairClass.VERIFIED_ASSOCIATION     # verified by a reviewer, not here
++        elif any(r.startswith("SCOPUS_ID_") for r in reasons):
++            classification = PairClass.CONFLICTING_EVIDENCE
++        elif not live:
++            classification = PairClass.INSUFFICIENT_EVIDENCE
++        else:
++            classification = PairClass.PLAUSIBLE_CANDIDATE
++        pairs.append(PairAssessment(
++            lecturer_id, author_id, scopus_id, classification, tuple(reasons),
++            tuple(sorted(i.fingerprint for i in items)),
++            decision.candidate_status if decision else None,
++            decision.identity_status if decision else None,
++            decision_preserved=True, accept_reason_required=True))
++        if decision is not None and decision.identity_status == "APPROVED" and not live:
++            findings.append(Finding("SOURCE_NO_LONGER_LISTS_APPROVED_ID", items[0].source_system,
++                                    items[0].scope_key, items[0].claim_key, lecturer_id,
++                                    scopus_id))
++    return tuple(pairs)
+diff --git b/backend/tests/unit/test_source_claim_matching_bridge.py b/backend/tests/unit/test_source_claim_matching_bridge.py
+new file mode 100644
+index 0000000..bbfb17d
+--- /dev/null
++++ b/backend/tests/unit/test_source_claim_matching_bridge.py
+@@ -0,0 +1,416 @@
++"""Gate E.3 / P3-A — pure bridge from staged source claims to pair evidence (synthetic data).
++
++Artifacts are built with the accepted P2-A adapters and parsed with the accepted P1 parser, then
++projected into observation rows exactly as the staging view would deliver them.
++"""
++
++from __future__ import annotations
++
++import copy
++import json
++import random
++import subprocess
++import sys
++import uuid
++from pathlib import Path
++
++import pytest
++
++from app.services.source_claim_matching.bridge import (
++    BRIDGE_RULE_ID,
++    SOURCE_TIER,
++    BridgeError,
++    CaptureRef,
++    DecisionRef,
++    LecturerRef,
++    ObservedClaim,
++    PairClass,
++    Presence,
++    Resolution,
++    ScopusAuthorRef,
++    bridge_source_claims,
++    observations_from_snapshot,
++)
++from app.services.source_claims import adapters, parser
++from app.services.source_claims.parser import parse_artifact_bytes
++from tests.source_staging_fixtures import ORCID_A, lecturer, sid, tables_snapshot
++
++BACKEND = Path(__file__).resolve().parents[2]
++NS = uuid.UUID("6f1d3c2a-0000-4000-8000-000000000e3a")
++REPO = "https://repository.example.invalid"
++GUIDE = f"{REPO}/huong-dan-gop-tai-khoan-scopus/"
++
++
++def u(*parts) -> uuid.UUID:
++    return uuid.uuid5(NS, "|".join(map(str, parts)))
++
++
++# ---------------------------------------------------------------------------
++# Synthetic artifacts -> captures and observations (as the staging view projects them)
++# ---------------------------------------------------------------------------
++
++def multi_artifact(rows, *, ts="2026-10-29T00:32:28Z", completeness="COMPLETE"):
++    return adapters.guide_multi_id_artifact(
++        {"ts": ts, "url": GUIDE, "multi_id_rows": len(rows), "rows": [list(r) for r in rows]},
++        snapshot_sha256="a" * 64, completeness=completeness)
++
++
++def tables_artifact(ambiguous=(), unassigned=(), *, ts="2026-10-29T01:37:29Z"):
++    snapshot = json.loads(tables_snapshot(ambiguous, unassigned, ts=ts)["snapshot_bytes"])
++    return adapters.guide_tables_artifact(snapshot, snapshot_sha256="a" * 64,
++                                          completeness="COMPLETE")
++
++
++def profiles_artifact(items, *, completed="2026-10-03T21:31:10Z"):
++    manifest = {"harvest_completed_at": completed, "source_base_url": REPO,
++                "source_card_count": len(items), "lecturer_count": len(items),
++                "status": "COMPLETE", "source_drift_detected": False,
++                "semantic_file_hashes": {"lecturers.json": "b" * 64}}
++    replay = {"a_equals_b_equals_c": True,
++              "file_hashes": {r: {"lecturers.json": "b" * 64} for r in ("A", "B", "C")}}
++    return adapters.profiles_artifact(items, manifest, {"source_entity_failures": []}, replay,
++                                      lecturers_sha256="a" * 64)
++
++
++def observe(artifact, *, version="1.0"):
++    artifact = copy.deepcopy(artifact)
++    artifact["contract_version"] = version
++    snap = parse_artifact_bytes(adapters.artifact_bytes(artifact))
++    capture_id = u("capture", snap.content_hash, snap.capture.capture_hash)
++    analysis_id = u("analysis", snap.content_hash, version, snap.identity_rules_version,
++                    snap.normalization_version)
++    ids = {r.ref: u("record", analysis_id, r.ref) for r in snap.records}
++    ids |= {f"{c.record_ref}/{c.claim_key}": u("claim", analysis_id, c.record_ref, c.claim_key)
++            for c in snap.claims}
++    capture = CaptureRef(capture_id, snap.source_system.value, snap.scope_key,
++                         json.loads(snap.capture.capture_json)["adapter"]["projection"],
++                         snap.capture.captured_at, snap.completeness.value)
++    return capture, observations_from_snapshot(snap, capture_id=capture_id,
++                                               analysis_id=analysis_id, ids=ids)
++
++
++def run(*observed, lecturers=(), authors=None, decisions=()):
++    captures = [c for c, _ in observed]
++    rows = [o for _, obs in observed for o in obs]
++    if authors is None:
++        authors = [ScopusAuthorRef(u("author", n), sid(n)) for n in range(1, 40)]
++    return bridge_source_claims(rows, captures, lecturers, authors, decisions)
++
++
++def gv(n, *, email=None, url=None, orcid=None):
++    return LecturerRef(u("lecturer", n), url, email or f"gv{n}@example.invalid", orcid)
++
++
++def row(n, ids, primary=None, email=None):
++    email = f"gv{n}@example.invalid" if email is None else email
++    return [f"GV {n}", email, str(len(ids)), "1", primary or ids[0], "; ".join(ids)]
++
++
++def author(n):
++    return u("author", n)
++
++
++def pair_of(result, lecturer_n, author_n):
++    found = [p for p in result.pairs if p.lecturer_id == u("lecturer", lecturer_n)
++             and p.scopus_author_id == author(author_n)]
++    assert len(found) == 1
++    return found[0]
++
++
++def codes(result):
++    return [f.code for f in result.findings]
++
++
++# ---------------------------------------------------------------------------
++# 1-6: claims, subjects, collisions, conflicts
++# ---------------------------------------------------------------------------
++
++def test_1_one_lecturer_claiming_several_scopus_ids_keeps_each_with_its_primary_flag():
++    result = run(observe(multi_artifact([row(1, [sid(1), sid(2), sid(3)], primary=sid(2))])),
++                 lecturers=[gv(1)])
++    assert len(result.evidence) == 3
++    assert {(e.scopus_id, e.is_primary_claimed) for e in result.evidence} == {
++        (sid(1), False), (sid(2), True), (sid(3), False)}          # R-06: source flag only
++    assert {e.subject_resolution for e in result.evidence} == {Resolution.RESOLVED_EMAIL}
++    assert {e.rule_id for e in result.evidence} == {BRIDGE_RULE_ID}
++    assert {e.source_tier for e in result.evidence} == {SOURCE_TIER}
++    assert [p.classification for p in result.pairs] == [PairClass.PLAUSIBLE_CANDIDATE] * 3
++    assert all(p.accept_reason_required and p.decision_preserved for p in result.pairs)
++
++
++def test_2_one_scopus_id_in_several_source_rows_is_kept_per_row_and_flagged():
++    result = run(observe(multi_artifact([row(1, [sid(5)]), row(2, [sid(5)])])),
++                 lecturers=[gv(1), gv(2)])
++    assert len(result.evidence) == 2
++    for lecturer_n in (1, 2):
++        pair = pair_of(result, lecturer_n, 5)
++        assert pair.classification is PairClass.CONFLICTING_EVIDENCE
++        assert "SCOPUS_ID_DECLARED_FOR_SEVERAL_LECTURERS" in pair.reasons
++
++
++def test_3_duplicate_orcid_on_distinct_profiles_is_flagged_never_evidence():
++    items = [lecturer(1, orcid=ORCID_A), lecturer(2, orcid=ORCID_A)]
++    lecturers = [LecturerRef(u("lecturer", 1), f"{REPO}/giang-vien/synthetic-1/",
++                             "lecturer1@example.invalid", ORCID_A),
++                 LecturerRef(u("lecturer", 2), f"{REPO}/giang-vien/synthetic-2",
++                             "lecturer2@example.invalid", None)]
++    result = run(observe(profiles_artifact(items)), lecturers=lecturers)
++    assert result.evidence == () and result.pairs == ()              # ORCID never pairs (R-13)
++    assert codes(result).count("ORCID_DECLARED_BY_MULTIPLE_RECORDS") == 1        # R-14
++    assert {(f.code, f.lecturer_id) for f in result.findings if f.code.startswith("ORCID_DECLARED_")
++            and f.lecturer_id} == {("ORCID_DECLARED_MATCHES_LECTURER", u("lecturer", 1)),
++                                   ("ORCID_DECLARED_LECTURER_HAS_NONE", u("lecturer", 2))}
++
++
++def test_4_declared_email_resolves_the_subject_and_names_never_do():
++    lecturers = [gv(1), LecturerRef(u("lecturer", 99), None, "someone@example.invalid", None)]
++    # Row 99 carries the same *name* as no lecturer key; only its e-mail could resolve it.
++    result = run(observe(multi_artifact([row(1, [sid(1)]),
++                                         ["GV 1", "unknown@example.invalid", "1", "1", sid(2),
++                                          sid(2)]])), lecturers=lecturers)
++    assert [e.scopus_id for e in result.evidence] == [sid(1)]
++    assert "SUBJECT_UNRESOLVED" in codes(result)
++
++
++def test_4b_profile_resolved_by_url_with_a_different_stored_email_is_reported():
++    lecturers = [LecturerRef(u("lecturer", 1), f"{REPO}/giang-vien/synthetic-1/",
++                             "old.address@example.invalid", None)]
++    result = run(observe(profiles_artifact([lecturer(1)])), lecturers=lecturers)
++    assert "EMAIL_DECLARED_DIFFERS_FROM_LECTURER" in codes(result)
++
++
++def test_5_weak_ambiguous_and_unresolved_subjects_never_get_a_lecturer():
++    shared = [LecturerRef(u("lecturer", 10), None, "shared@example.invalid", None),
++              LecturerRef(u("lecturer", 11), None, "shared@example.invalid", None)]
++    result = run(observe(multi_artifact([row(20, [sid(20)], email=""),          # no e-mail: WEAK
++                                         row(21, [sid(21)], email="shared@example.invalid"),
++                                         row(22, [sid(22)])])),                  # no such lecturer
++                 lecturers=shared)
++    assert result.evidence == () and result.pairs == ()
++    assert sorted(c for c in codes(result) if c.startswith("SUBJECT_")) == [
++        "SUBJECT_AMBIGUOUS", "SUBJECT_UNRESOLVED", "SUBJECT_WEAK_SOURCE_KEY"]
++
++
++def test_5b_url_and_email_pointing_at_different_lecturers_is_a_conflict():
++    capture, observed = observe(multi_artifact([row(1, [sid(1)])]))
++    conflicting = tuple(ObservedClaim(**{**{f: getattr(o, f) for f in o.__slots__},
++                                         "record_source_id": f"{REPO}/giang-vien/other"})
++                        for o in observed)
++    lecturers = [gv(1), LecturerRef(u("lecturer", 2), f"{REPO}/giang-vien/other",
++                                    "different@example.invalid", None)]
++    result = bridge_source_claims(conflicting, [capture], lecturers,
++                                  [ScopusAuthorRef(author(1), sid(1))])
++    assert result.evidence == () and "SUBJECT_CONFLICT" in codes(result)
++
++
++def test_6_conflicting_source_claims_and_approvals_elsewhere_are_conflicts():
++    owned = observe(multi_artifact([row(1, [sid(7), sid(8)])]))
++    unowned = observe(tables_artifact([], [["X", sid(7), "1"]]))
++    approved_elsewhere = DecisionRef(u("lecturer", 2), author(8), "ACCEPTED", "APPROVED")
++    result = run(owned, unowned, lecturers=[gv(1), gv(2)], decisions=[approved_elsewhere])
++    assert pair_of(result, 1, 7).classification is PairClass.CONFLICTING_EVIDENCE
++    assert "SCOPUS_ID_ALSO_LISTED_AS_UNASSIGNED" in pair_of(result, 1, 7).reasons
++    assert "SCOPUS_ID_APPROVED_FOR_OTHER_LECTURER" in pair_of(result, 1, 8).reasons
++    assert "UNOWNED_SCOPUS_ID_LISTED" in codes(result)
++    assert all(p.scopus_id != sid(7) or p.lecturer_id == u("lecturer", 1) for p in result.pairs)
++
++
++def test_unowned_ids_and_ids_missing_from_the_catalog_never_become_pairs():
++    result = run(observe(tables_artifact([["X", sid(30), "1"]], [["Y", sid(31), "1"]])),
++                 observe(multi_artifact([row(1, ["57000009999"])])),
++                 lecturers=[gv(1)], authors=[ScopusAuthorRef(author(30), sid(30))])
++    assert result.pairs == ()
++    assert codes(result).count("UNOWNED_SCOPUS_ID_LISTED") == 2                 # R-15
++    assert "SCOPUS_AUTHOR_NOT_IN_CATALOG" in codes(result)
++
++
++# ---------------------------------------------------------------------------
++# 7-10: projection policy — captures, artifact versions, rule versions, partial captures
++# ---------------------------------------------------------------------------
++
++def test_7_repeated_capture_of_identical_claims_does_not_inflate_evidence():
++    rows = [row(1, [sid(1), sid(2)])]
++    once = run(observe(multi_artifact(rows)), lecturers=[gv(1)])
++    twice = run(observe(multi_artifact(rows)), observe(multi_artifact(
++        rows, ts="2026-11-29T00:00:00Z")), lecturers=[gv(1)])
++    assert [e.fingerprint for e in twice.evidence] == [e.fingerprint for e in once.evidence]
++    assert [len(e.observed_in) for e in twice.evidence] == [2, 2]
++    assert {e.presence for e in twice.evidence} == {Presence.CURRENT}
++
++
++def test_8_several_artifact_versions_of_one_capture_are_refused_unless_projected():
++    artifact = multi_artifact([row(1, [sid(1)])])
++    v10, v11 = observe(artifact, version="1.0"), observe(artifact, version="1.1")
++    assert v10[0] == v11[0]                                     # one capture
++    with pytest.raises(BridgeError) as raised:
++        run(v10, (v11[0], v11[1]), lecturers=[gv(1)])
++    assert raised.value.code == "MULTIPLE_ANALYSES_PER_CAPTURE"
++    projected = run(v11, lecturers=[gv(1)])                     # what the view selects
++    assert [e.fingerprint for e in projected.evidence] == [
++        e.fingerprint for e in run(v10, lecturers=[gv(1)]).evidence]
++
++
++def test_9_new_rule_version_keeps_evidence_identity_and_mixing_is_refused(monkeypatch):
++    artifact = multi_artifact([row(1, [sid(1), sid(2)])])
++    v1 = observe(artifact)
++    before = run(v1, lecturers=[gv(1)])
++    monkeypatch.setattr(parser, "IDENTITY_RULES_VERSION", "2")
++    v2 = observe(artifact)
++    after = run(v2, lecturers=[gv(1)])
++    assert [e.evidence_key for e in after.evidence] == [e.evidence_key for e in before.evidence]
++    assert {e.identity_rules_version for e in after.evidence} == {"2"}
++    assert after.identity_rules_version == "2"
++    with pytest.raises(BridgeError) as raised:
++        bridge_source_claims([*v1[1], *v2[1]], [v1[0]], [gv(1)],
++                             [ScopusAuthorRef(author(1), sid(1))])
++    assert raised.value.code == "MIXED_RULE_VERSIONS"
++
++
++def test_10_partial_capture_never_implies_withdrawal():
++    first = observe(multi_artifact([row(1, [sid(1), sid(2)])]))
++    partial = observe(multi_artifact([row(1, [sid(1)])], ts="2026-11-29T00:00:00Z",
++                                     completeness="PARTIAL"))
++    result = run(first, partial, lecturers=[gv(1)])
++    gone = [e for e in result.evidence if e.scopus_id == sid(2)]
++    assert [e.presence for e in gone] == [Presence.NOT_OBSERVED]
++    assert pair_of(result, 1, 2).classification is PairClass.PLAUSIBLE_CANDIDATE
++
++
++def test_10b_complete_recapture_withdraws_but_does_not_revoke_anything():
++    first = observe(multi_artifact([row(1, [sid(1), sid(2)])]))
++    later = observe(multi_artifact([row(1, [sid(1)])], ts="2026-11-29T00:00:00Z"))
++    approved = DecisionRef(u("lecturer", 1), author(2), "ACCEPTED", "APPROVED")
++    result = run(first, later, lecturers=[gv(1)], decisions=[approved])
++    withdrawn = pair_of(result, 1, 2)
++    assert [e.presence for e in result.evidence if e.scopus_id == sid(2)] == [Presence.WITHDRAWN]
++    assert withdrawn.classification is PairClass.VERIFIED_ASSOCIATION       # decision stands
++    assert withdrawn.existing_identity_status == "APPROVED"
++    assert "SOURCE_NO_LONGER_LISTS_APPROVED_ID" in codes(result)
++    unapproved = run(first, later, lecturers=[gv(1)])
++    assert pair_of(unapproved, 1, 2).classification is PairClass.INSUFFICIENT_EVIDENCE
++
++
++# ---------------------------------------------------------------------------
++# 11-13: decisions, invalid claims, determinism
++# ---------------------------------------------------------------------------
++
++@pytest.mark.parametrize(("candidate_status", "identity_status", "expected"), [
++    ("ACCEPTED", "APPROVED", PairClass.VERIFIED_ASSOCIATION),
++    ("REJECTED", None, PairClass.PLAUSIBLE_CANDIDATE),
++    ("ACCEPTED", "REVOKED", PairClass.PLAUSIBLE_CANDIDATE),
++    ("SUPERSEDED", None, PairClass.PLAUSIBLE_CANDIDATE),
++    ("PENDING", None, PairClass.PLAUSIBLE_CANDIDATE),
++])
++def test_11_existing_decisions_are_echoed_never_changed(candidate_status, identity_status,
++                                                        expected):
++    decision = DecisionRef(u("lecturer", 1), author(1), candidate_status, identity_status)
++    result = run(observe(multi_artifact([row(1, [sid(1)])])), lecturers=[gv(1)],
++                 decisions=[decision])
++    pair = pair_of(result, 1, 1)
++    assert pair.classification is expected
++    assert (pair.existing_candidate_status, pair.existing_identity_status) == (
++        candidate_status, identity_status)
++    assert pair.decision_preserved
++    negative = candidate_status in ("REJECTED", "SUPERSEDED") or identity_status in (
++        "REJECTED", "REVOKED")
++    assert ("PRIOR_NEGATIVE_DECISION_REVIEWER_REOPEN_REQUIRED" in pair.reasons) is negative
++
++
++def test_11b_lecturers_with_approved_ids_stay_eligible_for_new_ids():
++    approved = DecisionRef(u("lecturer", 1), author(1), "ACCEPTED", "APPROVED")
++    result = run(observe(multi_artifact([row(1, [sid(1), sid(2)])])), lecturers=[gv(1)],
++                 decisions=[approved])
++    assert pair_of(result, 1, 1).classification is PairClass.VERIFIED_ASSOCIATION
++    assert pair_of(result, 1, 2).classification is PairClass.PLAUSIBLE_CANDIDATE   # R-16
++
++
++def test_11c_bridge_output_has_no_decision_or_status_writing_field():
++    fields = {name for cls in (__import__("app.services.source_claim_matching.bridge",
++                                          fromlist=["x"]).PairAssessment,)
++              for name in cls.__dataclass_fields__}
++    assert not fields & {"new_status", "to_status", "action", "approve", "revoke", "status"}
++
++
++def test_12_invalid_claim_never_becomes_evidence():
++    result = run(observe(multi_artifact([["GV 1", "gv1@example.invalid", "1", "1", "57-BAD",
++                                          "57-BAD"]])), lecturers=[gv(1)])
++    assert result.evidence == () and result.pairs == ()
++    assert "INVALID_CLAIM_VALUE" in codes(result)
++
++
++def test_13_deterministic_regardless_of_input_order():
++    observed = [observe(multi_artifact([row(1, [sid(1), sid(2)]), row(2, [sid(2)])])),
++                observe(tables_artifact([["X", sid(3), "1"]], [["Y", sid(2), "1"]])),
++                observe(multi_artifact([row(1, [sid(1)])], ts="2026-11-29T00:00:00Z"))]
++    lecturers = [gv(1), gv(2)]
++    baseline = run(*observed, lecturers=lecturers)
++    rows = [o for _, obs in observed for o in obs]
++    captures = [c for c, _ in observed]
++    authors = [ScopusAuthorRef(author(n), sid(n)) for n in range(1, 40)]
++    for seed in range(5):
++        rng = random.Random(seed)
++        shuffled_rows, shuffled_caps = rows[:], captures[:]
++        rng.shuffle(shuffled_rows)
++        rng.shuffle(shuffled_caps)
++        again = bridge_source_claims(shuffled_rows, shuffled_caps, list(reversed(lecturers)),
++                                     list(reversed(authors)))
++        assert again == baseline
++
++
++def test_evidence_traces_back_to_claim_record_capture_and_analysis():
++    capture, observed = observe(multi_artifact([row(1, [sid(1)])]))
++    result = bridge_source_claims(observed, [capture], [gv(1)],
++                                  [ScopusAuthorRef(author(1), sid(1))])
++    evidence, = result.evidence
++    ref, = evidence.observed_in
++    owned = [o for o in observed if o.claim_type == "SCOPUS_ID_OWNED"][0]
++    assert (ref.capture_id, ref.analysis_id, ref.claim_id, ref.record_id, ref.contract_version) == (
++        capture.capture_id, owned.analysis_id, owned.claim_id, owned.record_id, "1.0")
++    assert evidence.claim_key == owned.claim_key and evidence.scope_key == capture.scope_key
++
++
++def test_unknown_capture_and_duplicate_observations_are_refused():
++    capture, observed = observe(multi_artifact([row(1, [sid(1)])]))
++    with pytest.raises(BridgeError) as raised:
++        bridge_source_claims(observed, [], [gv(1)], [])
++    assert raised.value.code == "UNKNOWN_CAPTURE"
++    with pytest.raises(BridgeError) as raised:
++        bridge_source_claims([*observed, observed[0]], [capture], [gv(1)], [])
++    assert raised.value.code == "DUPLICATE_OBSERVATION"
++
++
++def test_existing_candidate_contract_cannot_yet_store_or_promote_source_claim_evidence():
++    """Pins the verified interfaces behind the P3-B blocker: when P3-B extends them, this test
++    must be updated deliberately together with the migration and the promotion mapping."""
++    import inspect
++
++    from app.models import Base
++    from app.services import review_reason_policy
++    from app.services.candidate_review_service import CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE
++
++    table = Base.metadata.tables["lecturer_scopus_candidate_evidence"]
++    kinds = [str(c.sqltext) for c in table.constraints
++             if getattr(c, "name", None) and "evidence_kind" in str(c.name)]
++    assert kinds == ["evidence_kind IN ('NAME', 'PUBLICATION')"]
++    assert set(CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE) == {"NAME", "PUBLICATION"}
++    # D-2: only PUBLICATION evidence lifts NAME_EVIDENCE_ONLY; a source listing must not (R-05).
++    assert '"PUBLICATION" not in set(evidence_kinds)' in inspect.getsource(
++        review_reason_policy.accept_reason_policy)
++
++
++def test_bridge_imports_no_database_matching_or_network_modules():
++    bad = ("sqlalchemy", "psycopg2", "fastapi", "app.models", "app.core", "app.api",
++           "app.services.matching", "app.services.candidate_review_service", "requests", "httpx",
++           "socket", "http.client")
++    code = (
++        "import json, sys; sys.path.insert(0, '.');"
++        f"bad = {bad!r};"
++        "hit = lambda names: sorted(m for m in names"
++        " if any(m == b or m.startswith(b + '.') for b in bad));"
++        "before = set(sys.modules);"
++        "import app.services.source_claim_matching.bridge;"
++        "print(json.dumps({'new': hit(set(sys.modules) - before)}))"
++    )
++    result = subprocess.run([sys.executable, "-I", "-S", "-c", code], cwd=BACKEND,
++                            capture_output=True, text=True, timeout=60, check=True)
++    assert json.loads(result.stdout)["new"] == [], result.stdout + result.stderr

@@ -1,0 +1,191 @@
+{
+  "gate": "E.3",
+  "phase": "P3-A",
+  "title": "Source claims -> matching & evidence bridge",
+  "date": "2026-10-29",
+  "status": "P3A_DELIVERED_STOPPED_FOR_INDEPENDENT_REVIEW",
+  "scope": {
+    "existing_files_modified": 0,
+    "db_connection": false,
+    "migrations": 0,
+    "real_data": false,
+    "endpoints": 0,
+    "frontend": 0,
+    "reviewer_decisions": 0,
+    "auto_approval": false,
+    "commit": false,
+    "push": false,
+    "p3b_started": false
+  },
+  "verified_interfaces": {
+    "candidate": "LecturerScopusCandidate (lecturer_id, scopus_author_id) name-based; PublicationEvidence separate",
+    "candidate_persistence": "root unique per pair; re-observation never changes status; evidence_kind IN (NAME, PUBLICATION)",
+    "candidate_statuses": [
+      "PENDING",
+      "ACCEPTED",
+      "REJECTED",
+      "SUPERSEDED"
+    ],
+    "candidate_review_actions": [
+      "ACCEPT",
+      "REJECT",
+      "REOPEN"
+    ],
+    "identity_statuses": [
+      "CANDIDATE",
+      "APPROVED",
+      "REJECTED",
+      "REVOKED"
+    ],
+    "mapping_review_actions": [
+      "APPROVE",
+      "REJECT",
+      "REVOKE",
+      "REOPEN"
+    ],
+    "accept_promotion": "NAME->NAME_SIMILARITY, PUBLICATION->DOI_EXACT|PUBLICATION_OVERLAP; other kinds fail closed",
+    "d2_policy": "reason required unless PUBLICATION evidence; shared author; multiple candidates",
+    "lecturer_keys": "repository_profile_url (exact, importer source id), email (non-unique), orcid (unique)",
+    "scopus_author": "scopus_id unique; no ORCID column"
+  },
+  "bridge": {
+    "module": "app/services/source_claim_matching/bridge.py (pure)",
+    "evidence_from": "SCOPUS_ID_OWNED with subject resolved by profile URL or e-mail; author in catalog",
+    "never": [
+      "name joins",
+      "approval",
+      "status changes",
+      "ORCID as verified authorship",
+      "unowned IDs as pairs",
+      "manufactured lecturer ids"
+    ],
+    "classes": [
+      "VERIFIED_ASSOCIATION",
+      "PLAUSIBLE_CANDIDATE",
+      "CONFLICTING_EVIDENCE",
+      "INSUFFICIENT_EVIDENCE"
+    ],
+    "claim_identity": "(source_system, scope_key, projection_version, claim_key)",
+    "evidence_key": "(lecturer, author, rule_id, rule_version, source_system, scope_key, projection, claim_key)",
+    "input_contract": [
+      "one rule set",
+      "one analysis per capture",
+      "no duplicate observation",
+      "known captures"
+    ],
+    "presence": [
+      "CURRENT",
+      "NOT_OBSERVED",
+      "WITHDRAWN (only after later COMPLETE)"
+    ]
+  },
+  "blockers_for_p3b": [
+    "evidence_kind CHECK limited to NAME/PUBLICATION (migration needed)",
+    "ACCEPT promotion fails closed on new kinds (owner decision)",
+    "D-2 treatment of source-claim evidence (recommend: not lifting NAME_EVIDENCE_ONLY)",
+    "candidate roots for source-only pairs (owner decision)",
+    "INSTITUTION_DECLARED tier vocabulary (proposed)"
+  ],
+  "tests": {
+    "bridge": {
+      "passed": 27
+    },
+    "full": {
+      "passed": 311,
+      "previous": 284
+    },
+    "existing_matching_unit": {
+      "passed": 37,
+      "errors": 7,
+      "error_cause": "isolated_db_engine fixture (no test DB)"
+    }
+  },
+  "mutation_probes": {
+    "no_input_validation": "3 failed",
+    "withdraw_on_partial": "1 failed",
+    "no_claim_dedup": "1 failed",
+    "ignore_negative_decisions": "3 failed"
+  },
+  "ruff": {
+    "version": "0.17.3",
+    "exit": 0
+  },
+  "diff": {
+    "diff_sha256": "bd3c5a239d9cd0613f5dfb4631637042278bbb689235e72b6baeea02e7045273",
+    "diff_stats": {
+      "backend/app/services/source_claim_matching/__init__.py": {
+        "added": 1
+      },
+      "backend/app/services/source_claim_matching/bridge.py": {
+        "added": 489
+      },
+      "backend/tests/unit/test_source_claim_matching_bridge.py": {
+        "added": 416
+      }
+    },
+    "whitespace_check": "clean",
+    "replay_steps": {
+      "E3P1_IMPLEMENTATION.diff": "OK",
+      "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+      "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK",
+      "E3P2A_IMPLEMENTATION.diff": "OK",
+      "E3P2A_CORRECTION.diff": "OK",
+      "E3P2B1_IMPLEMENTATION.diff": "OK",
+      "E3P2B1_CORRECTION.diff": "OK",
+      "E3P2B2_IMPLEMENTATION.diff": "OK",
+      "E3P2B2_CORRECTION.diff": "OK",
+      "E3P3A_IMPLEMENTATION.diff": "OK"
+    },
+    "replay_matches_workspace": {
+      "backend/app/services/source_claim_matching/__init__.py": true,
+      "backend/app/services/source_claim_matching/bridge.py": true,
+      "backend/tests/unit/test_source_claim_matching_bridge.py": true
+    },
+    "reverse_check": "OK"
+  },
+  "files": {
+    "backend/app/services/source_claim_matching/__init__.py": {
+      "sha256": "98156beacb54f3bf15a8eb5ce0ac57bbdb14496dc528032e9b495ccb0bdde337",
+      "lines": 1
+    },
+    "backend/app/services/source_claim_matching/bridge.py": {
+      "sha256": "0329ba2a5bc051d93160cfca4b8179cce39c20e73ee1e2100d77b0cb0a73029a",
+      "lines": 489
+    },
+    "backend/tests/unit/test_source_claim_matching_bridge.py": {
+      "sha256": "9d12be7e6adc674b60dfbdbc0164d22f8dbf6c39278951c3925be51aaa8c5db7",
+      "lines": 416
+    }
+  },
+  "preservation": {
+    "accepted_e3_files_unchanged": true,
+    "accepted_e3_files": 21,
+    "matching_review_identity_files_equal_head": true,
+    "g01_g04_files_rehashed": 31,
+    "g01_g04_all_match": true,
+    "tracked_modified": 17
+  },
+  "pending": [
+    "PostgreSQL gate: staging migration, 4 B2 tests, G04, candidate-persistence PG tests",
+    "owner decisions for P3-B",
+    "O-2/O-7 formal confirmation"
+  ],
+  "artifacts": {
+    "E3P3A_HANDOVER.md": {
+      "sha256": "2f591d54158eeeeccd5fa922d21d7720d9f48eaf48c9fe32bb38c9655ef1a3ab",
+      "bytes": 7922
+    },
+    "E3P3A_MATCHING_MAPPING.md": {
+      "sha256": "0c431a3b907caee3001e5bac281041f24cce3525ea4eeafb39ad843a03ba6833",
+      "bytes": 10473
+    },
+    "E3P3A_IMPLEMENTATION.diff": {
+      "sha256": "bd3c5a239d9cd0613f5dfb4631637042278bbb689235e72b6baeea02e7045273",
+      "bytes": 45544
+    },
+    "E3P3A_TEST_RESULTS.txt": {
+      "sha256": "ef1ae4447a381bd3bc1088d7a98f2fde9fb91f16126a171cd40d94dfaea5fdd1",
+      "bytes": 66173
+    }
+  }
+}

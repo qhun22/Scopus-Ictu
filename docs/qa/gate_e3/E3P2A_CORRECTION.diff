@@ -1,0 +1,359 @@
+# E3-P2-A narrow correction (P2A-S1, P2A-S2). Base = accepted E3-P2-A (E3P2A_IMPLEMENTATION.diff
+# applied on the accepted E3-P1 tree; adapters.py/test file re-hash to E3P2A_VALIDATION.json).
+# Production change: adapters.py only. E3-P1 modules and pyproject.toml unchanged by this diff.
+diff --git a/backend/app/services/source_claims/adapters.py b/backend/app/services/source_claims/adapters.py
+index 6ff4aea..153b69c 100644
+--- a/backend/app/services/source_claims/adapters.py
++++ b/backend/app/services/source_claims/adapters.py
+@@ -20,6 +20,8 @@ phone) are not copied at all; their labels and counts are reported in ``capture.
+ 
+ from __future__ import annotations
+ 
++import hashlib
++import json
+ import re
+ import unicodedata
+ from collections import Counter
+@@ -31,6 +33,7 @@ from app.services.source_claims.contract import (
+     CONTRACT_VERSION,
+     ColumnRole,
+     Completeness,
++    ParsedSnapshot,
+     SourceSystem,
+     TableKind,
+ )
+@@ -61,7 +64,15 @@ _KNOWN_PROFILE_FIELDS = frozenset(
+     PROFILE_CONTENT_FIELDS + (PROFILE_EMAIL_SOURCE_FIELD, "source_fields")
+     + PROFILE_CAPTURE_FIELDS + PROFILE_DERIVED_FIELDS + PROFILE_EXCLUDED_FIELDS
+ )
+-_LECTURER_ENTITY_TYPES = frozenset({"lecturer", "profile"})
++# Harvester vocabulary (Craw ``ictu_harvester/full_harvest.py``, read 2026-10-29):
++# - ``manifest.status`` is written as COMPLETE, or as COMPLETE_WITH_SOURCE_FAILURES when any entity
++#   failed. A run whose offline semantic replay differs ends BLOCKED, but that word is only
++#   returned by the CLI. The manifest is written *before* the replay check, so a BLOCKED run can
++#   leave a manifest saying COMPLETE; ``semantic_replay.json`` is the success evidence.
++# - ``source_entity_failures[].entity_type`` is "lecturer", "<kind>" or "<kind>_listing".
++#   Only "lecturer" failures affect the profile listing.
++HARVEST_SUCCESS_STATUSES = frozenset({"COMPLETE", "COMPLETE_WITH_SOURCE_FAILURES"})
++_LECTURER_ENTITY_TYPES = frozenset({"lecturer"})
+ 
+ # --- Scopus-guide page ---------------------------------------------------------------------
+ _TABLE_KIND_MARKERS = {TableKind.AMBIGUOUS: "nhập nhằng",
+@@ -132,6 +143,42 @@ def artifact_bytes(artifact: dict) -> bytes:
+     return canonical_json(artifact).encode("utf-8")
+ 
+ 
++# ---------------------------------------------------------------------------
++# Staging identity (pure): one definition shared by the schema proposal and its tests
++# ---------------------------------------------------------------------------
++
++def reconstruct_artifact_bytes(*, source_system: str, contract_version: str, capture_json: str,
++                               content_json: str) -> bytes:
++    """Canonical artifact bytes from stored parts. ``contract_version`` is part of the bytes, so
++    it must be stored per artifact: content and capture alone do not determine the artifact."""
++    return artifact_bytes({"contract": CONTRACT_NAME, "contract_version": contract_version,
++                           "source_system": source_system, "capture": json.loads(capture_json),
++                           "content": json.loads(content_json)})
++
++
++def staging_keys(snapshot: ParsedSnapshot) -> dict[str, tuple[str, ...]]:
++    """Natural keys of the three staging layers for a snapshot parsed from canonical bytes.
++
++    - content:  what the source asserts (reused across captures and contract versions);
++    - capture:  one observation of that content (reused across contract versions);
++    - artifact: the exact canonical envelope, contract version included.
++    """
++    _require(snapshot.artifact_bytes_sha256 is not None, "ARTIFACT_BYTES_REQUIRED",
++             "parse the artifact with parse_artifact_bytes to obtain its byte identity")
++    rebuilt = reconstruct_artifact_bytes(
++        source_system=snapshot.source_system.value, contract_version=snapshot.contract_version,
++        capture_json=snapshot.capture.capture_json, content_json=snapshot.content_json)
++    _require(hashlib.sha256(rebuilt).hexdigest() == snapshot.artifact_bytes_sha256,
++             "ARTIFACT_NOT_CANONICAL",
++             "artifact bytes are not canonical; store adapters.artifact_bytes(artifact) instead")
++    system = snapshot.source_system.value
++    return {
++        "content": (system, snapshot.content_hash),
++        "capture": (system, snapshot.content_hash, snapshot.capture.capture_hash),
++        "artifact": (snapshot.artifact_bytes_sha256,),
++    }
++
++
+ # ---------------------------------------------------------------------------
+ # ICTU_REPO_PROFILES from the Craw harvest
+ # ---------------------------------------------------------------------------
+@@ -174,10 +221,27 @@ def _cross_check(profile: dict, labels: dict, position: int, checks: dict) -> No
+             checks.setdefault(f"{label}_NOT_IN_SOURCE_TEXT", []).append(position)
+ 
+ 
+-def _profiles_completeness(lecturers: list, manifest: dict, crawl_report: dict | None):
++def _replay_verified(semantic_replay: Any, manifest: dict, upstream_name: str) -> bool:
++    """The run passed its own offline replay *and* that replay is of this lecturers file."""
++    if not isinstance(semantic_replay, dict):
++        return False
++    if semantic_replay.get("a_equals_b_equals_c") is not True:
++        return False
++    file_hashes = semantic_replay.get("file_hashes")
++    expected = (manifest.get("semantic_file_hashes") or {}).get(upstream_name)
++    if not isinstance(file_hashes, dict) or not isinstance(expected, str) or not file_hashes:
++        return False
++    return all(isinstance(run, dict) and run.get(upstream_name) == expected
++               for run in file_hashes.values())
++
++
++def _profiles_completeness(lecturers: list, manifest: dict, crawl_report: dict | None,
++                           semantic_replay: Any, upstream_name: str):
++    """COMPLETE only on positive evidence; anything missing, unknown or inconsistent is PARTIAL."""
+     failures = (crawl_report or {}).get("source_entity_failures")
+     failure_types = sorted({str(f.get("entity_type")) for f in failures or []
+                             if isinstance(f, dict)})
++    status = manifest.get("status")
+     basis = {
+         "profiles_in_file": len(lecturers),
+         "source_card_count": manifest.get("source_card_count"),
+@@ -185,25 +249,34 @@ def _profiles_completeness(lecturers: list, manifest: dict, crawl_report: dict |
+         "crawl_report_present": crawl_report is not None,
+         "source_drift_detected": manifest.get("source_drift_detected"),
+         "entity_failure_types": failure_types,
++        "manifest_status": status,
++        "semantic_replay_verified": _replay_verified(semantic_replay, manifest, upstream_name),
+     }
++    status_consistent = isinstance(failures, list) and (
++        (status == "COMPLETE" and not failures)
++        or (status == "COMPLETE_WITH_SOURCE_FAILURES" and bool(failures)))
+     complete = (crawl_report is not None
++                and status in HARVEST_SUCCESS_STATUSES
++                and status_consistent
++                and basis["semantic_replay_verified"]
+                 and basis["source_card_count"] == len(lecturers)
+                 and basis["lecturer_count"] == len(lecturers)
+                 and basis["source_drift_detected"] is False
+-                and isinstance(failures, list)
+                 and not _LECTURER_ENTITY_TYPES & set(failure_types))
+     return (Completeness.COMPLETE if complete else Completeness.PARTIAL).value, basis
+ 
+ 
+ def profiles_artifact(
+-    lecturers: Any, manifest: Any, crawl_report: Any = None, *, lecturers_sha256: str,
+-    upstream_name: str = "lecturers.json",
++    lecturers: Any, manifest: Any, crawl_report: Any = None, semantic_replay: Any = None, *,
++    lecturers_sha256: str, upstream_name: str = "lecturers.json",
+ ) -> dict:
+     """Map one Craw harvest to an ICTU_REPO_PROFILES artifact.
+ 
+     Every list item becomes exactly one profile in source order, including profiles without
+     publications and malformed items (kept verbatim for the parser to flag). Completeness is
+-    COMPLETE only when the harvest proves the listing was fully read; otherwise PARTIAL.
++    COMPLETE only when the harvest proves the listing was fully read: a success status that
++    agrees with the failure list, a passed semantic replay of this very file, matching counts,
++    no drift and no lecturer failure. Anything else, including a missing report, is PARTIAL.
+     """
+     _require(isinstance(lecturers, list), "LECTURERS_NOT_LIST", "lecturers.json must be a list")
+     _require(isinstance(manifest, dict), "MANIFEST_INVALID", "harvest manifest must be an object")
+@@ -229,7 +302,10 @@ def profiles_artifact(
+         observation.update({key: item[key] for key in PROFILE_CAPTURE_FIELDS if key in item})
+         observations.append(observation)
+ 
+-    completeness, basis = _profiles_completeness(lecturers, manifest, crawl_report)
++    _require(semantic_replay is None or isinstance(semantic_replay, dict),
++             "SEMANTIC_REPLAY_INVALID", "semantic replay report must be an object")
++    completeness, basis = _profiles_completeness(lecturers, manifest, crawl_report,
++                                                 semantic_replay, upstream_name)
+     retrieved = sorted(o["provenance"]["retrieved_at"] for o in observations
+                        if isinstance(o.get("provenance"), dict)
+                        and isinstance(o["provenance"].get("retrieved_at"), str))
+@@ -247,6 +323,7 @@ def profiles_artifact(
+             "harvest_completed_at": completed_at,
+             "harvester_version": manifest.get("parser_version"),
+             "harvest_status": manifest.get("status"),
++            "semantic_replay_combined_sha256": (semantic_replay or {}).get("combined_hash"),
+             "retrieved_at_min": retrieved[0] if retrieved else None,
+             "retrieved_at_max": retrieved[-1] if retrieved else None,
+         },
+diff --git a/backend/tests/unit/test_source_claims_adapters.py b/backend/tests/unit/test_source_claims_adapters.py
+index 8a56b75..39bf12b 100644
+--- a/backend/tests/unit/test_source_claims_adapters.py
++++ b/backend/tests/unit/test_source_claims_adapters.py
+@@ -79,13 +79,17 @@ def lecturer(n, *, orcid=None, pubs=0, name=None, email=None, retrieved="2026-10
+     }
+ 
+ 
+-def manifest(cards, *, completed="2026-10-03T21:31:10Z", drift=False, lecturers=None):
++LECTURERS_SEMANTIC_HASH = "b" * 64
++
++
++def manifest(cards, *, completed="2026-10-03T21:31:10Z", drift=False, lecturers=None,
++             status="COMPLETE"):
+     return {"harvest_started_at": "2026-10-03T20:05:14Z", "harvest_completed_at": completed,
+             "source_base_url": REPO, "parser_version": "ictu_harvester/1.4-full",
+             "source_card_count": cards,
+             "lecturer_count": cards if lecturers is None else lecturers,
+-            "status": "COMPLETE", "source_drift_detected": drift,
+-            "semantic_file_hashes": {"lecturers.json": "b" * 64}}
++            "status": status, "source_drift_detected": drift,
++            "semantic_file_hashes": {"lecturers.json": LECTURERS_SEMANTIC_HASH}}
+ 
+ 
+ def report(*failure_types):
+@@ -93,10 +97,28 @@ def report(*failure_types):
+             "duplicate_profile_url_count": 0}
+ 
+ 
+-def harvest(items, cards=None, *, crawl=None, **manifest_kwargs):
++def replay(ok=True, lecturers_hash=LECTURERS_SEMANTIC_HASH):
++    """Shape of Craw's semantic_replay.json: three passes over the same harvest state."""
++    runs = ("A_cached_write", "B_cached_replay", "C_offline_replay")
++    return {"a_equals_b_equals_c": ok, "combined_hash": "e" * 64,
++            "file_hashes": {run: {"lecturers.json": lecturers_hash} for run in runs}}
++
++
++def harvester_status(crawl):
++    """What the harvester writes: COMPLETE, or COMPLETE_WITH_SOURCE_FAILURES if anything failed."""
++    failures = crawl.get("source_entity_failures") if isinstance(crawl, dict) else None
++    return "COMPLETE_WITH_SOURCE_FAILURES" if failures else "COMPLETE"
++
++
++_DEFAULT = object()
++
++
++def harvest(items, cards=None, *, crawl=None, semantic=_DEFAULT, **manifest_kwargs):
+     cards = len(items) if cards is None else cards
+-    return adapters.profiles_artifact(items, manifest(cards, **manifest_kwargs),
+-                                      report("master_thesis") if crawl is None else crawl,
++    crawl = report("master_thesis") if crawl is None else crawl
++    manifest_kwargs.setdefault("status", harvester_status(crawl))
++    return adapters.profiles_artifact(items, manifest(cards, **manifest_kwargs), crawl,
++                                      replay() if semantic is _DEFAULT else semantic,
+                                       lecturers_sha256=SHA)
+ 
+ 
+@@ -279,6 +301,129 @@ def test_completeness_is_proven_from_the_harvest(kwargs, crawl, expected):
+     assert artifact["capture"]["completeness"] == expected
+ 
+ 
++# ---------------------------------------------------------------------------
++# P2A-S2: completeness fails closed on the harvest's own success evidence
++# ---------------------------------------------------------------------------
++
++@pytest.mark.parametrize(("status", "failures", "expected"), [
++    ("COMPLETE", (), "COMPLETE"),
++    ("COMPLETE_WITH_SOURCE_FAILURES", ("master_thesis",), "COMPLETE"),
++    ("COMPLETE_WITH_SOURCE_FAILURES", ("publication_listing", "project"), "COMPLETE"),
++    ("COMPLETE_WITH_SOURCE_FAILURES", ("lecturer",), "PARTIAL"),   # a profile fetch failed
++    ("COMPLETE", ("master_thesis",), "PARTIAL"),                    # status contradicts failures
++    ("COMPLETE_WITH_SOURCE_FAILURES", (), "PARTIAL"),               # status contradicts failures
++    ("FAILED", (), "PARTIAL"),                                       # not a success status
++    ("BLOCKED", (), "PARTIAL"),
++    (None, (), "PARTIAL"),
++])
++def test_harvest_status_must_be_a_consistent_success(status, failures, expected):
++    artifact = harvest([lecturer(1), lecturer(2)], crawl=report(*failures), status=status)
++    capture = artifact["capture"]
++    assert capture["completeness"] == expected
++    assert capture["completeness_basis"]["manifest_status"] == status
++
++
++def test_failed_status_with_matching_zero_counts_is_partial():
++    """The reviewer's counterexample: counts agree, no drift, no failures, status FAILED."""
++    artifact = harvest([], cards=0, crawl=report(), status="FAILED")
++    assert artifact["capture"]["completeness"] == "PARTIAL"
++
++
++@pytest.mark.parametrize(("semantic", "reason"), [
++    (None, "no replay report"),
++    (replay(ok=False), "replay mismatch: the harvester ends such a run BLOCKED"),
++    (replay(lecturers_hash="f" * 64), "replay of a different lecturers file"),
++    ({"a_equals_b_equals_c": True, "file_hashes": {}}, "replay without file hashes"),
++])
++def test_success_status_without_verified_replay_is_partial(semantic, reason):
++    artifact = harvest([lecturer(1)], crawl=report(), semantic=semantic)
++    assert artifact["capture"]["completeness_basis"]["manifest_status"] == "COMPLETE"
++    assert artifact["capture"]["completeness"] == "PARTIAL", reason
++    assert artifact["capture"]["completeness_basis"]["semantic_replay_verified"] is False
++
++
++def test_failed_harvest_never_authorizes_withdrawal():
++    before = parse_artifact(harvest([lecturer(1), lecturer(2)]))
++    failed = parse_artifact(harvest([lecturer(1)], crawl=report(), status="FAILED",
++                                    completed="2026-11-03T09:00:00Z"))
++    blocked = parse_artifact(harvest([lecturer(1)], crawl=report(), semantic=replay(ok=False),
++                                     completed="2026-11-03T09:00:00Z"))
++    key = f"{REPO}/giang-vien/synthetic-2"
++    for after in (failed, blocked):
++        report_ = analysis.presence_diff(before, after)
++        assert not report_.comparable and report_.by_status(P.WITHDRAWN) == ()
++        assert entry(report_, "RECORD:PROFILE", key).status is P.NOT_OBSERVED
++
++
++def test_semantic_replay_must_be_an_object():
++    with pytest.raises(AdapterError) as raised:
++        adapters.profiles_artifact([lecturer(1)], manifest(1), report(), ["not", "a", "report"],
++                                   lecturers_sha256=SHA)
++    assert raised.value.code == "SEMANTIC_REPLAY_INVALID"
++
++
++# ---------------------------------------------------------------------------
++# P2A-S1: contract version is part of artifact identity, not of content or capture
++# ---------------------------------------------------------------------------
++
++def _versions(*versions):
++    base = harvest([lecturer(1, orcid=ORCID_A), lecturer(2)])
++    snaps = []
++    for version in versions:
++        artifact = copy.deepcopy(base)
++        artifact["contract_version"] = version
++        snaps.append(parse_artifact_bytes(adapters.artifact_bytes(artifact)))
++    return snaps
++
++
++def test_contract_minor_versions_share_content_and_capture_but_not_artifact():
++    v10, v11 = _versions("1.0", "1.1")
++    assert v10.content_hash == v11.content_hash
++    assert v10.capture.capture_hash == v11.capture.capture_hash
++    assert v10.artifact_bytes_sha256 != v11.artifact_bytes_sha256
++    k10, k11 = adapters.staging_keys(v10), adapters.staging_keys(v11)
++    assert k10["content"] == k11["content"] and k10["capture"] == k11["capture"]
++    assert k10["artifact"] != k11["artifact"]
++
++
++def test_proposed_unique_keys_keep_both_contract_versions():
++    """Simulates the revised schema's UNIQUE constraints with sets."""
++    contents, captures, artifacts = set(), set(), set()
++    old_capture_unique = set()  # superseded proposal: UNIQUE(content_id, capture_hash)
++    snaps = _versions("1.0", "1.1", "1.0")  # the third is a re-ingest of the first
++    for snap in snaps:
++        keys = adapters.staging_keys(snap)
++        contents.add(keys["content"])
++        captures.add(keys["capture"])
++        artifacts.add(keys["artifact"])
++        old_capture_unique.add(keys["capture"])
++    assert (len(contents), len(captures), len(artifacts)) == (1, 1, 2)
++    assert len(old_capture_unique) == 1             # the old design would have kept only one
++
++
++def test_artifact_bytes_are_rebuilt_only_with_the_stored_contract_version():
++    v10, v11 = _versions("1.0", "1.1")
++    for snap, other in ((v10, v11), (v11, v10)):
++        def rebuilt(version, s=snap):
++            return hashlib.sha256(adapters.reconstruct_artifact_bytes(
++                source_system=s.source_system.value, contract_version=version,
++                capture_json=s.capture.capture_json, content_json=s.content_json)).hexdigest()
++        assert rebuilt(snap.contract_version) == snap.artifact_bytes_sha256
++        assert rebuilt(other.contract_version) == other.artifact_bytes_sha256
++        assert rebuilt(other.contract_version) != snap.artifact_bytes_sha256
++
++
++def test_staging_keys_require_canonical_artifact_bytes():
++    artifact = harvest([lecturer(1)])
++    with pytest.raises(AdapterError) as raised:
++        adapters.staging_keys(parse_artifact(artifact))           # dict input: no byte identity
++    assert raised.value.code == "ARTIFACT_BYTES_REQUIRED"
++    pretty = json.dumps(artifact, ensure_ascii=False, indent=2).encode("utf-8")
++    with pytest.raises(AdapterError) as raised:
++        adapters.staging_keys(parse_artifact_bytes(pretty))       # valid, but not canonical
++    assert raised.value.code == "ARTIFACT_NOT_CANONICAL"
++
++
+ def test_missing_profile_is_a_source_count_discrepancy():
+     snap = parse_artifact(harvest([lecturer(1), lecturer(2)], cards=3))
+     assert snap.completeness.value == "PARTIAL"

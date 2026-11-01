@@ -1,0 +1,104 @@
+# E3-P2-B2 audit closeout (B2-R1). Base = accepted E3-P2-B2 (E3P2B2_IMPLEMENTATION.diff;
+# both files re-hash to E3P2B2_VALIDATION.json). No other file changed.
+diff --git a/backend/app/services/source_staging/service.py b/backend/app/services/source_staging/service.py
+index a70fbee..7653a90 100644
+--- a/backend/app/services/source_staging/service.py
++++ b/backend/app/services/source_staging/service.py
+@@ -200,14 +200,15 @@ class SourceStagingService:
+                     raise StagingError("RULE_VERSION_DRIFT", "parser versions changed mid-run")
+                 _, new = self._ensure_analysis(artifact_row.content_id, snap)
+                 created += new
++            rule_set_id = uuid.uuid4()
+             self.session.execute(insert(SourceRuleSet).values(
+-                id=uuid.uuid4(), identity_rules_version=target[0],
++                id=rule_set_id, identity_rules_version=target[0],
+                 normalization_version=target[1], reason=reason,
+                 activated_by=self.actor.user_id))
+             if self.active_rule_set() != target:
+                 raise StagingError("ACTIVATION_NOT_VISIBLE", "new rule set is not the newest row")
+             artifacts, captures = self._coverage(target)
+-            self._audit(_ENTITY_RULE_SET, uuid.uuid4(), "SOURCE_RULE_SET_ACTIVATED", {
++            self._audit(_ENTITY_RULE_SET, rule_set_id, "SOURCE_RULE_SET_ACTIVATED", {
+                 "identity_rules_version": target[0], "normalization_version": target[1],
+                 "analyses_created": created, "artifacts": artifacts, "captures": captures,
+                 "reason": reason})
+diff --git a/backend/tests/unit/test_source_staging_service.py b/backend/tests/unit/test_source_staging_service.py
+index 928667a..f4ec73f 100644
+--- a/backend/tests/unit/test_source_staging_service.py
++++ b/backend/tests/unit/test_source_staging_service.py
+@@ -483,6 +483,75 @@ def test_user_actor_is_recorded(db, engine):
+     assert db.execute(text("SELECT ingested_by FROM source_artifacts")).scalar_one() == user.hex
+ 
+ 
++# ---------------------------------------------------------------------------
++# B2-R1: audit events reference the real affected rows
++# ---------------------------------------------------------------------------
++
++def _activation_audits(session):
++    return session.execute(select(AuditEvent.entity_type, AuditEvent.entity_id,
++                                  AuditEvent.event_metadata)
++                           .where(AuditEvent.action == "SOURCE_RULE_SET_ACTIVATED")).all()
++
++
++def test_b2_r1_activation_audit_references_the_persisted_rule_set_row(db, monkeypatch):
++    svc(db).activate_rule_set(reason="bootstrap")
++    ingested = svc(db).ingest_harvest(**harvest([lecturer(1)]))
++    monkeypatch.setattr(parser, "IDENTITY_RULES_VERSION", "2")
++    svc(db).activate_rule_set(reason="rules v2")
++
++    rows = {row.id: (row.identity_rules_version, row.normalization_version, row.reason)
++            for row in db.execute(select(staging.SourceRuleSet)).scalars()}
++    audits = _activation_audits(db)
++    assert len(rows) == len(audits) == 2
++    for entity_type, entity_id, metadata in audits:
++        assert entity_type == "source_rule_set"
++        assert entity_id in rows                      # the exact persisted row, not a new UUID
++        assert rows[entity_id] == (metadata["identity_rules_version"],
++                                   metadata["normalization_version"], metadata["reason"])
++    assert {e for _, e, _ in audits} == set(rows)
++    ingest_audit = db.execute(select(AuditEvent.entity_id).where(
++        AuditEvent.action == "SOURCE_ARTIFACT_INGESTED")).scalar_one()
++    assert ingest_audit == ingested.artifact_id
++
++
++def test_b2_r1_failure_after_the_rule_set_insert_leaves_no_row_and_no_audit(db, active,
++                                                                         monkeypatch):
++    """The rule-set row is written before coverage is proven; a failure there must undo it."""
++    active.ingest_harvest(**harvest([lecturer(1)]))
++    rule_sets, audits = count(db, "source_rule_sets"), count(db, "audit_events")
++    monkeypatch.setattr(parser, "IDENTITY_RULES_VERSION", "2")
++
++    def fail_coverage(self, target):
++        assert count(self.session, "source_rule_sets") == rule_sets + 1   # row was inserted
++        raise StagingError("ACTIVATION_INCOMPLETE", "injected")
++
++    monkeypatch.setattr(service_module.SourceStagingService, "_coverage", fail_coverage)
++    with pytest.raises(StagingError) as raised:
++        svc(db).activate_rule_set()
++    assert raised.value.code == "ACTIVATION_INCOMPLETE"
++    assert count(db, "source_rule_sets") == rule_sets
++    assert count(db, "audit_events") == audits
++    assert len(_activation_audits(db)) == 1           # only the bootstrap activation
++    assert svc(db).active_rule_set() == ("1", "1")
++
++
++def test_b2_r1_failed_reanalysis_leaves_no_activation_audit(db, active, monkeypatch):
++    active.ingest_harvest(**harvest([lecturer(1)]))
++    db.execute(text("UPDATE source_contents SET content_json = "
++                    "REPLACE(content_json, 'Synthetic Lecturer 1', 'Tampered Lecturer 1')"))
++    audits = count(db, "audit_events")
++    monkeypatch.setattr(parser, "IDENTITY_RULES_VERSION", "2")
++    with pytest.raises(StagingError):
++        svc(db).activate_rule_set()
++    assert count(db, "audit_events") == audits and len(_activation_audits(db)) == 1
++
++
++def test_b2_r1_already_active_writes_no_row_and_no_audit(db, active):
++    rule_sets, audits = count(db, "source_rule_sets"), count(db, "audit_events")
++    assert svc(db).activate_rule_set().outcome == "ALREADY_ACTIVE"
++    assert (count(db, "source_rule_sets"), count(db, "audit_events")) == (rule_sets, audits)
++
++
+ def test_ingest_outcome_names_the_first_new_layer():
+     layers = dict.fromkeys(("content", "capture", "artifact", "analysis"), False)
+     assert ingest_outcome(layers) == "ALREADY_INGESTED"

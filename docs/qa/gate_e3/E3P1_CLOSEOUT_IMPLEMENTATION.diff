@@ -1,0 +1,389 @@
+# E3-P1 final closeout diff. Baseline = E3-P1 + narrow errata, rebuilt by applying
+# E3P1_IMPLEMENTATION.diff then E3P1_ERRATA_IMPLEMENTATION.diff to an empty tree (all 7 files
+# re-hash to E3P1_ERRATA_VALIDATION.json errata_sha256). Not a Git HEAD diff.
+diff --git a/backend/app/services/source_claims/canonical.py b/backend/app/services/source_claims/canonical.py
+index de79069..99fb25a 100644
+--- a/backend/app/services/source_claims/canonical.py
++++ b/backend/app/services/source_claims/canonical.py
+@@ -161,10 +161,11 @@ def normalize_source_id(raw: Any, field: str | None = None) -> NormalizedValue:
+     trailing slash removed; path and query are kept as published (they may be
+     case-sensitive). Non-URL identifiers are only trimmed.
+ 
+-    A malformed HTTP(S) URL (invalid port, bad IPv6 authority, etc.) returns
++    A malformed HTTP(S) URL (invalid port, bad IPv6 authority, no host) returns
+     ``normalized=None`` with a ``SOURCE_URL_MALFORMED`` issue so that the raw
+-    value is preserved and the caller can fall back to a weaker key.  It is
+-    never silently accepted as a stable STRONG source key.
++    value is preserved and the caller can fall back to a weaker key. It is
++    never silently accepted as a stable STRONG source key. IPv6 hosts are kept
++    in brackets so the normalized URL parses back to the same host and port.
+     """
+     text = _text(raw)
+     if text is None or not text.strip():
+@@ -175,16 +176,20 @@ def normalize_source_id(raw: Any, field: str | None = None) -> NormalizedValue:
+     if re.match(r"^https?://", candidate, re.IGNORECASE):
+         try:
+             parts = urlsplit(candidate)
+-            host = (parts.hostname or "").lower()
++            hostname = parts.hostname
+             port = parts.port
+-            default = {"http": 80, "https": 443}.get(parts.scheme.lower())
+-            netloc = host if port in (None, default) else f"{host}:{port}"
+-            path = parts.path.rstrip("/") or "/"
+-            candidate = urlunsplit((parts.scheme.lower(), netloc, path, parts.query, ""))
+         except ValueError:
+             return NormalizedValue(text, None, SOURCE_ID_METHOD, (
+                 _issue("SOURCE_URL_MALFORMED",
+                        f"Cannot parse URL authority or port: {text!r}.", field),))
++        if not hostname:
++            return NormalizedValue(text, None, SOURCE_ID_METHOD, (
++                _issue("SOURCE_URL_MALFORMED", f"URL has no host: {text!r}.", field),))
++        host = f"[{hostname}]" if ":" in hostname else hostname
++        default = {"http": 80, "https": 443}.get(parts.scheme.lower())
++        netloc = host if port in (None, default) else f"{host}:{port}"
++        path = parts.path.rstrip("/") or "/"
++        candidate = urlunsplit((parts.scheme.lower(), netloc, path, parts.query, ""))
+     return NormalizedValue(text, candidate, SOURCE_ID_METHOD)
+ 
+ 
+diff --git a/backend/app/services/source_claims/parser.py b/backend/app/services/source_claims/parser.py
+index 17e0e54..7c44c9a 100644
+--- a/backend/app/services/source_claims/parser.py
++++ b/backend/app/services/source_claims/parser.py
+@@ -75,25 +75,37 @@ from app.services.source_claims.contract import (
+ 
+ PROFILES_DECLARED_KEY = "PROFILES"
+ 
+-# Matches the JSON Schema pattern ^1\.[0-9]+$ — both must stay in sync (R3).
+-_CONTRACT_VERSION_RE = re.compile(r"^([0-9]+)\.[0-9]+$")
++# Full-string match; the JSON Schema expresses the same language as
++# ^1\.[0-9]+(?![\s\S]) so that no validator accepts a trailing newline.
++_CONTRACT_VERSION_RE = re.compile(rf"{CONTRACT_MAJOR}\.[0-9]+")
++
++
++def _frozen_map(data: dict) -> _FrozenMap:
++    obj = dict.__new__(_FrozenMap)
++    for k, v in data.items():
++        dict.__setitem__(obj, k, v)  # bypass the rejecting __setitem__
++    return obj
+ 
+ 
+ class _FrozenMap(dict):
+     """Read-only dict for SourceRecord.normalized evidence (R2).
+ 
+-    Inherits from dict so equality, read access and deepcopy all work normally.
+-    Mutations raise TypeError.  Use _FrozenMap._make(data) to construct.
++    Inherits from dict so equality, read access and JSON encoding work normally.
++    Mutations raise TypeError. Construct with _FrozenMap._make(data).
+     """
+ 
+     __slots__ = ()
+ 
+     @classmethod
+-    def _make(cls, data: dict) -> "_FrozenMap":
+-        obj = dict.__new__(cls)
+-        for k, v in data.items():
+-            dict.__setitem__(obj, k, v)  # bypass our __setitem__ override
+-        return obj
++    def _make(cls, data: dict) -> _FrozenMap:
++        return _frozen_map(data)
++
++    def __reduce__(self):
++        # Pickle would otherwise rebuild through __setitem__ (rejected).
++        return (_frozen_map, (dict(self),))
++
++    def __ior__(self, other):
++        raise TypeError(f"'{type(self).__name__}' does not support in-place update")
+ 
+     def __setitem__(self, key, value) -> None:
+         raise TypeError(f"'{type(self).__name__}' does not support item assignment")
+@@ -116,11 +128,11 @@ class _FrozenMap(dict):
+     def update(self, *args, **kwargs) -> None:  # type: ignore[override]
+         raise TypeError(f"'{type(self).__name__}' does not support update")
+ 
+-    def __deepcopy__(self, memo: dict) -> "_FrozenMap":
+-        return _FrozenMap._make({k: _copy.deepcopy(v, memo) for k, v in self.items()})
++    def __deepcopy__(self, memo: dict) -> _FrozenMap:
++        return _frozen_map({k: _copy.deepcopy(v, memo) for k, v in self.items()})
+ 
+-    def __copy__(self) -> "_FrozenMap":
+-        return _FrozenMap._make(dict(self))
++    def __copy__(self) -> _FrozenMap:
++        return _frozen_map(dict(self))
+ 
+ 
+ class ArtifactError(ValueError):
+@@ -180,8 +192,7 @@ def parse_artifact(
+     if artifact.get("contract") != CONTRACT_NAME:
+         raise ArtifactError("WRONG_CONTRACT", f"contract must be {CONTRACT_NAME!r}")
+     version = artifact.get("contract_version")
+-    _vm = _CONTRACT_VERSION_RE.match(version) if isinstance(version, str) else None
+-    if not _vm or int(_vm.group(1)) != CONTRACT_MAJOR:
++    if not isinstance(version, str) or not _CONTRACT_VERSION_RE.fullmatch(version):
+         raise ArtifactError("UNSUPPORTED_CONTRACT_VERSION", f"got {version!r}")
+     try:
+         source_system = SourceSystem(artifact.get("source_system"))
+diff --git a/data/source_claims/schema/ictu_source_claims.schema.json b/data/source_claims/schema/ictu_source_claims.schema.json
+index 6fcb80c..f130a50 100644
+--- a/data/source_claims/schema/ictu_source_claims.schema.json
++++ b/data/source_claims/schema/ictu_source_claims.schema.json
+@@ -8,7 +8,7 @@
+   "required": ["contract", "contract_version", "source_system", "capture", "content"],
+   "properties": {
+     "contract": { "const": "ictu-source-claims" },
+-    "contract_version": { "type": "string", "pattern": "^1\\.[0-9]+$" },
++    "contract_version": { "type": "string", "pattern": "^1\\.[0-9]+(?![\\s\\S])", "description": "Major 1, numeric minor, nothing after it. The lookahead replaces $, which some validators match before a final newline." },
+     "source_system": { "enum": ["ICTU_REPO_SCOPUS_GUIDE", "ICTU_REPO_PROFILES"] },
+     "capture": {
+       "type": "object",
+diff --git a/backend/tests/unit/test_source_claims.py b/backend/tests/unit/test_source_claims.py
+index 01a12c3..7d4627b 100644
+--- a/backend/tests/unit/test_source_claims.py
++++ b/backend/tests/unit/test_source_claims.py
+@@ -684,10 +684,16 @@ def test_r2_hashes_and_raw_json_are_unchanged_after_mutation_attempt():
+ 
+ 
+ # ---------------------------------------------------------------------------
+-# P1-R3 — Contract version validation matches JSON Schema ^1\.[0-9]+$
++# P1-R3 / OPEN-3 — strict contract version: parser and JSON Schema agree
+ # ---------------------------------------------------------------------------
+ 
+-@pytest.mark.parametrize("version", ["1.0", "1.1", "1.99", "1.00"])
++VALID_VERSIONS = ["1.0", "1.1", "1.99", "1.00", "1.10"]
++INVALID_VERSIONS = ["1.x", "1.0.1", "1", "2.0", "0.9", "10.0", "1.", ".1", "01.0", "001.5",
++                    "1.0\n", "1.0\r", "1.0\r\n", " 1.0", "1.0 ", "\n1.0", "1.-1", "1.١",
++                    "١.0"]
++
++
++@pytest.mark.parametrize("version", VALID_VERSIONS)
+ def test_r3_valid_contract_versions_are_accepted(version):
+     artifact = base_guide()
+     artifact["contract_version"] = version
+@@ -695,7 +701,7 @@ def test_r3_valid_contract_versions_are_accepted(version):
+     assert snap.contract_version == version
+ 
+ 
+-@pytest.mark.parametrize("version", ["1.x", "1.0.1", "1", "2.0", "0.9", "1."])
++@pytest.mark.parametrize("version", INVALID_VERSIONS)
+ def test_r3_invalid_contract_versions_are_rejected(version):
+     artifact = base_guide()
+     artifact["contract_version"] = version
+@@ -704,16 +710,90 @@ def test_r3_invalid_contract_versions_are_rejected(version):
+     assert raised.value.code == "UNSUPPORTED_CONTRACT_VERSION"
+ 
+ 
+-def test_r3_schema_version_pattern_matches_parser_logic():
+-    import re as _re
++@pytest.mark.parametrize("version", [1, 1.0, None, ["1.0"]])
++def test_r3_non_string_contract_version_is_rejected(version):
++    artifact = base_guide()
++    artifact["contract_version"] = version
++    with pytest.raises(ArtifactError) as raised:
++        parse_artifact(artifact)
++    assert raised.value.code in {"UNSUPPORTED_CONTRACT_VERSION", "NON_CANONICAL_VALUE"}
++
++
++def test_r3_parser_and_json_schema_validator_accept_the_same_versions():
++    jsonschema = pytest.importorskip("jsonschema")
+     schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+-    schema_pattern = schema["properties"]["contract_version"]["pattern"]
+-    for valid in ("1.0", "1.1", "1.99", "1.00"):
+-        assert _re.match(schema_pattern, valid), f"{valid!r} should match schema pattern"
+-    for invalid in ("1.x", "1.0.1", "1", "2.0", "0.9", "1."):
+-        assert not _re.match(schema_pattern, invalid), f"{invalid!r} should not match"
+-    # Confirm parser and schema agree
+-    assert schema_pattern == r"^1\.[0-9]+$"
++    jsonschema.Draft202012Validator.check_schema(schema)
++    version_schema = schema["properties"]["contract_version"]
++    checker = jsonschema.Draft202012Validator(version_schema)
++    artifact_checker = jsonschema.Draft202012Validator(schema)
++    for version in VALID_VERSIONS + INVALID_VERSIONS:
++        artifact = base_guide()
++        artifact["contract_version"] = version
++        try:
++            parse_artifact(artifact)
++            parser_ok = True
++        except ArtifactError:
++            parser_ok = False
++        assert checker.is_valid(version) is parser_ok, repr(version)
++        assert artifact_checker.is_valid(artifact) is parser_ok, repr(version)
++
++
++# ---------------------------------------------------------------------------
++# P1-R1 completion — no-host URLs and bracketed IPv6
++# ---------------------------------------------------------------------------
++
++@pytest.mark.parametrize("bad_url", ["https:///profile/123", "https://", "http://:80/",
++                                     "http://?q=1", "http://#frag"])
++def test_r1_url_without_host_is_not_a_source_key(bad_url):
++    value = canonical.normalize_source_id(bad_url, "source_id")
++    assert value.normalized is None and value.raw == bad_url
++    assert [i.code for i in value.issues] == ["SOURCE_URL_MALFORMED"]
++    snap = parse_artifact(profiles({"full_name": "T", "email": "t@example.invalid",
++                                    "source_id": bad_url}))
++    record, = snap.records
++    assert record.raw["source_id"] == bad_url
++    assert "SOURCE_URL_MALFORMED" in codes(record)
++    assert record.record_key.method is KeyMethod.EMAIL_V1
++    no_fallback = parse_artifact(profiles({"full_name": "T", "source_id": bad_url}))
++    assert no_fallback.records[0].record_key.strength is KeyStrength.WEAK
++
++
++@pytest.mark.parametrize("bad_url", ["https:///profile/123", "https://"])
++def test_r1_artifact_source_url_without_host_raises(bad_url):
++    artifact = profiles(profile(1))
++    artifact["content"]["source_url"] = bad_url
++    with pytest.raises(ArtifactError) as raised:
++        parse_artifact(artifact)
++    assert raised.value.code == "SOURCE_URL_MALFORMED"
++
++
++@pytest.mark.parametrize(("raw", "expected"), [
++    ("http://[::1]/a", "http://[::1]/a"),
++    ("http://[::1]:8080/a/", "http://[::1]:8080/a"),
++    ("https://[2001:DB8::1]:443/x", "https://[2001:db8::1]/x"),
++    ("http://[2001:db8::1]:80/", "http://[2001:db8::1]/"),
++    ("HTTPS://Repository.Example.invalid:443/Profile/7/",
++     "https://repository.example.invalid/Profile/7"),
++    ("http://repository.example.invalid:8080/p?id=A#top",
++     "http://repository.example.invalid:8080/p?id=A"),
++    ("http://192.0.2.10:80/p/", "http://192.0.2.10/p"),
++    ("orcid-profile-42 ", "orcid-profile-42"),
++])
++def test_r1_valid_hosts_normalize_to_parseable_idempotent_urls(raw, expected):
++    from urllib.parse import urlsplit
++    value = canonical.normalize_source_id(raw)
++    assert value.normalized == expected and value.issues == ()
++    assert canonical.normalize_source_id(value.normalized).normalized == expected
++    if expected.startswith("http"):
++        original, again = urlsplit(raw.strip()), urlsplit(expected)
++        assert again.hostname == original.hostname.lower()
++        assert again.port in (original.port, None)
++
++
++def test_r1_ipv6_profile_keeps_strong_key():
++    snap = parse_artifact(profiles({"full_name": "T", "source_id": "http://[::1]:8080/p/9"}))
++    key = snap.records[0].record_key
++    assert key.value == "http://[::1]:8080/p/9" and key.strength is KeyStrength.STRONG
+ 
+ 
+ # ---------------------------------------------------------------------------
+@@ -735,7 +815,8 @@ def test_errata_nested_normalized_access_cannot_mutate_stored_evidence():
+                     lambda m: m.pop("raw"),
+                     lambda m: m.popitem(),
+                     lambda m: m.clear(),
+-                    lambda m: m.setdefault("extra", "Changed")):
++                    lambda m: m.setdefault("extra", "Changed"),
++                    lambda m: m.__ior__({"raw": "Changed"})):
+         with pytest.raises(TypeError):
+             attempt(by_name["email"])
+     by_name["email"] = {"raw": "Changed"}  # rebinding a local copy of the index only
+@@ -764,49 +845,79 @@ def test_errata_malformed_url_keeps_record_raw_and_claims():
+         ClaimType.EMAIL_DECLARED, ClaimType.ORCID_DECLARED}
+ 
+ 
+-# Open errata gaps found while preparing the handover. strict=True: each xfail
+-# turns into a failure once the gap is closed, so it cannot be forgotten.
++# ---------------------------------------------------------------------------
++# OPEN-1 / OPEN-2 — in-place union and pickle (trusted, self-produced data only)
++# ---------------------------------------------------------------------------
+ 
+-@pytest.mark.xfail(strict=True, raises=AssertionError,
+-                   reason="OPEN-1: dict.__ior__ bypasses _FrozenMap.update")
+-def test_open_1_inplace_or_must_not_mutate_normalized():
++def test_open_1_inplace_or_does_not_mutate_normalized():
+     record = parse_artifact(profiles(profile(1))).records[0]
+     mapping = dict(record.normalized)["email"]
+     original = dict(mapping)
+-    try:
++    with pytest.raises(TypeError):
+         mapping |= {"raw": "Changed"}
+-    except TypeError:
+-        pass
+     assert dict(dict(record.normalized)["email"]) == original
++    merged = mapping | {"raw": "Changed"}  # non-mutating union returns a new plain dict
++    assert type(merged) is dict and dict(mapping) == original
++
+ 
++def test_open_1_frozen_map_keeps_read_equality_copy_and_json_behaviour():
++    record = parse_artifact(profiles(profile(1))).records[0]
++    mapping = dict(record.normalized)["email"]
++    plain = dict(mapping)
++    assert mapping == plain and mapping["normalized"] == "lecturer1@example.invalid"
++    assert json.dumps(mapping, sort_keys=True) == json.dumps(plain, sort_keys=True)
++    for clone in (copy.copy(mapping), copy.deepcopy(mapping)):
++        assert clone == plain and type(clone) is type(mapping)
++        with pytest.raises(TypeError):
++            clone["raw"] = "Changed"
+ 
+-@pytest.mark.xfail(strict=True, raises=TypeError,
+-                   reason="OPEN-2: pickle rebuilds dict subclasses via __setitem__")
+-def test_open_2_snapshot_survives_pickle_roundtrip():
++
++def test_open_2_snapshot_pickle_roundtrip_stays_equal_and_immutable():
+     import pickle
+-    snap = parse_artifact(profiles(profile(1)))
+-    assert pickle.loads(pickle.dumps(snap)) == snap
++    snap = parse_artifact(base_guide())
++    for protocol in range(2, pickle.HIGHEST_PROTOCOL + 1):
++        clone = pickle.loads(pickle.dumps(snap, protocol=protocol))
++        assert clone == snap
++        assert clone.content_hash == snap.content_hash
++        assert [(r.raw_json, r.record_hash) for r in clone.records] == [
++            (r.raw_json, r.record_hash) for r in snap.records]
++        assert copy.deepcopy(clone) == snap
++        for record in clone.records:
++            for _name, mapping in record.normalized:
++                assert type(mapping).__name__ == "_FrozenMap"
++                for attempt in (lambda m: m.__setitem__("raw", "x"),
++                                lambda m: m.update(raw="x"),
++                                lambda m: m.__ior__({"raw": "x"})):
++                    with pytest.raises(TypeError):
++                        attempt(mapping)
+ 
+ 
+-@pytest.mark.xfail(strict=True, raises=pytest.fail.Exception,
+-                   reason="OPEN-3: parser regex wider than schema ^1\\.[0-9]+$")
+-@pytest.mark.parametrize("version", ["01.0", "001.5", "1.0\n"])
+-def test_open_3_versions_rejected_by_schema_are_rejected_by_parser(version):
+-    artifact = base_guide()
+-    artifact["contract_version"] = version
+-    with pytest.raises(ArtifactError):
+-        parse_artifact(artifact)
++# ---------------------------------------------------------------------------
++# Purity: only modules newly imported by source_claims count
++# ---------------------------------------------------------------------------
++
++_FORBIDDEN_MODULES = ("sqlalchemy", "psycopg2", "fastapi", "pydantic_settings", "app.main",
++                      "app.core", "app.models", "app.api", "requests", "httpx",
++                      "urllib.request", "http.client", "socket")
+ 
+ 
+-def test_package_imports_without_database_app_or_network_modules():
++@pytest.mark.parametrize("flags", [("-I", "-S"), ("-I",)], ids=["no-site", "with-site"])
++def test_package_imports_without_database_app_or_network_modules(flags):
++    """Measures sys.modules before and after the import, so modules an interpreter
++    preloads through site configuration are reported but not blamed on the package.
++    The no-site run has no such preload, so it also catches a forbidden import that
++    a with-site run could hide."""
+     code = (
+-        "import sys; sys.path.insert(0, '.');"
++        "import json, sys; sys.path.insert(0, '.');"
++        f"bad = {_FORBIDDEN_MODULES!r};"
++        "hit = lambda names: sorted(m for m in names"
++        " if any(m == b or m.startswith(b + '.') for b in bad));"
++        "before = set(sys.modules);"
+         "import app.services.source_claims.parser, app.services.source_claims.analysis;"
+-        "bad = ('sqlalchemy', 'psycopg2', 'fastapi', 'pydantic_settings', 'app.main',"
+-        " 'app.core', 'app.models', 'app.api', 'requests', 'httpx', 'urllib.request',"
+-        " 'http.client', 'socket');"
+-        "print(sorted(m for m in sys.modules if any(m == b or m.startswith(b + '.') for b in bad)))"
++        "print(json.dumps({'preloaded': hit(before), 'new': hit(set(sys.modules) - before)}))"
+     )
+-    result = subprocess.run([sys.executable, "-I", "-c", code], cwd=BACKEND,
++    result = subprocess.run([sys.executable, *flags, "-c", code], cwd=BACKEND,
+                             capture_output=True, text=True, timeout=60, check=True)
+-    assert result.stdout.strip() == "[]", result.stdout + result.stderr
++    report = json.loads(result.stdout)
++    print(flags, report)
++    assert report["new"] == [], result.stdout + result.stderr

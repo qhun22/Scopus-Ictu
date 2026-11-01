@@ -1,0 +1,43 @@
+E3-P3-B2-D - Actual static/document checks; DESIGN-ONLY
+Date: 2026-10-30 (Asia/Bangkok)
+Final decision: PARTIAL_DESIGN. SOURCE_CLAIM remains INACTIVE.
+
+Runtime tests executed in B2-D: 0.
+Pytest/PostgreSQL/application DB/migrations/HTTP/JWT/web E2E/frontend build: NOT_EXECUTED.
+Historical B2-C 597 combined + 14 independent tests are reported input evidence, not rerun here.
+No commit, no push, no DB connection, no source/test/model/route/config/freeze change.
+
+Commands and checks actually used:
+- git rev-parse HEAD
+- git status --porcelain=v1 --untracked-files=all
+- git ls-files --cached --others --exclude-standard -z
+- Read actual source/contracts/audit/freeze/model/migration files as text, no application import.
+- SHA-256 existing file baseline and B2-C manifest/code/B2-B preservation comparisons.
+- Parse Alembic revision/down_revision AST literals only; do not import alembic/env.py.
+- Read/hash actual independent report with approved temp-directory access; retain exact new input copy.
+- Document case IDs, decision IDs, runtime status cells, whitespace and scope checks.
+- git diff --no-index --no-ext-diff --no-textconv -- /dev/null <new QA path> (exit 1 is normal new-file diff)
+- git apply --check --reverse docs/qa/gate_e3/E3P3B2D_IMPLEMENTATION.diff (no application of patch)
+- Final new-file whitelist, baseline hash/status equality after removing only B2-D additions, manifest verification.
+
+Measured static results before final packaging:
+HEAD: 4bb69f6efaac945399b1c191fc12879ad1c62885
+Baseline: 1678 files; 20 tracked modified, 730 untracked file entries; 750 status entries.
+Existing-file hash mismatches: 0.
+B2-C manifest: 6/6 matching.
+B2-C code/test hashes: 2/2 matching.
+B2-B preserved code/test/QA hashes: 7/7 matching.
+Actual independent report/input copy SHA256: d6d08d4fac549a350463260825f6347027c801fa306633a4dbbef9f58f4447d9.
+Static migration graph: 15 revision-bearing files; one head b88f02d44ff2. No Alembic/DB execution.
+Security matrix: T01-T39 unique, complete; every execution cell NOT_EXECUTED.
+Decision log: D01-D11 unique, complete; owner decisions not fabricated.
+Core/handover added-line trailing-whitespace findings: 0.
+Patch exact coverage/reverse-check output and final file counts: see E3P3B2D_VALIDATION.json.
+Manifest hashes every other B2-D artifact; it intentionally has no self-hash.
+
+Access/tool notes:
+Default sandbox access-denied on former temp path was not treated as missing dependency.
+Approved read/copy recovered the report; original file remained unchanged.
+One documentation apply_patch context mismatch was corrected before packaging; no protected file changed.
+Git diff reports existing LF/CRLF warnings on unrelated files; no normalization was applied to them.
+No runtime security acceptance PASS is claimed by these static checks.

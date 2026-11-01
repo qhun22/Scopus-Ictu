@@ -1,0 +1,216 @@
+{
+  "gate": "E.3",
+  "phase": "P2-A",
+  "item": "final design correction P2A-S1, P2A-S2",
+  "date": "2026-10-29",
+  "status": "CORRECTION_DELIVERED_STOPPED_FOR_INDEPENDENT_REVIEW",
+  "scope": {
+    "files_changed": [
+      "backend/app/services/source_claims/adapters.py",
+      "backend/tests/unit/test_source_claims_adapters.py",
+      "docs/qa/gate_e3/E3P2A_STAGING_SCHEMA_PROPOSAL.md"
+    ],
+    "p1_modules_modified": false,
+    "pyproject_modified": false,
+    "models": 0,
+    "migrations": 0,
+    "database_access": false,
+    "real_import": false,
+    "g01_g04_modified": false,
+    "commit": false,
+    "push": false,
+    "p2b_started": false
+  },
+  "P2A-S1": {
+    "status": "FIXED_IN_DESIGN_AND_PURE_HELPERS",
+    "reproduced": "contract_version 1.0 vs 1.1: same content_hash and capture_hash, different artifact bytes",
+    "design": {
+      "source_captures": "UNIQUE(content_id, capture_hash) - pure observation",
+      "source_artifacts": "new; exact contract_version; UNIQUE(artifact_bytes_sha256); FK to analysis of same content+version",
+      "source_analyses": "UNIQUE(content_id, contract_version, rule versions); never the source of an artifact's version",
+      "new_outcome": "ARTIFACT_ADDED",
+      "already_ingested_by": "artifact_bytes_sha256"
+    },
+    "helpers": [
+      "adapters.staging_keys",
+      "adapters.reconstruct_artifact_bytes"
+    ],
+    "regression_tests": [
+      "test_contract_minor_versions_share_content_and_capture_but_not_artifact",
+      "test_proposed_unique_keys_keep_both_contract_versions",
+      "test_artifact_bytes_are_rebuilt_only_with_the_stored_contract_version",
+      "test_staging_keys_require_canonical_artifact_bytes"
+    ],
+    "simulated_unique_keys_1_0_1_1_1_0": {
+      "contents": 1,
+      "captures": 1,
+      "artifacts": 2,
+      "rev1_captures": 1
+    }
+  },
+  "P2A-S2": {
+    "status": "FIXED",
+    "harvester_vocabulary_source": "Craw src/ictu_harvester/full_harvest.py (read-only)",
+    "manifest_status_values": [
+      "COMPLETE",
+      "COMPLETE_WITH_SOURCE_FAILURES"
+    ],
+    "blocked_note": "BLOCKED is only a CLI result; manifest is written before the replay check",
+    "entity_types": [
+      "lecturer",
+      "<kind>",
+      "<kind>_listing"
+    ],
+    "removed_invented_name": "profile",
+    "complete_requires": [
+      "success status",
+      "status consistent with failure list",
+      "semantic replay passed and replayed this lecturers.json",
+      "card and lecturer counts match",
+      "no drift",
+      "no lecturer failure"
+    ],
+    "probe_accepted_vs_corrected": {
+      "FAILED zero counts": [
+        "COMPLETE",
+        "PARTIAL"
+      ],
+      "COMPLETE manifest of BLOCKED run": [
+        "COMPLETE",
+        "PARTIAL"
+      ]
+    },
+    "regression_tests": [
+      "test_harvest_status_must_be_a_consistent_success (9)",
+      "test_failed_status_with_matching_zero_counts_is_partial",
+      "test_success_status_without_verified_replay_is_partial (4)",
+      "test_failed_harvest_never_authorizes_withdrawal",
+      "test_semantic_replay_must_be_an_object"
+    ]
+  },
+  "real_data_after_correction": {
+    "profiles_completeness": "COMPLETE",
+    "profiles_basis": {
+      "profiles_in_file": 410,
+      "source_card_count": 410,
+      "lecturer_count": 410,
+      "crawl_report_present": true,
+      "source_drift_detected": false,
+      "entity_failure_types": [
+        "master_thesis"
+      ],
+      "manifest_status": "COMPLETE_WITH_SOURCE_FAILURES",
+      "semantic_replay_verified": true
+    },
+    "profiles_records": 410,
+    "profiles_claims": {
+      "EMAIL_DECLARED": 410,
+      "ORCID_DECLARED": 372
+    },
+    "profiles_content_hash_prefix": "ca03511cf6a9c019",
+    "profiles_content_hash_unchanged": true,
+    "guide_artifacts_unchanged": true,
+    "deterministic_over_hashseeds": true,
+    "storage_reconstruction": {
+      "PROFILES": true,
+      "GUIDE_TABLES": true,
+      "GUIDE_MULTI_ID": true
+    }
+  },
+  "tests": {
+    "full": {
+      "passed": 192,
+      "skipped": 0,
+      "xfailed": 0,
+      "previous": 172
+    },
+    "focused_s1_s2": {
+      "passed": 26
+    },
+    "project_conftest": "exit 4 (no TEST_DATABASE_URL; no DB used)"
+  },
+  "ruff": {
+    "version": "0.17.3",
+    "exit": 0
+  },
+  "diff": {
+    "diff_sha256": "0007ded4945a30082d2e5d7d25103a89d41018d3d600c1f9456ee5c64e877b75",
+    "diff_stats": {
+      "backend/app/services/source_claims/adapters.py": {
+        "added": 84,
+        "removed": 7
+      },
+      "backend/tests/unit/test_source_claims_adapters.py": {
+        "added": 151,
+        "removed": 6
+      }
+    },
+    "whitespace_check": "clean",
+    "replay_steps": {
+      "E3P1_IMPLEMENTATION.diff": "OK",
+      "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+      "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK",
+      "E3P2A_IMPLEMENTATION.diff": "OK",
+      "E3P2A_CORRECTION.diff": "OK"
+    },
+    "replay_matches_workspace": {
+      "backend/app/services/source_claims/adapters.py": true,
+      "backend/tests/unit/test_source_claims_adapters.py": true,
+      "backend/pyproject.toml": true
+    },
+    "reverse_check": "OK"
+  },
+  "files": {
+    "backend/app/services/source_claims/adapters.py": {
+      "accepted_p2a_sha256": "03dd829b88cf1c0c58b55543bd593d5b19ee0953ee7e25ad2ab35ee5c7b4c26d",
+      "corrected_sha256": "2596ce6a80750927c6e0ebedc88d9a11b85a4fed1416edaa297241f237d2ea8b",
+      "lines": 465
+    },
+    "backend/tests/unit/test_source_claims_adapters.py": {
+      "accepted_p2a_sha256": "2e258362ea84c8446fe25d6f6a993641aa38f1c0947029256782fec425e976ca",
+      "corrected_sha256": "5141399667c91c631abedc27f4baa0ad23e5b27c4acde5e0dfda3e43d204342d",
+      "lines": 677
+    }
+  },
+  "schema_proposal": {
+    "accepted_rev1_sha256": "cba67f4486e1581b42c53cdaacfc75ebb414c584ef0b9415eb5564a74a234cca",
+    "rev2_sha256": "682dc8f9ea2c061f6630b19900b07a76cf5c046e85348e82c60dff18b9546f29"
+  },
+  "preservation": {
+    "p1_files_unchanged_vs_closeout": true,
+    "pyproject_unchanged_since_p2a": true,
+    "g01_g04_files_rehashed": 31,
+    "g01_g04_all_match": true,
+    "accepted_p2a_deliverables_unchanged": {
+      "E3P2A_HANDOVER.md": true,
+      "E3P2A_SOURCE_MAPPING.md": true,
+      "E3P2A_IMPLEMENTATION.diff": true,
+      "E3P2A_TEST_RESULTS.txt": true
+    }
+  },
+  "owner_decisions_pending": [
+    "O-2 upstream raw-file retention",
+    "O-7 personal-data exclusion"
+  ],
+  "pending_gates": [
+    "G04 PostgreSQL isolation tests NOT_EXECUTED"
+  ],
+  "artifacts": {
+    "E3P2A_CORRECTION_HANDOVER.md": {
+      "sha256": "c7acdbb3633dfa717c414c0192c2ffe424fbafd8e18479dcbac586870bc5a580",
+      "bytes": 9273
+    },
+    "E3P2A_CORRECTION.diff": {
+      "sha256": "0007ded4945a30082d2e5d7d25103a89d41018d3d600c1f9456ee5c64e877b75",
+      "bytes": 19519
+    },
+    "E3P2A_CORRECTION_TEST_RESULTS.txt": {
+      "sha256": "76ddcdf3a6645ab794ae36310acbd530ca9b3dddd6cdf4a63d30cd64eed09728",
+      "bytes": 45482
+    },
+    "E3P2A_STAGING_SCHEMA_PROPOSAL.md": {
+      "sha256": "682dc8f9ea2c061f6630b19900b07a76cf5c046e85348e82c60dff18b9546f29",
+      "bytes": 16950
+    }
+  }
+}

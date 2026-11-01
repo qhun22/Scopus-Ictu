@@ -1,0 +1,1091 @@
+E3-P3-A TEMPORAL CLOSEOUT (P3A-R1, P3A-R2) - TEST RESULTS
+Date: 2026-10-29  Python 3.12.10  pytest 9.2.0  ruff 0.17.3
+No database; synthetic data only; PostgreSQL NOT_EXECUTED
+
+========================================================================
+1. R1/R2 REGRESSIONS AGAINST THE ACCEPTED (PRE-FIX) BRIDGE: they must fail
+$ bridge sha256 0329ba2a... == E3P3A_VALIDATION.json
+  python -m pytest tests/unit/test_source_claim_matching_bridge.py --noconftest -v -k "r1 or r2"   (new tests, old bridge)
+  result: 10 failed, 6 passed
+------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.1
+collecting ... collected 43 items / 27 deselected / 16 selected
+
+tests/unit/test_source_claim_matching_bridge.py::test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string FAILED [  6%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_listed_flag_follows_the_later_instant FAILED [ 12%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_ordering_is_independent_of_input_order_and_captures_listing PASSED [ 18%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_naive_capture_time_is_refused FAILED [ 25%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-29T17:00:00Z] FAILED [ 31%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-30T00:00:00+07:00] FAILED [ 37%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-29T17:00:00Z] FAILED [ 43%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-30T00:00:00+07:00] FAILED [ 50%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order0] PASSED [ 56%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order1] PASSED [ 62%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_two_later_captures_at_the_same_instant_that_both_omit_the_claim_withdraw_it PASSED [ 68%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order0] PASSED [ 75%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order1] FAILED [ 81%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_tied_listing_captures_with_different_flags_are_flagged_not_silently_chosen FAILED [ 87%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order0] FAILED [ 93%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order1] PASSED [100%]
+
+================================== FAILURES ===================================
+_ test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string _
+
+    def test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string():
+        older = observe(multi_artifact([row(1, [sid(1), sid(2)], primary=sid(1))],
+                                       ts=T_EARLIER_PLUS7))
+        newer = observe(multi_artifact([row(1, [sid(1), sid(2)], primary=sid(2))], ts=T_Z))
+        assert older[0].captured_at > newer[0].captured_at                # strings mislead
+        result = run(older, newer, lecturers=[gv(1)])
+>       assert (claim_of(result, 1).is_primary_claimed, claim_of(result, 2).is_primary_claimed) == (
+            False, True)                                                    # the 17:00Z capture wins
+E       assert (True, False) == (False, True)
+E         
+E         At index 0 diff: True != False
+E         
+E         Full diff: (-: missing in left side, +: extra in left side)
+E           (
+E         +     True,
+E               False,
+E         -     True,
+E           )
+
+tests\unit\test_source_claim_matching_bridge.py:414: AssertionError
+________________ test_r1_listed_flag_follows_the_later_instant ________________
+
+    def test_r1_listed_flag_follows_the_later_instant():
+        older = observe(multi_artifact([row(1, [sid(1)], primary=sid(2))], ts=T_EARLIER_PLUS7))
+        newer = observe(multi_artifact([row(1, [sid(1), sid(2)], primary=sid(2))], ts=T_Z))
+        result = run(older, newer, lecturers=[gv(1)])
+>       assert claim_of(result, 2).listed is True                           # 17:00Z lists it
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert False is True
+E        +  where False = SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=True, listed=False, presence=<Presence.CURRENT: 'CURRENT'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('aa020d72-9ec3-5ad7-8026-6631679cb9f2'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('c4a65fba-04f6-5a5e-ad47-d829368df6aa'), contract_version='1.0', claim_id=UUID('3664f185-42d5-5cae-b891-60c5412efbe8'), record_id=UUID('fbce6760-c633-5487-9691-a12258bf18e0')), ObservationRef(capture_id=UUID('40f1a75f-6506-5755-bdb2-65e8b483321f'), captured_at='2026-10-29T23:00:00+07:00', completeness='COMPLETE', analysis_id=UUID('3b599693-25e6-5b7c-8e8c-279dec908903'), contract_version='1.0', claim_id=UUID('60083038-41f0-5895-9f4c-f5d08b4d7303'), record_id=UUID('fb45b69a-ad64-5c35-a76f-f5a544f4c2fc')))).listed
+E        +    where SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=True, listed=False, presence=<Presence.CURRENT: 'CURRENT'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('aa020d72-9ec3-5ad7-8026-6631679cb9f2'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('c4a65fba-04f6-5a5e-ad47-d829368df6aa'), contract_version='1.0', claim_id=UUID('3664f185-42d5-5cae-b891-60c5412efbe8'), record_id=UUID('fbce6760-c633-5487-9691-a12258bf18e0')), ObservationRef(capture_id=UUID('40f1a75f-6506-5755-bdb2-65e8b483321f'), captured_at='2026-10-29T23:00:00+07:00', completeness='COMPLETE', analysis_id=UUID('3b599693-25e6-5b7c-8e8c-279dec908903'), contract_version='1.0', claim_id=UUID('60083038-41f0-5895-9f4c-f5d08b4d7303'), record_id=UUID('fb45b69a-ad64-5c35-a76f-f5a544f4c2fc')))) = claim_of(BridgeResult(evidence=(SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=True, listed=False, presence=<Presence.CURRENT: 'CURRENT'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('aa020d72-9ec3-5ad7-8026-6631679cb9f2'), captured_at='2026-10-29T17...ness='COMPLETE', analysis_id=UUID('3b599693-25e6-5b7c-8e8c-279dec908903'), contract_version='1.0', claim_id=UUID('74605cb4-bcbe-5024-9ce9-df920c5b4086'), record_id=UUID('fb45b69a-ad64-5c35-a76f-f5a544f4c2fc'))))), pairs=(PairAssessment(lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', classification=<PairClass.PLAUSIBLE_CANDIDATE: 'PLAUSIBLE_CANDIDATE'>, reasons=(), evidence_fingerprints=('0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0',), existing_candidate_status=None, existing_identity_status=None, decision_preserved=True, accept_reason_required=True), PairAssessment(lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('8f4d2d60-25ba-55be-ab7e-2eb5c94dd224'), scopus_id='57000000001', classification=<PairClass.PLAUSIBLE_CANDIDATE: 'PLAUSIBLE_CANDIDATE'>, reasons=(), evidence_fingerprints=('e3874dddea57f16238d0742b5152c1e794dfe5f1efa8e95ffecc3274ee33fd41',), existing_candidate_status=None, existing_identity_status=None, decision_preserved=True, accept_reason_required=True)), findings=(), identity_rules_version='1', normalization_version='1'), 2)
+
+tests\unit\test_source_claim_matching_bridge.py:426: AssertionError
+____________________ test_r1_naive_capture_time_is_refused ____________________
+
+    def test_r1_naive_capture_time_is_refused():
+        capture, observed = observe(multi_artifact([row(1, [sid(1)])]))
+        naive = dataclasses.replace(capture, captured_at="2026-10-29T17:00:00")
+>       with pytest.raises(BridgeError) as raised:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE BridgeError
+
+tests\unit\test_source_claim_matching_bridge.py:453: Failed
+_ test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-29T17:00:00Z] _
+
+uuid_order = (1, 2), later_time = '2026-10-29T17:00:00Z'
+
+    @pytest.mark.parametrize("later_time", [T_Z, T_EQUAL_PLUS7])
+    @pytest.mark.parametrize("uuid_order", [(1, 2), (2, 1)])
+    def test_r2_equal_instants_never_prove_withdrawal(uuid_order, later_time):
+        """Same instant (also written with another offset): no UUID order can make B 'later'."""
+        lists_both = with_id(observe(multi_artifact([row(1, [sid(1), sid(2)])], ts=T_Z)),
+                             uuid.UUID(int=uuid_order[0]))
+        omits_one = with_id(observe(multi_artifact([row(1, [sid(1)])], ts=later_time)),
+                            uuid.UUID(int=uuid_order[1]))
+        result = run(lists_both, omits_one, lecturers=[gv(1)])
+        gone = claim_of(result, 2)
+>       assert gone.presence is Presence.NOT_OBSERVED
+E       AssertionError: assert <Presence.WITHDRAWN: 'WITHDRAWN'> is <Presence.NOT_OBSERVED: 'NOT_OBSERVED'>
+E        +  where <Presence.WITHDRAWN: 'WITHDRAWN'> = SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.WITHDRAWN: 'WITHDRAWN'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('00000000-0000-0000-0000-000000000001'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('fcb32050-2310-5678-abbf-4f35fb414d5c'), contract_version='1.0', claim_id=UUID('38669065-db34-5eeb-8c6f-be6324d4f027'), record_id=UUID('b1916ce4-47e4-592e-bb7d-bb6613982ad6')),)).presence
+E        +  and   <Presence.NOT_OBSERVED: 'NOT_OBSERVED'> = Presence.NOT_OBSERVED
+
+tests\unit\test_source_claim_matching_bridge.py:468: AssertionError
+_ test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-30T00:00:00+07:00] _
+
+uuid_order = (1, 2), later_time = '2026-10-30T00:00:00+07:00'
+
+    @pytest.mark.parametrize("later_time", [T_Z, T_EQUAL_PLUS7])
+    @pytest.mark.parametrize("uuid_order", [(1, 2), (2, 1)])
+    def test_r2_equal_instants_never_prove_withdrawal(uuid_order, later_time):
+        """Same instant (also written with another offset): no UUID order can make B 'later'."""
+        lists_both = with_id(observe(multi_artifact([row(1, [sid(1), sid(2)])], ts=T_Z)),
+                             uuid.UUID(int=uuid_order[0]))
+        omits_one = with_id(observe(multi_artifact([row(1, [sid(1)])], ts=later_time)),
+                            uuid.UUID(int=uuid_order[1]))
+        result = run(lists_both, omits_one, lecturers=[gv(1)])
+        gone = claim_of(result, 2)
+>       assert gone.presence is Presence.NOT_OBSERVED
+E       AssertionError: assert <Presence.WITHDRAWN: 'WITHDRAWN'> is <Presence.NOT_OBSERVED: 'NOT_OBSERVED'>
+E        +  where <Presence.WITHDRAWN: 'WITHDRAWN'> = SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.WITHDRAWN: 'WITHDRAWN'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('00000000-0000-0000-0000-000000000001'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('fcb32050-2310-5678-abbf-4f35fb414d5c'), contract_version='1.0', claim_id=UUID('38669065-db34-5eeb-8c6f-be6324d4f027'), record_id=UUID('b1916ce4-47e4-592e-bb7d-bb6613982ad6')),)).presence
+E        +  and   <Presence.NOT_OBSERVED: 'NOT_OBSERVED'> = Presence.NOT_OBSERVED
+
+tests\unit\test_source_claim_matching_bridge.py:468: AssertionError
+_ test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-29T17:00:00Z] _
+
+uuid_order = (2, 1), later_time = '2026-10-29T17:00:00Z'
+
+    @pytest.mark.parametrize("later_time", [T_Z, T_EQUAL_PLUS7])
+    @pytest.mark.parametrize("uuid_order", [(1, 2), (2, 1)])
+    def test_r2_equal_instants_never_prove_withdrawal(uuid_order, later_time):
+        """Same instant (also written with another offset): no UUID order can make B 'later'."""
+        lists_both = with_id(observe(multi_artifact([row(1, [sid(1), sid(2)])], ts=T_Z)),
+                             uuid.UUID(int=uuid_order[0]))
+        omits_one = with_id(observe(multi_artifact([row(1, [sid(1)])], ts=later_time)),
+                            uuid.UUID(int=uuid_order[1]))
+        result = run(lists_both, omits_one, lecturers=[gv(1)])
+        gone = claim_of(result, 2)
+>       assert gone.presence is Presence.NOT_OBSERVED
+E       AssertionError: assert <Presence.CURRENT: 'CURRENT'> is <Presence.NOT_OBSERVED: 'NOT_OBSERVED'>
+E        +  where <Presence.CURRENT: 'CURRENT'> = SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.CURRENT: 'CURRENT'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('00000000-0000-0000-0000-000000000002'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('fcb32050-2310-5678-abbf-4f35fb414d5c'), contract_version='1.0', claim_id=UUID('38669065-db34-5eeb-8c6f-be6324d4f027'), record_id=UUID('b1916ce4-47e4-592e-bb7d-bb6613982ad6')),)).presence
+E        +  and   <Presence.NOT_OBSERVED: 'NOT_OBSERVED'> = Presence.NOT_OBSERVED
+
+tests\unit\test_source_claim_matching_bridge.py:468: AssertionError
+_ test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-30T00:00:00+07:00] _
+
+uuid_order = (2, 1), later_time = '2026-10-30T00:00:00+07:00'
+
+    @pytest.mark.parametrize("later_time", [T_Z, T_EQUAL_PLUS7])
+    @pytest.mark.parametrize("uuid_order", [(1, 2), (2, 1)])
+    def test_r2_equal_instants_never_prove_withdrawal(uuid_order, later_time):
+        """Same instant (also written with another offset): no UUID order can make B 'later'."""
+        lists_both = with_id(observe(multi_artifact([row(1, [sid(1), sid(2)])], ts=T_Z)),
+                             uuid.UUID(int=uuid_order[0]))
+        omits_one = with_id(observe(multi_artifact([row(1, [sid(1)])], ts=later_time)),
+                            uuid.UUID(int=uuid_order[1]))
+        result = run(lists_both, omits_one, lecturers=[gv(1)])
+        gone = claim_of(result, 2)
+>       assert gone.presence is Presence.NOT_OBSERVED
+E       AssertionError: assert <Presence.CURRENT: 'CURRENT'> is <Presence.NOT_OBSERVED: 'NOT_OBSERVED'>
+E        +  where <Presence.CURRENT: 'CURRENT'> = SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.CURRENT: 'CURRENT'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('00000000-0000-0000-0000-000000000002'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('fcb32050-2310-5678-abbf-4f35fb414d5c'), contract_version='1.0', claim_id=UUID('38669065-db34-5eeb-8c6f-be6324d4f027'), record_id=UUID('b1916ce4-47e4-592e-bb7d-bb6613982ad6')),)).presence
+E        +  and   <Presence.NOT_OBSERVED: 'NOT_OBSERVED'> = Presence.NOT_OBSERVED
+
+tests\unit\test_source_claim_matching_bridge.py:468: AssertionError
+_ test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order1] _
+
+uuid_order = (2, 1)
+
+    @pytest.mark.parametrize("uuid_order", [(1, 2), (2, 1)])
+    def test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal(uuid_order):
+        earlier = observe(multi_artifact([row(1, [sid(1), sid(2)])], ts=T_Z))
+        complete = with_id(observe(multi_artifact([row(1, [sid(1)])], ts=T_Z_PLUS_30)),
+                           uuid.UUID(int=uuid_order[0]))
+        partial = with_id(observe(multi_artifact([row(1, [sid(1)], email="gv1@example.invalid")],
+                                                 ts="2026-10-30T00:30:00+07:00",
+                                                 completeness="PARTIAL")),
+                          uuid.UUID(int=uuid_order[1]))
+        result = run(earlier, complete, partial, lecturers=[gv(1)])
+>       assert claim_of(result, 2).presence is Presence.NOT_OBSERVED
+E       AssertionError: assert <Presence.WITHDRAWN: 'WITHDRAWN'> is <Presence.NOT_OBSERVED: 'NOT_OBSERVED'>
+E        +  where <Presence.WITHDRAWN: 'WITHDRAWN'> = SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.WITHDRAWN: 'WITHDRAWN'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('4b5b4e89-0ee8-50d0-8f77-b2f6218dc7a1'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('fcb32050-2310-5678-abbf-4f35fb414d5c'), contract_version='1.0', claim_id=UUID('38669065-db34-5eeb-8c6f-be6324d4f027'), record_id=UUID('b1916ce4-47e4-592e-bb7d-bb6613982ad6')),)).presence
+E        +    where SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.WITHDRAWN: 'WITHDRAWN'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('4b5b4e89-0ee8-50d0-8f77-b2f6218dc7a1'), captured_at='2026-10-29T17:00:00Z', completeness='COMPLETE', analysis_id=UUID('fcb32050-2310-5678-abbf-4f35fb414d5c'), contract_version='1.0', claim_id=UUID('38669065-db34-5eeb-8c6f-be6324d4f027'), record_id=UUID('b1916ce4-47e4-592e-bb7d-bb6613982ad6')),)) = claim_of(BridgeResult(evidence=(SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.WITHDRAWN: 'WITHDRAWN'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('4b5b4e89-0ee8-50d0-8f77-b2f6218dc7a1'), captured_at='2026-10-2...'64abd873-f26d-5e31-a7c2-4e90c283330a'), contract_version='1.0', claim_id=UUID('2b24392b-2588-5dcc-bfc3-88c3eca15953'), record_id=UUID('d0b4d30d-0ff5-54dd-862f-7eec321570a5'))))), pairs=(PairAssessment(lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', classification=<PairClass.INSUFFICIENT_EVIDENCE: 'INSUFFICIENT_EVIDENCE'>, reasons=('CLAIM_WITHDRAWN_FROM_SOURCE',), evidence_fingerprints=('0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0',), existing_candidate_status=None, existing_identity_status=None, decision_preserved=True, accept_reason_required=True), PairAssessment(lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('8f4d2d60-25ba-55be-ab7e-2eb5c94dd224'), scopus_id='57000000001', classification=<PairClass.PLAUSIBLE_CANDIDATE: 'PLAUSIBLE_CANDIDATE'>, reasons=(), evidence_fingerprints=('e3874dddea57f16238d0742b5152c1e794dfe5f1efa8e95ffecc3274ee33fd41',), existing_candidate_status=None, existing_identity_status=None, decision_preserved=True, accept_reason_required=True)), findings=(), identity_rules_version='1', normalization_version='1'), 2)
+E        +  and   <Presence.NOT_OBSERVED: 'NOT_OBSERVED'> = Presence.NOT_OBSERVED
+
+tests\unit\test_source_claim_matching_bridge.py:511: AssertionError
+_ test_r2_tied_listing_captures_with_different_flags_are_flagged_not_silently_chosen _
+
+    def test_r2_tied_listing_captures_with_different_flags_are_flagged_not_silently_chosen():
+        a = with_id(observe(multi_artifact([row(1, [sid(1), sid(2)], primary=sid(1))], ts=T_Z)),
+                    uuid.UUID(int=1))
+        b = with_id(observe(multi_artifact([row(1, [sid(1), sid(2)], primary=sid(2))],
+                                           ts=T_EQUAL_PLUS7)), uuid.UUID(int=2))
+        result = run(a, b, lecturers=[gv(1)])
+        flagged = {dict(f.detail)["scopus_id"] for f in result.findings
+                   if f.code == "CAPTURE_ORDER_AMBIGUOUS" and dict(f.detail)["reason"] == "FLAGS_DIFFER"}
+>       assert flagged == {sid(1), sid(2)}
+E       AssertionError: assert set() == {'57000000001', '57000000002'}
+E         
+E         Extra items in the right set:
+E         '57000000001'
+E         '57000000002'
+E         
+E         Full diff: (-: missing in left side, +: extra in left side)
+E         + set()...
+E         
+E         ...Full output truncated, use '-vv' to show
+
+tests\unit\test_source_claim_matching_bridge.py:522: AssertionError
+______ test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order0] ______
+
+uuid_order = (1, 2)
+
+    @pytest.mark.parametrize("uuid_order", [(1, 2), (2, 1)])
+    def test_r2_ambiguity_never_revokes_an_approved_identity(uuid_order):
+        lists_both = with_id(observe(multi_artifact([row(1, [sid(1), sid(2)])], ts=T_Z)),
+                             uuid.UUID(int=uuid_order[0]))
+        omits_one = with_id(observe(multi_artifact([row(1, [sid(1)])], ts=T_EQUAL_PLUS7)),
+                            uuid.UUID(int=uuid_order[1]))
+        approved = DecisionRef(u("lecturer", 1), author(2), "ACCEPTED", "APPROVED")
+        result = run(lists_both, omits_one, lecturers=[gv(1)], decisions=[approved])
+        pair = pair_of(result, 1, 2)
+        assert pair.classification is PairClass.VERIFIED_ASSOCIATION
+        assert (pair.existing_candidate_status, pair.existing_identity_status) == (
+            "ACCEPTED", "APPROVED") and pair.decision_preserved
+>       assert "SOURCE_NO_LONGER_LISTS_APPROVED_ID" not in codes(result)
+E       AssertionError: assert 'SOURCE_NO_LONGER_LISTS_APPROVED_ID' not in ['SOURCE_NO_LONGER_LISTS_APPROVED_ID']
+E        +  where ['SOURCE_NO_LONGER_LISTS_APPROVED_ID'] = codes(BridgeResult(evidence=(SourceClaimEvidence(evidence_key=('5c15568b-022d-5f05-b2ed-830173babd62', '0bfd9840-2555-554f-a5c0-787b2f46fd11', 'RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', 'E3-P3A-1', 'ICTU_REPO_SCOPUS_GUIDE', '493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', 'ICTU_REPO_SCOPUS_GUIDE_PROJECTION_V1', 'SCOPUS_ID_OWNED|gv1@example.invalid|57000000002'), fingerprint='0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0', rule_id='RULE_ICTU_SOURCE_DECLARED_SCOPUS_ID', rule_version='E3-P3A-1', source_tier='INSTITUTION_DECLARED', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('0bfd9840-2555-554f-a5c0-787b2f46fd11'), scopus_id='57000000002', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', subject_resolution=<Resolution.RESOLVED_EMAIL: 'RESOLVED_EMAIL'>, is_primary_claimed=False, listed=True, presence=<Presence.WITHDRAWN: 'WITHDRAWN'>, identity_rules_version='1', normalization_version='1', observed_in=(ObservationRef(capture_id=UUID('00000000-0000-0000-0000-000000000001'), captured_at='2026-10-2...57000000002', classification=<PairClass.VERIFIED_ASSOCIATION: 'VERIFIED_ASSOCIATION'>, reasons=('CLAIM_WITHDRAWN_FROM_SOURCE',), evidence_fingerprints=('0db23fcb41bd425f50bcc2c71fa421803f2f2634e0f2708b4ec1ad369bb9fbf0',), existing_candidate_status='ACCEPTED', existing_identity_status='APPROVED', decision_preserved=True, accept_reason_required=True), PairAssessment(lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_author_id=UUID('8f4d2d60-25ba-55be-ab7e-2eb5c94dd224'), scopus_id='57000000001', classification=<PairClass.PLAUSIBLE_CANDIDATE: 'PLAUSIBLE_CANDIDATE'>, reasons=(), evidence_fingerprints=('e3874dddea57f16238d0742b5152c1e794dfe5f1efa8e95ffecc3274ee33fd41',), existing_candidate_status=None, existing_identity_status=None, decision_preserved=True, accept_reason_required=True)), findings=(Finding(code='SOURCE_NO_LONGER_LISTS_APPROVED_ID', source_system='ICTU_REPO_SCOPUS_GUIDE', scope_key='493a28a1100890aef7c12c6b8df1892547d3598da84609607e86a8323e6018aa', claim_key='SCOPUS_ID_OWNED|gv1@example.invalid|57000000002', lecturer_id=UUID('5c15568b-022d-5f05-b2ed-830173babd62'), scopus_id='57000000002', detail=()),), identity_rules_version='1', normalization_version='1'))
+
+tests\unit\test_source_claim_matching_bridge.py:538: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r1_listed_flag_follows_the_later_instant
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r1_naive_capture_time_is_refused
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-29T17:00:00Z]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-30T00:00:00+07:00]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-29T17:00:00Z]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-30T00:00:00+07:00]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order1]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_tied_listing_captures_with_different_flags_are_flagged_not_silently_chosen
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order0]
+================= 10 failed, 6 passed, 27 deselected in 0.63s =================
+
+========================================================================
+2. FOCUSED: bridge suite after the fix
+$ cd backend
+  python -m pytest tests/unit/test_source_claim_matching_bridge.py --noconftest -v
+  exit code 0
+------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.1
+collecting ... collected 43 items
+
+tests/unit/test_source_claim_matching_bridge.py::test_1_one_lecturer_claiming_several_scopus_ids_keeps_each_with_its_primary_flag PASSED [  2%]
+tests/unit/test_source_claim_matching_bridge.py::test_2_one_scopus_id_in_several_source_rows_is_kept_per_row_and_flagged PASSED [  4%]
+tests/unit/test_source_claim_matching_bridge.py::test_3_duplicate_orcid_on_distinct_profiles_is_flagged_never_evidence PASSED [  6%]
+tests/unit/test_source_claim_matching_bridge.py::test_4_declared_email_resolves_the_subject_and_names_never_do PASSED [  9%]
+tests/unit/test_source_claim_matching_bridge.py::test_4b_profile_resolved_by_url_with_a_different_stored_email_is_reported PASSED [ 11%]
+tests/unit/test_source_claim_matching_bridge.py::test_5_weak_ambiguous_and_unresolved_subjects_never_get_a_lecturer PASSED [ 13%]
+tests/unit/test_source_claim_matching_bridge.py::test_5b_url_and_email_pointing_at_different_lecturers_is_a_conflict PASSED [ 16%]
+tests/unit/test_source_claim_matching_bridge.py::test_6_conflicting_source_claims_and_approvals_elsewhere_are_conflicts PASSED [ 18%]
+tests/unit/test_source_claim_matching_bridge.py::test_unowned_ids_and_ids_missing_from_the_catalog_never_become_pairs PASSED [ 20%]
+tests/unit/test_source_claim_matching_bridge.py::test_7_repeated_capture_of_identical_claims_does_not_inflate_evidence PASSED [ 23%]
+tests/unit/test_source_claim_matching_bridge.py::test_8_several_artifact_versions_of_one_capture_are_refused_unless_projected PASSED [ 25%]
+tests/unit/test_source_claim_matching_bridge.py::test_9_new_rule_version_keeps_evidence_identity_and_mixing_is_refused PASSED [ 27%]
+tests/unit/test_source_claim_matching_bridge.py::test_10_partial_capture_never_implies_withdrawal PASSED [ 30%]
+tests/unit/test_source_claim_matching_bridge.py::test_10b_complete_recapture_withdraws_but_does_not_revoke_anything PASSED [ 32%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[ACCEPTED-APPROVED-VERIFIED_ASSOCIATION] PASSED [ 34%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[REJECTED-None-PLAUSIBLE_CANDIDATE] PASSED [ 37%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[ACCEPTED-REVOKED-PLAUSIBLE_CANDIDATE] PASSED [ 39%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[SUPERSEDED-None-PLAUSIBLE_CANDIDATE] PASSED [ 41%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[PENDING-None-PLAUSIBLE_CANDIDATE] PASSED [ 44%]
+tests/unit/test_source_claim_matching_bridge.py::test_11b_lecturers_with_approved_ids_stay_eligible_for_new_ids PASSED [ 46%]
+tests/unit/test_source_claim_matching_bridge.py::test_11c_bridge_output_has_no_decision_or_status_writing_field PASSED [ 48%]
+tests/unit/test_source_claim_matching_bridge.py::test_12_invalid_claim_never_becomes_evidence PASSED [ 51%]
+tests/unit/test_source_claim_matching_bridge.py::test_13_deterministic_regardless_of_input_order PASSED [ 53%]
+tests/unit/test_source_claim_matching_bridge.py::test_evidence_traces_back_to_claim_record_capture_and_analysis PASSED [ 55%]
+tests/unit/test_source_claim_matching_bridge.py::test_unknown_capture_and_duplicate_observations_are_refused PASSED [ 58%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string PASSED [ 60%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_listed_flag_follows_the_later_instant PASSED [ 62%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_ordering_is_independent_of_input_order_and_captures_listing PASSED [ 65%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_naive_capture_time_is_refused PASSED [ 67%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-29T17:00:00Z] PASSED [ 69%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-30T00:00:00+07:00] PASSED [ 72%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-29T17:00:00Z] PASSED [ 74%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-30T00:00:00+07:00] PASSED [ 76%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order0] PASSED [ 79%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order1] PASSED [ 81%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_two_later_captures_at_the_same_instant_that_both_omit_the_claim_withdraw_it PASSED [ 83%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order0] PASSED [ 86%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order1] PASSED [ 88%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_tied_listing_captures_with_different_flags_are_flagged_not_silently_chosen PASSED [ 90%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order0] PASSED [ 93%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order1] PASSED [ 95%]
+tests/unit/test_source_claim_matching_bridge.py::test_existing_candidate_contract_cannot_yet_store_or_promote_source_claim_evidence PASSED [ 97%]
+tests/unit/test_source_claim_matching_bridge.py::test_bridge_imports_no_database_matching_or_network_modules PASSED [100%]
+
+============================= 43 passed in 0.51s ==============================
+
+========================================================================
+3. FULL OFFLINE SUITE (P1, P2-A, B1 schema, provenance, B2, P3-A)
+$ python -m pytest <6 test files> --noconftest -v
+  exit code 0
+------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.1
+collecting ... collected 327 items
+
+tests/unit/test_source_claims.py::test_tc_sc_01_same_name_shared_orcid_keeps_both_profiles PASSED [  0%]
+tests/unit/test_source_claims.py::test_tc_sc_02_different_names_shared_orcid_are_reported_not_resolved PASSED [  0%]
+tests/unit/test_source_claims.py::test_tc_sc_03_three_ids_primary_flag_and_declared_count_mismatch_kept PASSED [  0%]
+tests/unit/test_source_claims.py::test_primary_outside_list_is_kept_as_unlisted_claim PASSED [  1%]
+tests/unit/test_source_claims.py::test_tc_sc_04_id_in_owned_and_unassigned_tables_is_cross_table_collision PASSED [  1%]
+tests/unit/test_source_claims.py::test_tc_sc_05_two_rows_claiming_one_id_is_multi_owner PASSED [  1%]
+tests/unit/test_source_claims.py::test_tc_sc_06_ambiguous_and_unassigned_ids_are_never_attributed PASSED [  2%]
+tests/unit/test_source_claims.py::test_tc_sc_07_owner_absent_from_profiles_stays_an_unresolved_source_claim PASSED [  2%]
+tests/unit/test_source_claims.py::test_tc_sc_08_two_profiles_sharing_one_email_are_both_kept_and_grouped PASSED [  2%]
+tests/unit/test_source_claims.py::test_tc_sc_09_identical_artifact_parses_identically PASSED [  3%]
+tests/unit/test_source_claims.py::test_captured_at_change_keeps_content_hash_and_changes_capture_hash PASSED [  3%]
+tests/unit/test_source_claims.py::test_reordered_json_keys_and_whitespace_hash_identically PASSED [  3%]
+tests/unit/test_source_claims.py::test_content_change_changes_content_hash PASSED [  3%]
+tests/unit/test_source_claims.py::test_raw_values_that_normalize_alike_stay_distinct PASSED [  4%]
+tests/unit/test_source_claims.py::test_record_hash_ignores_position_but_record_keeps_it PASSED [  4%]
+tests/unit/test_source_claims.py::test_same_name_lecturers_remain_separate_records PASSED [  4%]
+tests/unit/test_source_claims.py::test_rows_without_email_get_content_keys_never_name_keys PASSED [  5%]
+tests/unit/test_source_claims.py::test_duplicate_source_keys_are_flagged_on_both_records_and_both_kept PASSED [  5%]
+tests/unit/test_source_claims.py::test_profile_key_falls_back_to_email_then_content PASSED [  5%]
+tests/unit/test_source_claims.py::test_tc_sc_10_id_dropped_between_complete_snapshots_is_withdrawn PASSED [  6%]
+tests/unit/test_source_claims.py::test_tc_sc_11_move_from_unassigned_to_owned_is_reclassified_not_deleted PASSED [  6%]
+tests/unit/test_source_claims.py::test_tc_sc_12_partial_snapshot_never_proves_withdrawal[previous] PASSED [  6%]
+tests/unit/test_source_claims.py::test_tc_sc_12_partial_snapshot_never_proves_withdrawal[current] PASSED [  7%]
+tests/unit/test_source_claims.py::test_different_table_scope_is_not_comparable PASSED [  7%]
+tests/unit/test_source_claims.py::test_out_of_order_or_rule_version_change_is_not_comparable PASSED [  7%]
+tests/unit/test_source_claims.py::test_different_source_systems_are_never_compared PASSED [  7%]
+tests/unit/test_source_claims.py::test_weak_key_absence_is_unstable_not_withdrawn PASSED [  8%]
+tests/unit/test_source_claims.py::test_owner_change_between_strong_keys_is_reported PASSED [  8%]
+tests/unit/test_source_claims.py::test_profile_withdrawal_and_declared_value_change PASSED [  8%]
+tests/unit/test_source_claims.py::test_duplicate_keys_make_presence_a_key_collision PASSED [  9%]
+tests/unit/test_source_claims.py::test_presence_diff_does_not_modify_snapshots PASSED [  9%]
+tests/unit/test_source_claims.py::test_tc_sc_13_source_declares_35_lecturers_with_34_rows_kept_as_discrepancy PASSED [  9%]
+tests/unit/test_source_claims.py::test_tc_sc_14_invalid_scopus_id_and_orcid_are_preserved_raw PASSED [ 10%]
+tests/unit/test_source_claims.py::test_invalid_token_in_id_list_does_not_drop_valid_ids PASSED [ 10%]
+tests/unit/test_source_claims.py::test_malformed_rows_are_kept_with_issues PASSED [ 10%]
+tests/unit/test_source_claims.py::test_tc_sc_15_profiles_without_publications_are_kept PASSED [ 11%]
+tests/unit/test_source_claims.py::test_tc_sc_17_unicode_and_whitespace_variants_normalize_deterministically PASSED [ 11%]
+tests/unit/test_source_claims.py::test_repeated_parsing_is_byte_for_byte_deterministic PASSED [ 11%]
+tests/unit/test_source_claims.py::test_records_reconstruct_the_source_content_losslessly PASSED [ 11%]
+tests/unit/test_source_claims.py::test_inventory_counts_on_a_synthetic_snapshot PASSED [ 12%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-WRONG_CONTRACT] PASSED [ 12%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNSUPPORTED_CONTRACT_VERSION] PASSED [ 12%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNKNOWN_SOURCE_SYSTEM] PASSED [ 13%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNKNOWN_ENVELOPE_FIELD] PASSED [ 13%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-CAPTURED_AT_MISSING] PASSED [ 13%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-CAPTURED_AT_NO_OFFSET] PASSED [ 14%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-COMPLETENESS_INVALID] PASSED [ 14%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNKNOWN_TABLE] PASSED [ 14%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-COLUMN_ROLE_NOT_ALLOWED] PASSED [ 14%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-COLUMN_ROLE_REQUIRED] PASSED [ 15%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-NON_CANONICAL_VALUE] PASSED [ 15%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[{"contract": "a", "contract": "b"}-DUPLICATE_JSON_KEY] PASSED [ 15%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[{"x": 1.0}-FLOAT_NOT_ALLOWED] PASSED [ 16%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[\xff\xfe-NOT_UTF8] PASSED [ 16%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[{-NOT_JSON] PASSED [ 16%]
+tests/unit/test_source_claims.py::test_schema_file_matches_code_vocabularies PASSED [ 17%]
+tests/unit/test_source_claims.py::test_claims_carry_no_identity_decision PASSED [ 17%]
+tests/unit/test_source_claims.py::test_r1_malformed_source_id_in_profile_returns_issue_not_crash[http://host:notanumber/path] PASSED [ 17%]
+tests/unit/test_source_claims.py::test_r1_malformed_source_id_in_profile_returns_issue_not_crash[http://[::1malformed]/] PASSED [ 18%]
+tests/unit/test_source_claims.py::test_r1_valid_source_id_url_still_normalizes_correctly PASSED [ 18%]
+tests/unit/test_source_claims.py::test_r1_malformed_content_source_url_raises_artifact_error[http://host:notanumber/path] PASSED [ 18%]
+tests/unit/test_source_claims.py::test_r1_malformed_content_source_url_raises_artifact_error[http://[::1malformed]/] PASSED [ 18%]
+tests/unit/test_source_claims.py::test_r2_normalized_evidence_inner_mapping_is_immutable PASSED [ 19%]
+tests/unit/test_source_claims.py::test_r2_all_normalized_pairs_are_immutable PASSED [ 19%]
+tests/unit/test_source_claims.py::test_r2_hashes_and_raw_json_are_unchanged_after_mutation_attempt PASSED [ 19%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.0] PASSED [ 20%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.1] PASSED [ 20%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.99] PASSED [ 20%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.00] PASSED [ 21%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.10] PASSED [ 21%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.x] PASSED [ 21%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0.1] PASSED [ 22%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1] PASSED [ 22%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[2.0] PASSED [ 22%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[0.9] PASSED [ 22%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[10.0] PASSED [ 23%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.] PASSED [ 23%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[.1] PASSED [ 23%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[01.0] PASSED [ 24%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[001.5] PASSED [ 24%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\n] PASSED [ 24%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\r] PASSED [ 25%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\r\n] PASSED [ 25%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[ 1.0] PASSED [ 25%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0 ] PASSED [ 25%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[\n1.0] PASSED [ 26%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.-1] PASSED [ 26%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.\u0661] PASSED [ 26%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[\u0661.0] PASSED [ 27%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[1] PASSED [ 27%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[1.0] PASSED [ 27%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[None] PASSED [ 28%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[version3] PASSED [ 28%]
+tests/unit/test_source_claims.py::test_r3_parser_and_json_schema_validator_accept_the_same_versions PASSED [ 28%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[https:///profile/123] PASSED [ 29%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[https://] PASSED [ 29%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://:80/] PASSED [ 29%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://?q=1] PASSED [ 29%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://#frag] PASSED [ 30%]
+tests/unit/test_source_claims.py::test_r1_artifact_source_url_without_host_raises[https:///profile/123] PASSED [ 30%]
+tests/unit/test_source_claims.py::test_r1_artifact_source_url_without_host_raises[https://] PASSED [ 30%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[::1]/a-http://[::1]/a] PASSED [ 31%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[::1]:8080/a/-http://[::1]:8080/a] PASSED [ 31%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[https://[2001:DB8::1]:443/x-https://[2001:db8::1]/x] PASSED [ 31%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[2001:db8::1]:80/-http://[2001:db8::1]/] PASSED [ 32%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[HTTPS://Repository.Example.invalid:443/Profile/7/-https://repository.example.invalid/Profile/7] PASSED [ 32%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://repository.example.invalid:8080/p?id=A#top-http://repository.example.invalid:8080/p?id=A] PASSED [ 32%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://192.0.2.10:80/p/-http://192.0.2.10/p] PASSED [ 33%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[orcid-profile-42 -orcid-profile-42] PASSED [ 33%]
+tests/unit/test_source_claims.py::test_r1_ipv6_profile_keeps_strong_key PASSED [ 33%]
+tests/unit/test_source_claims.py::test_errata_nested_normalized_access_cannot_mutate_stored_evidence PASSED [ 33%]
+tests/unit/test_source_claims.py::test_errata_major_version_2_is_rejected PASSED [ 34%]
+tests/unit/test_source_claims.py::test_errata_malformed_url_keeps_record_raw_and_claims PASSED [ 34%]
+tests/unit/test_source_claims.py::test_open_1_inplace_or_does_not_mutate_normalized PASSED [ 34%]
+tests/unit/test_source_claims.py::test_open_1_frozen_map_keeps_read_equality_copy_and_json_behaviour PASSED [ 35%]
+tests/unit/test_source_claims.py::test_open_2_snapshot_pickle_roundtrip_stays_equal_and_immutable PASSED [ 35%]
+tests/unit/test_source_claims.py::test_package_imports_without_database_app_or_network_modules[no-site] PASSED [ 35%]
+tests/unit/test_source_claims.py::test_package_imports_without_database_app_or_network_modules[with-site] PASSED [ 36%]
+tests/unit/test_source_claims_adapters.py::test_every_profile_is_kept_including_those_without_publications PASSED [ 36%]
+tests/unit/test_source_claims_adapters.py::test_institutional_email_is_mapped_and_raw_labels_are_kept_verbatim PASSED [ 36%]
+tests/unit/test_source_claims_adapters.py::test_personal_fields_never_reach_the_artifact PASSED [ 37%]
+tests/unit/test_source_claims_adapters.py::test_observation_metadata_goes_to_capture_not_content PASSED [ 37%]
+tests/unit/test_source_claims_adapters.py::test_unclassified_profile_field_fails_closed PASSED [ 37%]
+tests/unit/test_source_claims_adapters.py::test_names_are_never_keys PASSED [ 37%]
+tests/unit/test_source_claims_adapters.py::test_same_content_recaptured_keeps_content_hash_and_changes_capture_hash PASSED [ 38%]
+tests/unit/test_source_claims_adapters.py::test_identical_upstream_gives_identical_artifact_bytes PASSED [ 38%]
+tests/unit/test_source_claims_adapters.py::test_reordered_equivalent_json_objects_hash_identically PASSED [ 38%]
+tests/unit/test_source_claims_adapters.py::test_profile_order_changes_positions_not_record_hashes PASSED [ 39%]
+tests/unit/test_source_claims_adapters.py::test_orcid_collision_keeps_both_profiles_and_claims PASSED [ 39%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs0-crawl0-COMPLETE] PASSED [ 39%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs1-crawl1-COMPLETE] PASSED [ 40%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs2-crawl2-PARTIAL] PASSED [ 40%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs3-crawl3-PARTIAL] PASSED [ 40%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs4-crawl4-PARTIAL] PASSED [ 40%]
+tests/unit/test_source_claims_adapters.py::test_completeness_is_proven_from_the_harvest[kwargs5-crawl5-PARTIAL] PASSED [ 41%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[COMPLETE-failures0-COMPLETE] PASSED [ 41%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[COMPLETE_WITH_SOURCE_FAILURES-failures1-COMPLETE] PASSED [ 41%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[COMPLETE_WITH_SOURCE_FAILURES-failures2-COMPLETE] PASSED [ 42%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[COMPLETE_WITH_SOURCE_FAILURES-failures3-PARTIAL] PASSED [ 42%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[COMPLETE-failures4-PARTIAL] PASSED [ 42%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[COMPLETE_WITH_SOURCE_FAILURES-failures5-PARTIAL] PASSED [ 43%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[FAILED-failures6-PARTIAL] PASSED [ 43%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[BLOCKED-failures7-PARTIAL] PASSED [ 43%]
+tests/unit/test_source_claims_adapters.py::test_harvest_status_must_be_a_consistent_success[None-failures8-PARTIAL] PASSED [ 44%]
+tests/unit/test_source_claims_adapters.py::test_failed_status_with_matching_zero_counts_is_partial PASSED [ 44%]
+tests/unit/test_source_claims_adapters.py::test_success_status_without_verified_replay_is_partial[None-no replay report] PASSED [ 44%]
+tests/unit/test_source_claims_adapters.py::test_success_status_without_verified_replay_is_partial[semantic1-replay mismatch: the harvester ends such a run BLOCKED] PASSED [ 44%]
+tests/unit/test_source_claims_adapters.py::test_success_status_without_verified_replay_is_partial[semantic2-replay of a different lecturers file] PASSED [ 45%]
+tests/unit/test_source_claims_adapters.py::test_success_status_without_verified_replay_is_partial[semantic3-replay without file hashes] PASSED [ 45%]
+tests/unit/test_source_claims_adapters.py::test_failed_harvest_never_authorizes_withdrawal PASSED [ 45%]
+tests/unit/test_source_claims_adapters.py::test_semantic_replay_must_be_an_object PASSED [ 46%]
+tests/unit/test_source_claims_adapters.py::test_contract_minor_versions_share_content_and_capture_but_not_artifact PASSED [ 46%]
+tests/unit/test_source_claims_adapters.py::test_proposed_unique_keys_keep_both_contract_versions PASSED [ 46%]
+tests/unit/test_source_claims_adapters.py::test_artifact_bytes_are_rebuilt_only_with_the_stored_contract_version PASSED [ 47%]
+tests/unit/test_source_claims_adapters.py::test_staging_keys_require_canonical_artifact_bytes PASSED [ 47%]
+tests/unit/test_source_claims_adapters.py::test_missing_profile_is_a_source_count_discrepancy PASSED [ 47%]
+tests/unit/test_source_claims_adapters.py::test_partial_harvest_never_proves_withdrawal PASSED [ 48%]
+tests/unit/test_source_claims_adapters.py::test_complete_harvests_report_withdrawal PASSED [ 48%]
+tests/unit/test_source_claims_adapters.py::test_malformed_profile_items_are_kept_and_flagged PASSED [ 48%]
+tests/unit/test_source_claims_adapters.py::test_extracted_values_not_traceable_to_page_text_are_reported PASSED [ 48%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-LECTURERS_NOT_LIST] PASSED [ 49%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID0] PASSED [ 49%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID1] PASSED [ 49%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID2] PASSED [ 50%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-MANIFEST_INVALID3] PASSED [ 50%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-ORIGIN_URL_INVALID0] PASSED [ 50%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-ORIGIN_URL_INVALID1] PASSED [ 51%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-CRAWL_REPORT_INVALID] PASSED [ 51%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-UPSTREAM_SHA256_INVALID] PASSED [ 51%]
+tests/unit/test_source_claims_adapters.py::test_malformed_harvest_inputs_raise[<lambda>-NON_CANONICAL_VALUE] PASSED [ 51%]
+tests/unit/test_source_claims_adapters.py::test_tables_snapshot_maps_sections_headers_and_rows PASSED [ 52%]
+tests/unit/test_source_claims_adapters.py::test_multi_id_rows_snapshot_uses_fixed_layout_and_emits_owned_and_email_claims PASSED [ 52%]
+tests/unit/test_source_claims_adapters.py::test_three_id_categories_stay_distinct_across_captures PASSED [ 52%]
+tests/unit/test_source_claims_adapters.py::test_duplicate_scopus_ids_are_kept_and_flagged PASSED [ 53%]
+tests/unit/test_source_claims_adapters.py::test_reclassified_id_between_comparable_captures PASSED [ 53%]
+tests/unit/test_source_claims_adapters.py::test_partial_guide_capture_never_proves_withdrawal PASSED [ 53%]
+tests/unit/test_source_claims_adapters.py::test_guide_count_discrepancy_is_kept_not_corrected PASSED [ 54%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_rows_are_kept PASSED [ 54%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLE_KIND_UNRESOLVED] PASSED [ 54%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLE_KIND_DUPLICATED] PASSED [ 55%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-HEADER_ROW_MISSING] PASSED [ 55%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-SECTION_HEADINGS_MISSING] PASSED [ 55%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-TABLES_MISSING] PASSED [ 55%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-ORIGIN_URL_INVALID] PASSED [ 56%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-COMPLETENESS_INVALID] PASSED [ 56%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-DECLARED_COUNT_FOR_ABSENT_TABLE0] PASSED [ 56%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-SNAPSHOT_ROW_COUNT_MISMATCH] PASSED [ 57%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-DECLARED_COUNT_FOR_ABSENT_TABLE1] PASSED [ 57%]
+tests/unit/test_source_claims_adapters.py::test_malformed_guide_snapshots_raise[<lambda>-UPSTREAM_SHA256_INVALID] PASSED [ 57%]
+tests/unit/test_source_claims_adapters.py::test_every_adapter_output_validates_against_the_json_schema PASSED [ 58%]
+tests/unit/test_source_claims_adapters.py::test_adapter_output_carries_no_identity_decision PASSED [ 58%]
+tests/unit/test_source_claims_adapters.py::test_adapters_import_no_database_app_or_network_modules PASSED [ 58%]
+tests/unit/test_source_staging_schema.py::test_all_staging_tables_are_registered PASSED [ 59%]
+tests/unit/test_source_staging_schema.py::test_staging_has_no_foreign_key_to_identity_or_canonical_tables PASSED [ 59%]
+tests/unit/test_source_staging_schema.py::test_unique_constraints_are_exactly_the_designed_ones PASSED [ 59%]
+tests/unit/test_source_staging_schema.py::test_check_vocabularies_match_the_p1_contract PASSED [ 59%]
+tests/unit/test_source_staging_schema.py::test_contract_version_sql_pattern_is_the_parser_grammar PASSED [ 60%]
+tests/unit/test_source_staging_schema.py::test_migration_is_the_single_new_head_on_top_of_the_previous_head PASSED [ 60%]
+tests/unit/test_source_staging_schema.py::test_migration_tables_match_the_models_item_by_item PASSED [ 60%]
+tests/unit/test_source_staging_schema.py::test_migration_indexes_match_the_models PASSED [ 61%]
+tests/unit/test_source_staging_schema.py::test_migration_views_are_the_model_view_sql PASSED [ 61%]
+tests/unit/test_source_staging_schema.py::test_downgrade_removes_everything_upgrade_creates_in_reverse_dependency_order PASSED [ 61%]
+tests/unit/test_source_staging_schema.py::test_migration_ddl_carries_the_integrity_checks PASSED [ 62%]
+tests/unit/test_source_staging_schema.py::test_two_minor_versions_share_one_capture_and_are_observed_once PASSED [ 62%]
+tests/unit/test_source_staging_schema.py::test_a_naive_capture_artifact_analysis_join_would_double_count PASSED [ 62%]
+tests/unit/test_source_staging_schema.py::test_re_ingesting_the_same_artifact_writes_nothing PASSED [ 62%]
+tests/unit/test_source_staging_schema.py::test_rule_version_change_reanalyses_an_existing_artifact PASSED [ 63%]
+tests/unit/test_source_staging_schema.py::test_reanalysis_from_stored_rows_needs_no_upstream_input PASSED [ 63%]
+tests/unit/test_source_staging_schema.py::test_switching_back_to_an_older_rule_set_reselects_its_analysis PASSED [ 63%]
+tests/unit/test_source_staging_schema.py::test_recaptured_content_is_observed_per_capture PASSED [ 64%]
+tests/unit/test_source_staging_schema.py::test_duplicate_orcid_claims_are_both_observed PASSED [ 64%]
+tests/unit/test_source_staging_schema.py::test_claims_sharing_one_scopus_id_are_all_kept PASSED [ 64%]
+tests/unit/test_source_staging_schema.py::test_invalid_rows_and_values_are_retained PASSED [ 65%]
+tests/unit/test_source_staging_schema.py::test_stand_in_foreign_keys_reject_cross_analysis_claims PASSED [ 65%]
+tests/unit/test_source_staging_schema.py::test_second_artifact_for_same_capture_and_version_is_impossible PASSED [ 65%]
+tests/unit/test_source_claims_provenance.py::test_consistent_harvest_files_bind_and_build_a_complete_artifact PASSED [ 66%]
+tests/unit/test_source_claims_provenance.py::test_declared_sha256_must_be_the_hash_of_the_bytes_read PASSED [ 66%]
+tests/unit/test_source_claims_provenance.py::test_other_lecturers_file_with_its_own_correct_sha_is_rejected_by_the_manifest PASSED [ 66%]
+tests/unit/test_source_claims_provenance.py::test_edited_manifest_is_rejected_by_the_replay PASSED [ 66%]
+tests/unit/test_source_claims_provenance.py::test_edited_crawl_report_is_rejected PASSED [ 67%]
+tests/unit/test_source_claims_provenance.py::test_b1_r1_old_failure_mutating_verified_content_cannot_reach_the_artifact PASSED [ 67%]
+tests/unit/test_source_claims_provenance.py::test_b1_r1_the_direct_adapter_path_still_trusts_its_input PASSED [ 67%]
+tests/unit/test_source_claims_provenance.py::test_b1_r1_hand_made_or_foreign_bindings_are_refused PASSED [ 68%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_full_valid_replay_has_exactly_the_harvester_passes PASSED [ 68%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_missing_extra_or_renamed_passes_are_rejected[passes0] PASSED [ 68%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_missing_extra_or_renamed_passes_are_rejected[passes1] PASSED [ 69%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_missing_extra_or_renamed_passes_are_rejected[passes2] PASSED [ 69%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_missing_extra_or_renamed_passes_are_rejected[passes3] PASSED [ 69%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_combined_hashes_must_cover_the_same_passes PASSED [ 70%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_malformed_passes_are_rejected[<lambda>0] PASSED [ 70%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_malformed_passes_are_rejected[<lambda>1] PASSED [ 70%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_malformed_passes_are_rejected[<lambda>2] PASSED [ 70%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_malformed_passes_are_rejected[<lambda>3] PASSED [ 71%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_malformed_passes_are_rejected[<lambda>4] PASSED [ 71%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_changed_pass_hash_is_rejected_even_with_a_recomputed_combined_hash PASSED [ 71%]
+tests/unit/test_source_claims_provenance.py::test_b1_r2_passes_must_agree_with_each_other PASSED [ 72%]
+tests/unit/test_source_claims_provenance.py::test_failed_replay_is_rejected[<lambda>0] PASSED [ 72%]
+tests/unit/test_source_claims_provenance.py::test_failed_replay_is_rejected[<lambda>1] PASSED [ 72%]
+tests/unit/test_source_claims_provenance.py::test_failed_replay_is_rejected[<lambda>2] PASSED [ 73%]
+tests/unit/test_source_claims_provenance.py::test_volatile_timestamps_are_bound_only_by_the_byte_hash PASSED [ 73%]
+tests/unit/test_source_claims_provenance.py::test_malformed_files_are_rejected[override0-DUPLICATE_JSON_KEY] PASSED [ 73%]
+tests/unit/test_source_claims_provenance.py::test_malformed_files_are_rejected[override1-NOT_UTF8] PASSED [ 74%]
+tests/unit/test_source_claims_provenance.py::test_malformed_files_are_rejected[override2-NOT_JSON] PASSED [ 74%]
+tests/unit/test_source_claims_provenance.py::test_malformed_files_are_rejected[override3-NOT_OBJECT] PASSED [ 74%]
+tests/unit/test_source_claims_provenance.py::test_malformed_files_are_rejected[override4-BYTES_REQUIRED] PASSED [ 74%]
+tests/unit/test_source_claims_provenance.py::test_semantic_hash_drops_volatile_keys_at_every_level PASSED [ 75%]
+tests/unit/test_source_claims_provenance.py::test_provenance_imports_no_database_app_or_network_modules PASSED [ 75%]
+tests/unit/test_source_staging_service.py::test_first_import_creates_every_layer_and_is_observable PASSED [ 75%]
+tests/unit/test_source_staging_service.py::test_identical_replay_writes_nothing_but_an_audit_event PASSED [ 76%]
+tests/unit/test_source_staging_service.py::test_reordered_json_keys_are_the_same_content_seen_in_a_new_capture PASSED [ 76%]
+tests/unit/test_source_staging_service.py::test_reordered_rows_are_new_content_with_identical_record_hashes PASSED [ 76%]
+tests/unit/test_source_staging_service.py::test_same_content_new_capture_is_reused PASSED [ 77%]
+tests/unit/test_source_staging_service.py::test_ingest_requires_an_active_rule_set_matching_the_code PASSED [ 77%]
+tests/unit/test_source_staging_service.py::test_new_rule_version_reanalyses_existing_artifacts_before_activation PASSED [ 77%]
+tests/unit/test_source_staging_service.py::test_activation_fails_closed_on_an_artifact_that_cannot_be_reanalysed PASSED [ 77%]
+tests/unit/test_source_staging_service.py::test_an_incomplete_analysis_can_never_become_active PASSED [ 78%]
+tests/unit/test_source_staging_service.py::test_two_contract_versions_of_one_capture_are_observed_once PASSED [ 78%]
+tests/unit/test_source_staging_service.py::test_claims_sharing_one_scopus_id_are_all_preserved PASSED [ 78%]
+tests/unit/test_source_staging_service.py::test_duplicate_orcid_claims_are_all_preserved PASSED [ 79%]
+tests/unit/test_source_staging_service.py::test_invalid_source_rows_are_retained PASSED [ 79%]
+tests/unit/test_source_staging_service.py::test_withdrawal_and_reclassification_between_complete_captures PASSED [ 79%]
+tests/unit/test_source_staging_service.py::test_partial_capture_never_withdraws PASSED [ 80%]
+tests/unit/test_source_staging_service.py::test_harvest_with_a_lecturer_failure_is_partial_and_never_withdraws PASSED [ 80%]
+tests/unit/test_source_staging_service.py::test_a_failed_replay_is_refused_before_any_write PASSED [ 80%]
+tests/unit/test_source_staging_service.py::test_different_projection_versions_are_not_comparable PASSED [ 81%]
+tests/unit/test_source_staging_service.py::test_reviewer_approved_identities_and_all_non_staging_tables_are_untouched PASSED [ 81%]
+tests/unit/test_source_staging_service.py::test_the_service_only_inserts_into_staging_and_audit_tables PASSED [ 81%]
+tests/unit/test_source_staging_service.py::test_failure_rolls_back_only_the_failing_ingest PASSED [ 81%]
+tests/unit/test_source_staging_service.py::test_unexpected_integrity_errors_fail_closed PASSED [ 82%]
+tests/unit/test_source_staging_service.py::test_rows_committed_by_another_transaction_are_reused_not_duplicated PASSED [ 82%]
+tests/unit/test_source_staging_service.py::test_a_concurrently_created_but_incomplete_analysis_is_refused PASSED [ 82%]
+tests/unit/test_source_staging_service.py::test_guide_snapshot_inputs_are_validated[change0-BYTES_SHA256_MISMATCH] PASSED [ 83%]
+tests/unit/test_source_staging_service.py::test_guide_snapshot_inputs_are_validated[change1-LAYOUT_INVALID] PASSED [ 83%]
+tests/unit/test_source_staging_service.py::test_guide_snapshot_inputs_are_validated[change2-SOURCE_REJECTED_COMPLETENESS_INVALID] PASSED [ 83%]
+tests/unit/test_source_staging_service.py::test_harvest_bytes_must_match_the_declared_sha PASSED [ 84%]
+tests/unit/test_source_staging_service.py::test_actor_follows_the_audit_invariant[actor0] PASSED [ 84%]
+tests/unit/test_source_staging_service.py::test_actor_follows_the_audit_invariant[actor1] PASSED [ 84%]
+tests/unit/test_source_staging_service.py::test_actor_follows_the_audit_invariant[actor2] PASSED [ 85%]
+tests/unit/test_source_staging_service.py::test_user_actor_is_recorded PASSED [ 85%]
+tests/unit/test_source_staging_service.py::test_b2_r1_activation_audit_references_the_persisted_rule_set_row PASSED [ 85%]
+tests/unit/test_source_staging_service.py::test_b2_r1_failure_after_the_rule_set_insert_leaves_no_row_and_no_audit PASSED [ 85%]
+tests/unit/test_source_staging_service.py::test_b2_r1_failed_reanalysis_leaves_no_activation_audit PASSED [ 86%]
+tests/unit/test_source_staging_service.py::test_b2_r1_already_active_writes_no_row_and_no_audit PASSED [ 86%]
+tests/unit/test_source_staging_service.py::test_ingest_outcome_names_the_first_new_layer PASSED [ 86%]
+tests/unit/test_source_claim_matching_bridge.py::test_1_one_lecturer_claiming_several_scopus_ids_keeps_each_with_its_primary_flag PASSED [ 87%]
+tests/unit/test_source_claim_matching_bridge.py::test_2_one_scopus_id_in_several_source_rows_is_kept_per_row_and_flagged PASSED [ 87%]
+tests/unit/test_source_claim_matching_bridge.py::test_3_duplicate_orcid_on_distinct_profiles_is_flagged_never_evidence PASSED [ 87%]
+tests/unit/test_source_claim_matching_bridge.py::test_4_declared_email_resolves_the_subject_and_names_never_do PASSED [ 88%]
+tests/unit/test_source_claim_matching_bridge.py::test_4b_profile_resolved_by_url_with_a_different_stored_email_is_reported PASSED [ 88%]
+tests/unit/test_source_claim_matching_bridge.py::test_5_weak_ambiguous_and_unresolved_subjects_never_get_a_lecturer PASSED [ 88%]
+tests/unit/test_source_claim_matching_bridge.py::test_5b_url_and_email_pointing_at_different_lecturers_is_a_conflict PASSED [ 88%]
+tests/unit/test_source_claim_matching_bridge.py::test_6_conflicting_source_claims_and_approvals_elsewhere_are_conflicts PASSED [ 89%]
+tests/unit/test_source_claim_matching_bridge.py::test_unowned_ids_and_ids_missing_from_the_catalog_never_become_pairs PASSED [ 89%]
+tests/unit/test_source_claim_matching_bridge.py::test_7_repeated_capture_of_identical_claims_does_not_inflate_evidence PASSED [ 89%]
+tests/unit/test_source_claim_matching_bridge.py::test_8_several_artifact_versions_of_one_capture_are_refused_unless_projected PASSED [ 90%]
+tests/unit/test_source_claim_matching_bridge.py::test_9_new_rule_version_keeps_evidence_identity_and_mixing_is_refused PASSED [ 90%]
+tests/unit/test_source_claim_matching_bridge.py::test_10_partial_capture_never_implies_withdrawal PASSED [ 90%]
+tests/unit/test_source_claim_matching_bridge.py::test_10b_complete_recapture_withdraws_but_does_not_revoke_anything PASSED [ 91%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[ACCEPTED-APPROVED-VERIFIED_ASSOCIATION] PASSED [ 91%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[REJECTED-None-PLAUSIBLE_CANDIDATE] PASSED [ 91%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[ACCEPTED-REVOKED-PLAUSIBLE_CANDIDATE] PASSED [ 92%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[SUPERSEDED-None-PLAUSIBLE_CANDIDATE] PASSED [ 92%]
+tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[PENDING-None-PLAUSIBLE_CANDIDATE] PASSED [ 92%]
+tests/unit/test_source_claim_matching_bridge.py::test_11b_lecturers_with_approved_ids_stay_eligible_for_new_ids PASSED [ 92%]
+tests/unit/test_source_claim_matching_bridge.py::test_11c_bridge_output_has_no_decision_or_status_writing_field PASSED [ 93%]
+tests/unit/test_source_claim_matching_bridge.py::test_12_invalid_claim_never_becomes_evidence PASSED [ 93%]
+tests/unit/test_source_claim_matching_bridge.py::test_13_deterministic_regardless_of_input_order PASSED [ 93%]
+tests/unit/test_source_claim_matching_bridge.py::test_evidence_traces_back_to_claim_record_capture_and_analysis PASSED [ 94%]
+tests/unit/test_source_claim_matching_bridge.py::test_unknown_capture_and_duplicate_observations_are_refused PASSED [ 94%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string PASSED [ 94%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_listed_flag_follows_the_later_instant PASSED [ 95%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_ordering_is_independent_of_input_order_and_captures_listing PASSED [ 95%]
+tests/unit/test_source_claim_matching_bridge.py::test_r1_naive_capture_time_is_refused PASSED [ 95%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-29T17:00:00Z] PASSED [ 96%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-30T00:00:00+07:00] PASSED [ 96%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-29T17:00:00Z] PASSED [ 96%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-30T00:00:00+07:00] PASSED [ 96%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order0] PASSED [ 97%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order1] PASSED [ 97%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_two_later_captures_at_the_same_instant_that_both_omit_the_claim_withdraw_it PASSED [ 97%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order0] PASSED [ 98%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order1] PASSED [ 98%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_tied_listing_captures_with_different_flags_are_flagged_not_silently_chosen PASSED [ 98%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order0] PASSED [ 99%]
+tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order1] PASSED [ 99%]
+tests/unit/test_source_claim_matching_bridge.py::test_existing_candidate_contract_cannot_yet_store_or_promote_source_claim_evidence PASSED [ 99%]
+tests/unit/test_source_claim_matching_bridge.py::test_bridge_imports_no_database_matching_or_network_modules PASSED [100%]
+
+============================= 327 passed in 2.82s =============================
+
+========================================================================
+4. MUTATION PROBES (old behaviour re-injected in memory; tests must fail)
+$ MUTATION=<name> python -m pytest tests/unit/test_source_claim_matching_bridge.py -p p3a_mutation_plugin
+------------------------------------------------------------------------
+== mutation string_time_order
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r1_listed_flag_follows_the_later_instant
+2 failed, 41 passed in 0.62s
+== mutation uuid_proves_succession
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-29T17:00:00Z]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-30T00:00:00+07:00]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-29T17:00:00Z]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-30T00:00:00+07:00]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order1]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order0]
+6 failed, 37 passed in 0.68s
+== mutation no_input_validation
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_8_several_artifact_versions_of_one_capture_are_refused_unless_projected
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_9_new_rule_version_keeps_evidence_identity_and_mixing_is_refused
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_unknown_capture_and_duplicate_observations_are_refused
+3 failed, 40 passed in 0.66s
+== mutation withdraw_on_partial
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_10_partial_capture_never_implies_withdrawal
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-29T17:00:00Z]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order0-2026-10-30T00:00:00+07:00]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-29T17:00:00Z]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_equal_instants_never_prove_withdrawal[uuid_order1-2026-10-30T00:00:00+07:00]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order0]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_a_partial_capture_at_the_latest_instant_blocks_withdrawal[uuid_order1]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_ambiguity_never_revokes_an_approved_identity[uuid_order0]
+8 failed, 35 passed in 0.70s
+== mutation no_claim_dedup
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_7_repeated_capture_of_identical_claims_does_not_inflate_evidence
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r1_mixed_offsets_take_flags_from_the_later_instant_not_the_later_string
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r1_listed_flag_follows_the_later_instant
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order0]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_r2_strictly_later_complete_capture_still_withdraws_whatever_the_uuids[uuid_order1]
+5 failed, 38 passed in 0.65s
+== mutation ignore_negative_decisions
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[REJECTED-None-PLAUSIBLE_CANDIDATE]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[ACCEPTED-REVOKED-PLAUSIBLE_CANDIDATE]
+FAILED tests/unit/test_source_claim_matching_bridge.py::test_11_existing_decisions_are_echoed_never_changed[SUPERSEDED-None-PLAUSIBLE_CANDIDATE]
+3 failed, 40 passed in 0.63s
+
+========================================================================
+5. EXISTING MATCHING UNIT TESTS (files unchanged; PostgreSQL-backed ones need isolated_db_engine)
+$ python -m pytest tests/unit/test_candidate_generator.py tests/unit/test_candidate_persistence.py tests/unit/test_publication_evidence_enricher.py --noconftest -q
+  37 passed, 7 errors = fixture 'isolated_db_engine' not found (no test database; not run)
+------------------------------------------------------------------------
+......................EEEEEEE...............                             [100%]
+=================================== ERRORS ====================================
+_____ ERROR at setup of test_first_run_and_same_run_retry_are_idempotent ______
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 151
+  def test_first_run_and_same_run_retry_are_idempotent(candidate_fixture) -> None:
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 115
+  @pytest.fixture
+  def candidate_fixture(isolated_db_engine):
+E       fixture 'isolated_db_engine' not found
+>       available fixtures: _asyncio_loop_factory, _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, candidate_fixture, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py:115
+_ ERROR at setup of test_same_run_retry_requires_the_exact_original_pair_set __
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 171
+  def test_same_run_retry_requires_the_exact_original_pair_set(candidate_fixture) -> None:
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 115
+  @pytest.fixture
+  def candidate_fixture(isolated_db_engine):
+E       fixture 'isolated_db_engine' not found
+>       available fixtures: _asyncio_loop_factory, _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, candidate_fixture, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py:115
+_ ERROR at setup of test_pair_uniqueness_allows_many_to_many_candidate_roots __
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 184
+  def test_pair_uniqueness_allows_many_to_many_candidate_roots(candidate_fixture) -> None:
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 115
+  @pytest.fixture
+  def candidate_fixture(isolated_db_engine):
+E       fixture 'isolated_db_engine' not found
+>       available fixtures: _asyncio_loop_factory, _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, candidate_fixture, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py:115
+____ ERROR at setup of test_new_run_reuses_rejected_root_without_reopening ____
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 213
+  def test_new_run_reuses_rejected_root_without_reopening(candidate_fixture) -> None:
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 115
+  @pytest.fixture
+  def candidate_fixture(isolated_db_engine):
+E       fixture 'isolated_db_engine' not found
+>       available fixtures: _asyncio_loop_factory, _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, candidate_fixture, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py:115
+_ ERROR at setup of test_changed_evidence_creates_new_observation_and_preserves_old _
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 236
+  def test_changed_evidence_creates_new_observation_and_preserves_old(candidate_fixture) -> None:
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 115
+  @pytest.fixture
+  def candidate_fixture(isolated_db_engine):
+E       fixture 'isolated_db_engine' not found
+>       available fixtures: _asyncio_loop_factory, _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, candidate_fixture, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py:115
+_ ERROR at setup of test_evidence_ordering_is_canonical_and_rule_changes_are_new_history _
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 273
+  def test_evidence_ordering_is_canonical_and_rule_changes_are_new_history(
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 115
+  @pytest.fixture
+  def candidate_fixture(isolated_db_engine):
+E       fixture 'isolated_db_engine' not found
+>       available fixtures: _asyncio_loop_factory, _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, candidate_fixture, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py:115
+_ ERROR at setup of test_fatal_persistence_failure_marks_run_failed_not_completed _
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 307
+  def test_fatal_persistence_failure_marks_run_failed_not_completed(candidate_fixture) -> None:
+file D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py, line 115
+  @pytest.fixture
+  def candidate_fixture(isolated_db_engine):
+E       fixture 'isolated_db_engine' not found
+>       available fixtures: _asyncio_loop_factory, _class_scoped_runner, _function_scoped_runner, _module_scoped_runner, _package_scoped_runner, _session_scoped_runner, anyio_backend, anyio_backend_name, anyio_backend_options, candidate_fixture, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, monkeypatch, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_candidate_persistence.py:115
+=========================== short test summary info ===========================
+ERROR tests/unit/test_candidate_persistence.py::test_first_run_and_same_run_retry_are_idempotent
+ERROR tests/unit/test_candidate_persistence.py::test_same_run_retry_requires_the_exact_original_pair_set
+ERROR tests/unit/test_candidate_persistence.py::test_pair_uniqueness_allows_many_to_many_candidate_roots
+ERROR tests/unit/test_candidate_persistence.py::test_new_run_reuses_rejected_root_without_reopening
+ERROR tests/unit/test_candidate_persistence.py::test_changed_evidence_creates_new_observation_and_preserves_old
+ERROR tests/unit/test_candidate_persistence.py::test_evidence_ordering_is_canonical_and_rule_changes_are_new_history
+ERROR tests/unit/test_candidate_persistence.py::test_fatal_persistence_failure_marks_run_failed_not_completed
+37 passed, 7 errors in 0.39s
+
+========================================================================
+6. RUFF
+$ python -m ruff check <all E3 packages, fixtures and tests>
+------------------------------------------------------------------------
+ruff 0.17.3
+All checks passed!
+exit=0
+
+========================================================================
+7. NARROW DIFF, ELEVEN-DIFF REPLAY, PRESERVATION
+$ python -I p3ar_evidence.py
+------------------------------------------------------------------------
+{
+  "diff_sha256": "1a38f1c740060bd1bdafddaa1cc6c9cf43dfe0faa7b4df3bd65192a3b9e35f58",
+  "diff_stats": {
+    "backend/app/services/source_claim_matching/bridge.py": {
+      "added": 51,
+      "removed": 20
+    },
+    "backend/tests/unit/test_source_claim_matching_bridge.py": {
+      "added": 157,
+      "removed": 0
+    }
+  },
+  "whitespace_check": "clean",
+  "replay_steps": {
+    "E3P1_IMPLEMENTATION.diff": "OK",
+    "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+    "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK",
+    "E3P2A_IMPLEMENTATION.diff": "OK",
+    "E3P2A_CORRECTION.diff": "OK",
+    "E3P2B1_IMPLEMENTATION.diff": "OK",
+    "E3P2B1_CORRECTION.diff": "OK",
+    "E3P2B2_IMPLEMENTATION.diff": "OK",
+    "E3P2B2_CORRECTION.diff": "OK",
+    "E3P3A_IMPLEMENTATION.diff": "OK",
+    "E3P3A_CORRECTION.diff": "OK"
+  },
+  "replay_matches_workspace": {
+    "backend/app/services/source_claim_matching/bridge.py": true,
+    "backend/tests/unit/test_source_claim_matching_bridge.py": true
+  },
+  "reverse_check": "OK",
+  "other_p3a_files_unchanged": {
+    "backend/app/services/source_claim_matching/__init__.py": true
+  },
+  "accepted_files_unchanged": {
+    "backend/app/services/source_claims/__init__.py": true,
+    "backend/app/services/source_claims/contract.py": true,
+    "backend/app/services/source_claims/canonical.py": true,
+    "backend/app/services/source_claims/parser.py": true,
+    "backend/app/services/source_claims/analysis.py": true,
+    "data/source_claims/schema/ictu_source_claims.schema.json": true,
+    "backend/tests/unit/test_source_claims.py": true,
+    "backend/app/services/source_claims/adapters.py": true,
+    "backend/tests/unit/test_source_claims_adapters.py": true,
+    "backend/app/models/source_staging.py": true,
+    "backend/alembic/versions/a77e01c33ee1_e3_p2b1_source_claim_staging.py": true,
+    "backend/app/services/source_claims/provenance.py": true,
+    "backend/tests/unit/test_source_staging_schema.py": true,
+    "backend/tests/unit/test_source_claims_provenance.py": true,
+    "backend/app/models/__init__.py": true,
+    "backend/app/services/source_staging/__init__.py": true,
+    "backend/app/services/source_staging/service.py": true,
+    "backend/tests/source_staging_fixtures.py": true,
+    "backend/tests/unit/test_source_staging_service.py": true,
+    "backend/tests/integration/test_source_staging_service_pg.py": true,
+    "backend/pyproject.toml": true
+  },
+  "matching_review_identity_files_equal_head": {
+    "backend/app/services/matching/candidate_types.py": true,
+    "backend/app/services/matching/candidate_persistence.py": true,
+    "backend/app/services/matching/candidate_generator.py": true,
+    "backend/app/services/candidate_review_service.py": true,
+    "backend/app/services/review_reason_policy.py": true,
+    "backend/app/models/candidate.py": true,
+    "backend/app/models/identity.py": true
+  },
+  "files": {
+    "backend/app/services/source_claim_matching/bridge.py": {
+      "accepted_p3a_sha256": "0329ba2a5bc051d93160cfca4b8179cce39c20e73ee1e2100d77b0cb0a73029a",
+      "corrected_sha256": "8b1f7602e461355170c5ad92bbb24a0190ab467176e5f54939e2d5ef5f7ed03e",
+      "lines": 520
+    },
+    "backend/tests/unit/test_source_claim_matching_bridge.py": {
+      "accepted_p3a_sha256": "9d12be7e6adc674b60dfbdbc0164d22f8dbf6c39278951c3925be51aaa8c5db7",
+      "corrected_sha256": "597041f5068a8448ab2202d199baae2e24b68cdd451ceb836b24f66cd19d0edd",
+      "lines": 573
+    }
+  }
+}
+
+========================================================================
+8. G01-G04 RE-HASH
+$ python -I g_rehash.py
+------------------------------------------------------------------------
+{
+ "backend/app/services/affiliation_import.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/affiliation_import.py",
+  "match": true
+ },
+ "backend/app/services/affiliation_sources.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/affiliation_sources.py",
+  "match": true
+ },
+ "backend/app/services/author_affiliation.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/author_affiliation.py",
+  "match": true
+ },
+ "backend/app/services/lecturer_dataset/known_publication_ingestion.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/lecturer_dataset/known_publication_ingestion.py",
+  "match": true
+ },
+ "backend/app/services/normalization/scopus_author_normalizer.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/app/services/normalization/scopus_author_normalizer.py",
+  "match": true
+ },
+ "backend/tests/integration/test_affiliation_workflow_api.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/integration/test_affiliation_workflow_api.py",
+  "match": true
+ },
+ "backend/tests/integration/test_author_normalizer_transactions_pg.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/integration/test_author_normalizer_transactions_pg.py",
+  "match": true
+ },
+ "backend/tests/integration/test_import_author_affiliations_cli.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/integration/test_import_author_affiliations_cli.py",
+  "match": true
+ },
+ "backend/tests/unit/test_affiliation_provenance.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_affiliation_provenance.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_affiliation.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_author_affiliation.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_normalizer_transactions.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/unit/test_author_normalizer_transactions.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_position_drift.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/unit/test_author_position_drift.py",
+  "match": true
+ },
+ "backend/tests/unit/test_known_publication_ingestion.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_known_publication_ingestion.py",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_CLARIFICATION_MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_CLARIFICATION_MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_CLARIFICATION_VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_CLARIFICATION_VALIDATION.json",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_DOCUMENTATION_CLARIFICATION.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_DOCUMENTATION_CLARIFICATION.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_VALIDATION.json",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/G04_IMPLEMENTATION.diff": {
+  "latest_record": "G04",
+  "field": "artifacts/G04_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G04_TEST_RESULTS.txt": {
+  "latest_record": "G04",
+  "field": "artifacts/G04_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/VALIDATION.json",
+  "match": true
+ }
+}
+files: 31 match: 31
+
+========================================================================
+9. GIT STATUS
+$ git status --short
+------------------------------------------------------------------------
+== tracked modified
+ M backend/app/models/__init__.py
+ M backend/app/services/affiliation_import.py
+ M backend/app/services/affiliation_sources.py
+ M backend/app/services/author_affiliation.py
+ M backend/app/services/lecturer_dataset/known_publication_ingestion.py
+ M backend/app/services/normalization/scopus_author_normalizer.py
+ M backend/pyproject.toml
+ M backend/tests/integration/test_affiliation_workflow_api.py
+ M backend/tests/integration/test_import_author_affiliations_cli.py
+ M backend/tests/unit/test_author_affiliation.py
+ M backend/tests/unit/test_known_publication_ingestion.py
+ M docs/qa/gate_d2/batch3_browser_evidence.json
+ M docs/qa/gate_d2/batch4_browser_evidence.json
+ M docs/qa/gate_d2/validate_gate_d2.py
+ M docs/research/01_RESEARCH_KNOWLEDGE.md
+ M docs/research/02_ICTU_DATA_FINDINGS.md
+ M docs/research/03_THESIS_DEFENSE_NOTES.md
+== untracked
+?? backend/alembic/versions/a77e01c33ee1_e3_p2b1_source_claim_staging.py
+?? backend/app/models/source_staging.py
+?? backend/app/services/source_claim_matching/
+?? backend/app/services/source_claims/
+?? backend/app/services/source_staging/
+?? backend/tests/integration/test_author_normalizer_transactions_pg.py
+?? backend/tests/integration/test_source_staging_service_pg.py
+?? backend/tests/source_staging_fixtures.py
+?? backend/tests/unit/test_affiliation_provenance.py
+?? backend/tests/unit/test_author_normalizer_transactions.py
+?? backend/tests/unit/test_author_position_drift.py
+?? backend/tests/unit/test_source_claim_matching_bridge.py
+?? backend/tests/unit/test_source_claims.py
+?? backend/tests/unit/test_source_claims_adapters.py
+?? backend/tests/unit/test_source_claims_provenance.py
+?? backend/tests/unit/test_source_staging_schema.py
+?? backend/tests/unit/test_source_staging_service.py
+?? data/source_claims/
+?? docs/qa/gate_d2/MANIFEST_v4.txt
+?? docs/qa/gate_d2/VALIDATION_REPORT_FINAL_20261028.md
+?? docs/qa/gate_d2/gate_d2_batch3to5_final_closeout_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_fixed_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip.sha256
+?? docs/qa/gate_d2/neg_test_evidence.py
+?? docs/qa/gate_d2/neg_test_evidence_20261028.json
+?? docs/qa/gate_d2/validate_v4_run_log.txt
+?? docs/qa/gate_d3/
+?? docs/qa/gate_d4/
+?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip
+?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip.sha256
+?? docs/qa/gate_d4_evidence_errata_20261029.zip
+?? docs/qa/gate_d4_evidence_errata_20261029.zip.sha256
+?? docs/qa/gate_e1/
+?? docs/qa/gate_e2/
+?? docs/qa/gate_e3/

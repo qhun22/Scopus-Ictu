@@ -1,0 +1,152 @@
+{
+  "gate": "E.3",
+  "phase": "P3-A",
+  "item": "temporal closeout P3A-R1, P3A-R2",
+  "date": "2026-10-29",
+  "status": "CORRECTION_DELIVERED_STOPPED_FOR_REVIEW",
+  "scope": {
+    "files_changed": [
+      "backend/app/services/source_claim_matching/bridge.py",
+      "backend/tests/unit/test_source_claim_matching_bridge.py"
+    ],
+    "dedup_or_decision_semantics_changed": false,
+    "db_connection": false,
+    "migrations": 0,
+    "real_data": false,
+    "reviewer_changes": 0,
+    "frontend": 0,
+    "commit": false,
+    "push": false,
+    "p3b_started": false
+  },
+  "P3A-R1": {
+    "status": "FIXED",
+    "defect": "claim observations sorted by captured_at string; flags and observed_in taken from the older instant",
+    "fix": [
+      "_instant(): offset-aware UTC instant; naive/invalid refused (CAPTURE_TIME_INVALID)",
+      "_sort_key(): (instant, uuid) - uuid only breaks exact ties"
+    ]
+  },
+  "P3A-R2": {
+    "status": "FIXED",
+    "defect": "UUID tie-break treated as succession; equal-instant COMPLETE captures could yield WITHDRAWN",
+    "fix": [
+      "_presence works on the set of captures at the latest instant",
+      "all listed -> CURRENT; some listed -> NOT_OBSERVED + CAPTURE_ORDER_AMBIGUOUS",
+      "WITHDRAWN only if last seen strictly earlier, all latest-instant captures COMPLETE, a COMPLETE last-seen capture, non-weak key",
+      "tied observations with different flags -> CAPTURE_ORDER_AMBIGUOUS (FLAGS_DIFFER)"
+    ]
+  },
+  "regressions": {
+    "new_tests": 16,
+    "bridge_total": 43,
+    "against_accepted_bridge": {
+      "bridge_sha256_prefix": "0329ba2a",
+      "failed": 10,
+      "passed": 6
+    }
+  },
+  "mutation_probes": {
+    "string_time_order": "2 failed",
+    "uuid_proves_succession": "6 failed",
+    "no_input_validation": "3 failed",
+    "withdraw_on_partial": "8 failed",
+    "no_claim_dedup": "5 failed",
+    "ignore_negative_decisions": "3 failed"
+  },
+  "tests": {
+    "bridge": {
+      "passed": 43
+    },
+    "full": {
+      "passed": 327,
+      "previous": 311
+    },
+    "existing_matching_unit": {
+      "passed": 37,
+      "errors": 7,
+      "error_cause": "isolated_db_engine fixture (no test DB)"
+    }
+  },
+  "ruff": {
+    "version": "0.17.3",
+    "exit": 0
+  },
+  "diff": {
+    "diff_sha256": "1a38f1c740060bd1bdafddaa1cc6c9cf43dfe0faa7b4df3bd65192a3b9e35f58",
+    "diff_stats": {
+      "backend/app/services/source_claim_matching/bridge.py": {
+        "added": 51,
+        "removed": 20
+      },
+      "backend/tests/unit/test_source_claim_matching_bridge.py": {
+        "added": 157,
+        "removed": 0
+      }
+    },
+    "whitespace_check": "clean",
+    "replay_steps": {
+      "E3P1_IMPLEMENTATION.diff": "OK",
+      "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+      "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK",
+      "E3P2A_IMPLEMENTATION.diff": "OK",
+      "E3P2A_CORRECTION.diff": "OK",
+      "E3P2B1_IMPLEMENTATION.diff": "OK",
+      "E3P2B1_CORRECTION.diff": "OK",
+      "E3P2B2_IMPLEMENTATION.diff": "OK",
+      "E3P2B2_CORRECTION.diff": "OK",
+      "E3P3A_IMPLEMENTATION.diff": "OK",
+      "E3P3A_CORRECTION.diff": "OK"
+    },
+    "replay_matches_workspace": {
+      "backend/app/services/source_claim_matching/bridge.py": true,
+      "backend/tests/unit/test_source_claim_matching_bridge.py": true
+    },
+    "reverse_check": "OK"
+  },
+  "files": {
+    "backend/app/services/source_claim_matching/bridge.py": {
+      "accepted_p3a_sha256": "0329ba2a5bc051d93160cfca4b8179cce39c20e73ee1e2100d77b0cb0a73029a",
+      "corrected_sha256": "8b1f7602e461355170c5ad92bbb24a0190ab467176e5f54939e2d5ef5f7ed03e",
+      "lines": 520
+    },
+    "backend/tests/unit/test_source_claim_matching_bridge.py": {
+      "accepted_p3a_sha256": "9d12be7e6adc674b60dfbdbc0164d22f8dbf6c39278951c3925be51aaa8c5db7",
+      "corrected_sha256": "597041f5068a8448ab2202d199baae2e24b68cdd451ceb836b24f66cd19d0edd",
+      "lines": 573
+    }
+  },
+  "preservation": {
+    "other_p3a_files_unchanged": true,
+    "accepted_e3_files_unchanged": true,
+    "accepted_e3_files": 21,
+    "matching_review_identity_files_equal_head": true,
+    "g01_g04_files_rehashed": 31,
+    "g01_g04_all_match": true,
+    "tracked_modified": 17
+  },
+  "p3b_provisional_policy": {
+    "1": "uniquely resolved institutional declaration may create a PENDING candidate root; catalog-matched author required; no auto-approve; no reopening negative decisions; conflicts stay visible",
+    "2": "SOURCE_CLAIM provenance stays in candidate evidence and review evidence_snapshot; no promotion to APPROVED_ID/ORCID_EXACT/DOI_EXACT or any IdentityEvidence type",
+    "3": "institutional source evidence does not lift D-2 NAME_EVIDENCE_ONLY",
+    "4": "INSTITUTION_DECLARED is a provenance tier, not verification or confidence"
+  },
+  "pending": [
+    "PostgreSQL gate NOT_EXECUTED",
+    "O-2/O-7 formal confirmation"
+  ],
+  "artifacts": {
+    "E3P3A_CORRECTION_HANDOVER.md": {
+      "sha256": "70235e2644ef0041500579a280ab167a43603fc848e9f23b2d2623eb4df6905c",
+      "bytes": 7729
+    },
+    "E3P3A_CORRECTION.diff": {
+      "sha256": "1a38f1c740060bd1bdafddaa1cc6c9cf43dfe0faa7b4df3bd65192a3b9e35f58",
+      "bytes": 16225
+    },
+    "E3P3A_CORRECTION_TEST_RESULTS.txt": {
+      "sha256": "0f7abae58635acac61f31a20c3b759f9b59ab62a4dc0e3b334d4e88a0db1522c",
+      "bytes": 107750
+    }
+  }
+}

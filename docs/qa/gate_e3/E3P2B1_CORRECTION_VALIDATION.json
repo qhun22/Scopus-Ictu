@@ -1,0 +1,150 @@
+{
+  "gate": "E.3",
+  "phase": "P2-B1",
+  "item": "provenance correction B1-R1, B1-R2",
+  "date": "2026-10-29",
+  "status": "CORRECTION_DELIVERED_STOPPED_FOR_REVIEW",
+  "scope": {
+    "files_changed": [
+      "backend/app/services/source_claims/provenance.py",
+      "backend/tests/unit/test_source_claims_provenance.py"
+    ],
+    "models_migration_views_changed": false,
+    "accepted_e3_changed": false,
+    "postgresql": "NOT_EXECUTED",
+    "real_import": false,
+    "reviewer_actions": 0,
+    "commit": false,
+    "push": false,
+    "b2_started": false
+  },
+  "B1-R1": {
+    "status": "FIXED",
+    "reproduced_on_accepted": "mutated binding.lecturers -> COMPLETE, mutated name, original SHA",
+    "fix": [
+      "HarvestBinding holds only bytes/str/None",
+      "build_profiles_artifact re-verifies the binding and decodes fresh objects",
+      "bind_and_build_profiles_artifact is the P2-B2 entrypoint",
+      "adapter contract unchanged (direct call = documented bypass)"
+    ],
+    "tests": [
+      "test_b1_r1_old_failure_mutating_verified_content_cannot_reach_the_artifact",
+      "test_b1_r1_the_direct_adapter_path_still_trusts_its_input",
+      "test_b1_r1_hand_made_or_foreign_bindings_are_refused"
+    ]
+  },
+  "B1-R2": {
+    "status": "FIXED",
+    "reproduced_on_accepted": "single-pass replay with flag true -> ACCEPTED",
+    "harvester_source": "Craw src/ictu_harvester/full_harvest.py run_semantic_replay/combined_hash (read-only)",
+    "required_passes": [
+      "A_cached_write",
+      "B_cached_replay",
+      "C_offline_replay"
+    ],
+    "checks": [
+      "a_equals_b_equals_c true and differing_files []",
+      "exact pass set in file_hashes and combined_hashes",
+      "each pass a non-empty name->hex64 map whose combined hash recomputes",
+      "each pass records lecturers and manifest semantic hashes",
+      "passes cover the same files; combined hashes equal; combined_hash matches"
+    ],
+    "tests": [
+      "test_b1_r2_full_valid_replay_has_exactly_the_harvester_passes",
+      "test_b1_r2_missing_extra_or_renamed_passes_are_rejected (4)",
+      "test_b1_r2_combined_hashes_must_cover_the_same_passes",
+      "test_b1_r2_malformed_passes_are_rejected (5)",
+      "test_b1_r2_changed_pass_hash_is_rejected_even_with_a_recomputed_combined_hash",
+      "test_b1_r2_passes_must_agree_with_each_other",
+      "test_failed_replay_is_rejected (3)"
+    ]
+  },
+  "real_harvest": {
+    "bound": true,
+    "replay_passes_match_harvester": true,
+    "profiles": 410,
+    "completeness": "COMPLETE",
+    "bytes_sha256_prefix": "c12252e02cbf73c5",
+    "real_replay_truncated_to_one_pass": "REPLAY_PASSES_INVALID"
+  },
+  "tests": {
+    "full": {
+      "passed": 247,
+      "skipped": 0,
+      "xfailed": 0,
+      "previous": 230
+    },
+    "provenance": {
+      "passed": 32
+    }
+  },
+  "ruff": {
+    "version": "0.17.3",
+    "exit": 0
+  },
+  "diff": {
+    "diff_sha256": "ccb8cf680302db0f7cff02c45b5509bda8da9ae684852379597cdf13a8e3cd8d",
+    "diff_stats": {
+      "backend/app/services/source_claims/provenance.py": {
+        "added": 84,
+        "removed": 30
+      },
+      "backend/tests/unit/test_source_claims_provenance.py": {
+        "added": 172,
+        "removed": 37
+      }
+    },
+    "whitespace_check": "clean",
+    "replay_steps": {
+      "E3P1_IMPLEMENTATION.diff": "OK",
+      "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+      "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK",
+      "E3P2A_IMPLEMENTATION.diff": "OK",
+      "E3P2A_CORRECTION.diff": "OK",
+      "E3P2B1_IMPLEMENTATION.diff": "OK",
+      "E3P2B1_CORRECTION.diff": "OK"
+    },
+    "replay_matches_workspace": {
+      "backend/app/services/source_claims/provenance.py": true,
+      "backend/tests/unit/test_source_claims_provenance.py": true
+    },
+    "reverse_check": "OK"
+  },
+  "files": {
+    "backend/app/services/source_claims/provenance.py": {
+      "accepted_b1_sha256": "9e5c2d8d07d69b59f3c6a2efe56c2de66ed8abecc9186c9b249a04f28d1bd062",
+      "corrected_sha256": "f6dc7f52625c7d2d09e3dfd52f6450d1fddfb9cf11475ce4a7312586b81e2d3d",
+      "lines": 171
+    },
+    "backend/tests/unit/test_source_claims_provenance.py": {
+      "accepted_b1_sha256": "2bde8887827a4c4c39630734ac27dcf5812c6ede5d8860ca76d9da7341c5db09",
+      "corrected_sha256": "8e490929ce0ef5b075efa28f6a32f9ed0f83cfc678f1c8c9179d9f1ab6404bf0",
+      "lines": 315
+    }
+  },
+  "preservation": {
+    "b1_files_unchanged": true,
+    "accepted_e3_files_unchanged": true,
+    "g01_g04_files_rehashed": 31,
+    "g01_g04_all_match": true,
+    "tracked_modified": 17
+  },
+  "pending": [
+    "PostgreSQL migration/G04 NOT_EXECUTED",
+    "O-2/O-7 owner decisions"
+  ],
+  "artifacts": {
+    "E3P2B1_CORRECTION_HANDOVER.md": {
+      "sha256": "e93b3ba1f9d4cb43c63edc104dd2bc6acdbc70f631e4d3ace4e6f7445462d340",
+      "bytes": 6603
+    },
+    "E3P2B1_CORRECTION.diff": {
+      "sha256": "ccb8cf680302db0f7cff02c45b5509bda8da9ae684852379597cdf13a8e3cd8d",
+      "bytes": 24234
+    },
+    "E3P2B1_CORRECTION_TEST_RESULTS.txt": {
+      "sha256": "2cc8d137267b8f5ba466b6250f3ace5a884dc13d1ec9c6729254b7516a5af687",
+      "bytes": 46953
+    }
+  }
+}

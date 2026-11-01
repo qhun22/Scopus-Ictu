@@ -1,0 +1,549 @@
+E3-P1 FINAL CLOSEOUT - TEST RESULTS
+Date: 2026-10-29  Python 3.12.10  pytest 9.2.0  ruff 0.17.3  jsonschema 4.26.0
+Code under test: P1 + E3P1_ERRATA_IMPLEMENTATION.diff + E3P1_CLOSEOUT_IMPLEMENTATION.diff
+
+========================================================================
+1. FULL E3-P1 PURE SUITE
+$ cd backend
+  python -m pytest tests/unit/test_source_claims.py --noconftest -v -p no:cacheprovider -W ignore::DeprecationWarning
+  exit code 0 - 118 passed, 0 xfailed, 0 skipped, 0 failed
+------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.1
+collecting ... collected 118 items
+
+tests/unit/test_source_claims.py::test_tc_sc_01_same_name_shared_orcid_keeps_both_profiles PASSED [  0%]
+tests/unit/test_source_claims.py::test_tc_sc_02_different_names_shared_orcid_are_reported_not_resolved PASSED [  1%]
+tests/unit/test_source_claims.py::test_tc_sc_03_three_ids_primary_flag_and_declared_count_mismatch_kept PASSED [  2%]
+tests/unit/test_source_claims.py::test_primary_outside_list_is_kept_as_unlisted_claim PASSED [  3%]
+tests/unit/test_source_claims.py::test_tc_sc_04_id_in_owned_and_unassigned_tables_is_cross_table_collision PASSED [  4%]
+tests/unit/test_source_claims.py::test_tc_sc_05_two_rows_claiming_one_id_is_multi_owner PASSED [  5%]
+tests/unit/test_source_claims.py::test_tc_sc_06_ambiguous_and_unassigned_ids_are_never_attributed PASSED [  5%]
+tests/unit/test_source_claims.py::test_tc_sc_07_owner_absent_from_profiles_stays_an_unresolved_source_claim PASSED [  6%]
+tests/unit/test_source_claims.py::test_tc_sc_08_two_profiles_sharing_one_email_are_both_kept_and_grouped PASSED [  7%]
+tests/unit/test_source_claims.py::test_tc_sc_09_identical_artifact_parses_identically PASSED [  8%]
+tests/unit/test_source_claims.py::test_captured_at_change_keeps_content_hash_and_changes_capture_hash PASSED [  9%]
+tests/unit/test_source_claims.py::test_reordered_json_keys_and_whitespace_hash_identically PASSED [ 10%]
+tests/unit/test_source_claims.py::test_content_change_changes_content_hash PASSED [ 11%]
+tests/unit/test_source_claims.py::test_raw_values_that_normalize_alike_stay_distinct PASSED [ 11%]
+tests/unit/test_source_claims.py::test_record_hash_ignores_position_but_record_keeps_it PASSED [ 12%]
+tests/unit/test_source_claims.py::test_same_name_lecturers_remain_separate_records PASSED [ 13%]
+tests/unit/test_source_claims.py::test_rows_without_email_get_content_keys_never_name_keys PASSED [ 14%]
+tests/unit/test_source_claims.py::test_duplicate_source_keys_are_flagged_on_both_records_and_both_kept PASSED [ 15%]
+tests/unit/test_source_claims.py::test_profile_key_falls_back_to_email_then_content PASSED [ 16%]
+tests/unit/test_source_claims.py::test_tc_sc_10_id_dropped_between_complete_snapshots_is_withdrawn PASSED [ 16%]
+tests/unit/test_source_claims.py::test_tc_sc_11_move_from_unassigned_to_owned_is_reclassified_not_deleted PASSED [ 17%]
+tests/unit/test_source_claims.py::test_tc_sc_12_partial_snapshot_never_proves_withdrawal[previous] PASSED [ 18%]
+tests/unit/test_source_claims.py::test_tc_sc_12_partial_snapshot_never_proves_withdrawal[current] PASSED [ 19%]
+tests/unit/test_source_claims.py::test_different_table_scope_is_not_comparable PASSED [ 20%]
+tests/unit/test_source_claims.py::test_out_of_order_or_rule_version_change_is_not_comparable PASSED [ 21%]
+tests/unit/test_source_claims.py::test_different_source_systems_are_never_compared PASSED [ 22%]
+tests/unit/test_source_claims.py::test_weak_key_absence_is_unstable_not_withdrawn PASSED [ 22%]
+tests/unit/test_source_claims.py::test_owner_change_between_strong_keys_is_reported PASSED [ 23%]
+tests/unit/test_source_claims.py::test_profile_withdrawal_and_declared_value_change PASSED [ 24%]
+tests/unit/test_source_claims.py::test_duplicate_keys_make_presence_a_key_collision PASSED [ 25%]
+tests/unit/test_source_claims.py::test_presence_diff_does_not_modify_snapshots PASSED [ 26%]
+tests/unit/test_source_claims.py::test_tc_sc_13_source_declares_35_lecturers_with_34_rows_kept_as_discrepancy PASSED [ 27%]
+tests/unit/test_source_claims.py::test_tc_sc_14_invalid_scopus_id_and_orcid_are_preserved_raw PASSED [ 27%]
+tests/unit/test_source_claims.py::test_invalid_token_in_id_list_does_not_drop_valid_ids PASSED [ 28%]
+tests/unit/test_source_claims.py::test_malformed_rows_are_kept_with_issues PASSED [ 29%]
+tests/unit/test_source_claims.py::test_tc_sc_15_profiles_without_publications_are_kept PASSED [ 30%]
+tests/unit/test_source_claims.py::test_tc_sc_17_unicode_and_whitespace_variants_normalize_deterministically PASSED [ 31%]
+tests/unit/test_source_claims.py::test_repeated_parsing_is_byte_for_byte_deterministic PASSED [ 32%]
+tests/unit/test_source_claims.py::test_records_reconstruct_the_source_content_losslessly PASSED [ 33%]
+tests/unit/test_source_claims.py::test_inventory_counts_on_a_synthetic_snapshot PASSED [ 33%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-WRONG_CONTRACT] PASSED [ 34%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNSUPPORTED_CONTRACT_VERSION] PASSED [ 35%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNKNOWN_SOURCE_SYSTEM] PASSED [ 36%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNKNOWN_ENVELOPE_FIELD] PASSED [ 37%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-CAPTURED_AT_MISSING] PASSED [ 38%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-CAPTURED_AT_NO_OFFSET] PASSED [ 38%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-COMPLETENESS_INVALID] PASSED [ 39%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-UNKNOWN_TABLE] PASSED [ 40%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-COLUMN_ROLE_NOT_ALLOWED] PASSED [ 41%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-COLUMN_ROLE_REQUIRED] PASSED [ 42%]
+tests/unit/test_source_claims.py::test_envelope_violations_raise[<lambda>-NON_CANONICAL_VALUE] PASSED [ 43%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[{"contract": "a", "contract": "b"}-DUPLICATE_JSON_KEY] PASSED [ 44%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[{"x": 1.0}-FLOAT_NOT_ALLOWED] PASSED [ 44%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[\xff\xfe-NOT_UTF8] PASSED [ 45%]
+tests/unit/test_source_claims.py::test_byte_level_violations_raise[{-NOT_JSON] PASSED [ 46%]
+tests/unit/test_source_claims.py::test_schema_file_matches_code_vocabularies PASSED [ 47%]
+tests/unit/test_source_claims.py::test_claims_carry_no_identity_decision PASSED [ 48%]
+tests/unit/test_source_claims.py::test_r1_malformed_source_id_in_profile_returns_issue_not_crash[http://host:notanumber/path] PASSED [ 49%]
+tests/unit/test_source_claims.py::test_r1_malformed_source_id_in_profile_returns_issue_not_crash[http://[::1malformed]/] PASSED [ 50%]
+tests/unit/test_source_claims.py::test_r1_valid_source_id_url_still_normalizes_correctly PASSED [ 50%]
+tests/unit/test_source_claims.py::test_r1_malformed_content_source_url_raises_artifact_error[http://host:notanumber/path] PASSED [ 51%]
+tests/unit/test_source_claims.py::test_r1_malformed_content_source_url_raises_artifact_error[http://[::1malformed]/] PASSED [ 52%]
+tests/unit/test_source_claims.py::test_r2_normalized_evidence_inner_mapping_is_immutable PASSED [ 53%]
+tests/unit/test_source_claims.py::test_r2_all_normalized_pairs_are_immutable PASSED [ 54%]
+tests/unit/test_source_claims.py::test_r2_hashes_and_raw_json_are_unchanged_after_mutation_attempt PASSED [ 55%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.0] PASSED [ 55%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.1] PASSED [ 56%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.99] PASSED [ 57%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.00] PASSED [ 58%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.10] PASSED [ 59%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.x] PASSED [ 60%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0.1] PASSED [ 61%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1] PASSED [ 61%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[2.0] PASSED [ 62%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[0.9] PASSED [ 63%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[10.0] PASSED [ 64%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.] PASSED [ 65%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[.1] PASSED [ 66%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[01.0] PASSED [ 66%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[001.5] PASSED [ 67%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\n] PASSED [ 68%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\r] PASSED [ 69%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\r\n] PASSED [ 70%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[ 1.0] PASSED [ 71%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0 ] PASSED [ 72%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[\n1.0] PASSED [ 72%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.-1] PASSED [ 73%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.\u0661] PASSED [ 74%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[\u0661.0] PASSED [ 75%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[1] PASSED [ 76%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[1.0] PASSED [ 77%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[None] PASSED [ 77%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[version3] PASSED [ 78%]
+tests/unit/test_source_claims.py::test_r3_parser_and_json_schema_validator_accept_the_same_versions PASSED [ 79%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[https:///profile/123] PASSED [ 80%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[https://] PASSED [ 81%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://:80/] PASSED [ 82%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://?q=1] PASSED [ 83%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://#frag] PASSED [ 83%]
+tests/unit/test_source_claims.py::test_r1_artifact_source_url_without_host_raises[https:///profile/123] PASSED [ 84%]
+tests/unit/test_source_claims.py::test_r1_artifact_source_url_without_host_raises[https://] PASSED [ 85%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[::1]/a-http://[::1]/a] PASSED [ 86%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[::1]:8080/a/-http://[::1]:8080/a] PASSED [ 87%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[https://[2001:DB8::1]:443/x-https://[2001:db8::1]/x] PASSED [ 88%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[2001:db8::1]:80/-http://[2001:db8::1]/] PASSED [ 88%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[HTTPS://Repository.Example.invalid:443/Profile/7/-https://repository.example.invalid/Profile/7] PASSED [ 89%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://repository.example.invalid:8080/p?id=A#top-http://repository.example.invalid:8080/p?id=A] PASSED [ 90%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://192.0.2.10:80/p/-http://192.0.2.10/p] PASSED [ 91%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[orcid-profile-42 -orcid-profile-42] PASSED [ 92%]
+tests/unit/test_source_claims.py::test_r1_ipv6_profile_keeps_strong_key PASSED [ 93%]
+tests/unit/test_source_claims.py::test_errata_nested_normalized_access_cannot_mutate_stored_evidence PASSED [ 94%]
+tests/unit/test_source_claims.py::test_errata_major_version_2_is_rejected PASSED [ 94%]
+tests/unit/test_source_claims.py::test_errata_malformed_url_keeps_record_raw_and_claims PASSED [ 95%]
+tests/unit/test_source_claims.py::test_open_1_inplace_or_does_not_mutate_normalized PASSED [ 96%]
+tests/unit/test_source_claims.py::test_open_1_frozen_map_keeps_read_equality_copy_and_json_behaviour PASSED [ 97%]
+tests/unit/test_source_claims.py::test_open_2_snapshot_pickle_roundtrip_stays_equal_and_immutable PASSED [ 98%]
+tests/unit/test_source_claims.py::test_package_imports_without_database_app_or_network_modules[no-site] PASSED [ 99%]
+tests/unit/test_source_claims.py::test_package_imports_without_database_app_or_network_modules[with-site] PASSED [100%]
+
+============================= 118 passed in 0.44s =============================
+
+========================================================================
+2. FOCUSED REGRESSIONS (R1, R2, R3, OPEN-1..3, errata evidence)
+$ same command with -k "r1 or r2 or r3 or errata or open"
+  exit code 0
+------------------------------------------------------------------------
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe
+rootdir: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-1.4.1
+collecting ... collected 118 items / 59 deselected / 59 selected
+
+tests/unit/test_source_claims.py::test_r1_malformed_source_id_in_profile_returns_issue_not_crash[http://host:notanumber/path] PASSED [  1%]
+tests/unit/test_source_claims.py::test_r1_malformed_source_id_in_profile_returns_issue_not_crash[http://[::1malformed]/] PASSED [  3%]
+tests/unit/test_source_claims.py::test_r1_valid_source_id_url_still_normalizes_correctly PASSED [  5%]
+tests/unit/test_source_claims.py::test_r1_malformed_content_source_url_raises_artifact_error[http://host:notanumber/path] PASSED [  6%]
+tests/unit/test_source_claims.py::test_r1_malformed_content_source_url_raises_artifact_error[http://[::1malformed]/] PASSED [  8%]
+tests/unit/test_source_claims.py::test_r2_normalized_evidence_inner_mapping_is_immutable PASSED [ 10%]
+tests/unit/test_source_claims.py::test_r2_all_normalized_pairs_are_immutable PASSED [ 11%]
+tests/unit/test_source_claims.py::test_r2_hashes_and_raw_json_are_unchanged_after_mutation_attempt PASSED [ 13%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.0] PASSED [ 15%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.1] PASSED [ 16%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.99] PASSED [ 18%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.00] PASSED [ 20%]
+tests/unit/test_source_claims.py::test_r3_valid_contract_versions_are_accepted[1.10] PASSED [ 22%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.x] PASSED [ 23%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0.1] PASSED [ 25%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1] PASSED [ 27%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[2.0] PASSED [ 28%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[0.9] PASSED [ 30%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[10.0] PASSED [ 32%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.] PASSED [ 33%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[.1] PASSED [ 35%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[01.0] PASSED [ 37%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[001.5] PASSED [ 38%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\n] PASSED [ 40%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\r] PASSED [ 42%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0\r\n] PASSED [ 44%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[ 1.0] PASSED [ 45%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.0 ] PASSED [ 47%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[\n1.0] PASSED [ 49%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.-1] PASSED [ 50%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[1.\u0661] PASSED [ 52%]
+tests/unit/test_source_claims.py::test_r3_invalid_contract_versions_are_rejected[\u0661.0] PASSED [ 54%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[1] PASSED [ 55%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[1.0] PASSED [ 57%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[None] PASSED [ 59%]
+tests/unit/test_source_claims.py::test_r3_non_string_contract_version_is_rejected[version3] PASSED [ 61%]
+tests/unit/test_source_claims.py::test_r3_parser_and_json_schema_validator_accept_the_same_versions PASSED [ 62%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[https:///profile/123] PASSED [ 64%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[https://] PASSED [ 66%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://:80/] PASSED [ 67%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://?q=1] PASSED [ 69%]
+tests/unit/test_source_claims.py::test_r1_url_without_host_is_not_a_source_key[http://#frag] PASSED [ 71%]
+tests/unit/test_source_claims.py::test_r1_artifact_source_url_without_host_raises[https:///profile/123] PASSED [ 72%]
+tests/unit/test_source_claims.py::test_r1_artifact_source_url_without_host_raises[https://] PASSED [ 74%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[::1]/a-http://[::1]/a] PASSED [ 76%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[::1]:8080/a/-http://[::1]:8080/a] PASSED [ 77%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[https://[2001:DB8::1]:443/x-https://[2001:db8::1]/x] PASSED [ 79%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://[2001:db8::1]:80/-http://[2001:db8::1]/] PASSED [ 81%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[HTTPS://Repository.Example.invalid:443/Profile/7/-https://repository.example.invalid/Profile/7] PASSED [ 83%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://repository.example.invalid:8080/p?id=A#top-http://repository.example.invalid:8080/p?id=A] PASSED [ 84%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[http://192.0.2.10:80/p/-http://192.0.2.10/p] PASSED [ 86%]
+tests/unit/test_source_claims.py::test_r1_valid_hosts_normalize_to_parseable_idempotent_urls[orcid-profile-42 -orcid-profile-42] PASSED [ 88%]
+tests/unit/test_source_claims.py::test_r1_ipv6_profile_keeps_strong_key PASSED [ 89%]
+tests/unit/test_source_claims.py::test_errata_nested_normalized_access_cannot_mutate_stored_evidence PASSED [ 91%]
+tests/unit/test_source_claims.py::test_errata_major_version_2_is_rejected PASSED [ 93%]
+tests/unit/test_source_claims.py::test_errata_malformed_url_keeps_record_raw_and_claims PASSED [ 94%]
+tests/unit/test_source_claims.py::test_open_1_inplace_or_does_not_mutate_normalized PASSED [ 96%]
+tests/unit/test_source_claims.py::test_open_1_frozen_map_keeps_read_equality_copy_and_json_behaviour PASSED [ 98%]
+tests/unit/test_source_claims.py::test_open_2_snapshot_pickle_roundtrip_stays_equal_and_immutable PASSED [100%]
+
+====================== 59 passed, 59 deselected in 0.22s ======================
+
+========================================================================
+3. PURITY (sys.modules delta; preloaded modules reported separately)
+$ same command with -k "imports_without" -s
+  exit code 0
+  'preloaded' = forbidden modules already loaded before the import (interpreter/site);
+  'new' = forbidden modules loaded BY importing source_claims.parser and .analysis.
+  The -I -S run has no site preload, so it also catches what a with-site run could hide.
+------------------------------------------------------------------------
+('-I', '-S') {'preloaded': [], 'new': []}
+.('-I',) {'preloaded': [], 'new': []}
+.
+2 passed, 116 deselected in 0.27s
+
+========================================================================
+4. SAME FILE WITH PROJECT conftest.py (environment note)
+$ python -m pytest tests/unit/test_source_claims.py -q -p no:cacheprovider
+  exit code 4
+  tests/conftest.py imports the app and exits without an allowlisted TEST_DATABASE_URL.
+  No database was configured; the pure file runs with --noconftest.
+------------------------------------------------------------------------
+ImportError while loading conftest 'D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\conftest.py'.
+tests\conftest.py:69: in <module>
+    pytest.exit(
+E   _pytest.outcomes.Exit: TEST ISOLATION BLOCKER: TEST_DATABASE_URL must point to an available, allowlisted PostgreSQL test database (see tests/db_safety_guard.py). There is no override � add the exact database name to ALLOWED_TEST_DATABASE_NAMES only after confirming it is disposable and never used for manual UI/E2E testing.
+
+========================================================================
+5. RUFF (scoped)
+$ python -m ruff check app/services/source_claims tests/unit/test_source_claims.py
+------------------------------------------------------------------------
+ruff 0.17.3
+All checks passed!
+exit=0
+
+========================================================================
+6. JSON SCHEMA VALIDATOR PROBE (old vs new contract_version pattern)
+$ jsonschema Draft202012Validator on {'type':'string','pattern':...}
+  The old pattern accepts '1.0\n' (Python re.search: $ matches before a final newline).
+------------------------------------------------------------------------
+jsonschema 4.26.0
+^1\.[0-9]+$              {'1.0': True, '1.0\\n': True, '1.0\\r': False, '01.0': False, '1.00': True, '2.0': False}
+^1\.[0-9]+(?![\s\S])     {'1.0': True, '1.0\\n': False, '1.0\\r': False, '01.0': False, '1.00': True, '2.0': False}
+
+========================================================================
+7. DIFF, REPLAY, WHITESPACE AND CROSS-PROCESS DETERMINISM
+$ python -I closeout.py  (replays P1 -> errata -> closeout diffs on an empty Git tree with
+  --whitespace=error; git diff --no-index --check; same parse digest under 4 PYTHONHASHSEED values)
+------------------------------------------------------------------------
+{
+  "closeout_changed_files": [
+    "backend/app/services/source_claims/canonical.py",
+    "backend/app/services/source_claims/parser.py",
+    "data/source_claims/schema/ictu_source_claims.schema.json",
+    "backend/tests/unit/test_source_claims.py"
+  ],
+  "closeout_stats": {
+    "backend/app/services/source_claims/canonical.py": {
+      "added": 13,
+      "removed": 8
+    },
+    "backend/app/services/source_claims/parser.py": {
+      "added": 26,
+      "removed": 15
+    },
+    "data/source_claims/schema/ictu_source_claims.schema.json": {
+      "added": 1,
+      "removed": 1
+    },
+    "backend/tests/unit/test_source_claims.py": {
+      "added": 153,
+      "removed": 42
+    }
+  },
+  "cumulative_stats_vs_p1": {
+    "backend/app/services/source_claims/canonical.py": {
+      "added": 20,
+      "removed": 4
+    },
+    "backend/app/services/source_claims/parser.py": {
+      "added": 70,
+      "removed": 3
+    },
+    "data/source_claims/schema/ictu_source_claims.schema.json": {
+      "added": 1,
+      "removed": 1
+    },
+    "backend/tests/unit/test_source_claims.py": {
+      "added": 316,
+      "removed": 11
+    }
+  },
+  "closeout_diff_sha256": "4607105179cd69531eb1c40d7ffcf619b983d3bda4963489113231816316203e",
+  "whitespace_check_closeout": "clean",
+  "whitespace_check_cumulative": "clean",
+  "replay_steps": {
+    "E3P1_IMPLEMENTATION.diff": "OK",
+    "E3P1_ERRATA_IMPLEMENTATION.diff": "OK",
+    "E3P1_CLOSEOUT_IMPLEMENTATION.diff": "OK"
+  },
+  "replay_matches_workspace": {
+    "backend/app/services/source_claims/__init__.py": true,
+    "backend/app/services/source_claims/contract.py": true,
+    "backend/app/services/source_claims/canonical.py": true,
+    "backend/app/services/source_claims/parser.py": true,
+    "backend/app/services/source_claims/analysis.py": true,
+    "data/source_claims/schema/ictu_source_claims.schema.json": true,
+    "backend/tests/unit/test_source_claims.py": true
+  },
+  "reverse_check": "OK",
+  "determinism_digests_by_hashseed": {
+    "0": "81c8182e0efe58133762842f1371b45e7902f0ffe9e0a1a2b38561324744f88b",
+    "1": "81c8182e0efe58133762842f1371b45e7902f0ffe9e0a1a2b38561324744f88b",
+    "4242": "81c8182e0efe58133762842f1371b45e7902f0ffe9e0a1a2b38561324744f88b",
+    "random": "81c8182e0efe58133762842f1371b45e7902f0ffe9e0a1a2b38561324744f88b"
+  },
+  "deterministic_across_processes": true
+}
+
+========================================================================
+8. OUTPUT PRESERVATION ACROSS P1 / ERRATA / CLOSEOUT
+$ same canonical digest of hashes, keys, normalized values, issues and claims for the synthetic
+  guide + profiles fixtures, computed from each tree
+------------------------------------------------------------------------
+81c8182e0efe58133762842f1371b45e7902f0ffe9e0a1a2b38561324744f88b base
+81c8182e0efe58133762842f1371b45e7902f0ffe9e0a1a2b38561324744f88b replay
+81c8182e0efe58133762842f1371b45e7902f0ffe9e0a1a2b38561324744f88b Scopus-Ictu
+
+========================================================================
+9. G01-G04 RE-HASH (latest recorded SHA-256 per file across G01..G04 validation JSONs)
+$ python -I g_rehash.py
+------------------------------------------------------------------------
+{
+ "backend/app/services/affiliation_import.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/affiliation_import.py",
+  "match": true
+ },
+ "backend/app/services/affiliation_sources.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/affiliation_sources.py",
+  "match": true
+ },
+ "backend/app/services/author_affiliation.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/author_affiliation.py",
+  "match": true
+ },
+ "backend/app/services/lecturer_dataset/known_publication_ingestion.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/app/services/lecturer_dataset/known_publication_ingestion.py",
+  "match": true
+ },
+ "backend/app/services/normalization/scopus_author_normalizer.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/app/services/normalization/scopus_author_normalizer.py",
+  "match": true
+ },
+ "backend/tests/integration/test_affiliation_workflow_api.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/integration/test_affiliation_workflow_api.py",
+  "match": true
+ },
+ "backend/tests/integration/test_author_normalizer_transactions_pg.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/integration/test_author_normalizer_transactions_pg.py",
+  "match": true
+ },
+ "backend/tests/integration/test_import_author_affiliations_cli.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/integration/test_import_author_affiliations_cli.py",
+  "match": true
+ },
+ "backend/tests/unit/test_affiliation_provenance.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_affiliation_provenance.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_affiliation.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_author_affiliation.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_normalizer_transactions.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/unit/test_author_normalizer_transactions.py",
+  "match": true
+ },
+ "backend/tests/unit/test_author_position_drift.py": {
+  "latest_record": "G04",
+  "field": "changed_files/backend/tests/unit/test_author_position_drift.py",
+  "match": true
+ },
+ "backend/tests/unit/test_known_publication_ingestion.py": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/backend/tests/unit/test_known_publication_ingestion.py",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_CLARIFICATION_MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_CLARIFICATION_MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_CLARIFICATION_VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_CLARIFICATION_VALIDATION.json",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_DOCUMENTATION_CLARIFICATION.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_DOCUMENTATION_CLARIFICATION.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G01_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G01_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/G02_VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/G02_VALIDATION.json",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_HANDOVER.md": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_HANDOVER.md",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_IMPLEMENTATION.diff": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G03_TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "artifacts/G03_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/G04_IMPLEMENTATION.diff": {
+  "latest_record": "G04",
+  "field": "artifacts/G04_IMPLEMENTATION.diff",
+  "match": true
+ },
+ "docs/qa/gate_e2/G04_TEST_RESULTS.txt": {
+  "latest_record": "G04",
+  "field": "artifacts/G04_TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/MANIFEST.sha256": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/MANIFEST.sha256",
+  "match": true
+ },
+ "docs/qa/gate_e2/TEST_RESULTS.txt": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/TEST_RESULTS.txt",
+  "match": true
+ },
+ "docs/qa/gate_e2/VALIDATION.json": {
+  "latest_record": "G03",
+  "field": "protection/g01_g02_preservation/docs/qa/gate_e2/VALIDATION.json",
+  "match": true
+ }
+}
+files: 31 match: 31
+
+========================================================================
+10. GIT STATUS
+$ git status --short (tracked modified set must equal the session-start snapshot)
+------------------------------------------------------------------------
+== tracked modified
+ M backend/app/services/affiliation_import.py
+ M backend/app/services/affiliation_sources.py
+ M backend/app/services/author_affiliation.py
+ M backend/app/services/lecturer_dataset/known_publication_ingestion.py
+ M backend/app/services/normalization/scopus_author_normalizer.py
+ M backend/tests/integration/test_affiliation_workflow_api.py
+ M backend/tests/integration/test_import_author_affiliations_cli.py
+ M backend/tests/unit/test_author_affiliation.py
+ M backend/tests/unit/test_known_publication_ingestion.py
+ M docs/qa/gate_d2/batch3_browser_evidence.json
+ M docs/qa/gate_d2/batch4_browser_evidence.json
+ M docs/qa/gate_d2/validate_gate_d2.py
+ M docs/research/01_RESEARCH_KNOWLEDGE.md
+ M docs/research/02_ICTU_DATA_FINDINGS.md
+ M docs/research/03_THESIS_DEFENSE_NOTES.md
+== untracked
+?? backend/app/services/source_claims/
+?? backend/tests/integration/test_author_normalizer_transactions_pg.py
+?? backend/tests/unit/test_affiliation_provenance.py
+?? backend/tests/unit/test_author_normalizer_transactions.py
+?? backend/tests/unit/test_author_position_drift.py
+?? backend/tests/unit/test_source_claims.py
+?? data/source_claims/
+?? docs/qa/gate_d2/MANIFEST_v4.txt
+?? docs/qa/gate_d2/VALIDATION_REPORT_FINAL_20261028.md
+?? docs/qa/gate_d2/gate_d2_batch3to5_final_closeout_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_fixed_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip
+?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip.sha256
+?? docs/qa/gate_d2/neg_test_evidence.py
+?? docs/qa/gate_d2/neg_test_evidence_20261028.json
+?? docs/qa/gate_d2/validate_v4_run_log.txt
+?? docs/qa/gate_d3/
+?? docs/qa/gate_d4/
+?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip
+?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip.sha256
+?? docs/qa/gate_d4_evidence_errata_20261029.zip
+?? docs/qa/gate_d4_evidence_errata_20261029.zip.sha256
+?? docs/qa/gate_e1/
+?? docs/qa/gate_e2/
+?? docs/qa/gate_e3/
+== alembic/models/api/frontend changes
+0

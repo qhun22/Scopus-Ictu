@@ -1,0 +1,247 @@
+E3-P3-B1 — ACTUAL EXECUTION EVIDENCE
+Date: 2026-10-30 (Asia/Bangkok)
+Baseline: accepted pre-task dirty worktree; main; HEAD 4bb69f6efaac945399b1c191fc12879ad1c62885
+HEAD is not the accepted E3 source baseline.
+No commit, no push, no application/PostgreSQL DB connection, no migration execution.
+SQLite-only synthetic unit tests; no live HTTP/CLI/reviewer action.
+
+INITIAL IMPLEMENTATION DRAFT
+Exit code: 1
+........FF.....FF................                                        [100%]
+================================== FAILURES ===================================
+_ test_partial_and_equal_instant_absence_never_withdraw[2026-10-29T07:00:00+07:00-COMPLETE-AMBIGUOUS] _
+tests\unit\test_source_claim_candidate_persistence.py:209: in test_partial_and_equal_instant_absence_never_withdraw
+    assert projection(world)[0]["payload"]["current_state"] == state
+E   AssertionError: assert 'WITHDRAWN' == 'AMBIGUOUS'
+E     
+E     - AMBIGUOUS
+E     + WITHDRAWN
+_____________ test_same_time_flag_conflicts_are_not_scoring_facts _____________
+tests\unit\test_source_claim_candidate_persistence.py:217: in test_same_time_flag_conflicts_are_not_scoring_facts
+    assert len(projection(world)) == 2
+E   assert 0 == 2
+E    +  where 0 = len(())
+E    +    where () = projection((<sqlalchemy.orm.session.Session object at 0x0000022A7B6CD2E0>, <app.services.source_staging.service.SourceStagingServ...0>, <app.services.matching.source_claim_candidate_persistence.SourceClaimCandidateWriter object at 0x0000022A7B6772C0>))
+_ test_negative_identity_is_untouched_and_does_not_spawn_a_new_pending_pair[REVOKED] _
+tests\unit\test_source_claim_candidate_persistence.py:270: in test_negative_identity_is_untouched_and_does_not_spawn_a_new_pending_pair
+    assert (row.status, row.version) == (status, 4)
+E   AssertionError: assert ('REVOKED', 1) == ('REVOKED', 4)
+E     
+E     At index 1 diff: 1 != 4
+E     Use -v to get more diff
+_ test_negative_identity_is_untouched_and_does_not_spawn_a_new_pending_pair[REJECTED] _
+tests\unit\test_source_claim_candidate_persistence.py:270: in test_negative_identity_is_untouched_and_does_not_spawn_a_new_pending_pair
+    assert (row.status, row.version) == (status, 4)
+E   AssertionError: assert ('REJECTED', 1) == ('REJECTED', 4)
+E     
+E     At index 1 diff: 1 != 4
+E     Use -v to get more diff
+=========================== short test summary info ===========================
+FAILED tests/unit/test_source_claim_candidate_persistence.py::test_partial_and_equal_instant_absence_never_withdraw[2026-10-29T07:00:00+07:00-COMPLETE-AMBIGUOUS]
+FAILED tests/unit/test_source_claim_candidate_persistence.py::test_same_time_flag_conflicts_are_not_scoring_facts
+FAILED tests/unit/test_source_claim_candidate_persistence.py::test_negative_identity_is_untouched_and_does_not_spawn_a_new_pending_pair[REVOKED]
+FAILED tests/unit/test_source_claim_candidate_persistence.py::test_negative_identity_is_untouched_and_does_not_spawn_a_new_pending_pair[REJECTED]
+4 failed, 29 passed in 2.56s
+Forbidden modules loaded: []
+
+This is not a run against the pre-feature baseline. The implementation draft
+required an offset-preserving capture timestamp read and test fixture corrections.
+SQLite DateTime drops the supplied offset; the writer now reads the timestamp
+from the immutable hashed capture envelope and normalizes its UTC instant.
+The ambiguity fixture initially expected a new root from unusable declarations;
+both new-root refusal and existing-root/history flag handling are now tested.
+SQLAlchemy initializes a new versioned object's version to 1; preservation is
+asserted against its actual post-flush pre-writer state.
+
+FOCUSED COMMAND (cwd backend)
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD='1'; @'
+import importlib.abc, socket, sys, pytest
+sys.stdout.reconfigure(encoding='utf-8')
+class NoApplicationDatabase(importlib.abc.MetaPathFinder):
+ def find_spec(self, fullname, path=None, target=None):
+  if fullname in ('app.core.database', 'app.main') or fullname.endswith('.conftest'):
+   raise AssertionError('Forbidden initialization: '+fullname)
+sys.meta_path.insert(0, NoApplicationDatabase())
+socket.socket.connect = lambda *a, **k: (_ for _ in ()).throw(AssertionError('Network forbidden'))
+result = pytest.main(['--noconftest','-p','no:cacheprovider','tests/unit/test_source_claim_candidate_persistence.py','-q','--tb=short'])
+print('Forbidden modules loaded:', [n for n in sys.modules if n in ('app.core.database','app.main') or n.endswith('.conftest')])
+raise SystemExit(result)
+'@ | & 'C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe' -B -
+FOCUSED FINAL RESULT
+Exit code: 0
+.......................................                                  [100%]
+39 passed in 2.66s
+Forbidden modules loaded: []
+
+
+FIRST SANDBOXED COMBINED OFFLINE RUN
+Exit code: 1
+........................................................................ [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 60%]
+.....................................................E.................. [ 80%]
+........................................................................ [100%]Traceback (most recent call last):
+  File "<stdin>", line 12, in <module>
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\config\__init__.py", line 231, in main
+    return _main(args=args, plugins=plugins, prog="pytest.main()")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\config\__init__.py", line 262, in _main
+    ret: ExitCode | int = config.hook.pytest_cmdline_main(config=config)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_caller.py", line 197, in __call__
+    return self._hookexec(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_manager.py", line 183, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_execution.py", line 195, in _multicall
+    raise exception
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_execution.py", line 147, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\main.py", line 380, in pytest_cmdline_main
+    return wrap_session(config, _main)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\main.py", line 368, in wrap_session
+    config.hook.pytest_sessionfinish(
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_caller.py", line 197, in __call__
+    return self._hookexec(
+           ^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_manager.py", line 183, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_execution.py", line 195, in _multicall
+    raise exception
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_execution.py", line 167, in _multicall
+    teardown.throw(exception)
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\logging.py", line 901, in pytest_sessionfinish
+    return (yield)
+            ^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_execution.py", line 167, in _multicall
+    teardown.throw(exception)
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\terminal.py", line 992, in pytest_sessionfinish
+    result = yield
+             ^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_execution.py", line 167, in _multicall
+    teardown.throw(exception)
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\warnings.py", line 104, in pytest_sessionfinish
+    return (yield)
+            ^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\pluggy\_execution.py", line 147, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\tmpdir.py", line 375, in pytest_sessionfinish
+    cleanup_dead_symlinks(basetemp)
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\site-packages\_pytest\pathlib.py", line 398, in cleanup_dead_symlinks
+    for left_dir in root.iterdir():
+                    ^^^^^^^^^^^^^^
+  File "C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1056, in iterdir
+    for name in os.listdir(self):
+                ^^^^^^^^^^^^^^^^
+PermissionError: [WinError 5] Access is denied: 'D:\\DataFolder\\ProjectIctu\\DoAn\\Scopus-Ictu\\backend\\.tmp\\e3p3b1-b8b5593fc8f84ceeb490ae6cb6c4ec84'
+
+Windows sandbox WinError 5 prevented pytest temp-directory setup/cleanup. This
+run has no successful suite result; no pass count is inferred from progress dots.
+It was rerun with approved execution, a fresh workspace-contained temporary path,
+and the same forbidden database/application/module/network guards.
+
+APPROVED INTERMEDIATE OFFLINE RUN
+Exit code: 0
+........................................................................ [ 20%]
+........................................................................ [ 40%]
+........................................................................ [ 60%]
+........................................................................ [ 80%]
+........................................................................ [100%]
+360 passed in 4.67s
+Forbidden modules loaded: []
+
+Scope here was 327 accepted E3 cases + the initial 33 P3-B1 cases.
+
+FINAL COMBINED OFFLINE COMMAND (cwd backend)
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD='1'; $env:PYTHONDONTWRITEBYTECODE='1'; @'
+import importlib.abc, socket, sys, uuid, pathlib, pytest
+sys.stdout.reconfigure(encoding='utf-8')
+class NoApplicationDatabase(importlib.abc.MetaPathFinder):
+ def find_spec(self, fullname, path=None, target=None):
+  if fullname in ('app.core.database','app.main') or fullname.endswith('.conftest'):
+   raise AssertionError('Forbidden initialization: '+fullname)
+sys.meta_path.insert(0, NoApplicationDatabase())
+socket.socket.connect = lambda *a, **k: (_ for _ in ()).throw(AssertionError('Network forbidden'))
+temp = pathlib.Path('.tmp') / ('e3p3b1-' + uuid.uuid4().hex)
+assert temp.resolve().is_relative_to(pathlib.Path.cwd()) and not temp.exists()
+files = ['tests/unit/test_source_claims.py','tests/unit/test_source_claims_adapters.py','tests/unit/test_source_staging_schema.py','tests/unit/test_source_claims_provenance.py','tests/unit/test_source_staging_service.py','tests/unit/test_source_claim_matching_bridge.py','tests/unit/test_source_claim_candidate_persistence.py','tests/unit/test_candidate_generator.py','tests/unit/test_candidate_persistence.py::test_canonical_json_and_hash_ignore_mapping_order','tests/unit/test_candidate_persistence.py::test_source_state_has_compact_rule_and_input_contract']
+result = pytest.main(['--noconftest','-p','no:cacheprovider','--basetemp',str(temp),*files,'-q','--tb=short'])
+forbidden = [n for n in sys.modules if n in ('app.core.database','app.main') or n.endswith('.conftest')]
+print('Forbidden modules loaded:', forbidden)
+assert not forbidden
+raise SystemExit(result)
+'@ | & 'C:\Users\QuangHuy\AppData\Local\Programs\Python\Python312\python.exe' -B -
+FINAL ACTUAL RESULT
+Exit code: 0
+........................................................................ [ 18%]
+........................................................................ [ 37%]
+........................................................................ [ 55%]
+........................................................................ [ 74%]
+........................................................................ [ 92%]
+............................                                             [100%]
+388 passed in 4.94s
+Forbidden modules loaded: []
+
+388 = 327 existing E3 cases + 39 P3-B1 cases + 22 existing pure matching cases.
+No final failures or skips. Seven PostgreSQL-backed candidate persistence cases
+requiring isolated_db_engine were not selected; no test DB guard was bypassed.
+The new tests use the accepted SQLite in-memory schema mirror and actual
+SQLAlchemy transactions/savepoints, not a dictionary-only session fake.
+That mirror omits PostgreSQL CHECKs, partial indexes and external canonical FKs;
+it does not prove PostgreSQL constraint, isolation or concurrency behavior.
+A separate SQLite table executes the portable evidence-kind CHECK.
+Migration-contract tests use recording fake Alembic operations only, no SQL.
+
+RUFF
+C:/Users/QuangHuy/AppData/Local/Programs/Python/Python312/Scripts/ruff.exe check
+  backend/app/models/candidate.py
+  backend/app/services/matching/source_claim_candidate_persistence.py
+  backend/alembic/versions/b88f02d44ff2_source_claim_candidate_evidence.py
+  backend/tests/unit/test_source_claim_candidate_persistence.py
+  backend/tests/unit/test_source_claim_matching_bridge.py
+  backend/tests/unit/test_source_staging_schema.py
+Version: ruff 0.17.3
+Exit code 0: All checks passed!
+Earlier draft lint diagnostics were corrected; no suppressions added.
+
+DIFF CHECKS
+git diff --check -- backend/app/models/candidate.py
+  backend/tests/unit/test_source_claim_matching_bridge.py
+  backend/tests/unit/test_source_staging_schema.py
+Exit code 0.
+Every added line of the delivered six-file patch separately checked: PASS.
+git apply --check --reverse docs/qa/gate_e3/E3P3B1_IMPLEMENTATION.diff
+Exit code 0.
+Patch SHA-256: 6c691e0f200e9c8a159ee0dbe3a2aee90f7c883afc649c043cf86267183c3ec4
+Pre-task hashes, not HEAD, establish the exact existing-file before bytes.
+
+WHOLE-WORKTREE git diff --check (pre-existing dirty research preserved)
+Exit code: 1
+warning: in the working copy of 'backend/tests/integration/test_affiliation_workflow_api.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/qa/gate_d2/validate_gate_d2.py', LF will be replaced by CRLF the next time Git touches it
+docs/research/01_RESEARCH_KNOWLEDGE.md:4: trailing whitespace.
++**Cập nhật gần nhất:** 2026-10-29 (v1.9 — errata E17: phân tầng bằng chứng ORCID)  
+docs/research/02_ICTU_DATA_FINDINGS.md:4: trailing whitespace.
++**Cập nhật gần nhất:** 2026-10-29 (v1.13 — Gate D.4 evidence errata E17–E19)  
+docs/research/03_THESIS_DEFENSE_NOTES.md:4: trailing whitespace.
++**Cập nhật gần nhất:** 2026-10-29 (v2.3 — errata E17: Q17)  
+
+All three reported research files match their pre-task SHA-256.
+
+MIGRATION HEAD INSPECTION
+python -B -m alembic heads (cwd backend)
+Exit 0: b88f02d44ff2 (head)
+An initial call from repository root with backend/alembic.ini failed because the
+relative script_location alembic did not exist there. Corrected cwd only; no
+migration was executed and no database connection was made by heads.
+
+POSTGRESQL / LIVE REVIEW
+NOT_EXECUTED. No authorized disposable PostgreSQL database used.
+P3-B2 reviewer integration, source evidence promotion and API serialization:
+NOT_IMPLEMENTED; feature remains STAGED and inactive in those workflows.
+
