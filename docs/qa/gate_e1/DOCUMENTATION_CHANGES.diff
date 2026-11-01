@@ -1,0 +1,875 @@
+diff --git a/docs/qa/gate_e1/AS_IS_ARCHITECTURE.md b/docs/qa/gate_e1/AS_IS_ARCHITECTURE.md
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/AS_IS_ARCHITECTURE.md
+@@ -0,0 +1,68 @@
++# Gate E.1 — As-is architecture
++
++Audit date: 2026-10-29 (Asia/Bangkok). Baseline HEAD: `4bb69f6efaac945399b1c191fc12879ad1c62885`.
++Scope: static code audit, test inspection, read-only local source inventory and synthetic in-memory probes. No application/database writes, migrations, imports, reviews or commits were performed. Only this Gate E.1 documentation package was written.
++
++## Handover and evidence policy
++
++`git status --short` showed pre-existing edits in three research files and Gate D.2 evidence, and untracked Gate D.3/D.4 artifacts. `docs/qa/gate_e1/` did not exist: there was no Claude draft to overwrite. The research files and evidence were preserved. The prior independent import audit was reused, then challenged against the remaining code.
++
++Authority order: the current R-01…R-12 matrix in `docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv`, corrected by E12–E16; current R-13…R-18 in `docs/qa/gate_d4/cumulative/research_to_system_traceability.csv`, corrected by E17–E19; current `docs/research/01_RESEARCH_KNOWLEDGE.md`, `02_ICTU_DATA_FINDINGS.md`, `03_THESIS_DEFENSE_NOTES.md`. Historical prose in those files is not automatically current. In particular R-10's phrase “stronger evidence” is constrained by R-13: registry DOI membership alone never verifies the target slot. Research acceptance is supplied by the owner; this audit does not re-adjudicate Gate D.
++
++Classifications mean: IMPLEMENTED = the entire stated invariant exists in inspected code; PARTIAL = some clauses exist; MISSING = the required application capability was not found in the traced paths; DEFECT_CONFIRMED = a concrete unsafe code path is identified, not proof that live data is corrupt; NOT_VERIFIABLE = requires unavailable runtime evidence. Existing tests are NOT_EXECUTED unless explicitly called an in-memory probe.
++
++## Actual application boundaries
++
++| Boundary | Actual implementation and evidence | What it does not establish |
++|---|---|---|
++| Lecturer JSON upload | `backend/app/api/v1/endpoints/lecturers.py:1110-1143`, `import_lecturer_dataset()` → `LecturerImportService.import_dataset()` in `backend/app/services/lecturer_dataset/importer.py:558-760` | Not a generic Craw/raw source-claim importer |
++| Structured validation | `backend/app/services/lecturer_dataset/parser.py:127-375`, `parse_and_validate()` | Allowlisted normalized output, not lossless raw capture |
++| Craw publications | `backend/scripts/ingest_craw_known_publications.py:81-141`, `build_sources()`; `backend/app/services/lecturer_dataset/known_publication_ingestion.py:537-687`, `apply()` | Requires existing lecturers; only profiles referenced by publication links are selected |
++| Web Craw orchestration | `backend/app/services/lecturer_dataset/craw_ingestion_workflow.py:81-177`, preview fingerprint, advisory lock and apply | Does not create a 410-profile roster or typed Scopus claims |
++| Scopus CSV | `backend/app/api/v1/endpoints/imports.py:54-129`, upload → `backend/app/services/scopus_import_service.py:119-190`, job creation and batch parsing | Raw ingestion and normalization are separate durable phases, not one all-file atomic transaction |
++| Publications | `backend/app/services/normalization/scopus_normalizer.py:517-606`, `normalize_single_raw()` | EID reuse does not prove correct person attribution |
++| Scopus authors | `backend/app/services/normalization/scopus_author_normalizer.py:137-276`, `parse_author_occurrences()`; `330-373`, `record_occurrences()` | Creating a Scopus author does not approve a lecturer association |
++| Candidate retrieval | `backend/app/services/matching/candidate_generator.py:207-324`, `generate_candidates()` / `generate_all()` | String retrieval rules, not a working weighted identity scorer |
++| Publication-assisted retrieval | `backend/app/services/matching/generation_workflow.py:113-149`, `build_candidates()` → enrichment and Craw discovery | Does not consume the Gate D identity evidence tiers or source-ID inventories |
++| Candidate persistence | `backend/app/services/matching/candidate_persistence.py:494-604`, observations, descriptors and pair roots | New observations do not reopen accepted/rejected roots |
++| Human acceptance | `backend/app/api/v1/endpoints/reviews.py:578-633`; `backend/app/services/candidate_review_service.py:547-790` | ACCEPT creates APPROVED identity; no automatic canonical linking |
++| Affiliation | `backend/app/services/author_affiliation.py:194-344`; `backend/app/services/affiliation_sources.py:184-344`; `backend/app/services/affiliation_import.py:248-319` | Separate author-slot reconciliation, not lecturer identity acceptance or registry DOI-work verification |
++| Read projections | `backend/app/services/lecturer_scopus_projection.py:305-329`; `backend/app/services/publication_queries.py:263-292`; `backend/app/services/dashboard_queries.py:30-83` | Lecturer association currently propagates to every publication of an approved ID; dashboard counts the local corpus, not a proven ICTU-only universe |
++
++The `import_pipeline` orchestrator/apply classes and `matching/engine.py`, `matching/scoring.py`, `matching/rules/orcid_rule.py`, `review_service.py` contain scaffolds. They are not the active implementations just because architecture prose names them: `backend/app/services/import_pipeline/orchestrator.py:18-23`, `backend/app/services/import_pipeline/apply_service.py:12-17`, `backend/app/services/matching/engine.py:22-26`, `backend/app/services/matching/scoring.py:36-40`, `backend/app/services/matching/rules/orcid_rule.py:4-8`, `backend/app/services/review_service.py:6-17`.
++
++## Model, constraint and migration inventory
++
++| Data | Declared protections | Limit |
++|---|---|---|
++| Lecturer | versioning; staff-code and canonical ORCID partial unique indexes | Email is nonunique; repository URL has no unique constraint. Canonical ORCID has no reviewer-verification field. `backend/app/models/master_lecturer.py:39-117` |
++| Source snapshot / known publication | JSON payload/hash, validation fields; publication's composite FK binds snapshot and lecturer | Generic snapshot storage can hold duplicate raw ORCID claims, but there is no normalized raw claim/withdrawal lifecycle. `backend/app/models/master_lecturer.py:123-204`, `210-276` |
++| Publication / provenance | unique EID; nullable nonunique DOI; raw-to-publication provenance | No reviewed per-lecturer publication exclusion relation in inspected models/queries. `backend/app/models/publication.py:39-150` |
++| Author / authorship | unique external Scopus ID; `(publication, author)` and `(publication, author_order)` unique | Position drift on an existing pair is ignored in normalization. `backend/app/models/publication.py:157-182`, `245-293` |
++| Candidate | pair uniqueness, version, statuses PENDING/ACCEPTED/REJECTED/SUPERSEDED; observations per run; evidence fingerprint | No typed source claims or persistent conflict observations. `backend/app/models/candidate.py:83-240` |
++| Canonical identity | unique lecturer/author pair; partial unique approved author ownership | One lecturer may own many approved IDs. `backend/app/models/identity.py:40-133` |
++| Evidence / reviews | JSON evidence, fingerprints, decision snapshot; MappingReview transition checks and CandidateReview action checks | A check on a review row is not a DB trigger enforcing aggregate transitions. Enum existence does not implement REVOKE/REOPEN. `backend/app/models/identity.py:139-312`, `backend/app/models/candidate.py:243-317` |
++| Affiliation | per-author-row/source/payload resolution versions and separate multiple affiliation entries | VERIFIED here describes an external author bridge, not a canonical lecturer approval. `backend/app/models/affiliation.py:104-178`, `190-236` |
++| Audit | actor type/user/service consistency and structured snapshots | Application append conventions are not proof of database-enforced immutability. `backend/app/models/governance.py:200-295` |
++
++Migration declarations were inspected, not executed: initial schema `backend/alembic/versions/e5b3cf21c1d12b64_0001_initial_schema.py:119-136` (ORCID), `462-480` (EID), `650-664` (authorship), `748-760` (approved ownership); candidate tables `backend/alembic/versions/b27c9d1e4f60_m2_7b2_candidate_persistence.py:80-140`, `245-312`; duplicate lecturer email change `backend/alembic/versions/c3f0b9a18d42_allow_duplicate_lecturer_emails.py:1-40`. Applied revision, external triggers, DB privileges and actual data are NOT_VERIFIABLE without a separate runtime audit.
++
++## Transactions and governance
++
++- Structured lecturer import commits master changes, snapshots, publications and audit together, rolling back SQLAlchemy errors (`importer.py:589-766` under the full path above).
++- CSV ingestion commits lifecycle and batches independently. Publication creation uses a nested savepoint for EID races (`scopus_normalizer.py:560-597`). Author normalization instead calls whole-session rollback inside integrity-error recovery; see defect G04.
++- Candidate persistence uses pair insert-or-ignore and row locks; human review locks the candidate, validates version/current completed observation, enforces one approved owner and commits decision/identity/evidence/audit once (`candidate_review_service.py:547-790`). Database-backed concurrency tests exist but were not run.
++- Affiliation web apply includes its audit in the import transaction: `backend/app/services/affiliation_workflow.py:138-199`. Craw web apply commits data before its success audit: `craw_ingestion_workflow.py:133-176`; a success-audit failure can leave applied data without that event. Treat this as a known transaction-boundary gap, not proof of observed audit loss.
++- Authorization checks the persisted active user and session version, then server-side role: `backend/app/api/dependencies.py:87-138`, `170-187`. Import/matching are ADMIN-only; reviews allow ADMIN/REVIEWER; lecturer self-service resolves the account-linked lecturer. `backend/app/api/v1/endpoints/lecturer_scopus.py:28-55`. No privilege bypass was confirmed in inspected routes; this is not a penetration test.
++
++## Frontend integration
++
++`frontend/src/App.tsx:74-115` gates academic lookup, lecturer, review and ADMIN routes. `frontend/src/pages/ApprovalQueue/index.tsx:378-439` submits only ACCEPT/REJECT with observation/version/reason and handles stale-state conflicts. `frontend/src/types/review.ts:3-4`, `71-128` has name/publication evidence, not typed research counter-evidence or T1–T6. REOPEN appears in history vocabulary, not a functioning write action.
++
++The UI already separates approved identity from evidence basis (`frontend/src/pages/Publications/LinkEvidence.tsx:7-60`), lists approved identities (`frontend/src/pages/Identity/index.tsx:92-110`) and labels personal publications as derived from approved identities (`frontend/src/pages/MyPublications/index.tsx:48-64`). It cannot display source-listed IDs that never entered a claim store. Affiliation UI distinguishes VERIFIED/CORROBORATED/UNRESOLVED, includes sources and reasons, but its “Identity verified” label inherits the unsafe aggregator bridge (`frontend/src/pages/Publications/AuthorAffiliations.tsx:10-92`). No browser session or frontend build/test was run; `frontend/package.json` defines no test runner.
++
++## Limits and corrections to the earlier audit
++
++The earlier audit did not locate the local Craw file. This continuation found it through `CRAW_SOURCE_DIR`, read it without importing, and confirmed 410 records and SHA-256 `c12252e02cbf73c58ae3add65a5b6b925f5e0fcd75273bd7e0a3cc28c8a0accb`. It contains 10 duplicated ORCID values on 20 profiles, 106 profiles with raw publication URLs, and a separate link file with 328 rows covering 48 lecturer profiles. This establishes source availability, not DB population. The source contains no Scopus-ID field: the 83/69 inventories are separate ICTU-WEB artifacts.
++
++Research prose saying candidate generation never writes, or listing a weighted matcher/revision service as implemented, is narrower or older than current runtime code. Pure retrieval is read-only; generation persistence writes candidate observations; canonical changes still require a reviewer. Research files were not edited.
+diff --git a/docs/qa/gate_e1/REQUIREMENT_IMPLEMENTATION_MATRIX.csv b/docs/qa/gate_e1/REQUIREMENT_IMPLEMENTATION_MATRIX.csv
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/REQUIREMENT_IMPLEMENTATION_MATRIX.csv
+@@ -0,0 +1,19 @@
++﻿requirement_id,research_finding_ids,authoritative_requirement_source,business_invariant,research_evidence,research_expected_behavior,research_limitation,existing_implementation,exact_code_references,existing_tests_and_limits,verified_behavior,gaps_or_confirmed_defects,severity_priority,business_risk,smallest_remediation,proposed_regression_tests,final_classification,verification_limit
++R-01,FINDING-026,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,Accepting an ID-to-lecturer link must not imply that every publication on that ID belongs to the lecturer.,"SC-01, SC-02; raw/orcid/0009-0007-0103-6055.json",Publication flagged as CONFLICTING_EVIDENCE; excluded from lecturer counts only after reviewer decision.,HIGH evidence for one paper; one case only,Approved author identity and per-lecturer publication projection exist.,backend/app/services/lecturer_scopus_projection.py:305-329 _publication_set; backend/app/services/publication_queries.py:263-292 _approved_lecturer_link_rows; backend/app/services/publication_export.py:91-140 _batch_lecturer_links,backend/tests/integration/test_lecturer_scopus_projection.py:368-378 test_t08_overlapping_publication_dedup (dedup only; no exclusion),Approved author identity and per-lecturer publication projection exist.,G09: no reviewed per-publication lecturer attribution flag/exclusion; approving ID includes all its publications.,P1,A suspected mixed historical profile can attribute another person's paper to a lecturer.,Add audited lecturer/publication attribution decisions and apply consistently to personal views/export/counts; do not delete the global publication.,TC-07; TC-12; TC-20,MISSING,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-02,FINDING-027,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,"Every identity evidence item records its source tier: PUBLISHER, REGISTRY, AGGREGATOR_RAW, AGGREGATOR_ENTITY.",SC-04..SC-09,Evidence uses A; conflict A/B recorded; no auto decision.,6 observed cases across 6 lecturers,Affiliation sources and payload fingerprints exist; entity and raw metadata are conflated before alignment.,backend/app/services/author_affiliation.py:194-218 parse_openalex_authorships; backend/app/services/author_affiliation.py:273-324 align_paper; backend/app/services/affiliation_sources.py:265-319 build_inputs,backend/tests/unit/test_author_affiliation.py:47-53 test_verified_by_orcid_chain_even_when_names_differ; backend/tests/unit/test_author_affiliation.py:141-161 test_openalex_entries_keep_the_sources_own_raw_to_organization_pairing; synthetic probes openalex_entity_overrides_raw_name and aggregator_orcid_bridge_bypasses_name,Affiliation sources and payload fingerprints exist; entity and raw metadata are conflated before alignment.,G02: OpenAlex entity display_name/ORCID can verify affiliation slot even when raw name differs; source_system does not distinguish entity from publisher tier.,P0,Incorrect affiliations can be labeled VERIFIED. This path does not approve lecturer identities.,Preserve raw author name; isolate entity identifiers as non-verifying signals; retain contrary publisher observations and explicit provenance.,TC-03; TC-04; TC-15; TC-19,DEFECT_CONFIRMED,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-03,FINDING-028; FINDING-022,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,An author may have several affiliations on one publication; ICTU among them is ICTU evidence; an extra non-ICTU affiliation is not a conflict.,per_id_facts.json (7 lecturers),ICTU evidence = true; no conflict raised.,Consistent across 7 lecturers,Multiple affiliation entries are preserved per authorship and source.,backend/app/services/author_affiliation.py:194-239 parse_openalex_authorships/parse_crossref_authors; backend/app/services/affiliation_sources.py:79-103 entries_of; backend/app/services/affiliation_import.py:230-240 apply,"backend/tests/unit/test_author_affiliation.py:100-121 test_multiple_affiliations_and_organizations_are_preserved_separately (preservation, not institutional qualification)",Multiple affiliation entries are preserved per authorship and source.,No active ICTU-specific whole-list eligibility policy or separate temporal Scopus-profile affiliation observations. G02 limits trusted alignment.,P2,A second institution or umbrella TNU could be overinterpreted by a future consumer.,Reuse list storage; define scoped ICTU/umbrella matching and publication-vs-profile observations without automatic identity conflict.,TC-06; TC-17,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-04,FINDING-024; FINDING-010; FINDING-016; FINDING-021,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,"Author-position evidence requires the name at that position to match, not only the index.","SC-03, SC-11","Match by name, not index; record metadata anomaly.",2 records,CSV occurrence parsing validates list lengths/embedded IDs; nonidentifier affiliation alignment requires count/position/name; importer validates canonical slot.,backend/app/services/normalization/scopus_author_normalizer.py:137-276 parse_author_occurrences; backend/app/services/author_affiliation.py:313-343 align_paper; backend/app/services/affiliation_import.py:258-291 _plan; backend/app/services/matching/candidate_types.py:67-87 PublicationEvidence,backend/tests/integration/test_scopus_author_normalization.py:1039-1094 test_author_list_length_mismatch_no_author_created; backend/tests/unit/test_author_affiliation.py:77-80 test_name_mismatch_at_same_position_is_unresolved; backend/tests/unit/test_author_affiliation.py:124-138 test_crossref_parser_and_orcid_scopus_extraction,CSV occurrence parsing validates list lengths/embedded IDs; nonidentifier affiliation alignment requires count/position/name; importer validates canonical slot.,G02/G03 affect slot trust/replay; G06 candidate evidence omits immutable author_order and publication-author row ID.,P0,Same DOI or position can be attached to the wrong person; complete author list must remain available.,Fix G02/G03; freeze publication-author identity/order/raw row/name in candidate descriptors; represent absent author lists explicitly.,TC-03; TC-05; TC-15; TC-18,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-05,FINDING-025; FINDING-001; FINDING-003; FINDING-004; FINDING-013,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,SOURCE_LISTED and PUBLICATION_EVIDENCE are separate states; an ID with zero evidence is shown as such.,SC-13; FINDING-025 (60320483500),ID visible with EVIDENCE_GAP status; not auto-linked or auto-rejected.,2 cases,Source-listed and canonical approval are not automatically equated; approved zero-publication identity can be projected.,backend/scripts/ingest_craw_known_publications.py:81-124 build_sources; backend/app/services/lecturer_dataset/parser.py:338-375 parse_and_validate; backend/app/services/lecturer_scopus_projection.py:65-84 get_approved_identity_summaries,"backend/tests/integration/test_lecturer_scopus_projection.py:437-453 test_t14_approved_identity_with_zero_publications (already approved, not a source-only ID)",Source-listed and canonical approval are not automatically equated; approved zero-publication identity can be projected.,G05: no typed inventory importer or reviewable claim for ID with zero CSV authorship. Craw record contains no Scopus-ID field.,P1,Source-listed secondary IDs disappear from the application or could be fabricated as canonical evidence by ad hoc conversion.,"Add snapshot-linked claim intake, including unowned IDs and zero-publication IDs, without auto-linking.",TC-08; TC-21,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-06,FINDING-002,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,"ICTU 'primary' designation is a source claim, not derived from publication volume or recency.","csv_analysis.json (ptthuong, nhtan, lsthai)",Both IDs shown; primary flag preserved as source claim.,3 cases,Canonical multi-ID relationships exist; no source-primary flag in identity/claim representation.,backend/app/models/identity.py:40-128 LecturerScopusIdentity; backend/app/services/lecturer_scopus_projection.py:65-84 get_approved_identity_summaries; backend/app/services/lecturer_dataset/parser.py:338-360 parse_and_validate,No source-primary regression found. Multi-ID approval test backend/tests/integration/test_candidate_review_service.py:891-948 does not cover source primary.,Canonical multi-ID relationships exist; no source-primary flag in identity/claim representation.,G05: source primary_id and source counts are not ingested.,P1,Sorting by numeric ID/publication count could be mistaken for the source designation.,Preserve primary flag per source snapshot separately from canonical identity and computed rankings.,TC-01; TC-21,MISSING,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-07,FINDING-020; FINDING-012; FINDING-015; FINDING-017,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,Name comparison is token-set based and tolerant of titles and merged tokens; names remain weak evidence.,SC-12; scopus_title_fetch (merged tokens),"Recognised as candidates, never auto-accepted on name alone.",5 observed forms,N0/N2/comma/hyphen and observed leading titles; Craw anchored token matching.,backend/app/services/matching/candidate_generator.py:28-90 normalization; backend/app/services/matching/candidate_generator.py:114-149 _lecturer_query/_surface_query; backend/app/services/matching/craw_assisted_discovery.py:180-243 _has_name_correspondence,backend/tests/unit/test_candidate_generator.py:59-83 title prefix cases; backend/tests/unit/test_craw_matching_quality_negative_cases.py:401-467 reordered name/title tests,N0/N2/comma/hyphen and observed leading titles; Craw anchored token matching.,G13: ordered canonical retrieval and leading whitelist do not cover every merged token or embedded title; G16 run rule metadata lists only four name rules.,P2,Recall gaps; broad token splitting could instead raise homonym false positives.,Add focused positive/negative synthetic regressions; extend only observed forms and version the changed rules.,TC-16; TC-22,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-08,FINDING-009,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,"Profile-unavailable is a time-stamped observation, never an attribute of the ID.",raw/scopus_render_attempts_20261029.json,Status PROFILE_UNAVAILABLE@T2; previous observation kept.,Session-wide outage with control,No Scopus profile HTTP-result classification in active candidate/import flow; no automatic merge inferred from an error.,backend/app/models/publication.py:157-182 ScopusAuthor; backend/app/services/matching/generation_workflow.py:76-149 _load_all/build_candidates,No timestamped Scopus profile-failure observation/retry test found.,No Scopus profile HTTP-result classification in active candidate/import flow; no automatic merge inferred from an error.,G14: application has no profile-attempt history corresponding to browser research observations.,P3,A later ad hoc import may mistake session errors for invalid or merged identity.,"Only when importing profile observations, store timestamp/source/result history; do not change ID ownership from fetch status.",TC-23,MISSING,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-09,FINDING-019; FINDING-006; FINDING-007; FINDING-014; FINDING-018,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,"Institution count = distinct EIDs; lecturer count = distinct (lecturer, EID).",cumulative_stats.json,Institution total counts each EID once.,380 pairs / 276 EIDs,Unique canonical EID; distinct per-lecturer publication set; corpus dashboard counts one Publication row per EID.,backend/app/models/publication.py:54-62 Publication; backend/app/services/lecturer_scopus_projection.py:305-329 _publication_set; backend/app/services/dashboard_queries.py:30-33 get_dashboard_summary; backend/app/services/normalization/scopus_author_normalizer.py:454-510 _ensure_publication_author_link,backend/tests/integration/test_lecturer_scopus_projection.py:368-378 test_t08_overlapping_publication_dedup; backend/tests/integration/test_dashboard_api.py:451-456 test_publication_count (no approved ICTU eligibility); backend/tests/integration/test_scopus_author_normalization.py:563-610 test_author_order_conflict_no_overwrite (different-author slot conflict),Unique canonical EID; distinct per-lecturer publication set; corpus dashboard counts one Publication row per EID.,G12: dashboard is local corpus rather than institution-eligible count; G03/G04 undermine relationship/replay integrity upstream of DISTINCT.,P1,Correct dedup cannot repair wrong authorship; corpus total can be mistaken for ICTU output.,Fix normalization defects; retain corpus count; add separately scoped approved/institutional count and paper attribution rules.,TC-11; TC-12; TC-18; TC-20,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-10,FINDING-023,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,ORCID evidence distinguishes 'ORCID on publication' from 'registry lists this DOI'.,orcid_claims.json; per_id_facts.json (orcid_claims_doi_on_both_ids); ../mission_errata/raw_orcid/,Two evidence levels stored.,"At least 1/17 lecturers (Nguyễn Thị Hải Anh) have a public ORCID registry record listing DOIs that the historical Scopus CSV assigns to both of their Author IDs. ORCID candidate discovery via Crossref/OpenAlex was incomplete (the bridging ORCID was found by a public ORCID search during owner review), so this is a lower bound. Registry corroboration is publication-level evidence for the reviewer, not VERIFIED IDENTITY and not a merge decision.",Affiliation ORCID external-identifier bridge is stored separately from positional name matching. No registry DOI-work matching.,backend/app/services/affiliation_online_fetch.py:229-258 fetch_orcid_records; backend/app/services/affiliation_sources.py:223-228 build_inputs bridge; backend/app/services/affiliation_sources.py:303-319 evidence; backend/app/services/matching/rules/orcid_rule.py:4-8 OrcidRule.apply,"backend/tests/unit/test_author_affiliation.py:124-138 test_crossref_parser_and_orcid_scopus_extraction (external IDs, not work claims)",Affiliation ORCID external-identifier bridge is stored separately from positional name matching. No registry DOI-work matching.,"Registry work membership, publisher-slot ORCID and profile ORCID have no candidate-level separation. R-10 wording must be constrained by corrected R-13, not treated as slot proof.",P1,Coauthor DOI claim could be laundered into target identity proof if the missing feature is added naively.,Store independent observations/origins and derivation; bridge registry work only with target-slot evidence and no auto-approval.,TC-03; TC-04; TC-19,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-11,FINDING-008; FINDING-004,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,Every count carries source and snapshot date.,csv_analysis.json,Both shown with source labels.,17 lecturers,Local CSV import hash/date and raw row provenance; personal UI labels approved-derived publications.,backend/app/services/publication_queries.py:319-341 _provenance_rows; backend/app/services/dashboard_queries.py:30-83 get_dashboard_summary; frontend/src/pages/MyPublications/index.tsx:48-64; backend/app/services/lecturer_dataset/parser.py:362-375 metadata,"backend/tests/integration/test_scopus_normalization.py:361-378 test_provenance_links_correct (lineage, not source count comparison)",Local CSV import hash/date and raw row provenance; personal UI labels approved-derived publications.,G12: no source/date count observations for ICTU-WEB versus CSV versus Scopus profile; local corpus scope needs explicit presentation.,P2,Different snapshots and count universes may be interpreted as contradictory totals.,Preserve source count observations with date/definition; label local canonical corpus separately from claims and approved lecturer set.,TC-21; TC-12,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-12,FINDING-024,docs/qa/gate_d3/mission/cumulative/research_to_system_traceability.csv,NOT_VERIFIABLE (source missing) is distinct from CONFLICT (source disagrees).,"SC-10, SC-11",Status NOT_VERIFIABLE; no penalty.,2 records,Affiliation missing/conflict reasons exist; publication reconciliation detects ambiguity and DOI/title conflict.,backend/app/services/author_affiliation.py:41-48 reason constants; backend/app/services/affiliation_import.py:150-178 apply_cross_source_policy; backend/app/services/matching/publication_evidence_enricher.py:91-193 _reconcile_known_publications; backend/app/services/matching/generation_workflow.py:131-149 build_candidates,backend/tests/unit/test_publication_evidence_enricher.py:95-108 test_doi_mismatch_uses_exact_title_fallback; backend/tests/unit/test_publication_evidence_enricher.py:133-150 test_doi_and_unique_title_pointing_to_different_publications_fail_closed; backend/tests/integration/test_affiliation_import_and_api.py:165-175 absent vs unresolved,Affiliation missing/conflict reasons exist; publication reconciliation detects ambiguity and DOI/title conflict.,G07: candidate conflict details not persisted/displayed; G11 DOI mismatch fallback only yields TITLE_EXACT.,P1,"Missing metadata, contrary evidence and tested title fallback can all look like simple insufficient support.",Persist missing/conflict observations independently from candidate approval; retain DOI disagreements; owner approves hard-block policy.,TC-13; TC-15; TC-19,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-13,FINDING-029,docs/qa/gate_d4/cumulative/research_to_system_traceability.csv,"Evidence is tiered: only a publisher ORCID at the TARGET author slot that the registry confirms is slot-verified (T1). A registry DOI claim with a name match (T3 full name, T4 initials) supports a candidate but does NOT verify the target slot; without a name match it is a co-author claim and is excluded.","excluded_coauthor_orcid_claims (5 cases); tiers in evidence.py; T3/T4 cases AMB-02, UNA-04, UNA-09, UNA-13, UNA-30, UNA-50","(1) T3, not slot-verified; (2) excluded; (3) T4, not slot-verified.",5 co-author exclusions; 6 registry-only cases,Human review and candidate/publication descriptors exist; literal tiers and equivalent slot-aware ORCID derivations absent.,backend/app/services/matching/candidate_types.py:67-87 PublicationEvidence; backend/app/services/candidate_review_service.py:479-504 _promote_candidate_evidence_to_identity; backend/app/services/identity_evidence_basis.py:33-65 evidence_basis,backend/tests/integration/test_publication_link_evidence_basis.py:30-58 no-evidence/name/publication basis cases; no T1/T2/T3/T4 target-slot registry tests in application,Human review and candidate/publication descriptors exist; literal tiers and equivalent slot-aware ORCID derivations absent.,"No publisher-slot/registry works tier producer; generic ORCID_EXACT cannot encode corrected research distinctions. Research tests live under Gate D, not runtime integration.",P1,Same-name coauthor or initials-only DOI claimant could be mislabeled independently verified.,Persist proof components/source tiers and contraindications; use literal tier names only if useful; keep acceptance separate.,TC-03; TC-04; TC-19,MISSING,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-14,FINDING-005; FINDING-001,docs/qa/gate_d4/cumulative/research_to_system_traceability.csv,Source records may legitimately contain the same ORCID on several lecturer profiles; this is NOT enforced as UNIQUE(orcid) on raw/imported source data. Uniqueness applies only to a reviewer-confirmed canonical identity.,10 ORCIDs on 20 ICTU profiles in lecturers.json; AMB-01 (0000-0002-7857-2602 on two Nguyễn Thanh Tùng profiles); AMB-04/09/10 (two ORCIDs each on two Nguyễn Thị Dung profiles); AMB-02/UNA-09 (two Vũ Hải Yến profiles),Both rows imported with provenance; collision flagged; matching proposes both as candidates with the collision noted; no auto-link.,10 colliding ORCIDs in source,Generic Craw raw snapshots can preserve duplicate claims for selected linked profiles; canonical ORCID unique and structured upload rejects duplicates.,backend/app/models/master_lecturer.py:108-113 canonical index; backend/app/services/lecturer_dataset/parser.py:243-259 duplicate handling; backend/app/services/lecturer_dataset/known_publication_ingestion.py:671-683 raw snapshot,backend/tests/integration/test_lecturer_json_roundtrip.py:238-246 test_duplicate_source_id_or_orcid_in_file_is_rejected; synthetic structured_duplicate_orcid_rejected confirms canonical contract only,Generic Craw raw snapshots can preserve duplicate claims for selected linked profiles; canonical ORCID unique and structured upload rejects duplicates.,"G05: no all-profile raw claim collision intake. Canonical field is imported directly, not necessarily reviewer-verified.",P1,Attempting direct canonical conversion of 410 raw records can reject the snapshot or lose claims through manual cleanup.,"Preserve full raw profiles and per-profile ORCID claims first; flag collisions; resolve canonical ORCID explicitly, retaining canonical uniqueness.",TC-02; TC-09; TC-10,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-15,FINDING-030; FINDING-003,docs/qa/gate_d4/cumulative/research_to_system_traceability.csv,NO_CANDIDATE (not in lecturer inventory) is distinct from NOT_ICTU.,"39 NO_CANDIDATE cases; clusters Đàm Thanh Phương (3 IDs), Vũ Thanh Vinh (3-4), Nguyễn Vũ Hải (2, ORCID)",Kept as UNRESOLVED with affiliation evidence; never auto-linked.,39 cases,Scopus authors exist independently of lecturer identities and can remain unlinked.,backend/app/models/publication.py:157-182 ScopusAuthor; backend/app/models/identity.py:40-128 association; backend/app/services/matching/generation_workflow.py:87-101 _load_all,No unmatched ICTU-affiliated source-author/grouping regression found; standalone authors are a narrower capability.,Scopus authors exist independently of lecturer identities and can remain unlinked.,No source inventory state/grouping for unresolved ICTU-affiliated IDs outside the lecturer roster.,P1,A 39-case no-candidate inventory could disappear or be forced onto a homonym.,Retain unowned ID claims and affiliation provenance; distinguish no roster candidate from not ICTU; defer person grouping algorithm until justified.,TC-08; TC-14,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-16,FINDING-031; FINDING-022,docs/qa/gate_d4/cumulative/research_to_system_traceability.csv,Lecturers with approved IDs remain eligible candidates for new IDs; supporting and counter-evidence are stored and shown together.,"UNA-16 (dhkhoi) and UNA-29 (nthang): publisher ORCID at slot, NOT registry-confirmed (T2), UNA-29 with topic/affiliation/position counter-evidence; UNA-14/27/28 (nthang), UNA-11 (dqlong) name-based",Third ID proposed as candidate with tier T2 and counter-evidence; no auto-assign.,2 T2 + 4 name-based,Generation loads all lecturers without excluding those with approved IDs; pair cardinality supports multiple IDs.,backend/app/services/matching/candidate_generator.py:304-324 _load_inputs/generate_all; backend/app/services/matching/generation_workflow.py:131-149 build_candidates; backend/app/services/candidate_review_service.py:479-504 promotion,"backend/tests/integration/test_candidate_review_service.py:891-948 test_lecturer_can_have_multiple_approved_authors (approval, not new-ID retrieval plus counter-evidence)",Generation loads all lecturers without excluding those with approved IDs; pair cardinality supports multiple IDs.,G07: counter-evidence from conflicting affiliations/registry/slots is not included in review descriptors.,P1,Third ID may be considered without the reasons against assignment.,"Keep all-lecturer retrieval; persist and display supporting and contrary observations together, without auto-rejecting registry absence.",TC-01; TC-06; TC-19,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-17,FINDING-020; FINDING-015; FINDING-017,docs/qa/gate_d4/cumulative/research_to_system_traceability.csv,"Initials-only matches are never sufficient; titles ('Master', 'Ts') stripped before matching.","UNA-11/UNA-40 (initials IDs from one 2015 paper); 'van Thuc Master, Hoang'; 'Vinh, Vinh Thanh'",All kept as WEAK candidates; review required.,8-candidate cases observed,Whitelisted leading titles stripped; Craw requires name anchor and refuses bare initials unless a full-name variant corroborates.,backend/app/services/matching/candidate_generator.py:28-90 normalization; backend/app/services/matching/craw_assisted_discovery.py:180-243 _has_name_correspondence; backend/app/services/review_reason_policy.py:54-82 accept_reason_policy,backend/tests/unit/test_candidate_generator.py:59-83 title tests; backend/tests/unit/test_craw_matching_quality_negative_cases.py:241-268 test_case_4_abbreviated_initials_anchored_via_name_variant,Whitelisted leading titles stripped; Craw requires name anchor and refuses bare initials unless a full-name variant corroborates.,Embedded Master/Ts and all merged-token forms not covered. Safe refusal can reduce recall; initials alone not auto-accepted.,P2,Aggressive normalization could merge homonyms; narrow matching can miss source-listed IDs.,Add synthetic embedded-title/initials positives and homonym negatives; carry names as weak signals.,TC-16; TC-22,PARTIAL,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
++R-18,FINDING-002,docs/qa/gate_d4/cumulative/research_to_system_traceability.csv,"Counts are derived from the rows, not from the source's summary text.",ictu_web_d4_snapshot (summary 35 vs table 34; 25/69 pub counts differ from CSV),"Difference reported, rows used.",1 page,"Structured envelope checks record_count versus rows, not ICTU-WEB summary versus detailed source inventory.",backend/app/services/lecturer_dataset/parser.py:164-180 parse_and_validate; backend/scripts/ingest_craw_known_publications.py:81-86 build_sources,backend/tests/unit/test_lecturer_dataset_parser.py:114-120 test_parse_rejects_record_count_mismatch (different input contract),"Structured envelope checks record_count versus rows, not ICTU-WEB summary versus detailed source inventory.",No ICTU-WEB table importer records 35-summary versus 34-detail discrepancy; canonical parser should not be claimed to implement this requirement.,P2,Wrong source summary could become an imported roster/count claim.,Derive inventory counts from detailed rows; preserve summary value and discrepancy in source snapshot report.,TC-21,MISSING,Static code/test inspection; existing tests NOT_EXECUTED; no database state or browser behavior verified. See AUDIT_VALIDATION.json for pure probes.
+diff --git a/docs/qa/gate_e1/IMPORT_DATA_FLOW_AUDIT.md b/docs/qa/gate_e1/IMPORT_DATA_FLOW_AUDIT.md
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/IMPORT_DATA_FLOW_AUDIT.md
+@@ -0,0 +1,62 @@
++# Gate E.1 — Import and source-to-canonical identity flow
++
++Read-only continuation, 2026-10-29. Code references are repository-relative paths with inclusive line ranges. Tests mentioned below were inspected, NOT_EXECUTED. In-memory probes are recorded separately in `AUDIT_VALIDATION.json`.
++
++## Source reality versus application state
++
++Read-only inspection found the configured Craw snapshot outside the repository at `D:/DataFolder/ProjectIctu/DoAn/Craw/output/full/lecturers.json`. Its 410 records and SHA-256 match FINDING-001. There are no duplicated source IDs, but 10 ORCIDs occur on 20 profiles. This is permissible source data. The snapshot has no source-listed Scopus-ID field. The separate accepted ICTU-WEB tables contain 34 multi-ID rows (83 IDs), 10 ambiguous rows and 59 unassigned rows. Their availability does not prove any application ingestion occurred.
++
++**Has the system already imported 410 lecturers? NOT_VERIFIABLE.** No DB was queried. A file count, source inventory, mocked test or UI counter is not evidence of deployed import state.
++
++**Can existing workflows safely ingest all source material? Not end-to-end.** The canonical upload requires a different envelope and rejects duplicate ORCIDs. Craw known-publication ingestion is an additive enrichment for existing lecturers, not a roster importer. The 152-ID source inventory lacks a typed ingestion/reconciliation path, especially IDs with no canonical CSV author row and IDs with no lecturer owner.
++
++## Traced route A — structured master data
++
++1. ADMIN uploads to `import_lecturer_dataset()` (`backend/app/api/v1/endpoints/lecturers.py:1110-1143`). It bounds/reads the upload and invokes `LecturerImportService.import_dataset()`.
++2. `parse_and_validate()` expects a `{dataset, lecturers}` envelope, validates count/schema, normalizes identity fields, rejects duplicate ORCID claims and constructs a normalized field allowlist (`backend/app/services/lecturer_dataset/parser.py:127-181`, `243-259`, `325-375`). Synthetic `scopus_ids` disappears from that output.
++3. `_build_index()` reads canonical lecturer rows and historical source identifiers; `_resolve()` uses source ID, staff code and email, reporting conflicts and avoiding name-only merge (`backend/app/services/lecturer_dataset/importer.py:219-261`, `296-377`). This is lecturer master resolution, not publisher-email identity matching.
++4. `import_dataset()` refuses blocking conflicts before writes, creates/updates master data, appends a reconstructed snapshot for every record, deduplicates known publications by title/DOI/year, writes audit and commits (`importer.py:558-760` under the same path).
++
++The upload contract is internally coherent for canonical master data. Dropping unsupported `scopus_ids` is **VERIFIED behavior / integration functionality MISSING**, not automatically a defective implementation of its current contract. In particular the real Craw file does not contain that field. The business problem is the absent separate source-claim path; changing the canonical importer to auto-approve IDs would be unsafe.
++
++The canonical `Lecturer.orcid` is unique, but upload writes it directly without a reviewed ORCID state. Do not describe it as “reviewer-verified” merely because it occupies a canonical column (`backend/app/models/master_lecturer.py:64-65`, `108-113`; importer `614`, `643`). Retain canonical uniqueness; capture raw claims before resolving them.
++
++## Traced route B — actual Craw JSON through review
++
++1. `build_sources()` reads all three local Craw artifacts. It indexes source records and follows `lecturer_publication_links.json`, rejecting unresolved links at the wrapper level. Only lecturers present in those links become service inputs. Their full record and source/link hashes enter raw payload (`backend/scripts/ingest_craw_known_publications.py:81-141`, `174-185`). On the inspected source this selects 48 of 410 profiles, not all 106 with raw publication URLs.
++2. `KnownPublicationIngestionService._build_lecturer_index()` maps profile URL to canonical lecturer; `apply()` hashes raw payload and reuses snapshots by hash/lecturer, creates known-publication rows and commits (`backend/app/services/lecturer_dataset/known_publication_ingestion.py:335-378`, `537-687`). Duplicate source ORCID values are not checked here, but no complete 410-profile source staging exists. Duplicate canonical URL mapping is defect G01.
++3. Separately, Scopus CSV ingestion preserves row payload/EID/DOI (`backend/app/services/scopus_import_service.py:172-190`, `1365-1392`), normalizes unique EID publications and external authors/positions (`backend/app/services/normalization/scopus_normalizer.py:517-606`; `backend/app/services/normalization/scopus_author_normalizer.py:137-276`, `330-373`). This establishes a canonical publication-author pair, not its lecturer ownership.
++4. `build_candidates()` generates names, enriches existing pairs with known publications and discovers additional publication/name-anchored pairs (`backend/app/services/matching/generation_workflow.py:113-149`). `enrich_candidates()` requires the candidate author on the reconciled publication; Craw discovery additionally checks name correspondence (`backend/app/services/matching/publication_evidence_enricher.py:196-246`; `backend/app/services/matching/craw_assisted_discovery.py:307-351`). A shared DOI alone does not automatically create a lecturer identity.
++5. `persist_generation()` stores observations/descriptors under a stable pair root. `_get_or_create_root()` does not change existing review status (`backend/app/services/matching/candidate_persistence.py:494-604`). A same-run replay verifies content; a new run appends history.
++6. `decide_review_candidate()` delegates ACCEPT/REJECT to `CandidateReviewService`. ACCEPT checks actor, lock, candidate version, current completed observation and ownership; creates APPROVED identity plus promoted evidence, candidate review and audit; commits once (`backend/app/api/v1/endpoints/reviews.py:578-633`; `backend/app/services/candidate_review_service.py:547-790`). REJECT creates no identity (`candidate_review_service.py:900-947`).
++7. `LecturerScopusProjectionService._publication_set()` derives distinct publications from approved IDs; there is no per-publication lecturer exclusion (`backend/app/services/lecturer_scopus_projection.py:305-329`). This is the unresolved R-01 concern.
++
++## Eight independent cross-checks
++
++| Hypothesis | Verdict | Test and limitation | Risk / smallest appropriate response |
++|---|---|---|---|
++| Structured parser ignores `scopus_ids` | VERIFIED behavior; MISSING integration | `backend/tests/unit/test_lecturer_dataset_parser.py:32-51` covers normalization, not claim ingestion; synthetic probe reproduced omission | Add an explicit source-claim contract. Do not reinterpret unsupported fields as reviewer approval. |
++| Craw excludes profiles without publication links | VERIFIED; contract-specific | `build_sources()` above; `backend/tests/integration/test_ingest_craw_known_publications_cli.py:138-170` covers publication ingestion replay, not complete roster staging | Preserve every source profile independently; keep linked-publication enrichment. |
++| URL `setdefault` can select wrong lecturer | VERIFIED / DEFECT_CONFIRMED G01 | Exact extracted method probe: two canonical rows → first wins. Model has no URL uniqueness (`master_lecturer.py:82-115`); no duplicate-URL regression found | URL→set index, report ambiguity and block affected writes; do not merge records or impose raw URL uniqueness blindly. |
++| Regeneration preserves decisions/history, including withdrawal | PARTIAL | `backend/tests/unit/test_candidate_persistence.py:213-233` checks REJECTED root survives a new run; accepted/revoked + source-withdrawal combinations not covered | Preserve decisions; add source-presence observations. Latest completed observation is per candidate, not proof the pair exists in the latest global run (`backend/app/services/candidate_review_queries.py:22-83`). |
++| PublicationEvidence freezes position/row ID | REFUTED | Descriptor lacks both (`backend/app/services/matching/candidate_types.py:67-87`); persistence refs use pair (`candidate_persistence.py:317-355`). Existing provenance tests do not assert a frozen slot | Add row ID/order/raw row/name/algorithm to immutable descriptors and reviewer snapshot. |
++| ORCID raw claims separated from verified canonical identities | PARTIAL | Raw JSONB can preserve included collisions; structured rejection test `backend/tests/integration/test_lecturer_json_roundtrip.py:238-246` confirms canonical contract | Add all-profile claim capture/collision flags; do not relax canonical uniqueness or choose an ORCID owner automatically. |
++| Review API implements REVOKE/REOPEN | REFUTED for canonical identity writes | API action Literal is only ACCEPT/REJECT (`backend/app/schemas/review_api.py:11-25`), legacy service stub (`backend/app/services/review_service.py:6-17`) | Add compensating transitions if required; affiliation-override revocation is a different feature. |
++| DOI mismatch/title fallback is intentional and safe | VERIFIED intentional behavior; safety PARTIAL | `backend/tests/unit/test_publication_evidence_enricher.py:95-108` expects differing DOI + same title → TITLE_EXACT; `133-150` blocks DOI/title pointing at two known publications | Preserve title fallback for absent DOI; explicitly retain observed DOI disagreement and show it to reviewer. Policy approval required before making it a hard rejection. |
++
++## Reimport and disappearance semantics
++
++| Route | Same input replay | New snapshot removes claim/publication |
++|---|---|---|
++| Structured master upload | Reuses master identity and known-publication keys, appends new snapshots/audit even when unchanged (`importer.py:625-675`, `696-760`) | Absent lecturer not deleted/deactivated; known publications remain. Missing canonical ORCID can clear the master field on an included updated record. This is not an ORCID withdrawal history. |
++| Craw enrichment | Same content/lecturer snapshot and publication keys reused (`known_publication_ingestion.py:597-609`, `619-689`) | New payload is additive; all historical known publications remain inputs. Full-file hashes embedded in each payload may cause unrelated source changes to create many snapshots. No source-claim tombstones. |
++| Candidate generation | Same run ID/content replay checked; new run creates observations without resetting statuses | Missing pair is untouched; prior completed observation remains reviewable. Does not remove/revoke identities or record an explicit withdrawal. |
++| CSV normalization | Unique EID/author/links reused; metadata drift reported rather than silently replacing canonical publication | No snapshot-based publication deletion. Author replay has position-drift and integrity-recovery defects G03/G04. |
++
++Thus “idempotent” must state which rows it means. Neither new-run history nor repeated canonical snapshots is a duplicate canonical identity. Source absence must never automatically erase a human decision, but reviewers need to see that support has become historical.
++
++## Decision: extend ingestion infrastructure, add a separate source-claim boundary
++
++Reuse `LecturerSourceSnapshot`, source URL/hash conventions, the existing Craw loader and ADMIN preview/apply pattern. Extend the source loader to preserve the entire roster and parse the separate ICTU-WEB tables into snapshot-linked claim observations. Represent an ID as a string even when no local Scopus-author row or lecturer owner exists. Preserve source group, primary flag, count/source timestamp, raw value, collision and withdrawal observations.
++
++Keep this operationally distinct from canonical master upload and candidate approval. Existing candidates require canonical lecturer/author FKs and only NAME/PUBLICATION descriptors; they cannot safely substitute for raw claims. Materialize candidates only after an explicit, non-approving resolution to existing canonical rows. Avoid an unrelated parallel import framework or a wholesale staging redesign. Proposed schema/API details require design review, not implementation during this gate.
+diff --git a/docs/qa/gate_e1/IDENTITY_EVIDENCE_GAP_ANALYSIS.md b/docs/qa/gate_e1/IDENTITY_EVIDENCE_GAP_ANALYSIS.md
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/IDENTITY_EVIDENCE_GAP_ANALYSIS.md
+@@ -0,0 +1,61 @@
++# Gate E.1 — Identity, evidence and governance gaps
++
++2026-10-29. Findings below describe code behavior. They do not assert that a particular live lecturer, source claim or reviewer decision is wrong. R-01…R-18 classifications are in `REQUIREMENT_IMPLEMENTATION_MATRIX.csv`; all existing repository tests cited here are inspected / NOT_EXECUTED.
++
++## Essential invariants versus research vocabulary
++
++The application need not literally adopt T1–T6 as enum names or numeric weights. It must retain observations sufficient to distinguish target-slot publisher ORCID, registry DOI membership, Scopus-profile ORCID, raw source ORCID and aggregator entities; supporting and contrary signals must coexist. A registry not listing a DOI is incomplete evidence, not proof of a different person. A same-name coauthor can share a DOI; no tier should silently create an approved identity.
++
++The corrected tiers in `docs/qa/gate_d4/errata/EVIDENCE_ERRATA_D4_20261029.md` are: T1 target-slot publisher ORCID + registry DOI claim; T2 publisher ORCID without registry support or shifted position; T3 registry + full name; T4 registry + initials; T5 name + affiliation; T6 name. T1 verifies a research author-slot chain, not a human decision or all publications of an ID. COAUTHOR_CLAIM is not target identity support. The 13 cases with conflict indicators and the one CONFLICTING_EVIDENCE research classification are separate measures.
++
++Literal tiers, ranking thresholds, hard-versus-soft DOI conflict policy, publication exclusions and review permissions are owner design decisions. Lossless provenance, no arbitrary collision selection, no automatic acceptance and explicit evidence limitations are integrity requirements.
++
++## Confirmed unsafe code paths
++
++| ID / priority | Code evidence and trigger | Demonstrated behavior / business impact | Smallest safe remediation and test |
++|---|---|---|---|
++| G01 / P0 | `backend/app/services/lecturer_dataset/known_publication_ingestion.py:335-351`, `_build_lecturer_index()` uses `setdefault`; `383-415`, `490-497` never records URL ambiguity | Two canonical lecturers sharing a repository URL silently map to whichever row arrives first. No unique URL constraint in `backend/app/models/master_lecturer.py:82-115`. Exact-method synthetic probe reproduced first-row selection. Live collision presence NOT_VERIFIABLE. | URL→set mapping, explicit ambiguous error, wrapper refuses apply. Test TC-10; preserve both canonical people and all raw records. |
++| G02 / P0 | `backend/app/services/author_affiliation.py:194-218`, `parse_openalex_authorships()` prefers entity display_name and reads entity ORCID; `273-324`, `align_paper()` trusts ORCID→Scopus bridge without name/slot equality | Aggregator entity data can make an external authorship VERIFIED and carry its affiliations to a Scopus slot even when raw name disagrees. In-memory probe reproduced this. It does **not** create a LecturerScopusIdentity; impact is falsely trusted affiliation and downstream UI/coverage. | Keep raw_author_name separate; entity ORCID must not verify a slot. Restrict identifier proof by source type and retain conflicting observations. TC-03/04/15/19. Do not disable legitimate publisher identifier bridges merely to force same-name matching. |
++| G03 / P0 | `backend/app/services/normalization/scopus_author_normalizer.py:454-478`, `_ensure_publication_author_link()` returns for an existing pair before comparing order | EID/author replay at another position is counted as existing, with no position-drift error. Affiliation workflow later takes newest raw cells (`backend/app/services/affiliation_workflow.py:78-96`) while canonical order can remain older. Checks in affiliation importer may reject some drift, but canonical replay itself does not report it. | Compare existing order; keep canonical link, append structured conflict. TC-05/18. Existing `test_author_order_conflict_no_overwrite` covers a different author occupying a slot, not this branch. |
++| G04 / P0 | `backend/app/services/normalization/scopus_author_normalizer.py:398-414`, `445-452`, `497-510`; called in the batch loop `658-693` | IntegrityError recovery calls whole-session `rollback()` and resumes as existing/reused, without a savepoint or full batch restart. Earlier uncommitted successful writes in the batch can be rolled back while in-memory counters remain incremented. Other integrity failures can be swallowed by variant/link handlers. Conditional error-path defect; no concurrent DB reproduction was performed. | Follow publication normalizer's nested-savepoint pattern (`backend/app/services/normalization/scopus_normalizer.py:560-597`) and classify only expected uniqueness conflicts; otherwise fail/retry the batch with consistent counters. TC-18 plus fault injection and isolated-DB concurrency test. |
++
++P0 denotes code-level misattribution or data-loss exposure when its trigger occurs, not a declaration of exploited vulnerability or corrupt current data. G02/G03 map directly to research invariants; G01/G04 are import safety dependencies rather than invented R-19/R-20 requirements.
++
++## Missing or partial capabilities, not automatically bugs
++
++| ID | Classification / requirements | Verified boundary and gap |
++|---|---|---|
++| G05 | MISSING source-claim workflow; R-05/06/14/15/18 | Structured parser's allowlist is its current master-data contract. Craw raw capture is publication-linked only. Neither parses the 83/69 inventories or keeps source primary/count/disposition independently. `backend/app/services/lecturer_dataset/parser.py:338-375`; `backend/scripts/ingest_craw_known_publications.py:81-124`. |
++| G06 | PARTIAL frozen provenance; R-04/10/13 | EID/DOI, candidate author, source snapshot and known publication are preserved. Candidate snapshot retains external ID (`backend/app/services/matching/candidate_persistence.py:317-355`, `398-417`). `PublicationEvidence` omits author order and publication-author row ID (`backend/app/services/matching/candidate_types.py:67-87`). Affiliation resolutions **do** separately store external position and link to publication-author row (`backend/app/services/affiliation_import.py:76-93`, `258-291`); this does not repair candidate decision snapshots. |
++| G07 | PARTIAL conflicts; R-12/16 | Publication reconciliation emits DOI/title ambiguity/conflict records (`backend/app/services/matching/publication_evidence_enricher.py:91-193`), but generation returns only a count and persists candidates (`backend/app/services/matching/generation_workflow.py:131-149`). Promoted candidate evidence is always SUPPORTS (`backend/app/services/candidate_review_service.py:479-504`). Contrary evidence model capability exists, but no research-conflict producer/queue contract was found. |
++| G08 | PARTIAL absence semantics | No raw claim disappearance lifecycle. Candidate/current-observation queries retain prior pair observations even if absent from a later global generation (`backend/app/services/candidate_review_queries.py:22-83`). All historical known publications feed generation (`backend/app/services/matching/generation_workflow.py:87-101`). Preserve decisions; add explicit source-presence/staleness observations rather than auto-revoking. |
++| G09 | MISSING publication-specific review; R-01 | Approved Scopus ID implies all canonical publications of the ID in lecturer views and export links: `backend/app/services/lecturer_scopus_projection.py:305-329`, `backend/app/services/publication_queries.py:263-292`, `backend/app/services/publication_export.py:91-140`. No per-lecturer publication flag/exclusion is checked. A mixed-profile suspicion cannot be resolved at paper granularity. |
++| G10 | MISSING compensating identity review | `backend/app/schemas/review_api.py:11-25` / `backend/app/api/v1/endpoints/reviews.py:578-612` accept only ACCEPT/REJECT; `backend/app/services/review_service.py:6-17` is a stub. Schema REVOKED/REOPEN values and history filters are not operational transitions. Affiliation override revoke is unrelated. |
++| G11 | PARTIAL DOI/title policy; R-12 | `backend/app/services/matching/publication_evidence_enricher.py:125-193` allows title fallback when no DOI match exists, even if both source/canonical DOIs differ. `backend/tests/unit/test_publication_evidence_enricher.py:95-108` intentionally expects this. Record disagreement next to TITLE_EXACT; owner decides hard-block policy. Do not call an intentional tested fallback a confirmed bug without an agreed invariant. |
++| G12 | PARTIAL count semantics; R-09/11 | EID is globally unique and personal sets DISTINCT; global dashboard counts every local Publication (`backend/app/services/dashboard_queries.py:30-33`, `94-130`). This is deduplicated corpus count, not necessarily approved ICTU output. No source-claim count/time comparison exists. Preserve separate corpus, approved lecturer and institutional-affiliation scopes. |
++| G13 | PARTIAL name retrieval; R-07/17 | Canonical generator uses ordered exact/folded/comma/hyphen strings and leading title whitelist (`backend/app/services/matching/candidate_generator.py:28-90`, `114-149`, `207-253`). Craw adds anchored token correspondence (`backend/app/services/matching/craw_assisted_discovery.py:180-243`). Embedded “Master/Ts”, merged tokens and initials are not comprehensively normalized. Weak candidate recall needs tests before broader matching; absence of auto-accept is a protection. |
++| G14 | MISSING profile observations; R-08 | No Scopus Preview fetch-attempt/time-state ingestion found in active imports/matching. Does not infer MERGED from failures, but also cannot retain/retry the research observations in application state. |
++| G15 | PARTIAL audit atomicity | Craw success audit follows committed data (`backend/app/services/lecturer_dataset/craw_ingestion_workflow.py:133-176`), unlike atomic affiliation apply. Make success audit/data atomic if audit completeness is required; test audit-commit failure. Application append-only conventions are not a demonstrated deployed DB immutability barrier. |
++| G16 | PARTIAL rule provenance | Generator has seven name rules (`backend/app/services/matching/candidate_generator.py:39-47`), but source-state name rule list has four and version describes name/enrichment only (`backend/app/services/matching/candidate_persistence.py:42-59`, `178-190`). Craw-assisted discovery is not separately versioned in that list. Evidence stores each actual rule ID, limiting impact; align run metadata/version with actual executable retrieval for reproducible replays. |
++
++## Evidence channels that already work
++
++Affiliation alignment preserves full author arrays and multiple affiliation strings/organization entries (`backend/app/services/author_affiliation.py:194-239`, `273-344`), with reasons distinguishing no list, count/name mismatch and identifier conflict. Affiliation importer checks EID/Scopus ID/order/DOI against the canonical slot and withholds trusted links if another source reports ID_CONFLICT/ID_AMBIGUOUS (`backend/app/services/affiliation_import.py:150-178`, `248-319`). These protections should be reused, not described as entirely missing.
++
++ORCID bridge here reads registry **external identifiers**, not DOI works (`backend/app/services/affiliation_online_fetch.py:229-258`, `backend/app/services/affiliation_sources.py:223-228`, `303-319`). It is a different proof from T1. No active lecturer matcher consumes publisher email, ORCID works, profile affiliation, coauthor confirmation or literal evidence weights; `matching/rules/*` and scorer scaffolds are not counted as implementations. Email in the master importer only resolves lecturer records.
++
++## Frontend consequences
++
++| User concept | Existing representation | Gap |
++|---|---|---|
++| Source-listed claim | No typed source-claim API/UI | Missing IDs, especially zero-CSV/unowned IDs, cannot be reviewed as source claims |
++| Pending / approved | Queue status and approved identity cards distinguish them | Keep this boundary when claims are introduced |
++| Independent evidence | `frontend/src/pages/Publications/LinkEvidence.tsx:30-60` separates approval and evidence | `ORCID_EXACT` is too coarse for future source-tier proof; no active candidate ORCID producer currently promotes it |
++| Conflict / missing | Queue handles stale/ownership errors (`frontend/src/pages/ApprovalQueue/index.tsx:88-95`, `378-439`); affiliation UI shows detailed reasons (`frontend/src/pages/Publications/AuthorAffiliations.tsx:48-73`) | Research counter-evidence is not in candidate detail contract (`backend/app/schemas/review_api.py:93-121`) |
++| Affiliation verified | UI explains ORCID→Scopus bridge (`AuthorAffiliations.tsx:18-40`) | Label can overstate unsafe OpenAlex entity path; fix backend proof first, then scope label |
++| Multi-ID / counts | Approved identities and distinct personal publications exist | No source primary flag, profile-count snapshots or institutional eligibility filter |
++| REVOKE / REOPEN | History vocabulary includes REOPEN; affiliation override supports revoke | No canonical identity action in API or queue |
++
++## Areas requiring further verification
++
++Actual DB row counts, imported source coverage, deployed migrations/privileges, real URL collisions, race frequency, external-source quality, browser rendering and restore/backup behavior were not verified. No statement of “410 imported”, “152 available in application”, “all reviewer decisions protected by DB triggers” or “all publication counts are correct ICTU output” is supported by this audit alone. No real Scopus merge or identity decision occurred.
+diff --git a/docs/qa/gate_e1/TEST_CASE_DESIGN.md b/docs/qa/gate_e1/TEST_CASE_DESIGN.md
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/TEST_CASE_DESIGN.md
+@@ -0,0 +1,43 @@
++# Gate E.1 — Synthetic regression design
++
++2026-10-29. These are proposed tests, not implemented fixtures or reported passes. Existing tests were inspected and are NOT_EXECUTED because shared `backend/tests/conftest.py:41-99` initializes database safety checks and fixtures may write. No pytest, application startup, DB engine, migration or real import was run. Eight in-memory probes loaded only the pure parser/alignment module or an exact AST-extracted method with fake query dependencies; their results describe current behavior, including unsafe behavior, not acceptance of it.
++
++## Fixture conventions
++
++Use generated lecturer UUIDs L-A/L-B; source profiles `https://example.invalid/lecturer/a` and `/b`; synthetic Scopus IDs S-A=`11111111111`, S-B=`22222222222`, S-C=`33333333333`; EIDs such as `2-s2.0-999000001`; DOI strings `10.99999/gate-e1-a` and `10.99999/gate-e1-b`; and synthetic names/email addresses at `example.invalid`. ORCID-format samples are syntax tokens only, never fetched. Do not copy real names, addresses, phone/DOB, research DOI rows or raw ORCID records into committed fixtures. Labels AMB/UNA/FINDING only identify the research pattern that inspired a test.
++
++Three test levels: pure functions with no application bootstrap; isolated disposable DB integration in a separately authorized implementation phase; API/UI contract tests with synthetic responses. A dedicated pure-test runner must avoid the current root conftest rather than silently connecting to the configured environment.
++
++## Case catalogue
++
++| ID / research pattern | Synthetic input | Expected invariant after implementation | Relevant code / existing coverage / missing regression |
++|---|---|---|---|
++| TC-01 Multi-ID + already linked lecturer (F002/F031) | L-A has approved S-A/S-B; new source lists S-C; primary S-A has 1 pub and S-B has 5 | All three source claims retained; primary remains a source flag; L-A remains eligible for S-C; only explicit review approves it; no canonical review status changed by intake | `backend/app/services/matching/candidate_generator.py:304-324`; `backend/app/services/candidate_review_service.py:630-742`. Existing `backend/tests/integration/test_candidate_review_service.py:891-948` tests two approvals. Missing third-ID discovery/source-primary combination. |
++| TC-02 Shared source ORCID (AMB-01/F005) | Two distinct source profiles, same name or different names, same ORCID O-A, different synthetic emails; include profiles without publication links | Two raw records/claims with URL/time/hash retained; collision visible; no arbitrary canonical ORCID owner; no auto identity. Canonical uniqueness remains | `backend/app/services/lecturer_dataset/parser.py:243-259`; `backend/app/models/master_lecturer.py:108-113`; `backend/scripts/ingest_craw_known_publications.py:81-124`. Existing `backend/tests/integration/test_lecturer_json_roundtrip.py:238-246` expects canonical rejection, not raw acceptance. |
++| TC-03 Publisher slot versus registry DOI-only (UNA-09/F029) | E-A has target S-A at position 2 and a same-name coauthor at position 3; registry O-A lists DOI; variants: correct publisher ORCID at target; no publisher ORCID/full name; initials only | First variant may carry T1-equivalent slot proof; registry-only variants remain candidate support (T3/T4 equivalent), not verified slot or APPROVED identity; different-name coauthor claim excluded | `backend/app/services/author_affiliation.py:273-344`; `backend/app/services/matching/candidate_types.py:67-87`. No application registry-work/slot regression; Gate D evidence tests are not runtime integration coverage. |
++| TC-04 Publisher ORCID without registry work (UNA-16/29) | Correct publisher slot carries O-A but registry lists none of the two synthetic DOI works | Retain publisher observation and weak registry absence separately, T2-equivalent; no auto-link or automatic conclusion “different person” | `backend/app/services/affiliation_online_fetch.py:229-258` currently fetches external identifiers, not works; `backend/app/services/affiliation_sources.py:303-319`. Missing runtime work-claim coverage. |
++| TC-05 Shifted author slot | CSV S-A at 4; external list at 7 because of metadata insertion; ORCID/name data variants | Record positions and anomaly. No positional-only target proof. Any publisher identifier proof must be source-qualified, with disagreement visible and frozen in decision evidence | `backend/app/services/author_affiliation.py:313-343`; `backend/app/services/matching/candidate_persistence.py:317-355`. Existing `backend/tests/unit/test_author_affiliation.py:83-89` tests positional fallback withheld by identifier order contradiction, not a full candidate decision snapshot. |
++| TC-06 Profile versus publication affiliation (F022/F028) | Profile says institution B at time T2; publication at T1 says [ICTU, institution C]; second variant contains [ICTU, B] on one publication | Keep observations at their own scope/time. Additional publication affiliation is not by itself a conflict. Profile difference remains reviewable evidence; no automatic identity decision | `backend/app/services/author_affiliation.py:194-239`; `backend/app/services/affiliation_import.py:230-240`. Existing `backend/tests/unit/test_author_affiliation.py:100-121` covers multi-affiliation preservation only; profile/time comparison missing. |
++| TC-07 Suspected mixed person profile (F026) | One approved ID S-A has E-A/E-B/E-C; E-B has independent target-slot evidence for a different synthetic person | Flag E-B for review; do not silently remove it. After explicit exclusion, L-A personal count is 2; global corpus still has 3 and legitimate other lecturer links survive; exclusion has actor/reason/history | `backend/app/services/lecturer_scopus_projection.py:305-329`; `backend/app/services/publication_queries.py:263-292`. No paper-attribution decision model/test found. |
++| TC-08 Listed ID with no CSV publications (F025) | Source lists S-C for L-A; second variant lists S-C with no owner; no ScopusAuthor/canonical publication row | Preserve claim as source-only/evidence-gap or unresolved owner; visible to reviewer; no fabricated CSV/publisher evidence; neither auto-accept nor auto-reject | `backend/app/services/lecturer_dataset/parser.py:338-375`; `backend/app/models/candidate.py:93-102` requires canonical FKs. Existing `backend/tests/integration/test_lecturer_scopus_projection.py:437-453` is an already-approved zero-pub case, not intake. |
++| TC-09 Snapshot withdrawal | Complete source snapshot A lists S-A/S-B; B lists only S-A. Repeat B exactly; also test a partial/incomplete snapshot B | Record historical S-B claim and last-seen/absent observation only for declared complete snapshot; reviewer decisions/evidence unchanged; repeated B creates no duplicate claim observation; incomplete B does not imply withdrawal | `backend/app/services/lecturer_dataset/importer.py:625-675`; `backend/app/services/matching/generation_workflow.py:87-101`. Existing `backend/tests/integration/test_lecturer_json_roundtrip.py:398-418` tests absent master lecturer, not ID withdrawal. |
++| TC-10 Duplicate canonical repository URL | Two canonical lecturers share one URL; one Craw source record targets it; reverse query row order | Both previews report ambiguity; apply writes no affected snapshot/KP; result independent of row order; no merge | `backend/app/services/lecturer_dataset/known_publication_ingestion.py:335-351`, `_build_lecturer_index()`. Exact-method probe confirms current first-row selection; no protective URL unique constraint/test found. |
++| TC-11 Missing DOI / valid EID | Same valid EID imported twice with DOI null; include 10-digit and 11-digit author IDs | One canonical publication, nullable DOI retained, valid authorships preserved, two raw provenance observations if distinct imports; DOI absence not identity contradiction | `backend/app/models/publication.py:54-62`; `backend/app/services/normalization/scopus_normalizer.py:517-606`; `backend/app/services/normalization/scopus_author_normalizer.py:224-232`. Existing `backend/tests/integration/test_scopus_normalization.py:246-267` covers EID reuse; add combined no-DOI/ID-length/replay case. |
++| TC-12 One EID / five lecturers | E-A has S-A…S-E each approved to one lecturer; L-A also has secondary author on E-A; E-B is unlinked non-ICTU | Corpus count 2, E-A institutional eligible count 1, each of five lecturers counts E-A once; L-A not doubled by secondary ID; all authorships retained; eligibility policy explicitly defined | `backend/app/services/dashboard_queries.py:30-33`; `backend/app/services/lecturer_scopus_projection.py:305-329`. Existing `backend/tests/integration/test_lecturer_scopus_projection.py:368-378` covers overlapping IDs; `backend/tests/integration/test_dashboard_api.py:451-456` corpus total only. Missing cross-scope five-person test. |
++| TC-13 DOI/title disagreement | Known DOI A absent canonically; title matches E-B with DOI B. Variants: canonical DOI A exists as a different publication; source DOI absent | First retains explicit DOI disagreement and title support for review; second emits DOI_TITLE_CONFLICT/no support; third permits clean title fallback. No auto-accept. Hard block for first variant requires owner policy | `backend/app/services/matching/publication_evidence_enricher.py:125-193`. Existing `backend/tests/unit/test_publication_evidence_enricher.py:95-108` intentionally supports first; `133-150` blocks second. Add conflict observation persistence/UI, preserve no-DOI case. |
++| TC-14 Identity ownership conflict | L-A already approved to S-A; L-B pending for same S-A; simultaneous reviewers submit acceptance | One approved owner remains; L-B receives conflict; loser writes no partial identity/evidence/decision; UI refreshes | `backend/app/models/identity.py:115-128`; `backend/app/services/candidate_review_service.py:630-661`. Existing `backend/tests/integration/test_candidate_review_service.py:1403-1450` concurrency case. Add API/UI recovery and source-collision context; rerun only on authorized isolated DB. |
++| TC-15 Missing metadata vs contradiction | Crossref response 404/no authors; second response has contradictory identifier; third has seventh author as target | First NOT_VERIFIABLE-equivalent with reason, not CONTRADICTS; second visible counter-evidence; third processed in full, not truncated | `backend/app/services/author_affiliation.py:222-239`, `283-306`; `backend/app/services/affiliation_import.py:150-178`. Existing `backend/tests/unit/test_author_affiliation.py:124-138` parser and external-ID extraction; in-memory full-list/missing-list probes passed. Add candidate/UI conflict/missing distinction. |
++| TC-16 Initials/embedded titles/homonyms | “Synthetic, A.B.” and “van Cedar Master, Arbor”; unrelated coauthors share surname/middle tokens; full-name variant optional | Initials alone never independently verify; full-name variant can support a weak candidate; observed title normalization increases recall without homonym cross-attribution; original strings preserved | `backend/app/services/matching/candidate_generator.py:28-90`; `backend/app/services/matching/craw_assisted_discovery.py:180-243`. Existing `backend/tests/unit/test_craw_matching_quality_negative_cases.py:241-268` initials with variant; `439-467` title-prefix coverage. Add embedded title/merged-token negatives. |
++| TC-17 ICTU '&' / umbrella affiliation (UNA-47) | Raw strings use “Information & Communication”, “Information and Communication”, and bare “Thai Nguyen University”; include non-ICTU plus ICTU list | Equivalent ICTU strings yield same scoped affiliation signal; umbrella-only is unknown, not positive/negative ICTU proof; retain raw forms and multiple affiliations | `backend/app/services/author_affiliation.py:194-239` preserves strings; no active ICTU-specific classifier found. Gate D detector regression does not test application eligibility. |
++| TC-18 Replay order and transaction race | E-A/S-A originally order 1, replay order 2; then batch successfully creates E-B authors before a later unique race/foreign-key error | Order drift recorded without replacement; expected race rolls back only savepoint or retries entire batch; unrelated failures propagate; counters equal durable writes; provenance stays valid | `backend/app/services/normalization/scopus_author_normalizer.py:398-510`, `658-693`. Existing `backend/tests/integration/test_scopus_author_normalization.py:563-610` different-author slot conflict and `839-885` retry do not prove batch preservation on swallowed IntegrityError. |
++| TC-19 Support plus contrary evidence (F031) | L-A already has two IDs; S-C has publisher ORCID support, registry absence, topical anomaly and shifted external slot; separate OpenAlex entity contradicts publisher | Third-ID candidate allowed; all origins/directions retained together; absence is weak/not decisive; T2-equivalent never slot verified; decision requires justified review; conflict indicators not conflated with one final classification | `backend/app/services/matching/generation_workflow.py:131-149`; `backend/app/services/candidate_review_service.py:479-504`; `backend/app/schemas/review_api.py:93-121`. Existing tests cover multi-ID approval and weak-reason policy separately, not this context. |
++| TC-20 ACCEPT/REJECT/regenerate/compensate | Accept pair A, reject B; regenerate same and new runs; remove A from later input; attempt REVOKE/REOPEN with stale version and wrong role | Same-run retry deduped; decisions/evidence remain historical; new observation never resets root; source absence does not revoke; future compensating action has valid transition/version/actor/reason and count effects | `backend/app/services/matching/candidate_persistence.py:494-604`; `backend/app/services/candidate_review_queries.py:22-83`; `backend/app/schemas/review_api.py:11-25`. Existing `backend/tests/unit/test_candidate_persistence.py:213-233` rejected root and `backend/tests/integration/test_candidate_review_service.py:582-646` decision retries; current API must reject unsupported REVOKE/REOPEN, not pretend success. |
++| TC-21 Source summary/count/primary | 34 detailed synthetic rows, summary says 35; source primary has fewer works; WEB/CSV/profile counts 53/7/60 at three timestamps | Row-derived inventory 34 with discrepancy observation; preserve primary flag and all count scopes/times; no inferred identity or completeness from count disagreement | `backend/app/services/lecturer_dataset/parser.py:164-180` only envelope count; `backend/app/services/publication_queries.py:319-341` CSV lineage. No WEB-table importer/test. |
++| TC-22 Topic/status independent from identity | Confirmed publisher identifier for L-A on an unusual topic; publication has separate Expression of Concern metadata | No topic-only rejection; academic notice never implies misattribution/retraction/merge; preserve metadata separately if feature added | Canonical model `backend/app/models/publication.py:39-107`; names/publication matcher paths above. F011 has no dedicated R-01…R-18 requirement; optional future metadata UX, not a blocker invented by this audit. |
++| TC-23 Profile unavailable observation | Profile body readable at T1; unavailable at T2; title still loads; retry T3 | Keep all attempts/times; no MERGED/INVALID derivation; visited != verified; preserve prior observations | `backend/app/models/publication.py:157-182` has no profile attempt storage. No runtime observation test found; add with any future profile-intake workflow. |
++
++## Before real import
++
++Run pure synthetic tests first. After separate authorization, use a disposable DB with migrations verified and synthetic seeded data, never the currently configured database. Exercise fail-closed preview/apply, same-input replay, partial snapshot, source withdrawal, existing ACCEPT/REJECT and externally seeded REVOKED state, all transaction rollback branches, and concurrent author/identity races. Verify API/frontend source/candidate/approved/conflict labels and global versus personal count scopes. Compare normalized row identities and immutable evidence, not only row totals or SQL DISTINCT.
++
++For 410/83/69 eventual acceptance: stage all source profiles/claims first; require zero silently dropped records, explicit unresolved/collision reports, no auto canonical decisions, an import hash manifest and backup/recovery procedure. Complete source-only IDs and no-candidate cases must remain inspectable. This gate does not authorize running that acceptance import.
+diff --git a/docs/qa/gate_e1/IMPLEMENTATION_ROADMAP.md b/docs/qa/gate_e1/IMPLEMENTATION_ROADMAP.md
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/IMPLEMENTATION_ROADMAP.md
+@@ -0,0 +1,61 @@
++# Gate E.1 — Prioritized implementation roadmap
++
++Audit only, 2026-10-29. No fixes implemented. Priorities describe future work; they are not permission to import or alter identities. G IDs refer to `IDENTITY_EVIDENCE_GAP_ANALYSIS.md`; TC IDs refer to `TEST_CASE_DESIGN.md`.
++
++## Preserve what already works
++
++Keep multi-ID canonical cardinality, one approved owner per Scopus author, explicit human acceptance, reason policy, role checks, candidate row locks and stale observation/version checks. Keep EID-first canonical dedup, nullable DOI, full CSV author lists, raw provenance, distinct personal publication sets, multiple affiliations and source-specific affiliation resolution versions. Keep regenerated decisions and old evidence. Do not replace these with a new auto-matching system.
++
++Evidence: `backend/app/models/identity.py:115-128`; `backend/app/services/candidate_review_service.py:547-790`; `backend/app/services/normalization/scopus_normalizer.py:517-606`; `backend/app/services/affiliation_import.py:248-319`; `backend/app/services/matching/candidate_persistence.py:494-604`. Existing tests need execution in an authorized isolated environment before a release claim.
++
++## P0 — Confirmed conditional integrity defects
++
++| Order | Work | Dependency / bounded scope | Acceptance |
++|---|---|---|---|
++| 0A | G01: detect ambiguous canonical repository URLs | Small change to existing known-publication mapping, no new canonical uniqueness or merge | TC-10; order-independent ambiguity; no affected writes on apply; unaffected unique URLs still work |
++| 0B | G03/G04: author replay and transaction recovery | Compare existing author order; use local savepoints or full-batch retry; handle only expected unique races; leave EID canonical strategy intact | TC-05/18; error log records drift; previous batch work never silently lost; counters match committed state; unrelated failures visible |
++| 0C | G02: qualify affiliation evidence sources | Separate aggregator entity from raw/publisher values before ORCID bridge. Preserve the valid publisher identifier-chain use case rather than requiring names for every bridge | TC-03/04/15/19; wrong entity name/ORCID cannot create VERIFIED slot affiliation; no canonical lecturer identity created by affiliation import |
++
++These are separate reviewable changes, not a combined broad migration. Verify current data impact only in a later read-only DB assessment; do not mass repair associations or delete historical evidence based on this report.
++
++## P1 — Critical workflow additions
++
++1. **Source-claim intake (G05), then collision/presence lifecycle (G08).** Extend current source infrastructure with an all-profile/raw-claim boundary. Preserve 410 source records including no-publication profiles, duplicate ORCID claims, WEB source groups/primary/counts and unowned/zero-CSV IDs. Use snapshot/hash/URL provenance already established. Resolve candidates only against known canonical rows; unresolved external IDs remain claims. Gate implementation on P0 mapping protections. Tests TC-01/02/08/09/10/14/21.
++2. **Complete evidence descriptors and persistent counter-evidence (G06/G07/G11).** Freeze author row/order/raw source/name, EID/DOI/ID and derivation; preserve source tiers and both directions; distinguish observed conflict from missing metadata. Introduce no numeric confidence scheme without a need. Decide whether DOI mismatch is a warning or blocking conflict; retain no-DOI title fallback. Align run rule metadata (G16). Tests TC-03/04/05/13/15/19.
++3. **Compensating identity review and publication attribution (G09/G10).** Add explicit audited REVOKE/REOPEN only after transition, permission and count policies are agreed. Add per-lecturer/publication flag/exclusion for suspected mixed profiles; retain canonical publication and other lecturer links. Keep affiliation-override revocation separate. Tests TC-07/14/20.
++4. **Count definitions (G12).** Preserve existing corpus total. Define a separate ICTU-eligible total and time/source scope; reuse EID and lecturer/EID dedup. Apply any paper-attribution decisions consistently to lists, exports and totals. Tests TC-11/12/21. This depends on policy and per-paper review, not just adding DISTINCT.
++
++If scope is constrained, stage lossless claims first and keep them unapproved. Do not import them by manufacturing canonical author/publication evidence merely to fit existing candidate FKs.
++
++## P2 — Required regression coverage and import hardening
++
++- Execute existing isolated tests for multi-ID/ownership concurrency, retries, evidence snapshots, EID/provenance, affiliation conflicts and access controls. Current audit marks them NOT_EXECUTED.
++- Add combined ingestion → generation → review → replay → withdrawal tests; standalone mocked API tests are insufficient. In particular `backend/tests/integration/test_lecturer_import_api.py:223-239` does one import despite its idempotency-oriented name.
++- Add G01 duplicate URL, G03 same-pair changed-order and G04 late-batch IntegrityError cases. Existing different-author slot/retry tests do not cover those paths.
++- Add original strings/embedded titles/initials/merged-token recall and homonym negatives (G13), and source row-summary checks (R-18). Do not broaden to fuzzy auto-approval.
++- Make Craw apply's audit and data commit consistent or explicitly recoverable (G15). Freeze actual executed rule-set metadata (G16). Test file-change-between-preview/apply and concurrent replay; source/known-publication hash reuse has no global source-claim idempotency constraint yet.
++- Verify applied migrations, privileges/immutability expectations, live import counts and potential URL collisions in a separately scoped runtime audit. A migration file or model docstring is not evidence of deployed state.
++
++## P3 — UX and optional observation features
++
++Add source-claim versus candidate versus approved badges, evidence origins and counter-evidence beside support, source-primary labels, count source/time/scope, and explicit claim withdrawal history. Correct affiliation “Identity verified” wording only together with fixing its proof provenance. Source Scopus-profile attempts (G14) should be timestamped observations, never MERGED/INVALID conclusions from unavailable pages. Academic publication notices (FINDING-011) may be stored separately if in scope; they do not decide identity.
++
++No new person-clustering engine is necessary for first intake. Keep unresolved ICTU-affiliated author IDs distinct from “not ICTU”; preserve candidate grouping hints for later owner-approved work.
++
++## Ingestion design decision and alternatives
++
++| Option | Benefit | Integrity/trade-off | Decision |
++|---|---|---|---|
++| Broaden canonical lecturer upload to consume all raw claims | Reuses visible upload route | Current scalar canonical ORCID/uniqueness and direct master updates conflict with unverified duplicates; source-only ID has no proper representation | Keep master contract; optional explicit adapter later, not automatic interpretation of extra fields |
++| Put every source claim directly into existing candidates | Reuses review queue | Candidate requires canonical lecturer/author FKs; cannot represent no owner, missing local author, source primary/count or withdrawn raw claim; NAME/PUBLICATION kinds imply stronger semantics | Reuse candidates only downstream of claim resolution |
++| Extend Craw/source loader plus a separate claim boundary using existing snapshots and ADMIN preview/apply | Preserves lossless roster/claims and current human governance; smallest justified addition | Requires explicit claim/presence/collision schema or equivalent normalized projection; must retain source data securely | **Recommended**. An additional claim workflow within existing ingestion infrastructure, not a second unrelated ingestion framework |
++
++Literal T1–T6 enums, review roles for compensation, hard conflict policy, completeness/withdrawal policy and institutional time basis require owner design approval. Those are future implementation decisions; this audit does not stop short of delivering a concrete recommendation.
++
++## First implementation task handover
++
++Start with **G01 fail-closed URL mapping**. Reproduce using two synthetic Lecturer rows with one repository URL, not live data. Change `KnownPublicationIngestionService._build_lecturer_index()` and its preview/apply consumers (`backend/app/services/lecturer_dataset/known_publication_ingestion.py:335-415`, `537-569`) to retain the candidate set and report ambiguity. Check CLI/web wrappers already treat nonzero ambiguous counts as blocking. Preserve existing unique mapping, snapshot reuse and KP dedup behavior. Add TC-10 plus one unaffected happy path and no-write assertion. No source schema migration, canonical merge, ownership decision or real import belongs in that change. In the same phase, schedule G02/G03/G04 as separate patches before any production enrichment/import.
++
++## Explicit non-decisions and remaining verification
++
++No assertion that 410 lecturer masters or 152 source IDs are present in DB. No assertion that G01/G04 has occurred in live data. No presumption that historical Scopus IDs were merged, that a suspected mixed profile is proven, that registry absence disproves identity, or that raw duplicated ORCID is invalid. Runtime tests, browser verification and applied migration checks remain outstanding. Gate E.1 documentation is ready for independent review; implementation is not authorized by completion of this audit.
+diff --git a/docs/qa/gate_e1/EXECUTIVE_SUMMARY.md b/docs/qa/gate_e1/EXECUTIVE_SUMMARY.md
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/EXECUTIVE_SUMMARY.md
+@@ -0,0 +1,62 @@
++# Gate E.1 — System integration audit handover
++
++**Date:** 2026-10-29, Asia/Bangkok. **Baseline:** `4bb69f6efaac945399b1c191fc12879ad1c62885`.
++**Disposition:** audit complete for owner review; no implementation, real import, identity decision or merge performed. Research Gate D acceptance is inherited, not reopened. This is not permission to import into the current DB.
++
++## Decision
++
++The existing canonical identity and human-review foundation should be retained. **Source-claim ingestion is required to use the 410-profile roster and separate 83/69-ID inventories safely.** Extend existing Craw/snapshot/ADMIN-preview infrastructure with a distinct raw-claim boundary. Do not bypass current master contracts or manufacture canonical candidates for unowned/zero-CSV source IDs.
++
++The 18 requirement rows classify as **12 PARTIAL, 5 MISSING, 1 DEFECT_CONFIRMED**. This grades complete research invariants, not the entire product: many narrower protections are implemented. Four conditional integrity defects G01–G04 are documented; only G02 directly classifies a whole matrix row as DEFECT_CONFIRMED. No live data corruption or privilege exploit is claimed.
++
++## What already works in code
++
++- Multiple approved Scopus IDs per lecturer; only one lecturer can own a given approved author ID. Explicit reviewer acceptance, role checks, reason policy, candidate locks, version/observation checks, decision snapshots and audit records exist.
++- Candidate regeneration appends observations and preserves existing review status; same-run replay verifies content. It does not auto-accept or reopen decided roots.
++- EID-first unique publications, nullable DOI, full CSV author-list checks, raw lineage, personal publication dedup and multiple affiliation entries exist.
++- Frontend separates approved identity links from their evidence basis and exposes name/publication evidence plus stale/ownership conflicts. Affiliation reconciliation is distinct from canonical lecturer approval.
++
++Sources: `backend/app/models/identity.py:115-128`; `backend/app/services/candidate_review_service.py:547-790`; `backend/app/services/matching/candidate_persistence.py:494-604`; `backend/app/services/normalization/scopus_author_normalizer.py:137-276`; `backend/app/services/lecturer_scopus_projection.py:305-329`; `frontend/src/pages/Publications/LinkEvidence.tsx:7-60`.
++
++## First phase: P0 integrity corrections
++
++| Defect | Verified trigger and effect | Priority |
++|---|---|---|
++| G01 | Duplicate canonical repository URL → first lecturer silently selected by `setdefault`; exact-method probe reproduced selection | P0: block ambiguity before writes |
++| G02 | OpenAlex entity name/ORCID → VERIFIED external affiliation through registry external-ID bridge even when raw name differs; pure probe reproduced it | P0: source-qualified proof and separate entity signals |
++| G03 | Existing publication/author pair replayed at another position → early return, no drift conflict | P0: compare order, preserve link and report drift |
++| G04 | Late author/variant/link IntegrityError → whole-session rollback and continue, without a savepoint/full-batch restart | P0: bounded recovery and durable-counter consistency; DB reproduction still outstanding |
++
++Exact functions/ranges, tests and impacts are in `IDENTITY_EVIDENCE_GAP_ANALYSIS.md`. G02 affects affiliation trust; it does not itself approve a lecturer association. Existing source data triggering G01/G04 was not queried.
++
++## Critical integration gaps
++
++There is no complete source-claim intake with all-profile capture, duplicated ORCID provenance/collision handling, source-primary flags, unowned IDs and withdrawal history. Candidate decision descriptors omit frozen author position/row ID. Publication conflicts are computed but not retained as complete reviewer counter-evidence. The active identity API supports ACCEPT/REJECT, not REVOKE/REOPEN. Approved ID projections include every publication of the ID; per-paper attribution/exclusion is missing. Dashboard totals are deduplicated local corpus totals, not established ICTU-only output. Publisher slot, registry DOI-work, profile and aggregator tiers are not equivalent in current runtime models.
++
++The structured parser dropping `scopus_ids` is verified behavior under its **canonical master-data contract**, not automatically a bug. The real Craw file has no such field; the separate ICTU-WEB inventories must be handled explicitly. DOI-mismatch/title fallback is intentional and tested; its counter-evidence policy needs design review rather than being mislabeled a confirmed bug.
++
++## What was verified locally, and what was not
++
++The configured external Craw file was available and read without import: 410 profiles, checksum `c12252e02cbf73c58ae3add65a5b6b925f5e0fcd75273bd7e0a3cc28c8a0accb`, 10 repeated ORCID values across 20 profiles, zero duplicate source IDs. Of 410 profiles, 106 have raw publication URLs; the separate publication-link file contains 328 rows covering 48 profiles. Current Craw enrichment selects those 48, not all 410. The research tables contain 34/10/59 rows and represent the accepted 83/69 ID inventories; research claims are not reviewer decisions.
++
++**NOT_VERIFIABLE:** whether 410 lecturer masters or 152 claimed IDs were imported in the deployed application; applied migration revision, real duplicates/ownership, transaction race outcomes, immutable DB permissions/triggers and browser UI behavior. No DB connection was made. Existing DB-backed tests are **NOT_EXECUTED**. Eight synthetic in-memory probes passed assertions about current behavior, including confirmed unsafe behavior; they are not a product regression-suite pass.
++
++The original independent audit did not find the external raw snapshot. This continuation located it via configuration and corrected that limitation. No Gate D evidence or research files were changed; their original historical statements were preserved. Superseded R-10/E17/E18/E19 statements were not reused as current conclusions.
++
++## Before importing real ICTU data
++
++Resolve P0 triggers; stage all profiles and ID claims without approvals; run synthetic end-to-end replay/withdrawal/collision/slot/source-tier tests on an explicitly authorized disposable DB; verify current schema and backup/recovery; exercise concurrent ownership and author-normalization error paths; verify UI source/candidate/approved/counter-evidence/count labels. Ingested raw duplicates must survive. An absent registry DOI or unavailable profile must not cause automatic rejection, invalidation or merge.
++
++The first bounded implementation handover is G01 URL ambiguity handling, followed by separate G02/G03/G04 fixes. Source-claim intake follows those protections. Detailed dependencies, policy choices and acceptance criteria are in `IMPLEMENTATION_ROADMAP.md`; no fix is implemented here.
++
++## Deliverables and provenance
++
++1. `AS_IS_ARCHITECTURE.md` — runtime models, active paths, transactions, migrations, auth and frontend.
++2. `REQUIREMENT_IMPLEMENTATION_MATRIX.csv` — all R-01…R-18, accepted wording, findings, code/tests, limits, risk and remediation.
++3. `IMPORT_DATA_FLOW_AUDIT.md` — complete paths, eight independent cross-checks, reimport/withdrawal behavior and ingestion design.
++4. `IDENTITY_EVIDENCE_GAP_ANALYSIS.md` — confirmed defects versus missing/partial capabilities, tiers and UI implications.
++5. `TEST_CASE_DESIGN.md` — 23 synthetic cases and existing-test limits.
++6. `IMPLEMENTATION_ROADMAP.md` — P0–P3, dependencies, design trade-offs and first-task handover.
++7. `EXECUTIVE_SUMMARY.md` — this handover.
++
++Supporting artifacts: `SOURCE_REFERENCES.csv` (source hashes/ranges/symbols), `AUDIT_VALIDATION.json` (method, probes and documentation/source-integrity checks), `DOCUMENTATION_CHANGES.diff` (actual additions against the absent Gate E.1 baseline), `MANIFEST.sha256`, and a documentation ZIP with SHA-256 in a separate `.zip.sha256` file. Package verification is a documentation check, not runtime test execution. Stop for independent owner/ChatGPT review.
+diff --git a/docs/qa/gate_e1/SOURCE_REFERENCES.csv b/docs/qa/gate_e1/SOURCE_REFERENCES.csv
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/SOURCE_REFERENCES.csv
+@@ -0,0 +1,160 @@
++﻿path,line_start,line_end,overlapping_python_symbols,source_sha256,verification
++backend/alembic/versions/b27c9d1e4f60_m2_7b2_candidate_persistence.py,80,140,upgrade,83eb118252263703dd9769b54cd3e09952ad778767113ea02a0d4c1224ab6fc1,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/alembic/versions/c3f0b9a18d42_allow_duplicate_lecturer_emails.py,1,40,upgrade; downgrade,53500102d9ba8a2e1fa0ffa2b6c0704466a0af8d0f488bd0cc99d24ca5c3e9ce,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/alembic/versions/e5b3cf21c1d12b64_0001_initial_schema.py,119,136,upgrade,a3dee72647c7ed84a3869b3d13a1c9c1ed25c70d4bd2eb46dc1a5231350b6794,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/api/dependencies.py,87,138,get_current_user,8634aee98df1ca7e8e147d700442e2cdbe1141077fe68f50600ab2062f0a3d6b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/api/v1/endpoints/imports.py,54,129,upload_scopus_import,ae8a9705fba902d70f1d02bb36bb7cde330564a08e458dfdd58a527cc7f99bcb,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/api/v1/endpoints/lecturer_scopus.py,28,55,_read; _linked_lecturer_id,f1cd4619a586930e09d734be9b537816681e5b205212779411e5ccca95117188,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/api/v1/endpoints/lecturers.py,1110,1143,import_lecturer_dataset,45b5726dcc7b193f058b5edb19f76db1780c8a4e6ae9fa98f58aa2c91dab7921,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/api/v1/endpoints/reviews.py,578,612,decide_review_candidate,a518c910860d791619fb6a67b2196b361f13907b7ba9ea02e884652020479ba2,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/api/v1/endpoints/reviews.py,578,633,decide_review_candidate,a518c910860d791619fb6a67b2196b361f13907b7ba9ea02e884652020479ba2,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/affiliation.py,104,178,PublicationAuthorAffiliationResolution,96e617b2a90955aa0a5b9e0e5ba80c0659e4f7af4e73fd3fd56ca85eecefda83,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/candidate.py,83,240,LecturerScopusCandidate; LecturerScopusCandidateObservation; LecturerScopusCandidateEvidence,4c3919635512307af30fd6b34d71f7756cc3a0816284b1aac82d854481e3d1ad,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/candidate.py,93,102,LecturerScopusCandidate,4c3919635512307af30fd6b34d71f7756cc3a0816284b1aac82d854481e3d1ad,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/candidate.py,243,317,LecturerScopusCandidateReview,4c3919635512307af30fd6b34d71f7756cc3a0816284b1aac82d854481e3d1ad,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/governance.py,200,295,AuditEvent,4c6435643cc01dff00807c468f77cc861ea733514a7f8ddb00ab1cc0213b670e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/identity.py,40,128,LecturerScopusIdentity,d2478cdb6999eb808967e2d1fd56cf456c5433e68e1f262577cea8685432046d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/identity.py,40,133,LecturerScopusIdentity,d2478cdb6999eb808967e2d1fd56cf456c5433e68e1f262577cea8685432046d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/identity.py,115,128,LecturerScopusIdentity,d2478cdb6999eb808967e2d1fd56cf456c5433e68e1f262577cea8685432046d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/identity.py,139,312,IdentityEvidence; MappingReview,d2478cdb6999eb808967e2d1fd56cf456c5433e68e1f262577cea8685432046d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/master_lecturer.py,39,117,Lecturer,c05f64dce194386ef671626d5078847b821a5afc41a8c027b75ba01f5a5d6eea,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/master_lecturer.py,64,65,Lecturer,c05f64dce194386ef671626d5078847b821a5afc41a8c027b75ba01f5a5d6eea,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/master_lecturer.py,82,115,Lecturer,c05f64dce194386ef671626d5078847b821a5afc41a8c027b75ba01f5a5d6eea,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/master_lecturer.py,108,113,Lecturer,c05f64dce194386ef671626d5078847b821a5afc41a8c027b75ba01f5a5d6eea,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/master_lecturer.py,123,204,LecturerSourceSnapshot,c05f64dce194386ef671626d5078847b821a5afc41a8c027b75ba01f5a5d6eea,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/publication.py,39,107,Publication,8c5915a0176ed570844939753861a9382aa60a28677471aff6fff2a9fda1ab18,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/publication.py,39,150,Publication; PublicationRawSource,8c5915a0176ed570844939753861a9382aa60a28677471aff6fff2a9fda1ab18,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/publication.py,54,62,Publication,8c5915a0176ed570844939753861a9382aa60a28677471aff6fff2a9fda1ab18,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/models/publication.py,157,182,ScopusAuthor,8c5915a0176ed570844939753861a9382aa60a28677471aff6fff2a9fda1ab18,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/schemas/review_api.py,11,25,ReviewDecisionRequest,ebaab0efaa7245fe222c2507acd15ad09d1825f98bf15e35ae8157ada1ce094a,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/schemas/review_api.py,93,121,ReviewNameEvidenceResponse; ReviewPublicationEvidenceResponse,ebaab0efaa7245fe222c2507acd15ad09d1825f98bf15e35ae8157ada1ce094a,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_import.py,76,93,ResolutionInput,3f42cf2de92cc5dacf1fd0e2485b91ce0ad2ccac52c59f4cec99a2dca7f7a7ba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_import.py,150,178,apply_cross_source_policy,3f42cf2de92cc5dacf1fd0e2485b91ce0ad2ccac52c59f4cec99a2dca7f7a7ba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_import.py,230,240,AffiliationImportService; apply,3f42cf2de92cc5dacf1fd0e2485b91ce0ad2ccac52c59f4cec99a2dca7f7a7ba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_import.py,248,319,AffiliationImportService; _plan,3f42cf2de92cc5dacf1fd0e2485b91ce0ad2ccac52c59f4cec99a2dca7f7a7ba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_import.py,258,291,AffiliationImportService; _plan,3f42cf2de92cc5dacf1fd0e2485b91ce0ad2ccac52c59f4cec99a2dca7f7a7ba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_online_fetch.py,229,258,fetch_orcid_records,d2ed1951c3b24104824d34deeac90b059e1d1aab8541aab0ae73511cf8bc186f,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_sources.py,79,103,entries_of,21fe756e092e688b285f080224a4e0b98e4deeed6d6ac81740009e4acf80d46e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_sources.py,184,344,build_inputs,21fe756e092e688b285f080224a4e0b98e4deeed6d6ac81740009e4acf80d46e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_sources.py,223,228,build_inputs,21fe756e092e688b285f080224a4e0b98e4deeed6d6ac81740009e4acf80d46e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_sources.py,265,319,build_inputs,21fe756e092e688b285f080224a4e0b98e4deeed6d6ac81740009e4acf80d46e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_sources.py,303,319,build_inputs,21fe756e092e688b285f080224a4e0b98e4deeed6d6ac81740009e4acf80d46e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_workflow.py,78,96,load_scopus_rows,371b8ee6873c8ab47c2ec9eeadb48f213632f93c71cbd669be4124a660ce5d30,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/affiliation_workflow.py,138,199,apply,371b8ee6873c8ab47c2ec9eeadb48f213632f93c71cbd669be4124a660ce5d30,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,41,48,,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,194,218,parse_openalex_authorships,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,194,239,parse_openalex_authorships; parse_crossref_authors,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,194,344,parse_openalex_authorships; parse_crossref_authors; parse_orcid_scopus_ids; _link; align_paper,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,222,239,parse_crossref_authors,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,273,324,align_paper,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,273,344,align_paper,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/author_affiliation.py,313,343,align_paper,cc6909d36fbbb50f397dcb209045f683780486f02e60796fd0adfb98f30d7722,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/candidate_review_queries.py,22,83,latest_completed_observations_subquery; current_reviewable_candidates_subquery,caf11c87dc629128fa7be7cae1c451a4ace87386e958ea37d05ae591b668a4fb,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/candidate_review_service.py,479,504,CandidateReviewService; _promote_candidate_evidence_to_identity,ac9bbc6410d9f428e13ab214c83884ec015762ae103a684cf807d571f5e3e672,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/candidate_review_service.py,547,790,CandidateReviewService; _accept,ac9bbc6410d9f428e13ab214c83884ec015762ae103a684cf807d571f5e3e672,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/candidate_review_service.py,630,661,CandidateReviewService; _accept,ac9bbc6410d9f428e13ab214c83884ec015762ae103a684cf807d571f5e3e672,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/candidate_review_service.py,630,742,CandidateReviewService; _accept,ac9bbc6410d9f428e13ab214c83884ec015762ae103a684cf807d571f5e3e672,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/dashboard_queries.py,30,33,get_dashboard_summary,c9eaf5094531044ab3259678e77e134ec2bdfc8f9434994585e1b76273471903,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/dashboard_queries.py,30,83,get_dashboard_summary,c9eaf5094531044ab3259678e77e134ec2bdfc8f9434994585e1b76273471903,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/identity_evidence_basis.py,33,65,evidence_basis,3c6b1533da9a7e42ad471da6cc64c9f7ac2ddeb3190d8307f4b16e09ab4fc6d6,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/import_pipeline/apply_service.py,12,17,ApplyCanonicalChangesService; apply,c2e7ae208bfc0282095c5976f639d3c55e5b665573d2bffbac17306555fbceb9,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/import_pipeline/orchestrator.py,18,23,ImportOrchestrator; run,e85a392dbe76c0fd5471566b3c1630c8d742c405fb328e2f394261ed5589679b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/craw_ingestion_workflow.py,81,177,compute_preview; apply_ingestion,8a1ae2df4e80b58a5499414b18e3936250dec876d1de0d5316f9e70e272d9b3d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/craw_ingestion_workflow.py,133,176,apply_ingestion,8a1ae2df4e80b58a5499414b18e3936250dec876d1de0d5316f9e70e272d9b3d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/importer.py,219,261,_build_index,da7a7c1bb6b3f40658c5149843f0ef4bd088d763caef86ee142875499779fe7d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/importer.py,558,760,LecturerImportService; import_dataset,da7a7c1bb6b3f40658c5149843f0ef4bd088d763caef86ee142875499779fe7d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/importer.py,625,675,LecturerImportService; import_dataset,da7a7c1bb6b3f40658c5149843f0ef4bd088d763caef86ee142875499779fe7d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/known_publication_ingestion.py,335,351,KnownPublicationIngestionService; _build_lecturer_index,1b47027f77d8d5e7aa7c3084cdf3fa58057eda970faf9968337316de1ca4fcba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/known_publication_ingestion.py,335,378,KnownPublicationIngestionService; _build_lecturer_index; _existing_snapshot_hashes,1b47027f77d8d5e7aa7c3084cdf3fa58057eda970faf9968337316de1ca4fcba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/known_publication_ingestion.py,335,415,KnownPublicationIngestionService; _build_lecturer_index; _existing_snapshot_hashes; preview,1b47027f77d8d5e7aa7c3084cdf3fa58057eda970faf9968337316de1ca4fcba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/known_publication_ingestion.py,537,687,KnownPublicationIngestionService; apply,1b47027f77d8d5e7aa7c3084cdf3fa58057eda970faf9968337316de1ca4fcba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/known_publication_ingestion.py,671,683,KnownPublicationIngestionService; apply,1b47027f77d8d5e7aa7c3084cdf3fa58057eda970faf9968337316de1ca4fcba,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/parser.py,127,181,parse_and_validate,e1873f41708efd10cbf04220ff0b0ef4458e779cb89fbe2fead61b7ca0c64076,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/parser.py,127,375,parse_and_validate,e1873f41708efd10cbf04220ff0b0ef4458e779cb89fbe2fead61b7ca0c64076,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/parser.py,164,180,parse_and_validate,e1873f41708efd10cbf04220ff0b0ef4458e779cb89fbe2fead61b7ca0c64076,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/parser.py,243,259,parse_and_validate,e1873f41708efd10cbf04220ff0b0ef4458e779cb89fbe2fead61b7ca0c64076,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/parser.py,338,360,parse_and_validate,e1873f41708efd10cbf04220ff0b0ef4458e779cb89fbe2fead61b7ca0c64076,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/parser.py,338,375,parse_and_validate,e1873f41708efd10cbf04220ff0b0ef4458e779cb89fbe2fead61b7ca0c64076,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_dataset/parser.py,362,375,parse_and_validate,e1873f41708efd10cbf04220ff0b0ef4458e779cb89fbe2fead61b7ca0c64076,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_scopus_projection.py,65,84,LecturerScopusProjectionService; get_approved_identity_summaries,636f0016add8bd9b7e2f6e31c95bc18218afe7d0e952b472ef69fc0986fd31a4,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/lecturer_scopus_projection.py,305,329,LecturerScopusProjectionService; _publication_set,636f0016add8bd9b7e2f6e31c95bc18218afe7d0e952b472ef69fc0986fd31a4,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_generator.py,28,90,normalize_name_n0; normalize_name_n2; normalize_comma_equivalence; normalize_hyphen_equivalence; has_observed_title_prefix; strip_observed_title_prefix,5ccc018a5393959192f4ef7a07995df71ed3ea9403e7d34c56ecb1835906e144,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_generator.py,39,47,,5ccc018a5393959192f4ef7a07995df71ed3ea9403e7d34c56ecb1835906e144,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_generator.py,114,149,_lecturer_query; _surface_query,5ccc018a5393959192f4ef7a07995df71ed3ea9403e7d34c56ecb1835906e144,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_generator.py,207,324,generate_candidates; CandidateGenerator; evidence_key; _dedup_evidence; __init__; _load_inputs; generate_all,5ccc018a5393959192f4ef7a07995df71ed3ea9403e7d34c56ecb1835906e144,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_generator.py,304,324,CandidateGenerator; _load_inputs; generate_all,5ccc018a5393959192f4ef7a07995df71ed3ea9403e7d34c56ecb1835906e144,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_persistence.py,42,59,,747ca03b782b56bd259908760b10898882e1fa2c23b438d97d6654019303e24c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_persistence.py,317,355,_publication_evidence,747ca03b782b56bd259908760b10898882e1fa2c23b438d97d6654019303e24c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_persistence.py,494,604,CandidatePersistenceService; _persist_started_run; _get_or_create_root,747ca03b782b56bd259908760b10898882e1fa2c23b438d97d6654019303e24c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/candidate_types.py,67,87,PublicationEvidence,9bd92dbba523f6b208cc189b95f5ca2758da89917f3ac5d284f4ba8029b91d50,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/craw_assisted_discovery.py,180,243,_has_name_correspondence,d2d0dedde03db776e25eb14eeb40a27b647bac723a995ab50efaff180c846454,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/craw_assisted_discovery.py,307,351,discover_craw_assisted_candidates,d2d0dedde03db776e25eb14eeb40a27b647bac723a995ab50efaff180c846454,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/engine.py,22,26,MatchingEngine; run,0584d1e6cf7b285f69558a3744c07010444f00fc85f3a20dc3a9d70f053d35a0,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/generation_workflow.py,76,149,_load_all; build_candidates,73bb09254b3987525a06201eb425e070d4e17b4c322ecf67b012d404a8de8df0,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/generation_workflow.py,87,101,_load_all,73bb09254b3987525a06201eb425e070d4e17b4c322ecf67b012d404a8de8df0,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/generation_workflow.py,113,149,build_candidates,73bb09254b3987525a06201eb425e070d4e17b4c322ecf67b012d404a8de8df0,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/generation_workflow.py,131,149,build_candidates,73bb09254b3987525a06201eb425e070d4e17b4c322ecf67b012d404a8de8df0,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/publication_evidence_enricher.py,91,193,_reconcile_known_publications,9d0536a1d3a709f10558ea318e58b9576cf623af479e12ca85a922cc84f9dd53,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/publication_evidence_enricher.py,125,193,_reconcile_known_publications,9d0536a1d3a709f10558ea318e58b9576cf623af479e12ca85a922cc84f9dd53,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/publication_evidence_enricher.py,196,246,enrich_candidates,9d0536a1d3a709f10558ea318e58b9576cf623af479e12ca85a922cc84f9dd53,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/rules/orcid_rule.py,4,8,OrcidRule; apply,f3a74df21d43c57e8570122f5a86a255c7478d0f197174282b7ac6f16afd5341,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/matching/scoring.py,36,40,ScoreCalculator; score,b685e44f79420cbf64238d3cbdf517fe5c1c7a03a49684b24507dc751272801e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_author_normalizer.py,137,276,parse_author_occurrences,6c84863cbe822148071cd17304c4cbb9c356982f74019c35afb32a2b1f606b4c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_author_normalizer.py,224,232,parse_author_occurrences,6c84863cbe822148071cd17304c4cbb9c356982f74019c35afb32a2b1f606b4c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_author_normalizer.py,398,414,AuthorNormalizer; _upsert_author,6c84863cbe822148071cd17304c4cbb9c356982f74019c35afb32a2b1f606b4c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_author_normalizer.py,398,510,AuthorNormalizer; _upsert_author; _ensure_variant; _ensure_publication_author_link,6c84863cbe822148071cd17304c4cbb9c356982f74019c35afb32a2b1f606b4c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_author_normalizer.py,454,478,AuthorNormalizer; _ensure_publication_author_link,6c84863cbe822148071cd17304c4cbb9c356982f74019c35afb32a2b1f606b4c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_author_normalizer.py,454,510,AuthorNormalizer; _ensure_publication_author_link,6c84863cbe822148071cd17304c4cbb9c356982f74019c35afb32a2b1f606b4c,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_normalizer.py,517,606,normalize_single_raw,5e0abfc5372267b2794822eb19fe6cb61c67c1d801e518d5f6c72d0b29a29378,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/normalization/scopus_normalizer.py,560,597,normalize_single_raw,5e0abfc5372267b2794822eb19fe6cb61c67c1d801e518d5f6c72d0b29a29378,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/publication_export.py,91,140,_batch_lecturer_links,ae9ba556ef334e83cfbf5f79aa95ca7a4df1af189d2b0174b05edc38ba9f598d,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/publication_queries.py,263,292,_approved_lecturer_link_rows,0597a50f9704a8c6bf7124cbbef7b19f31b6614efcf02aeec5a53a7d91e14e19,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/publication_queries.py,319,341,_provenance_rows,0597a50f9704a8c6bf7124cbbef7b19f31b6614efcf02aeec5a53a7d91e14e19,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/review_reason_policy.py,54,82,accept_reason_policy,4226a96b33140963276347a00f4fe79cd3c08dd189025f76f933da9e699c64eb,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/review_service.py,6,17,ReviewService; approve; reject; revert,358a806f836a220bcaca8af772623ac087340d4f0a35aa4b7c8ff09a2e82bf20,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/scopus_import_service.py,119,190,create_import_job; process_import_job,50ff9128d0612a9945e900f5151c5f56909e4c15d0d67fce97066e6bfa2beefd,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/app/services/scopus_import_service.py,172,190,process_import_job,50ff9128d0612a9945e900f5151c5f56909e4c15d0d67fce97066e6bfa2beefd,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/scripts/ingest_craw_known_publications.py,81,86,build_sources,db194452cb3455e3127ceb51db61c59d0aa3ad147bcebf86bd07eb0353a4ee20,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/scripts/ingest_craw_known_publications.py,81,124,build_sources,db194452cb3455e3127ceb51db61c59d0aa3ad147bcebf86bd07eb0353a4ee20,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/scripts/ingest_craw_known_publications.py,81,141,build_sources,db194452cb3455e3127ceb51db61c59d0aa3ad147bcebf86bd07eb0353a4ee20,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/conftest.py,41,99,_build_isolated_test_engine; pytest_runtest_setup; pytest_runtest_teardown,4213118eea3b70255845e097af00deb72fc5d9f9581019bd7c00c6990c003ca1,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_affiliation_import_and_api.py,165,175,test_confidence_levels_are_stored_distinct_and_absent_is_not_unresolved,fef4804a34f0170a67d53b551b33f58a7cd86a26699102348babd4c8224945e6,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_candidate_review_service.py,582,646,test_accept_retry_is_idempotent; test_reject_retry_is_idempotent,8262236bf3845815e66cabf91724335a12222869cc8a4a813f36a8b95f19f365,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_candidate_review_service.py,891,948,test_lecturer_can_have_multiple_approved_authors,8262236bf3845815e66cabf91724335a12222869cc8a4a813f36a8b95f19f365,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_candidate_review_service.py,1403,1450,test_concurrent_accept_same_author_has_one_winner,8262236bf3845815e66cabf91724335a12222869cc8a4a813f36a8b95f19f365,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_dashboard_api.py,451,456,TestCoreCounts; test_publication_count,f5fd33f0623d254ef9e25bbfa0b07f4b0063ad8afc8476ed73d7892cc68dc978,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_ingest_craw_known_publications_cli.py,138,170,test_preview_is_read_only_and_apply_is_idempotent,07e3ff1422ac5512839ed9d3866b0223631275f3f4c6ed8fc3072a8ae35a7c54,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_lecturer_import_api.py,223,239,test_import_creates_records_then_idempotent,457c081c8805f01112e332d6b3addc2f13699132a21bfe2c84b6b6aeb58512ea,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_lecturer_json_roundtrip.py,238,246,test_duplicate_source_id_or_orcid_in_file_is_rejected,d88836bc293804548bd93ee4ca77841634b4f63a3bc37a8117fa3b10a62d6d12,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_lecturer_json_roundtrip.py,398,418,test_absent_record_is_not_deleted,d88836bc293804548bd93ee4ca77841634b4f63a3bc37a8117fa3b10a62d6d12,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_lecturer_scopus_projection.py,368,378,test_t08_overlapping_publication_dedup,390798e1fa4b605815514a09331a0a1909bb6fd660324121fe05c024bda30549,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_lecturer_scopus_projection.py,437,453,test_t14_approved_identity_with_zero_publications,390798e1fa4b605815514a09331a0a1909bb6fd660324121fe05c024bda30549,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_publication_link_evidence_basis.py,30,58,test_links_without_recorded_evidence_are_not_verified; test_evidence_basis_reflects_identity_evidence_rows,2bc35584224f2052a270bcda5ef49d9dcaa3fb2409c1244fa1e9188c276d32db,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_scopus_author_normalization.py,563,610,test_author_order_conflict_no_overwrite,36bf49dbb57481f7bb4ce9c0719a63c45e5ed5d142daf580f5aad62c1ecdf566,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_scopus_author_normalization.py,1039,1094,test_author_list_length_mismatch_no_author_created,36bf49dbb57481f7bb4ce9c0719a63c45e5ed5d142daf580f5aad62c1ecdf566,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_scopus_normalization.py,246,267,TestNormalizationExistingRecords; test_existing_eid_reused,cfd95b0ea1cfefb342e50702bd9ad415e2a6f1405129a5cd5b15b6936a1ec2fb,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/integration/test_scopus_normalization.py,361,378,TestProvenanceLinks; test_provenance_links_correct,cfd95b0ea1cfefb342e50702bd9ad415e2a6f1405129a5cd5b15b6936a1ec2fb,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_author_affiliation.py,47,53,test_verified_by_orcid_chain_even_when_names_differ,52d062cd7e32a3606e4e9672b1517c8ef3ebbcb2592cbf794cad93ee8774050b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_author_affiliation.py,77,80,test_name_mismatch_at_same_position_is_unresolved,52d062cd7e32a3606e4e9672b1517c8ef3ebbcb2592cbf794cad93ee8774050b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_author_affiliation.py,83,89,test_verified_id_contradicting_order_invalidates_positional_claims,52d062cd7e32a3606e4e9672b1517c8ef3ebbcb2592cbf794cad93ee8774050b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_author_affiliation.py,100,121,test_multiple_affiliations_and_organizations_are_preserved_separately,52d062cd7e32a3606e4e9672b1517c8ef3ebbcb2592cbf794cad93ee8774050b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_author_affiliation.py,124,138,test_crossref_parser_and_orcid_scopus_extraction,52d062cd7e32a3606e4e9672b1517c8ef3ebbcb2592cbf794cad93ee8774050b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_author_affiliation.py,141,161,test_openalex_entries_keep_the_sources_own_raw_to_organization_pairing,52d062cd7e32a3606e4e9672b1517c8ef3ebbcb2592cbf794cad93ee8774050b,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_candidate_generator.py,59,83,test_every_supported_title_prefix_is_stripped; test_unknown_or_non_title_prefix_is_not_stripped; test_title_prefix_requires_a_token_boundary,5c472c836c7eba853e69dc86432a2940a2de28cb19d930d429374bfa43d2326e,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_candidate_persistence.py,213,233,test_new_run_reuses_rejected_root_without_reopening,dd64082653283a503915195947d5b59c6800c030ebdb08168e0405f1ba1d9e5f,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_craw_matching_quality_negative_cases.py,241,268,test_case_4_abbreviated_initials_anchored_via_name_variant,f255e1a2556a6f77f6f729b3137063353ac3da551784ab9ab48e8a96138d07ce,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_craw_matching_quality_negative_cases.py,401,467,test_case_9_reversed_scopus_name_order_is_attributed; test_case_10_academic_title_prefix_stripped_correctly,f255e1a2556a6f77f6f729b3137063353ac3da551784ab9ab48e8a96138d07ce,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_lecturer_dataset_parser.py,32,51,test_parse_fixture_returns_envelope; test_parse_normalises_full_name_whitespace; test_parse_lowercases_institutional_email,ccaae8d219a88b5c996c008f785eb7eed432fa416d6b512009d084de589f4261,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_lecturer_dataset_parser.py,114,120,test_parse_rejects_record_count_mismatch,ccaae8d219a88b5c996c008f785eb7eed432fa416d6b512009d084de589f4261,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_publication_evidence_enricher.py,95,108,test_doi_mismatch_uses_exact_title_fallback,bd45383491c2913dcca2a870f126a33e8f35d583fec79fc871010fee9580ba75,READ_ONLY; range exists; code/test inspected; runtime not executed
++backend/tests/unit/test_publication_evidence_enricher.py,133,150,test_doi_and_unique_title_pointing_to_different_publications_fail_closed,bd45383491c2913dcca2a870f126a33e8f35d583fec79fc871010fee9580ba75,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/App.tsx,74,115,,d6ef4aa2b891dd9b0fb05d7adca93df96d86ef26bdb9041baeed6fc783e359e3,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/ApprovalQueue/index.tsx,88,95,,6bf0d845bd605ee013fdb93408eb024121f8b8c5eb41524cb225dec84a02c479,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/ApprovalQueue/index.tsx,378,439,,6bf0d845bd605ee013fdb93408eb024121f8b8c5eb41524cb225dec84a02c479,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/Identity/index.tsx,92,110,,8582b9505bf6d450d32f66a24e98bf7f0ed3277ca82676d472cfc0b4b34dbe00,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/MyPublications/index.tsx,48,64,,56aa118965281160acf863d597b417024349f3604202f808417082573357b9e7,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/Publications/AuthorAffiliations.tsx,10,92,,91d0c4c76d9ac595a64f3042386aa7358794088518f954410f7ed6069c86d5a0,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/Publications/AuthorAffiliations.tsx,48,73,,91d0c4c76d9ac595a64f3042386aa7358794088518f954410f7ed6069c86d5a0,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/Publications/LinkEvidence.tsx,7,60,,7d2f7b17b8be561c65e1a1a2857d66b5b2497e2240f148f34ad62ee3cf73b59f,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/pages/Publications/LinkEvidence.tsx,30,60,,7d2f7b17b8be561c65e1a1a2857d66b5b2497e2240f148f34ad62ee3cf73b59f,READ_ONLY; range exists; code/test inspected; runtime not executed
++frontend/src/types/review.ts,3,4,,868135f6f9fd47d03f1e64152e5c3ae52a808901c069eb6577c66d0778962586,READ_ONLY; range exists; code/test inspected; runtime not executed
+diff --git a/docs/qa/gate_e1/AUDIT_VALIDATION.json b/docs/qa/gate_e1/AUDIT_VALIDATION.json
+new file mode 100644
+--- /dev/null
++++ b/docs/qa/gate_e1/AUDIT_VALIDATION.json
+@@ -0,0 +1,294 @@
++{
++  "audit": "SCOPUS–ICTU Gate E.1",
++  "date_local": "2026-10-29",
++  "timezone": "Asia/Bangkok",
++  "baseline_head": "4bb69f6efaac945399b1c191fc12879ad1c62885",
++  "handover": {
++    "gate_e1_existed_before": false,
++    "existing_outside_scope_work_preserved": true,
++    "previous_independent_audit_reused": true
++  },
++  "execution_boundary": {
++    "database_connections": 0,
++    "database_writes": 0,
++    "real_imports": 0,
++    "migrations": 0,
++    "identity_decisions": 0,
++    "source_changes": 0,
++    "commits": 0,
++    "pushes": 0,
++    "allowed_write_root": "docs/qa/gate_e1/"
++  },
++  "verification": {
++    "requirement_rows": 18,
++    "requirement_ids_complete": true,
++    "accepted_requirement_wording_preserved": true,
++    "classifications": {
++      "PARTIAL": 12,
++      "MISSING": 5,
++      "DEFECT_CONFIRMED": 1
++    },
++    "finding_ids_accounted_for": 31,
++    "finding_011_treatment": "Academic notice independent of identity; no invented R-ID; optional TC-22/P3.",
++    "proposed_synthetic_cases": 23,
++    "source_ranges_checked": 159,
++    "source_files_referenced": 72,
++    "named_test_symbols_exist": true,
++    "existing_repository_tests": "INSPECTED_NOT_EXECUTED",
++    "frontend_build_and_browser": "NOT_EXECUTED",
++    "runtime_db_state": "NOT_VERIFIABLE",
++    "deployed_migrations": "NOT_VERIFIABLE"
++  },
++  "synthetic_in_memory_probes": [
++    {
++      "probe": "openalex_entity_overrides_raw_name",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": "Different Entity Person"
++    },
++    {
++      "probe": "aggregator_orcid_bridge_bypasses_name",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": {
++        "status": "VERIFIED",
++        "name": "Different Entity Person"
++      }
++    },
++    {
++      "probe": "multiple_affiliations_preserved",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": [
++        "Other Institute",
++        "ICTU Synthetic Faculty"
++      ]
++    },
++    {
++      "probe": "missing_authors_not_identifier_conflict",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": "NO_EXTERNAL_AUTHOR_LIST"
++    },
++    {
++      "probe": "crossref_full_author_list",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": 7
++    },
++    {
++      "probe": "structured_scopus_ids_not_carried",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": [
++        "source_id",
++        "staff_code",
++        "full_name",
++        "full_name_normalized",
++        "institutional_email",
++        "tel",
++        "academic_degree",
++        "academic_rank",
++        "position",
++        "faculty",
++        "department",
++        "specialization",
++        "gender",
++        "date_of_birth",
++        "phone",
++        "profile_url",
++        "orcid",
++        "is_active",
++        "provenance",
++        "known_publications",
++        "account"
++      ]
++    },
++    {
++      "probe": "structured_duplicate_orcid_rejected",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": "DUPLICATE_LECTURER_IDENTITY"
++    },
++    {
++      "probe": "duplicate_url_first_row_selected",
++      "result": "PASS_CURRENT_BEHAVIOR",
++      "observed": {
++        "input_rows": 2,
++        "mapped_urls": 1,
++        "selected": "first row"
++      }
++    }
++  ],
++  "probe_interpretation": "PASS_CURRENT_BEHAVIOR means an assertion about actual current behavior passed; unsafe behavior is intentionally reproduced, not accepted as correct. No pytest/conftest/application startup or database engine was loaded.",
++  "local_source_inventory": {
++    "available": true,
++    "lecturer_count": 410,
++    "lecturer_file_sha256": "c12252e02cbf73c58ae3add65a5b6b925f5e0fcd75273bd7e0a3cc28c8a0accb",
++    "lecturer_keys": [
++      "academic_degree",
++      "academic_rank",
++      "counts",
++      "department",
++      "discovery_source",
++      "extra_fields",
++      "faculty",
++      "full_name",
++      "google_scholar_url",
++      "institutional_email",
++      "is_active",
++      "lost_labels",
++      "normalized",
++      "observed_labels",
++      "orcid",
++      "orcid_url",
++      "position",
++      "preserved_labels",
++      "profile_url",
++      "provenance",
++      "public_publication_links",
++      "source",
++      "source_display_name",
++      "source_fields",
++      "source_id",
++      "specialisation"
++    ],
++    "link_rows": 328,
++    "linked_lecturer_count": 48,
++    "publication_count": 1907,
++    "duplicate_source_ids": 0,
++    "orcid_value_shapes": {
++      "str": 372,
++      "NoneType": 38
++    },
++    "duplicate_orcid_values": 10,
++    "profiles_in_orcid_collisions": 20,
++    "profiles_with_raw_publication_links": 106,
++    "multi_id_table_rows": 34,
++    "multi_id_distinct_ids": 83,
++    "ambiguous_table_rows": 10,
++    "unknown_table_rows": 59,
++    "total_distinct_inventory_ids": 152,
++    "multi_vs_other_id_overlap": 0
++  },
++  "integrity": {
++    "protected_tree_checks": {
++      "backend/app": {
++        "before": {
++          "files": 139,
++          "sha256": "580d8ab35faa8bfd17b4eb20dcb0ad8bc345181f6a92697edf33d10fbad81e93"
++        },
++        "after": {
++          "files": 139,
++          "sha256": "580d8ab35faa8bfd17b4eb20dcb0ad8bc345181f6a92697edf33d10fbad81e93"
++        },
++        "unchanged": true
++      },
++      "backend/alembic": {
++        "before": {
++          "files": 16,
++          "sha256": "e9d6d887a442ad810d0b703a39c1e4e3dc4728ca93e26049e6bf1f02869270d8"
++        },
++        "after": {
++          "files": 16,
++          "sha256": "e9d6d887a442ad810d0b703a39c1e4e3dc4728ca93e26049e6bf1f02869270d8"
++        },
++        "unchanged": true
++      },
++      "backend/tests": {
++        "before": {
++          "files": 79,
++          "sha256": "c00ce3917bdc5dd839688c156b98254f3d2f6f617fb9e6d58f9204acdb7fd912"
++        },
++        "after": {
++          "files": 79,
++          "sha256": "c00ce3917bdc5dd839688c156b98254f3d2f6f617fb9e6d58f9204acdb7fd912"
++        },
++        "unchanged": true
++      },
++      "backend/scripts": {
++        "before": {
++          "files": 22,
++          "sha256": "c3e78f657dad8e60a5ed1d9659137c0c146321e6713f2ab83a4c7a73ce2955de"
++        },
++        "after": {
++          "files": 22,
++          "sha256": "c3e78f657dad8e60a5ed1d9659137c0c146321e6713f2ab83a4c7a73ce2955de"
++        },
++        "unchanged": true
++      },
++      "frontend/src": {
++        "before": {
++          "files": 92,
++          "sha256": "bc9b17765f3ddf93fe0077893fa0841c7aac91c281435815318e495111927d2b"
++        },
++        "after": {
++          "files": 92,
++          "sha256": "bc9b17765f3ddf93fe0077893fa0841c7aac91c281435815318e495111927d2b"
++        },
++        "unchanged": true
++      },
++      "docs/research": {
++        "before": {
++          "files": 3,
++          "sha256": "0435fe80a035b6089eca7123d8968d24bece11054f0f99309d1043e4fa9aa767"
++        },
++        "after": {
++          "files": 3,
++          "sha256": "0435fe80a035b6089eca7123d8968d24bece11054f0f99309d1043e4fa9aa767"
++        },
++        "unchanged": true
++      },
++      "docs/qa/gate_d3": {
++        "before": {
++          "files": 275,
++          "sha256": "f8f0be8b7f291f1d9c70d061e59b935e29487022cfa6a4e0acf3f7df0b42fe12"
++        },
++        "after": {
++          "files": 275,
++          "sha256": "f8f0be8b7f291f1d9c70d061e59b935e29487022cfa6a4e0acf3f7df0b42fe12"
++        },
++        "unchanged": true
++      },
++      "docs/qa/gate_d4": {
++        "before": {
++          "files": 303,
++          "sha256": "c79590f8860832931daf1c5aceb4389d2378e1dc8e57c88d31532692a1ae32a2"
++        },
++        "after": {
++          "files": 303,
++          "sha256": "c79590f8860832931daf1c5aceb4389d2378e1dc8e57c88d31532692a1ae32a2"
++        },
++        "unchanged": true
++      }
++    },
++    "git_head_unchanged": true,
++    "outside_gate_git_status_unchanged": true,
++    "source_ranges_checked": 159,
++    "source_files_referenced": 72,
++    "core_deliverables": [
++      "AS_IS_ARCHITECTURE.md",
++      "REQUIREMENT_IMPLEMENTATION_MATRIX.csv",
++      "IMPORT_DATA_FLOW_AUDIT.md",
++      "IDENTITY_EVIDENCE_GAP_ANALYSIS.md",
++      "TEST_CASE_DESIGN.md",
++      "IMPLEMENTATION_ROADMAP.md",
++      "EXECUTIVE_SUMMARY.md"
++    ],
++    "document_hashes": {
++      "AS_IS_ARCHITECTURE.md": "b56400c490b2cca00f86235efaffa035fc03de1ab5c554ecaf7a36dab49ae631",
++      "REQUIREMENT_IMPLEMENTATION_MATRIX.csv": "b1da1c472c9d87b01f5bc52328c95220a0052196d11eb9a74742dca83b46be56",
++      "IMPORT_DATA_FLOW_AUDIT.md": "dacfa8e91e6b7617dd08fa716d8606d12eee4f59447fe4752fb5d099b591e961",
++      "IDENTITY_EVIDENCE_GAP_ANALYSIS.md": "3e46a8ade2f2d28d4e52b2f485c1df28e88bdd2833e7270c6aa11da81a0299ff",
++      "TEST_CASE_DESIGN.md": "99500f49869556cea1d884b3ad6b16ca841acad93ec980a112bdd6264692b2c6",
++      "IMPLEMENTATION_ROADMAP.md": "8b0ed994c4e195b72e45772b30e43383a050723c2607890d8482ff7607198ab3",
++      "EXECUTIVE_SUMMARY.md": "8fe1c85f0e1a25672bc72a03b7a81ff975376116cb238eb55e539aba81edfa3b"
++    },
++    "current_git_status": " M docs/qa/gate_d2/batch3_browser_evidence.json\n M docs/qa/gate_d2/batch4_browser_evidence.json\n M docs/qa/gate_d2/validate_gate_d2.py\n M docs/research/01_RESEARCH_KNOWLEDGE.md\n M docs/research/02_ICTU_DATA_FINDINGS.md\n M docs/research/03_THESIS_DEFENSE_NOTES.md\n?? docs/qa/gate_d2/MANIFEST_v4.txt\n?? docs/qa/gate_d2/VALIDATION_REPORT_FINAL_20261028.md\n?? docs/qa/gate_d2/gate_d2_batch3to5_final_closeout_20261028.zip\n?? docs/qa/gate_d2/gate_d2_batch3to5_validator_fixed_20261028.zip\n?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip\n?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip.sha256\n?? docs/qa/gate_d2/neg_test_evidence.py\n?? docs/qa/gate_d2/neg_test_evidence_20261028.json\n?? docs/qa/gate_d2/validate_v4_run_log.txt\n?? docs/qa/gate_d3/\n?? docs/qa/gate_d4/\n?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip\n?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip.sha256\n?? docs/qa/gate_d4_evidence_errata_20261029.zip\n?? docs/qa/gate_d4_evidence_errata_20261029.zip.sha256\n?? docs/qa/gate_e1/\n"
++  },
++  "limitations": [
++    "No deployed lecturer/import/identity counts verified.",
++    "No live URL collisions or concurrent rollback outcomes established.",
++    "No runtime UI behavior verified.",
++    "Application append-only conventions do not establish deployed DB immutability.",
++    "Gate D acceptance inherited from owner; no research re-adjudication."
++  ],
++  "packaging_policy": {
++    "diff": "Exact text additions against absent docs/qa/gate_e1 baseline; includes seven deliverables, SOURCE_REFERENCES.csv and this report.",
++    "manifest": "Hashes all payload files including DOCUMENTATION_CHANGES.diff; excludes manifest itself, ZIP and external ZIP checksum to avoid self-reference.",
++    "archive": "Documentation only; ZIP CRC, member set, member content and manifest checked separately after creation; ZIP SHA-256 stored outside ZIP."
++  }
++}

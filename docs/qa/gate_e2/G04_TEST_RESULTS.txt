@@ -1,0 +1,298 @@
+Gate E.2 / G04 — Transaction rollback safety — test results
+Date: 2026-10-29. Python: 3.14.0; SQLAlchemy 2.0.41; psycopg2 2.9.13; ruff 0.16.10.
+All commands run from backend/. Runner scripts live outside the repository (scratch dir) and are reproduced at the end.
+
+================================================================
+1. PURE UNIT TESTS — G04 + G03 + parser (final code)
+   Guard: --noconftest, plugin autoload off, no cache, python -B, socket.connect blocked,
+   import of app.core.database / app.main / any conftest raises.
+   cmd: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../.venv/Scripts/python.exe -B run_pure.py \
+        tests/unit/test_author_normalizer_transactions.py tests/unit/test_author_position_drift.py \
+        tests/unit/test_scopus_author_parser.py -q --tb=short -rA
+   exit code: 0
+----------------------------------------------------------------
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig0-expected0]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig1-expected1]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig2-expected2]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig3-expected3]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_recognized_constraint_names_match_the_migrations
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_without_driver_error
+PASSED tests/unit/test_author_normalizer_transactions.py::test_insert_flushes_pending_state_before_savepoint_and_adds_inside_it
+PASSED tests/unit/test_author_normalizer_transactions.py::test_pending_duplicate_is_flushed_outside_recovery_scope_and_fails_closed
+PASSED tests/unit/test_author_normalizer_transactions.py::test_author_race_keeps_earlier_batch_writes_and_counts_winner_as_existing
+PASSED tests/unit/test_author_normalizer_transactions.py::test_variant_race_counts_existing_only_after_exact_key_is_proven
+PASSED tests/unit/test_author_normalizer_transactions.py::test_link_pair_race_reclassifies_through_g03_drift_without_overwrite
+PASSED tests/unit/test_author_normalizer_transactions.py::test_link_slot_race_records_author_order_conflict
+PASSED tests/unit/test_author_normalizer_transactions.py::test_fk_and_check_violations_propagate_and_are_never_counted[publication_id0-1-expected0]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_fk_and_check_violations_propagate_and_are_never_counted[publication_id1-0-expected1]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_unrecognized_unique_constraint_propagates
+PASSED tests/unit/test_author_normalizer_transactions.py::test_recognized_conflict_without_provable_row_raises[author]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_recognized_conflict_without_provable_row_raises[variant]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_recognized_conflict_without_provable_row_raises[link]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_order_constraint_is_recognized_only_for_links
+PASSED tests/unit/test_author_normalizer_transactions.py::test_failed_batch_rolls_back_whole_and_summary_reports_only_committed_batches
+PASSED tests/unit/test_author_normalizer_transactions.py::test_rolled_back_batch_does_not_report_g03_observations_as_recorded
+PASSED tests/unit/test_author_normalizer_transactions.py::test_g03_observation_of_failed_batch_is_discarded
+PASSED tests/unit/test_author_normalizer_transactions.py::test_replay_is_idempotent_for_authors_variants_and_links
+PASSED tests/unit/test_author_normalizer_transactions.py::test_race_recovery_and_failed_batch_leave_reviewer_identity_untouched
+PASSED tests/unit/test_author_position_drift.py::test_new_association_preserves_current_behavior
+PASSED tests/unit/test_author_position_drift.py::test_same_position_is_idempotent
+PASSED tests/unit/test_author_position_drift.py::test_known_position_drift_is_reported_without_overwrite[2-4]
+PASSED tests/unit/test_author_position_drift.py::test_known_position_drift_is_reported_without_overwrite[4-2]
+PASSED tests/unit/test_author_position_drift.py::test_known_position_drift_is_reported_without_overwrite[7-9]
+PASSED tests/unit/test_author_position_drift.py::test_known_position_drift_is_reported_without_overwrite[9-7]
+PASSED tests/unit/test_author_position_drift.py::test_missing_position_is_not_a_conflict_or_silent_promotion[2-None]
+PASSED tests/unit/test_author_position_drift.py::test_missing_position_is_not_a_conflict_or_silent_promotion[None-None]
+PASSED tests/unit/test_author_position_drift.py::test_missing_position_is_not_a_conflict_or_silent_promotion[None-4]
+PASSED tests/unit/test_author_position_drift.py::test_new_association_without_position_is_not_inserted_or_called_a_conflict
+PASSED tests/unit/test_author_position_drift.py::test_multiple_authors_including_swapped_slots_and_late_author
+PASSED tests/unit/test_author_position_drift.py::test_existing_different_author_slot_conflict_is_unchanged
+PASSED tests/unit/test_author_position_drift.py::test_reversed_import_order_preserves_first_position_but_detects_drift[orders0]
+PASSED tests/unit/test_author_position_drift.py::test_reversed_import_order_preserves_first_position_but_detects_drift[orders1]
+PASSED tests/unit/test_author_position_drift.py::test_repeated_mismatch_and_rerun_do_not_duplicate_persisted_conflicts
+PASSED tests/unit/test_author_position_drift.py::test_distinct_raw_observations_share_one_conflict_with_deterministic_provenance
+PASSED tests/unit/test_author_position_drift.py::test_provenance_merges_across_normalizer_instances_without_duplicate_conflicts
+PASSED tests/unit/test_author_position_drift.py::test_drift_provenance_is_not_lost_to_fifty_error_sample_cap
+PASSED tests/unit/test_author_position_drift.py::test_multiple_observed_positions_and_author_iteration_are_deterministic
+PASSED tests/unit/test_author_position_drift.py::test_publication_renormalization_preserves_position_diagnostic
+PASSED tests/unit/test_author_position_drift.py::test_record_occurrences_preserves_approved_identity_and_review
+PASSED tests/unit/test_author_position_drift.py::test_entry_point_checkpoints_retain_drift_and_same_import_replay[4]
+PASSED tests/unit/test_author_position_drift.py::test_entry_point_checkpoints_retain_drift_and_same_import_replay[8]
+PASSED tests/unit/test_scopus_author_parser.py::TestSplitSemicolon::test_single_value
+PASSED tests/unit/test_scopus_author_parser.py::TestSplitSemicolon::test_multiple_values
+PASSED tests/unit/test_scopus_author_parser.py::TestSplitSemicolon::test_spaces_trimmed
+PASSED tests/unit/test_scopus_author_parser.py::TestSplitSemicolon::test_trailing_semicolon_dropped
+PASSED tests/unit/test_scopus_author_parser.py::TestSplitSemicolon::test_empty_string
+PASSED tests/unit/test_scopus_author_parser.py::TestSplitSemicolon::test_whitespace_only
+PASSED tests/unit/test_scopus_author_parser.py::TestSplitSemicolon::test_mixed_spacing
+PASSED tests/unit/test_scopus_author_parser.py::TestNormalizeName::test_basic_lowercase
+PASSED tests/unit/test_scopus_author_parser.py::TestNormalizeName::test_whitespace_collapsed
+PASSED tests/unit/test_scopus_author_parser.py::TestNormalizeName::test_nfkc_normalization
+PASSED tests/unit/test_scopus_author_parser.py::TestNormalizeName::test_empty
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_single_author
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_multiple_authors
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_spaces_around_semicolons
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_mismatched_list_lengths_full_names
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_mismatched_list_lengths_ids
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_missing_scopus_id
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_non_numeric_id
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_embedded_id_mismatch
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_duplicate_id_in_one_publication
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_full_name_strips_embedded_id
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_full_name_no_embedded_id
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_empty_full_name
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_unicode_vietnamese_names
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_empty_authors_field
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_author_order_is_1_based
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_trailing_semicolon_in_ids
+PASSED tests/unit/test_scopus_author_parser.py::TestParseAuthorOccurrences::test_no_author_full_names_column_present_but_empty
+75 passed in 0.58s
+Database/application/conftest modules loaded: []
+
+================================================================
+2. BEHAVIORAL BASELINE — same G04 unit module against the PRE-G04 normalizer
+   (accepted G03 working-tree version, loaded from a saved snapshot under the real module
+   name; only the new constant names the test imports are supplied). Expected: failures.
+   cmd: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 ../.venv/Scripts/python.exe -B run_baseline.py \
+        tests/unit/test_author_normalizer_transactions.py -q --tb=line -rA
+   exit code: 1
+----------------------------------------------------------------
+E   AssertionError: assert ['add:ScopusA...r', 'flush:1'] == ['flush:0', '...flush:1', ...]
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:256: AssertionError: assert ['add:ScopusA...r', 'flush:1'] == ['flush:0', '...flush:1', ...]
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:269: Failed: DID NOT RAISE IntegrityError
+E   assert (<app.models.publication.ScopusAuthor object at 0x00000246B64295B0> in [])
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:291: assert (<app.models.publication.ScopusAuthor object at 0x00000246B64295B0> in [])
+E   AssertionError: assert [] == ['Earlier']
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:310: AssertionError: assert [] == ['Earlier']
+E   assert 0 == 1
+     +  where 0 = AuthorNormalizationCounters(raw_records_processed=0, raw_records_failed=0, author_occurrences=0, unique_authors_seen=0...tion_author_links_created=0, publication_author_links_existing=1, variants_created=0, variants_existing=0, conflicts=0).conflicts
+     +    where AuthorNormalizationCounters(raw_records_processed=0, raw_records_failed=0, author_occurrences=0, unique_authors_seen=0...tion_author_links_created=0, publication_author_links_existing=1, variants_created=0, variants_existing=0, conflicts=0) = <app.services.normalization.scopus_author_normalizer.AuthorNormalizer object at 0x00000246B642AD70>.counters
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:326: assert 0 == 1
+E   assert 1 == 0
+     +  where 1 = AuthorNormalizationCounters(raw_records_processed=0, raw_records_failed=0, author_occurrences=0, unique_authors_seen=0...tion_author_links_created=0, publication_author_links_existing=1, variants_created=0, variants_existing=0, conflicts=0).publication_author_links_existing
+     +    where AuthorNormalizationCounters(raw_records_processed=0, raw_records_failed=0, author_occurrences=0, unique_authors_seen=0...tion_author_links_created=0, publication_author_links_existing=1, variants_created=0, variants_existing=0, conflicts=0) = <app.services.normalization.scopus_author_normalizer.AuthorNormalizer object at 0x00000246B6394170>.counters
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:341: assert 1 == 0
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:358: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:358: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:393: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:393: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:393: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:416: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:456: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:486: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:507: Failed: DID NOT RAISE IntegrityError
+E   Failed: DID NOT RAISE IntegrityError
+D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend\tests\unit\test_author_normalizer_transactions.py:563: Failed: DID NOT RAISE IntegrityError
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig0-expected0]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig1-expected1]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig2-expected2]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing[orig3-expected3]
+PASSED tests/unit/test_author_normalizer_transactions.py::test_recognized_constraint_names_match_the_migrations
+PASSED tests/unit/test_author_normalizer_transactions.py::test_integrity_violation_without_driver_error
+PASSED tests/unit/test_author_normalizer_transactions.py::test_unrecognized_unique_constraint_propagates
+PASSED tests/unit/test_author_normalizer_transactions.py::test_replay_is_idempotent_for_authors_variants_and_links
+FAILED tests/unit/test_author_normalizer_transactions.py::test_insert_flushes_pending_state_before_savepoint_and_adds_inside_it
+FAILED tests/unit/test_author_normalizer_transactions.py::test_pending_duplicate_is_flushed_outside_recovery_scope_and_fails_closed
+FAILED tests/unit/test_author_normalizer_transactions.py::test_author_race_keeps_earlier_batch_writes_and_counts_winner_as_existing
+FAILED tests/unit/test_author_normalizer_transactions.py::test_variant_race_counts_existing_only_after_exact_key_is_proven
+FAILED tests/unit/test_author_normalizer_transactions.py::test_link_pair_race_reclassifies_through_g03_drift_without_overwrite
+FAILED tests/unit/test_author_normalizer_transactions.py::test_link_slot_race_records_author_order_conflict
+FAILED tests/unit/test_author_normalizer_transactions.py::test_fk_and_check_violations_propagate_and_are_never_counted[publication_id0-1-expected0]
+FAILED tests/unit/test_author_normalizer_transactions.py::test_fk_and_check_violations_propagate_and_are_never_counted[publication_id1-0-expected1]
+FAILED tests/unit/test_author_normalizer_transactions.py::test_recognized_conflict_without_provable_row_raises[author]
+FAILED tests/unit/test_author_normalizer_transactions.py::test_recognized_conflict_without_provable_row_raises[variant]
+FAILED tests/unit/test_author_normalizer_transactions.py::test_recognized_conflict_without_provable_row_raises[link]
+FAILED tests/unit/test_author_normalizer_transactions.py::test_order_constraint_is_recognized_only_for_links
+FAILED tests/unit/test_author_normalizer_transactions.py::test_failed_batch_rolls_back_whole_and_summary_reports_only_committed_batches
+FAILED tests/unit/test_author_normalizer_transactions.py::test_rolled_back_batch_does_not_report_g03_observations_as_recorded
+FAILED tests/unit/test_author_normalizer_transactions.py::test_g03_observation_of_failed_batch_is_discarded
+FAILED tests/unit/test_author_normalizer_transactions.py::test_race_recovery_and_failed_batch_leave_reviewer_identity_untouched
+16 failed, 8 passed in 0.07s
+Database/application/conftest modules loaded: []
+
+   Interpretation: the 8 baseline passes are the classifier/static tests (new helper,
+   supplied by the runner) plus two behaviors the old code already had right
+   (unrecognized-unique on author re-raises; plain replay). The FK/CHECK and batch cases
+   fail with 'DID NOT RAISE': the old link handler counted an FK/CHECK violation as an
+   existing link and the run finished COMPLETED. This is shown on the fake session only.
+
+================================================================
+3. POSTGRESQL INTEGRATION TESTS — NOT_EXECUTED
+   File: tests/integration/test_author_normalizer_transactions_pg.py (11 tests, P1-P10).
+   Reason: no TEST_DATABASE_URL in the environment; the only known allowlisted pytest DBs
+   (scopus_ictu_test_pytest_20261011/_20261013) live on 127.0.0.1:55432, which refused
+   connections (server not running). No disposable DB was separately authorized, so none
+   was started or created. The application database was not contacted.
+   Collection-only check (no conftest, no DB, no fixtures executed):
+----------------------------------------------------------------
+tests/integration/test_author_normalizer_transactions_pg.py::test_p5_constraint_names_exist_in_postgresql
+tests/integration/test_author_normalizer_transactions_pg.py::test_p5_driver_reports_sqlstate_and_constraint_for_each_violation
+tests/integration/test_author_normalizer_transactions_pg.py::test_p1_author_race_keeps_earlier_batch_writes
+tests/integration/test_author_normalizer_transactions_pg.py::test_p2_concurrent_sessions_create_one_author_and_keep_prior_writes
+tests/integration/test_author_normalizer_transactions_pg.py::test_p3_fk_violation_rolls_back_batch_and_reports_failed
+tests/integration/test_author_normalizer_transactions_pg.py::test_p4_check_violation_rolls_back_batch
+tests/integration/test_author_normalizer_transactions_pg.py::test_p6_slot_race_records_conflict_without_overwrite
+tests/integration/test_author_normalizer_transactions_pg.py::test_p6_pair_race_with_other_position_is_g03_drift
+tests/integration/test_author_normalizer_transactions_pg.py::test_p7_pending_duplicate_fails_closed_before_savepoint
+tests/integration/test_author_normalizer_transactions_pg.py::test_p8_replay_is_idempotent
+tests/integration/test_author_normalizer_transactions_pg.py::test_p10_g03_observations_follow_transaction_outcome
+
+11 tests collected in 0.49s
+
+   To execute (only against an allowlisted disposable DB; conftest re-verifies it):
+     TEST_DATABASE_URL=postgresql+psycopg2://<user>:<pw>@127.0.0.1:55432/scopus_ictu_test_pytest_20261013 \
+       python -m pytest tests/integration/test_author_normalizer_transactions_pg.py -q
+
+================================================================
+4. RUFF — diagnostic comparison (line-number-insensitive)
+   files: app/services/normalization/scopus_author_normalizer.py, tests/unit/test_author_position_drift.py,
+          tests/integration/test_scopus_author_normalization.py
+   before: 46 diagnostics (normalizer 10, drift test 0, existing integration test 36)
+   after:  46 diagnostics (normalizer 10, drift test 0, existing integration test 36)
+   result: identical diagnostic sets -> 0 new diagnostics
+   new files: All checks passed!
+   (one new UP037 introduced during development was fixed before this comparison)
+
+================================================================
+5. WIDER UNIT SWEEP (informational; not a G04 claim)
+   cmd: PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -B -m pytest --noconftest -p no:cacheprovider tests/unit -q --tb=line
+   1 failed, 475 passed, 6 skipped, 6 warnings, 33 errors in 14.77s
+   Non-passing causes (none in a file that imports the author normalizer):
+     25 E   PermissionError: [WinError 5] Access is denied: 'C:\\Users\\QuangHuy\\AppData\\Local\\Temp\\pytest-of-QuangHuy'
+      8 E       fixture 'isolated_db_engine' not found
+      1 E   assert ('demo_launcher.py' in '@echo off\nsetlocal\n\nrem ============================================================\nrem  Scopus-Ictu
+      1 ERROR tests/unit/test_affiliation_online_fetch.py
+      8 ERROR tests/unit/test_affiliation_provenance.py
+      7 ERROR tests/unit/test_candidate_persistence.py
+      1 ERROR tests/unit/test_demo_launcher.py
+     15 ERROR tests/unit/test_demo_launcher_safety.py
+      1 ERROR tests/unit/test_text_folding.py
+      1 FAILED tests/unit/test_demo_launcher.py
+   25x PermissionError = sandbox cannot use the pytest tmp dir; 8x isolated_db_engine = conftest
+   fixture absent under --noconftest; test_demo_launcher assertion = .bat launcher content
+   (pre-existing, unrelated, files untouched by G04).
+
+================================================================
+6. RUNNER SCRIPTS (scratch dir, not committed)
+---- run_pure.py ----
+"""Run pure tests with no conftest, no network and no DB/app modules (G03 convention)."""
+import importlib.abc
+import socket
+import sys
+
+import pytest
+
+sys.stdout.reconfigure(encoding="utf-8")
+
+
+def _no_network(*args, **kwargs):
+    raise AssertionError("Network forbidden in pure G04 tests")
+
+
+socket.socket.connect = _no_network
+FORBIDDEN = ("app.core.database", "app.main")
+
+
+class NoDatabase(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in FORBIDDEN or fullname.endswith(".conftest"):
+            raise AssertionError("Forbidden module: " + fullname)
+
+
+sys.meta_path.insert(0, NoDatabase())
+result = pytest.main(["--noconftest", "-p", "no:cacheprovider", *sys.argv[1:]])
+loaded = [n for n in sys.modules if n in FORBIDDEN or n.endswith(".conftest")]
+print("Database/application/conftest modules loaded:", loaded)
+assert not loaded
+raise SystemExit(result)
+---- run_baseline.py ----
+"""Run the G04 unit tests against the pre-G04 normalizer snapshot (behavioral baseline).
+
+Loads the saved pre-G04 source under the real module name and supplies only the
+new G04 *names* the test module imports, so behavior is the pre-G04 code.
+"""
+import os
+import sys
+import types
+
+sys.path.insert(0, os.getcwd())
+here = os.path.dirname(os.path.abspath(__file__))
+name = "app.services.normalization.scopus_author_normalizer"
+import app.services.normalization.scopus_normalizer  # noqa: F401,E402  (parent package)
+
+module = types.ModuleType(name)
+module.__file__ = os.path.join(here, "normalizer_pre_g04.py")
+src = open(module.__file__, encoding="utf-8").read()
+sys.modules[name] = module
+exec(compile(src, module.__file__, "exec"), module.__dict__)
+for const, value in {
+    "UQ_SCOPUS_AUTHOR_ID": "uq_scopus_authors_scopus_id",
+    "UQ_AUTHOR_NAME_VARIANT": "uq_author_name_variants",
+    "UQ_PUBLICATION_AUTHOR": "uq_publication_authors_author",
+    "UQ_PUBLICATION_AUTHOR_ORDER": "uq_publication_authors_order",
+}.items():
+    setattr(module, const, value)
+
+
+def integrity_violation(exc):  # test-only helper; not part of the baseline behavior
+    orig = getattr(exc, "orig", None)
+    if orig is None:
+        return None, None
+    diag = getattr(orig, "diag", None)
+    return (getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None),
+            getattr(diag, "constraint_name", None) if diag is not None else None)
+
+
+module.integrity_violation = integrity_violation
+sys.argv = [sys.argv[0], *sys.argv[1:]]
+exec(open(os.path.join(here, "run_pure.py"), encoding="utf-8").read())

@@ -1,0 +1,174 @@
+{
+  "gate": "E.2",
+  "item": "G04",
+  "title": "Transaction rollback safety in author normalization",
+  "date": "2026-10-29",
+  "status": "IMPLEMENTED_READY_FOR_REVIEW",
+  "evidence_level": {
+    "code_path": "FIXED",
+    "pure_unit_tests": "PASSED",
+    "postgresql_transaction_safety": "NOT_EXECUTED",
+    "claim": "PostgreSQL safety is not claimed until P1-P10 pass on an allowlisted disposable DB"
+  },
+  "takeover": {
+    "partial_codex_g04_work_found": false,
+    "normalizer_baseline_equals_head_plus_g03_diff": true,
+    "g03_changed_lines_compared": 107,
+    "g03_drift_test_matches_artifact": true,
+    "g03_drift_test_lines_compared": 393,
+    "files_restored_from_head": 0,
+    "unrelated_dirty_files_touched": 0,
+    "pre_g04_normalizer_sha256": "69267bd4ef304a85178a251f6b238a9b6074b79a58f4ab1e5b588a987263af2c"
+  },
+  "changed_files": {
+    "backend/app/services/normalization/scopus_author_normalizer.py": {
+      "change": "modified",
+      "sha256": "9f722dde9ad3aa4618d3ea1b5fa04ff6f86ca1f9b1582b4b377429371ca9a084"
+    },
+    "backend/tests/unit/test_author_position_drift.py": {
+      "change": "modified (test double only)",
+      "sha256": "2f444bfecc9b9f0eab0a37a8c308dfbcbdd44ad510875309d8a8d4ca8aecd359"
+    },
+    "backend/tests/unit/test_author_normalizer_transactions.py": {
+      "change": "added",
+      "sha256": "af614202b8f9eba7287a2b0fd8f69d80a8cad50239077b55f62b8c6e1080425d"
+    },
+    "backend/tests/integration/test_author_normalizer_transactions_pg.py": {
+      "change": "added",
+      "sha256": "3b16daf2e8845dcc4c435a97d6f1a0bdd5559abf8e69d0562d936d806b2a1d52"
+    }
+  },
+  "artifacts": {
+    "G04_IMPLEMENTATION.diff": "a1dfc99c31e4f57adc9a45ae3470404f0af9ba5624f22f9d7f85883755f6db1d",
+    "G04_TEST_RESULTS.txt": "e66e568b499625804780f2fa0af4bbd039c969098ab9fc58c47080343ee0e3bd"
+  },
+  "diff_stats_normalizer": {
+    "added": 115,
+    "removed": 30
+  },
+  "modified_functions": [
+    "integrity_violation (new)",
+    "_insert_in_savepoint (new)",
+    "AuthorNormalizer.batch_checkpoint (new)",
+    "AuthorNormalizer.restore_batch_checkpoint (new)",
+    "AuthorNormalizer._upsert_author",
+    "AuthorNormalizer._ensure_variant",
+    "AuthorNormalizer._ensure_publication_author_link (handler + _after_conflict guard only)",
+    "normalize_authors_for_import (batch checkpoint and failure path only)"
+  ],
+  "helper_level_rollbacks": {
+    "before": 3,
+    "after": 0
+  },
+  "remaining_session_rollback": "normalize_authors_for_import batch owner (intentional, whole batch)",
+  "sqlalchemy": {
+    "version": "2.0.41",
+    "begin_nested_flushes_unconditionally": true,
+    "source": "SessionTransaction._take_snapshot",
+    "mitigation": "explicit db.flush() before begin_nested, outside the try; add inside savepoint"
+  },
+  "recognized_constraints": {
+    "uq_scopus_authors_scopus_id": {
+      "sqlstate": "23505",
+      "helper": "_upsert_author",
+      "migration_line": 562
+    },
+    "uq_author_name_variants": {
+      "sqlstate": "23505",
+      "helper": "_ensure_variant",
+      "migration_line": 603
+    },
+    "uq_publication_authors_order": {
+      "sqlstate": "23505",
+      "helper": "_ensure_publication_author_link",
+      "migration_line": 657
+    },
+    "uq_publication_authors_author": {
+      "sqlstate": "23505",
+      "helper": "_ensure_publication_author_link",
+      "migration_line": 661
+    }
+  },
+  "fail_closed": [
+    "23503 FK",
+    "23514 CHECK",
+    "unrecognized unique",
+    "recognized name in wrong helper",
+    "recognized conflict with no provable row",
+    "missing SQLSTATE or constraint name",
+    "error from pre-savepoint boundary flush"
+  ],
+  "constraint_identification": "orig.pgcode/sqlstate + orig.diag.constraint_name; no message parsing",
+  "migration": "none",
+  "tests": {
+    "pure_final": {
+      "passed": 75,
+      "failed": 0,
+      "breakdown": {
+        "g04": 24,
+        "g03": 24,
+        "parser": 27
+      },
+      "forbidden_modules_loaded": []
+    },
+    "pure_baseline_pre_g04": {
+      "passed": 8,
+      "failed": 16
+    },
+    "postgresql": {
+      "status": "NOT_EXECUTED",
+      "tests_written": 11,
+      "collected": 11,
+      "reason": "No TEST_DATABASE_URL; allowlisted pytest DBs on 127.0.0.1:55432 unreachable (connection refused); no disposable DB separately authorized",
+      "application_db_contacted": false
+    },
+    "unit_sweep_informational": {
+      "passed": 475,
+      "failed": 1,
+      "errors": 33,
+      "skipped": 6,
+      "related_to_g04": false,
+      "causes": [
+        "PermissionError on pytest tmp dir (25)",
+        "conftest fixture absent under --noconftest (8)",
+        "demo_launcher .bat content assertion (1)"
+      ]
+    }
+  },
+  "ruff": {
+    "files": [
+      "scopus_author_normalizer.py",
+      "test_author_position_drift.py",
+      "test_scopus_author_normalization.py"
+    ],
+    "before": 46,
+    "after": 46,
+    "identical_set": true,
+    "new_diagnostics": 0,
+    "new_test_files": "clean"
+  },
+  "g03_compatibility": {
+    "g03_tests_passed": 24,
+    "g03_assertions_changed": 0,
+    "drift_on_race_reported_as_replay": true,
+    "drift_of_rolled_back_batch_reported": false,
+    "drift_of_committed_batches_kept_in_failed_summary": true,
+    "canonical_position_overwritten": false
+  },
+  "identity_decisions_modified": false,
+  "concurrency": {
+    "cross_import_unique_race": "recovered via savepoint",
+    "deadlock": "fails batch closed; replay",
+    "same_import_double_run": "data-safe after G04; summary last-writer-wins; no lock added (owner decision)"
+  },
+  "safety": {
+    "db_connections": 0,
+    "migrations": 0,
+    "real_data_imported": false,
+    "accept_reject_revoke_merge": 0,
+    "commit": false,
+    "push": false
+  },
+  "stopped_after": "G04",
+  "gate_e3_started": false
+}

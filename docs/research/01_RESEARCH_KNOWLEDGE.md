@@ -1,7 +1,7 @@
 # 01 — Kiến thức nghiên cứu: Bài toán Scopus–ICTU
 
 **Tạo lần đầu:** 2026-10-27  
-**Cập nhật gần nhất:** 2026-10-27 (v1.3 — Batch 4: cross-GV scope note, distinct EID counting)  
+**Cập nhật gần nhất:** 2026-10-29 (v1.9 — errata E17: phân tầng bằng chứng ORCID)  
 **Tác giả:** Claude Sonnet 4.6 (tổng hợp từ tài liệu QA và thiết kế)  
 **Phạm vi:** Kiến thức nền, định nghĩa, mô hình nghiệp vụ, nguyên tắc thiết kế hệ thống
 
@@ -41,6 +41,12 @@
 
 **[INFERENCE]** Không có bằng chứng trực tiếp về tranh chấp trong dữ liệu Batch 1–2, nhưng cơ chế này là lý do thiết kế cần tầng review thủ công.
 
+**[FACT — Gate D.3 mission, 2026-10-29; CORRECTED cùng ngày]** Quan sát được **nghi vấn trộn hồ sơ** (HIGH-PRIORITY POTENTIAL IDENTITY CONFLICT, chưa kết luận chính thức): Scopus ID 57211884261 (ICTU-WEB liệt kê cho Nguyễn Thị Hải Anh) chứa bài Heliyon 2024 — do ORCID 0009-0005-2135-2544 của GV tự nhận — và một bài vật lý mà hồ sơ ORCID 0009-0007-0103-6055 của một nhà nghiên cứu VAST tự liệt kê (FINDING-026). *(Bản đầu ghi "quan sát được trường hợp trộn hồ sơ thực tế" — nói quá mức bằng chứng.)* Như vậy "một ID — một người" cũng không được giả định; đơn vị cần review có thể là **từng công bố trên ID**, không chỉ cả ID.
+
+**[SOURCE CLAIM — ORCID tự khai, 2026-10-29]** Nơi công tác thay đổi theo thời gian: ORCID 0009-0005-2135-2544 ghi GV làm việc tại ICTU 2013-01→2024-02 và tại Trường Ngoại ngữ – ĐH Thái Nguyên từ 2024-03. **[INFERENCE]** Việc ICTU Repository/ICTU-WEB còn liệt kê một GV không chứng minh GV đó đang công tác tại ICTU; affiliation cần có **thời gian hiệu lực** và nguồn.
+
+**[FACT — Batch 6, 2026-10-28]** Lần đầu quan sát được một tín hiệu mâu thuẫn cụ thể: hồ sơ 58771657000 (TS. Nguyễn Đức Bình theo ICTU-WEB) hiển thị affiliation HCM-UTE, trong khi 5/5 công bố trong CSV của ID này ghi ICTU + email `ndbinh@ictu.edu.vn`. **[HYPOTHESIS]** Có thể hồ sơ chứa công bố của người trùng tên, hoặc chỉ do 2 docs ngoài CSV. Chưa kiểm chứng (FINDING-022).
+
 ---
 
 ### 1.4 DOI, EID và khử trùng công bố
@@ -73,6 +79,14 @@
 
 **[FACT]** ORCID trên orcid.org do tác giả tự nhập (self-reported), nhưng có quy trình xác minh tổ chức. Đáng tin hơn ICTU Repository nhưng vẫn không thể coi là tuyệt đối.
 
+**[FACT — Batch 6, 2026-10-28]** Có ba vị trí ORCID khác nhau, cần ghi rõ nguồn: (1) trên hồ sơ Scopus, (2) trên metadata công bố (Crossref, do nhà xuất bản ghi), (3) trên ICTU Repository. Chúng có thể không đồng bộ: hồ sơ 58771657000 không liên kết ORCID, nhưng cả 5 công bố của nó trên Crossref đều mang ORCID 0000-0002-1258-394X, chính là ORCID trên hồ sơ 57075583000 (FINDING-023).
+
+**[INFERENCE]** ORCID cấp công bố trùng ORCID hồ sơ của một ID khác là tín hiệu mạnh rằng hai ID thuộc cùng người, nhưng vẫn chỉ là bằng chứng cho reviewer, không phải căn cứ merge tự động.
+
+**[FACT — Gate D.3 mission, 2026-10-29]** Thứ tự tin cậy của nguồn ORCID quan sát được: (1) hồ sơ ORCID registry **liệt kê chính DOI** — mạnh nhất; (2) ORCID do nhà xuất bản ghi (Crossref); (3) ORCID trên hồ sơ Scopus; (4) ORCID do nguồn tổng hợp gán cho thực thể tác giả (OpenAlex) — **không dùng làm bằng chứng**: 6 ca sai tên/ORCID (FINDING-027). Ngược lại, hồ sơ registry **không** liệt kê một DOI chỉ là phản chứng yếu.
+
+**[FACT — errata 2026-10-29]** Trong hồ sơ ORCID cần phân biệt **ai khai** từng work: tự khai bởi chủ hồ sơ (self-asserted) hay do tổ chức thành viên nhập (Crossref, "Scopus – Elsevier"). Ví dụ 0009-0005-2135-2544 có bài Heliyon cả hai dạng; bài IJLTER chỉ tự khai. Việc tìm ORCID ứng viên chỉ qua Crossref/OpenAlex là **không đầy đủ** — ORCID của GV Hải Anh chỉ được tìm thấy qua tra cứu ORCID công khai (E14).
+
 ---
 
 ### 1.6 Phương pháp kiểm chứng danh tính — cấp độ bằng chứng
@@ -91,6 +105,24 @@ Hệ thống sử dụng thang bằng chứng tăng dần:
 **[FACT]** Cấp E5 (bằng chứng từ nhà xuất bản) mạnh hơn nhiều so với E4. Ví dụ: DOI `10.1371/journal.pone.0321009` — PLOS xác nhận `nhminh@ictu.edu.vn` là tác giả liên hệ. (Xem FINDING-010.)
 
 **[INFERENCE]** Không có bằng chứng E5 cho phần lớn các IDs trong Gate D.2 do giới hạn thời gian. Đây là giới hạn của audit hiện tại.
+
+**[FACT — Batch 6, 2026-10-28]** Thang trên cần thêm hai nhãn song song, không xếp theo cấp:
+- **CONFLICTING_EVIDENCE** — các nguồn mâu thuẫn nhau (ví dụ affiliation hồ sơ ≠ affiliation trên công bố). Có thể tồn tại cùng lúc với E4/E5.
+- Tách E5 thành **PUBLICATION_NAME_CORROBORATED** (chỉ khớp tên) và **PUBLICATION_AFFILIATION_CORROBORATED** (khớp affiliation/email do nhà xuất bản ghi); ORCID cấp công bố được ghi kèm.
+
+Ví dụ: 58771657000 đạt đồng thời PROFILE_ACCESSIBLE, PUBLICATION_AFFILIATION_CORROBORATED và CONFLICTING_EVIDENCE, nên trạng thái danh tính vẫn là IDENTITY_UNVERIFIED.
+
+**[FACT — Batch 7, 2026-10-29]** Email tác giả trên metadata nhà xuất bản có thể sai: Springer từng gán một email cho hai tác giả khác nhau trong cùng bài, và cùng một người có thể mang hai dạng email (`ndbinh@` / `binhnd@`). Vì vậy bằng chứng email chỉ có giá trị khi khớp cả **vị trí tác giả** và **tên**; một email đứng riêng không đủ cho PUBLICATION_AFFILIATION_CORROBORATED (FINDING-024).
+
+**[FACT — Batch 7, 2026-10-29]** Một ID có thể đạt SOURCE_LISTED và PROFILE_ACCESSIBLE nhưng không có bất kỳ công bố nào trong dữ liệu để kiểm tra (60320483500: 0 dòng CSV, hồ sơ ghi HUST). "Được liệt kê" không phải là bằng chứng công bố (FINDING-025).
+
+**[FACT — Gate D.3 mission, 2026-10-29]** Affiliation trên công bố thường là **danh sách**: 7/17 GV có bài ghi ICTU kèm nơi học tập/hợp tác (HUST-MICA, Budapest, Irkutsk, GUST-VAST, VNU-ITI, NPUST, ĐH Sư phạm TN). Affiliation phụ không phải mâu thuẫn; chỉ affiliation không-ICTU **không kèm** ICTU mới cần xem xét (FINDING-028). *(Phạm vi: các DOI đã chọn có metadata đọc được; phần lớn affiliation từ bản sao thứ cấp OpenAlex raw.)*
+
+**[FACT — Gate D.4, 2026-10-29]** Bằng chứng ORCID phải gắn với **vị trí tác giả**, không chỉ với bài báo: ORCID registry của một GV liệt kê DOI chỉ chứng minh GV đó là **một** tác giả của bài (đồng tác giả cũng liệt kê). ~~Quy tắc dùng trong D.4: liên kết mạnh = ORCID nhà xuất bản tại đúng vị trí trùng ORCID hồ sơ GV, hoặc ORCID registry nhận DOI **và** tên khớp (FINDING-029).~~ **[CORRECTED E17, 2026-10-29]** Hai tín hiệu này **không tương đương**. Chỉ "ORCID nhà xuất bản tại đúng vị trí (CSV = Crossref) trùng ORCID hồ sơ GV **và** registry nhận DOI" mới xác minh vị trí tác giả (T1). "Registry nhận DOI + tên khớp" (T3, hoặc T4 nếu chỉ viết tắt) chỉ **hỗ trợ ứng viên** — một đồng tác giả cùng tên vẫn có thể là người nhận. ORCID tại vị trí mà registry không nhận (T2) phải đi kèm phản chứng. Không có quy tắc này, 5/69 ID bị gán nhầm cho đồng tác giả; bản trước còn gọi 6 ca T3/T4 là "mạnh".
+
+**[FACT — Gate D.4, 2026-10-29]** "Không có ứng viên trong danh mục GV" (NO_CANDIDATE) khác "không thuộc ICTU": 39/69 ID chưa rõ chủ không khớp 410 hồ sơ GV, nhưng một số có affiliation ICTU/tên cũ của ICTU và gom được theo người (FINDING-030). **[METHOD]** Sự nhất quán chủ đề giữa các bài của một ID là tín hiệu phản chứng hữu ích (ví dụ cụm "Nguyễn Thị Dung" đại số giao hoán vs một bài lập trình di truyền), nhưng chỉ là chỉ báo, không phải bằng chứng danh tính.
+
+**[FACT — Gate D.3 mission, 2026-10-29]** Cần phân biệt bốn trạng thái kết quả kiểm chứng, không gộp: CORROBORATED (nguồn đồng ý) · CONFLICT (nguồn không đồng ý) · NOT_VERIFIABLE (nguồn thiếu dữ liệu: DOI 404, Crossref không có tác giả) · UNRESOLVED (không có dữ liệu để đánh giá: ID 0 dòng CSV + hồ sơ không xem được).
 
 ---
 
@@ -119,7 +151,15 @@ Hệ thống sử dụng thang bằng chứng tăng dần:
 | Giới hạn | Mô tả | Tác động |
 |---------|-------|---------|
 | CSV coverage | CSV là personal export của QH — không chứa toàn bộ pubs ICTU | DQA: 7 trong CSV vs 53 trên Scopus |
-| Scopus Preview server error | Batch 3 (2026-10-27): tất cả 6 profiles trả "Unable to display"; page title vẫn load → dùng làm PARTIAL evidence | Fallback về page title; ghi BROWSER_OPENED thay vì PROFILE_ACCESSIBLE |
+| Scopus Preview server error | Batch 3 (2026-10-27): tất cả 6 profiles trả "Unable to display"; page title vẫn load → dùng làm PARTIAL evidence. Batch 6 (2026-10-28): cả 4 profiles tải được body → lỗi phụ thuộc thời điểm, không phải thuộc tính của ID | Fallback về page title; ghi BROWSER_OPENED thay vì PROFILE_ACCESSIBLE; có thể mở lại sau |
+| Scopus Preview không liệt kê documents | Preview chỉ hiện số lượng docs, không cho xem danh sách ("Limited access") | Không xác định được docs của hồ sơ nằm ngoài CSV local (ví dụ 2/7 docs của 58771657000) |
+| Ba nguồn đếm công bố | ICTU-WEB, CSV và Scopus Preview cho số khác nhau theo cả hai chiều (Bình 24/24/34, Khánh 17/20/21; Batch 7: Sơn 11/21/21, Việt 10/21/22) | Luôn ghi nguồn và thời điểm của số đếm |
+| Trang nhà xuất bản chặn truy cập bằng script | Springer trả "Client Challenge" cho request tự động; chỉ đọc được trong browser | Response Crossref lưu nguyên bản bằng script; meta Springer chép từ browser và kiểm bằng SHA-256 lần chụp lại (Batch 7). Không vượt cơ chế chống bot. |
+| Cụm đồng tác giả dày đặc | Sơn–Việt–Huệ chung 15–17 EID từng cặp; 1 EID có 5 GV (Batch 7) | Tín hiệu đồng tác giả kém phân biệt trong cụm; không dùng làm bằng chứng danh tính |
+| Scopus Preview lỗi toàn phiên | Gate D.3 mission: từ 00:34Z mọi hồ sơ (kể cả ID đối chứng đã hiển thị lúc 00:18Z) trả "Unable to display"; chỉ có title | PROFILE_ACCESSIBLE = 0/34 cho nhiệm vụ; ghi trạng thái có timestamp, thử lại sau; không gọi API nội bộ |
+| Nguồn tổng hợp (OpenAlex) | Thực thể tác giả có thể sai tên/ORCID (6 ca) | Chỉ dùng chuỗi raw; ORCID thực thể không phải bằng chứng |
+| Trang nhà xuất bản sau Cloudflare | Cell/Heliyon trả trang "Just a moment…" | Dùng Europe PMC/OpenAlex raw; ghi nhãn SECONDARY_AGGREGATOR; không vượt chống bot |
+| Chọn mẫu DOI | Nhiệm vụ lớn: mọi DOI nếu ID có ≤3 bài; nếu nhiều hơn: sớm nhất / trung vị / muộn nhất | Bằng chứng công bố không bao phủ mọi DOI của ID lớn; bổ sung bằng kiểm tra ORCID registry trên **toàn bộ** DOI |
 | ICTU Repository ORCID lỗi | Ít nhất 10 cặp ORCID trùng (1 HIGH risk, 9 MEDIUM) | Không dùng ORCID ICTU làm evidence duy nhất |
 | Scopus ID "not found" ambiguity | Có thể đã merged, hoặc xóa, hoặc lỗi truy cập | Không kết luận MERGED từ "not found" |
 | Không có DOM snapshot portable | browser_evidence.json là bản ghi quan sát, không có HTML gốc | Khó tái kiểm tra độc lập |
@@ -137,6 +177,12 @@ Hệ thống sử dụng thang bằng chứng tăng dần:
 | 2026-10-27 | v1.1 | Batch 3: cập nhật Scopus Preview server error note; DOI cross-check anomaly (FINDING-016) |
 | 2026-10-27 | v1.2 | FINDING-016 CORRECTED: bổ sung quy tắc CrossRef — phải đọc toàn bộ author list, không giới hạn số tác giả |
 | 2026-10-27 | v1.3 | Batch 4: bổ sung giới hạn "cross-GV scope" (FINDING-018) và "pairwise cross-GV counting" (FINDING-019) |
+| 2026-10-28 | v1.4 | Gate D.3 Batch 6: 1.3 thêm tín hiệu mâu thuẫn đầu tiên (FINDING-022); 1.5 thêm ba vị trí ORCID và ORCID cấp công bố (FINDING-023); 1.6 thêm CONFLICTING_EVIDENCE và tách E5 name/affiliation; Phần 2 thêm 2 giới hạn và cập nhật Scopus Preview error. Không xóa nội dung cũ. |
+| 2026-10-29 | v1.5 | Gate D.3 Batch 7: 1.6 thêm giới hạn bằng chứng email (FINDING-024) và "được liệt kê ≠ có bằng chứng công bố" (FINDING-025); Phần 2 bổ sung số đếm Batch 7, thêm giới hạn chặn bot của nhà xuất bản và cụm đồng tác giả. Không xóa nội dung cũ. |
+| 2026-10-29 | v1.6 | Gate D.3 mission A/B/C: 1.3 thêm ca trộn hồ sơ (FINDING-026); 1.5 thêm thứ tự tin cậy nguồn ORCID (FINDING-027); 1.6 thêm affiliation dạng danh sách (FINDING-028) và bốn trạng thái kiểm chứng; Phần 2 thêm 4 giới hạn (Scopus Preview lỗi toàn phiên, OpenAlex, Cloudflare, chọn mẫu DOI). Không xóa nội dung cũ. |
+| 2026-10-29 | v1.7 | Scientific errata: 1.3 hạ "trộn hồ sơ thực tế" xuống nghi vấn HIGH-PRIORITY, thêm ORCID 0009-0005-2135-2544 và affiliation có thời gian hiệu lực; 1.5 thêm phân biệt self-asserted vs member-imported và giới hạn tìm ORCID ứng viên; 1.6 giới hạn phạm vi dual affiliation. Giữ văn bản cũ trong ghi chú. |
+| 2026-10-29 | v1.8 | Gate D.4: 1.6 thêm quy tắc ORCID gắn với vị trí tác giả (FINDING-029), NO_CANDIDATE ≠ không thuộc ICTU (FINDING-030), tín hiệu nhất quán chủ đề. Không xóa nội dung cũ. |
+| 2026-10-29 | v1.9 | Errata E17: tách "ORCID nhà xuất bản tại vị trí + registry" (T1, xác minh vị trí) khỏi "registry + tên khớp" (T3/T4, chỉ hỗ trợ); câu cũ giữ dạng gạch ngang. |
 
 ---
 

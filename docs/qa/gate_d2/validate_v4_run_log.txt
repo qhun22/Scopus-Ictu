@@ -1,0 +1,217 @@
+
+============================================================
+  DEPENDENCY CHECK — required files
+============================================================
+  [PASS] exists: data\scopus\Truong_Quang_Huy_Scopus_Sep2026.csv
+  [PASS] exists: docs\qa\gate_d1r\ictu_multi_scopus_ids.csv
+  [PASS] exists: docs\qa\gate_d2\batch1_full_csv_reconciliation.csv
+  [PASS] exists: docs\qa\gate_d2\batch1_id_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch2_id_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch3_id_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch4_id_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch5_id_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch1_publication_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch2_publication_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch3_publication_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch4_publication_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch5_publication_evidence.csv
+  [PASS] exists: docs\qa\gate_d2\batch2_browser_evidence.json
+  [PASS] exists: docs\qa\gate_d2\batch3_browser_evidence.json
+  [PASS] exists: docs\qa\gate_d2\batch4_browser_evidence.json
+  [PASS] exists: docs\qa\gate_d2\batch5_browser_evidence.json
+  [PASS] exists: docs\research\02_ICTU_DATA_FINDINGS.md
+
+============================================================
+  DEPENDENCY SHA-256 VERIFICATION
+============================================================
+  [PASS] Source CSV SHA-256 matches pin -- got fa2e2a48ef325590... expected fa2e2a48ef325590...
+  [PASS] ICTU CSV normalized SHA-256 matches Gate D.1 ZIP content -- normalized=8e782e12c689e756... expected=8e782e12c689e756...
+  [PASS] ICTU CSV raw SHA-256 recorded -- raw=7f14c3a7b42ed648694e15baa74ff0c56a95ac7e0ca008e4b5f024e4cdd3554e (differs from Gate D.1 ZIP due to line endings only)
+  [PASS] batch1_full_csv_reconciliation.csv SHA-256 recorded -- 646e9f06f643420d...
+
+============================================================
+  LOAD ICTU MULTI-SCOPUS IDS (34 GVs / 83 IDs)
+============================================================
+  [PASS] ICTU CSV: 34 GVs -- got 34
+  [PASS] ICTU CSV: 83 unique IDs -- got 83
+  [PASS] DDC: 2 IDs {'26423550300','60561601800'} -- got ['26423550300', '60561601800']
+  [PASS] DXL: 2 IDs {'59707347300','58805827700'} -- got ['58805827700', '59707347300']
+
+============================================================
+  LOAD SOURCE CSV
+============================================================
+  [PASS] Source CSV: 660 rows -- got 660
+  [PASS] Source EID+SID pairs built (2751)
+
+============================================================
+  CHECK 1: CSV files strict UTF-8
+============================================================
+  [PASS] UTF-8: batch1_id_evidence.csv
+  [PASS] UTF-8: batch2_id_evidence.csv
+  [PASS] UTF-8: batch3_id_evidence.csv
+  [PASS] UTF-8: batch4_id_evidence.csv
+  [PASS] UTF-8: batch5_id_evidence.csv
+  [PASS] UTF-8: batch1_publication_evidence.csv
+  [PASS] UTF-8: batch2_publication_evidence.csv
+  [PASS] UTF-8: batch3_publication_evidence.csv
+  [PASS] UTF-8: batch4_publication_evidence.csv
+  [PASS] UTF-8: batch5_publication_evidence.csv
+  [PASS] UTF-8: batch1_full_csv_reconciliation.csv -- already checked via utf-8-sig read above
+
+============================================================
+  CHECK 2: JSON files parse OK
+============================================================
+  [PASS] JSON parse: batch2_browser_evidence.json
+  [PASS] JSON parse: batch3_browser_evidence.json
+  [PASS] JSON parse: batch4_browser_evidence.json
+  [PASS] JSON parse: batch5_browser_evidence.json
+
+============================================================
+  CHECK 3: Publication row provenance -- EID+SID+DOI vs source CSV (same row)
+============================================================
+  [PASS] All 64/65 rows OK: batch1_full_csv_reconciliation.csv -- no_eid=1 no_sid=0 verified=64
+  [PASS] All 34/38 rows OK: batch2_publication_evidence.csv -- no_eid=4 no_sid=0 verified=34
+  [PASS] All 29/29 rows OK: batch3_publication_evidence.csv -- no_eid=0 no_sid=0 verified=29
+  [PASS] All 39/39 rows OK: batch4_publication_evidence.csv -- no_eid=0 no_sid=0 verified=39
+  [PASS] All 20/20 rows OK: batch5_publication_evidence.csv -- no_eid=0 no_sid=0 verified=20
+  [PASS] Total rows seen: 191 -- with_eid=186 eid+sid=186 no_eid=5 no_sid(FAIL)=0
+  [PASS] All rows verified: mismatches=0 unparseable_sid=0 -- mismatches=0 unparseable_sid=0
+
+============================================================
+  CHECK 4: DOI->ID provenance (doi_crossref_verified in id_evidence)
+============================================================
+  [PASS] DOI->ID [batch3] 58830932700: 10.1109/icca.2010.5524407
+  [PASS] DOI->ID [batch3] 56967513900: 10.1109/mnet.010.2100509
+  [PASS] DOI->ID [batch3] 57221224211: 10.3390/fi17080350
+  [PASS] DOI->ID [batch4] 59775920700: 10.5121/ijcnc.2026.18401
+  [PASS] DOI->ID [batch4] 58771615400: 10.4108/eetiot.5210
+  [PASS] DOI->ID [batch5] 57197579769: 10.1109/cisp.2009.5303557
+  [PASS] DOI->ID [batch5] 58805722900: 10.1007/978-3-031-50818-9_35
+  [PASS] DOI->ID [batch5] 59526508700: 10.1007/s00542-026-06031-2
+  [PASS] DOI->ID [batch5] 57819997900: 10.11591/eei.v14i3.9064
+
+============================================================
+  CHECK 5: Coverage 41/83 IDs and 13/34 GVs -- from real data
+============================================================
+  [PASS] Batch CSVs: unique IDs in 83-set = 37 -- got 37
+  [PASS] Batch CSVs: GVs covered = 11 -- got 11: ['dqa', 'dtbac', 'lhlinh', 'lmhue', 'nhhuy', 'nhminh', 'nvtao', 'pdlong', 'ptnghia', 'qxtruong', 'tqquy']
+  [PASS] Gate D.1 adds DDC+DXL IDs not in batch CSVs: 4 -- got 4: ['26423550300', '58805827700', '59707347300', '60561601800']
+  [PASS] DTB x5 already in batch5 CSV -- DTB missing: set()
+  [PASS] Total visited IDs = 41/83 -- got 41
+  [PASS] Total visited GVs = 13/34 -- got 13: ['ddcuong', 'dqa', 'dtbac', 'dxlam', 'lhlinh', 'lmhue', 'nhhuy', 'nhminh', 'nvtao', 'pdlong', 'ptnghia', 'qxtruong', 'tqquy']
+  [PASS] Unvisited IDs = 42/83 -- got 42
+
+============================================================
+  CHECK 6: Per-ID pub counts in id_evidence.csv match source CSV
+============================================================
+  [PASS] Pub count [batch3] 56548128100
+  [PASS] Pub count [batch3] 58830932700
+  [PASS] Pub count [batch3] 57200439355
+  [PASS] Pub count [batch3] 57192958573
+  [PASS] Pub count [batch3] 56967513900
+  [PASS] Pub count [batch3] 57221224211
+  [PASS] Pub count [batch4] 57210434401
+  [PASS] Pub count [batch4] 59708261900
+  [PASS] Pub count [batch4] 59775920700
+  [PASS] Pub count [batch4] 58771615400
+  [PASS] Pub count [batch4] 60214163500
+  [PASS] Pub count [batch4] 59768494800
+  [PASS] Pub count [batch5] 26637116200
+  [PASS] Pub count [batch5] 57197579769
+  [PASS] Pub count [batch5] 58805722900
+  [PASS] Pub count [batch5] 59526508700
+  [PASS] Pub count [batch5] 57819997900
+  [PASS] Pub count [batch5] 59663496400
+  [PASS] Pub count [batch5] 59159284800
+  [PASS] Pub count [batch5] 57899449200
+
+============================================================
+  CHECK 7: Stats 186/158/25/3 -- from full pub exports (batch1 full + batch2-5)
+============================================================
+  [PASS] Pub exports (batch1 full + batch2-5): GV-EID pairs = 186 -- got 186
+  [PASS] Pub exports: unique EIDs = 158 -- got 158
+  [PASS] Pub exports: cross-GV EIDs (>=2 GVs) = 25 -- got 25
+  [PASS] Pub exports: triple-GV EIDs (>=3 GVs) = 3 -- got 3: ['2-s2.0-105000957095', '2-s2.0-105041762468', '2-s2.0-85208627580']
+  [PASS] All 186 export pairs verified in source CSV -- some export pairs not found in source
+  [PASS] No intra-GV EID duplicates across full pub exports
+
+============================================================
+  CHECK 8: FINDING-001 through FINDING-021 in findings file
+============================================================
+  [PASS] FINDING-001 present
+  [PASS] FINDING-002 present
+  [PASS] FINDING-003 present
+  [PASS] FINDING-004 present
+  [PASS] FINDING-005 present
+  [PASS] FINDING-006 present
+  [PASS] FINDING-007 present
+  [PASS] FINDING-008 present
+  [PASS] FINDING-009 present
+  [PASS] FINDING-010 present
+  [PASS] FINDING-011 present
+  [PASS] FINDING-012 present
+  [PASS] FINDING-013 present
+  [PASS] FINDING-014 present
+  [PASS] FINDING-015 present
+  [PASS] FINDING-016 present
+  [PASS] FINDING-017 present
+  [PASS] FINDING-018 present
+  [PASS] FINDING-019 present
+  [PASS] FINDING-020 present
+  [PASS] FINDING-021 present
+
+============================================================
+  CHECK 9: batch4 JSON three_way_shared_eids split
+============================================================
+  [PASS] Old 'three_way_shared_eids' renamed/removed -- field still present
+  [PASS] three_way_shared_eids_nhh_qxt_tqq has 2 EIDs -- got 2: ['2-s2.0-105000957095', '2-s2.0-105041762468']
+  [PASS] three_way_shared_eids_all_9gv has 3 EIDs -- got 3: ['2-s2.0-105000957095', '2-s2.0-105041762468', '2-s2.0-85208627580']
+  [PASS] all_9gv includes 2-s2.0-85208627580
+  [PASS] Exports confirm 3 triple-GV EIDs -- got ['2-s2.0-105000957095', '2-s2.0-105041762468', '2-s2.0-85208627580']
+  [PASS] Exports confirm triple EID 2-s2.0-105000957095: ['nhhuy', 'qxtruong', 'tqquy'] -- only ['nhhuy', 'qxtruong', 'tqquy']
+  [PASS] Exports confirm triple EID 2-s2.0-105041762468: ['nhhuy', 'qxtruong', 'tqquy'] -- only ['nhhuy', 'qxtruong', 'tqquy']
+  [PASS] Exports confirm triple EID 2-s2.0-85208627580: ['lhlinh', 'nhhuy', 'tqquy'] -- only ['lhlinh', 'nhhuy', 'tqquy']
+
+============================================================
+  CHECK 10: batch3 JSON ids_doi_anomaly_flagged cleared
+============================================================
+  [PASS] ids_doi_anomaly_flagged is empty list -- got: []
+  [PASS] correction_history has >=1 entry -- got 1
+  [PASS] history entry for 56967513900
+
+============================================================
+  NEGATIVE TESTS — real mutations on temp copies, validator re-invoked
+============================================================
+  [NEG-PASS] NEG-1: Wrong SID in batch3 pub CSV -> provenance FAIL -- exit=1
+  [NEG-PASS] NEG-2: Wrong DOI in batch4 pub CSV -> DOI mismatch FAIL -- exit=1
+  [NEG-PASS] NEG-3: Missing batch5 pub CSV -> dependency FAIL -- exit=1
+  [NEG-PASS] NEG-4: batch1_full EIDs cleared -> 186 count FAIL -- exit=1
+  [NEG-PASS] NEG-5: Source CSV truncated -> SHA pin + row count FAIL -- exit=1
+  [PASS] All 5 negative tests triggered (exit != 0) -- 5/5 triggered
+
+============================================================
+  EXTERNAL DEPENDENCY MANIFEST
+============================================================
+  data\scopus\Truong_Quang_Huy_Scopus_Sep2026.csv
+    SHA-256 (raw): fa2e2a48ef3255905d3a14b0e63f052f7893815bbe91a35b2d643fd928d0f707
+
+  docs\qa\gate_d1r\ictu_multi_scopus_ids.csv
+    SHA-256 (raw, local CRLF):   7f14c3a7b42ed648694e15baa74ff0c56a95ac7e0ca008e4b5f024e4cdd3554e
+    SHA-256 (normalized to LF):  8e782e12c689e7563dfd88e02d8c0c8f145b3c7634029faf7759251c8ddb77c0
+    Gate D.1 ZIP SHA (LF):       8e782e12c689e7563dfd88e02d8c0c8f145b3c7634029faf7759251c8ddb77c0
+    Content identical (after line-ending normalization): True
+
+  docs\qa\gate_d2\batch1_full_csv_reconciliation.csv
+    SHA-256: 646e9f06f643420d03b3b3a668244e87d83f91823fbb79f6b145ea3df1b6020b
+
+  Note: ZIP does not include the first two files above.
+  To reproduce: place at their paths and run this script.
+
+============================================================
+  SUMMARY
+============================================================
+
+  Total: 125  |  Passed: 125  |  Failed: 0
+
+  [PASS] ALL CHECKS PASSED
+

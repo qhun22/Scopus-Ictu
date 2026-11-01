@@ -1,0 +1,336 @@
+{
+  "originals_before": {
+    "data\\scopus\\Truong_Quang_Huy_Scopus_Sep2026.csv": "fa2e2a48ef3255905d3a14b0e63f052f7893815bbe91a35b2d643fd928d0f707",
+    "docs\\qa\\gate_d1r\\ictu_multi_scopus_ids.csv": "7f14c3a7b42ed648694e15baa74ff0c56a95ac7e0ca008e4b5f024e4cdd3554e",
+    "docs\\qa\\gate_d2\\batch1_full_csv_reconciliation.csv": "646e9f06f643420d03b3b3a668244e87d83f91823fbb79f6b145ea3df1b6020b",
+    "docs\\research\\02_ICTU_DATA_FINDINGS.md": "6cc3b224bb16befc7af9e12f66ade7dd3b28be08d245fc0cee7246deb6199527",
+    "docs\\qa\\gate_d2\\batch1_id_evidence.csv": "9c3ca17ec692c2b4cddf575c1a8271dc0cc7bd421ac9f0829ec0d2b7db44fc12",
+    "docs\\qa\\gate_d2\\batch2_id_evidence.csv": "be7f3c24317380587082db0188c00e543db6395172a9ecc296f84d0293dfe057",
+    "docs\\qa\\gate_d2\\batch3_id_evidence.csv": "7babc8a30cada07aca0beeda21ead619cdae5ec09c675182275992aaa5d63f7e",
+    "docs\\qa\\gate_d2\\batch4_id_evidence.csv": "e6a92a20e1c06b2e26f1b8cb954bf093f599069431ad53817e77e329ce131011",
+    "docs\\qa\\gate_d2\\batch5_id_evidence.csv": "1e57915f91e8507862fd89b1dba5910a99a4315afc9cc465c29c9d412c70b70b",
+    "docs\\qa\\gate_d2\\batch1_publication_evidence.csv": "92d622fe11ab1c29c8940799b69ac7b517c784da756ac09fc81b4d64bbb5abb4",
+    "docs\\qa\\gate_d2\\batch2_publication_evidence.csv": "118ecd53a9b09fd83ece7ad768a6b6f6fd4b293edd51bae4f5382a24b553cc99",
+    "docs\\qa\\gate_d2\\batch3_publication_evidence.csv": "0b43ea394bacde10b04767fbf662593ffec285836e38d2352f2155703a98d2e8",
+    "docs\\qa\\gate_d2\\batch4_publication_evidence.csv": "86bddf056f193929de6d9a2699c490a81807097dad5d7e58f8eb368d3a7bdd7d",
+    "docs\\qa\\gate_d2\\batch5_publication_evidence.csv": "9990b4a3ef20cfcfe3a7a28c2eb6420b67d4f6f41caee5a1f5974350b3e40a39",
+    "docs\\qa\\gate_d2\\batch2_browser_evidence.json": "d7da49e24982ec81179135649066b9b56d32b7b5abc94088e80381bb98bfd120",
+    "docs\\qa\\gate_d2\\batch3_browser_evidence.json": "c0211053abc97137d15626b25abed2b4ba319ce090e2c5fa34326b880e17d7ed",
+    "docs\\qa\\gate_d2\\batch4_browser_evidence.json": "5d582bdf849b19e06e96fdbc6c95b0e8f23f051e358c401eedb3fd595dd92ff5",
+    "docs\\qa\\gate_d2\\batch5_browser_evidence.json": "d1be8ed815a4f74cb384134f26cb5d83f6aee3e9e309eed4bd4beefb28395760",
+    "docs\\qa\\gate_d2\\validate_gate_d2.py": "1ff7143587bc0ebcdbd6c8797a6f3bddefc043b7ce196c41c2bf6c93139170ec"
+  },
+  "tests": [
+    {
+      "id": "NEG-1",
+      "mutation": "Wrong SID in batch3 pub CSV",
+      "baseline_exit": 0,
+      "baseline_totals": [
+        "125",
+        "125",
+        "0"
+      ],
+      "baseline_fail_lines": [],
+      "files_changed_by_mutation": [
+        "docs\\qa\\gate_d2\\batch3_publication_evidence.csv"
+      ],
+      "mutated_exit": 1,
+      "mutated_totals": [
+        "125",
+        "121",
+        "4"
+      ],
+      "mutated_fail_lines": [
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105038090067, 00000000000) NOT in source CSV",
+        "[FAIL] All rows verified: mismatches=0 unparseable_sid=0 -- mismatches=1 unparseable_sid=0",
+        "[FAIL] Pub exports (batch1 full + batch2-5): GV-EID pairs = 186 -- got 185",
+        "[FAIL] Pub exports: cross-GV EIDs (>=2 GVs) = 25 -- got 24",
+        "[FAIL] 4 CHECK(S) FAILED:"
+      ],
+      "expected_tokens": [
+        "CHECK 3",
+        "provenance",
+        "batch3"
+      ],
+      "expected_fail_matched": [
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105038090067, 00000000000) NOT in source CSV"
+      ],
+      "traceback": false,
+      "verdict": "NEG-PASS"
+    },
+    {
+      "id": "NEG-2",
+      "mutation": "Wrong DOI in batch4 pub CSV",
+      "baseline_exit": 0,
+      "baseline_totals": [
+        "125",
+        "125",
+        "0"
+      ],
+      "baseline_fail_lines": [],
+      "files_changed_by_mutation": [
+        "docs\\qa\\gate_d2\\batch4_publication_evidence.csv"
+      ],
+      "mutated_exit": 1,
+      "mutated_totals": [
+        "125",
+        "123",
+        "2"
+      ],
+      "mutated_fail_lines": [
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- DOI 10.9999/fake-doi-neg2 not on source row for (2-s2.0-105046197896, 59775920700); valid: ['10.5121/ijcnc.2026.18401']",
+        "[FAIL] All rows verified: mismatches=0 unparseable_sid=0 -- mismatches=1 unparseable_sid=0",
+        "[FAIL] 2 CHECK(S) FAILED:"
+      ],
+      "expected_tokens": [
+        "DOI"
+      ],
+      "expected_fail_matched": [
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- DOI 10.9999/fake-doi-neg2 not on source row for (2-s2.0-105046197896, 59775920700); valid: ['10.5121/ijcnc.2026.18401']"
+      ],
+      "traceback": false,
+      "verdict": "NEG-PASS"
+    },
+    {
+      "id": "NEG-3",
+      "mutation": "Delete batch5 pub CSV",
+      "baseline_exit": 0,
+      "baseline_totals": [
+        "125",
+        "125",
+        "0"
+      ],
+      "baseline_fail_lines": [],
+      "files_changed_by_mutation": [
+        "docs\\qa\\gate_d2\\batch5_publication_evidence.csv"
+      ],
+      "mutated_exit": 1,
+      "mutated_totals": null,
+      "mutated_fail_lines": [
+        "[FAIL] exists: docs\\qa\\gate_d2\\batch5_publication_evidence.csv",
+        "FATAL: 1 required file(s) missing. Aborting."
+      ],
+      "expected_tokens": [
+        "exists: docs",
+        "batch5_publication_evidence.csv"
+      ],
+      "expected_fail_matched": [
+        "[FAIL] exists: docs\\qa\\gate_d2\\batch5_publication_evidence.csv"
+      ],
+      "traceback": false,
+      "verdict": "NEG-PASS"
+    },
+    {
+      "id": "NEG-4",
+      "mutation": "Clear all EIDs in batch1_full",
+      "baseline_exit": 0,
+      "baseline_totals": [
+        "125",
+        "125",
+        "0"
+      ],
+      "baseline_fail_lines": [],
+      "files_changed_by_mutation": [
+        "docs\\qa\\gate_d2\\batch1_full_csv_reconciliation.csv"
+      ],
+      "mutated_exit": 1,
+      "mutated_totals": [
+        "125",
+        "118",
+        "7"
+      ],
+      "mutated_fail_lines": [
+        "[FAIL] Pub exports (batch1 full + batch2-5): GV-EID pairs = 186 -- got 122",
+        "[FAIL] Pub exports: unique EIDs = 158 -- got 106",
+        "[FAIL] Pub exports: cross-GV EIDs (>=2 GVs) = 25 -- got 15",
+        "[FAIL] Pub exports: triple-GV EIDs (>=3 GVs) = 3 -- got 1: ['2-s2.0-85208627580']",
+        "[FAIL] Exports confirm 3 triple-GV EIDs -- got ['2-s2.0-85208627580']",
+        "[FAIL] Exports confirm triple EID 2-s2.0-105000957095: ['nhhuy', 'tqquy'] -- only ['nhhuy', 'tqquy']",
+        "[FAIL] Exports confirm triple EID 2-s2.0-105041762468: ['nhhuy', 'tqquy'] -- only ['nhhuy', 'tqquy']",
+        "[FAIL] 7 CHECK(S) FAILED:"
+      ],
+      "expected_tokens": [
+        "186",
+        "pairs"
+      ],
+      "expected_fail_matched": [
+        "[FAIL] Pub exports (batch1 full + batch2-5): GV-EID pairs = 186 -- got 122"
+      ],
+      "traceback": false,
+      "verdict": "NEG-PASS"
+    },
+    {
+      "id": "NEG-5",
+      "mutation": "Truncate source CSV to 11 lines",
+      "baseline_exit": 0,
+      "baseline_totals": [
+        "125",
+        "125",
+        "0"
+      ],
+      "baseline_fail_lines": [],
+      "files_changed_by_mutation": [
+        "data\\scopus\\Truong_Quang_Huy_Scopus_Sep2026.csv"
+      ],
+      "mutated_exit": 1,
+      "mutated_totals": [
+        "150",
+        "87",
+        "63"
+      ],
+      "mutated_fail_lines": [
+        "[FAIL] Source CSV SHA-256 matches pin -- got b7c475abc263df4a... expected fa2e2a48ef325590...",
+        "[FAIL] Source CSV: 660 rows -- got 10",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-105041697341, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-85120584036, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-105041711156, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-85187712377, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-105000957095, 57196472280) NOT in source CSV",
+        "[FAIL]   ...58 more fails in batch1_full_csv_reconciliation.csv",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105027134268, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105037881639, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105047727785, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105041697341, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105041696493, 60319803200) NOT in source CSV",
+        "[FAIL]   ...28 more fails in batch2_publication_evidence.csv",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105038090067, 56548128100) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105011872801, 56548128100) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105014444022, 57221224211) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-85123285689, 57192958573) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105038594009, 56548128100) NOT in source CSV",
+        "[FAIL]   ...24 more fails in batch3_publication_evidence.csv",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-85214436904, 57210434401) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-105038090067, 59775920700) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-85208225546, 57210434401) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-105041696493, 59775920700) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-105038594009, 59775920700) NOT in source CSV",
+        "[FAIL]   ...31 more fails in batch4_publication_evidence.csv",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-85181976602, 58805722900) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-73849149157, 57197579769) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-77957858516, 26637116200) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-77949585630, 26637116200) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-71449114986, 26637116200) NOT in source CSV",
+        "[FAIL]   ...15 more fails in batch5_publication_evidence.csv",
+        "[FAIL] All rows verified: mismatches=0 unparseable_sid=0 -- mismatches=181 unparseable_sid=0",
+        "[FAIL] DOI->ID [batch3] 58830932700: 10.1109/icca.2010.5524407 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch3] 56967513900: 10.1109/mnet.010.2100509 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch3] 57221224211: 10.3390/fi17080350 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch4] 59775920700: 10.5121/ijcnc.2026.18401 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch4] 58771615400: 10.4108/eetiot.5210 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 57197579769: 10.1109/cisp.2009.5303557 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 58805722900: 10.1007/978-3-031-50818-9_35 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 59526508700: 10.1007/s00542-026-06031-2 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 57819997900: 10.11591/eei.v14i3.9064 -- source maps DOI to NOT FOUND",
+        "[FAIL] Pub count [batch3] 56548128100 -- claimed 13, source has 0",
+        "[FAIL] Pub count [batch3] 58830932700 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch3] 57200439355 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch3] 57192958573 -- claimed 5, source has 0",
+        "[FAIL] Pub count [batch3] 56967513900 -- claimed 7, source has 0",
+        "[FAIL] Pub count [batch3] 57221224211 -- claimed 2, source has 0",
+        "[FAIL] Pub count [batch4] 57210434401 -- claimed 12, source has 1",
+        "[FAIL] Pub count [batch4] 59708261900 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch4] 59775920700 -- claimed 9, source has 0",
+        "[FAIL] Pub count [batch4] 58771615400 -- claimed 9, source has 1",
+        "[FAIL] Pub count [batch4] 60214163500 -- claimed 7, source has 1",
+        "[FAIL] Pub count [batch4] 59768494800 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 26637116200 -- claimed 4, source has 0",
+        "[FAIL] Pub count [batch5] 57197579769 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 58805722900 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 59526508700 -- claimed 8, source has 0",
+        "[FAIL] Pub count [batch5] 57819997900 -- claimed 3, source has 0",
+        "[FAIL] Pub count [batch5] 59663496400 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 59159284800 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 57899449200 -- claimed 1, source has 0",
+        "[FAIL] All 186 export pairs verified in source CSV -- some export pairs not found in source",
+        "[FAIL] 63 CHECK(S) FAILED:"
+      ],
+      "expected_tokens": [
+        "SHA-256",
+        "source"
+      ],
+      "expected_fail_matched": [
+        "[FAIL] Source CSV SHA-256 matches pin -- got b7c475abc263df4a... expected fa2e2a48ef325590...",
+        "[FAIL] Source CSV: 660 rows -- got 10",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-105041697341, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-85120584036, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-105041711156, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-85187712377, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch1_full_csv_reconciliation.csv] -- (2-s2.0-105000957095, 57196472280) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105027134268, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105037881639, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105047727785, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105041697341, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch2_publication_evidence.csv] -- (2-s2.0-105041696493, 60319803200) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105038090067, 56548128100) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105011872801, 56548128100) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105014444022, 57221224211) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-85123285689, 57192958573) NOT in source CSV",
+        "[FAIL] Provenance [batch3_publication_evidence.csv] -- (2-s2.0-105038594009, 56548128100) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-85214436904, 57210434401) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-105038090067, 59775920700) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-85208225546, 57210434401) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-105041696493, 59775920700) NOT in source CSV",
+        "[FAIL] Provenance [batch4_publication_evidence.csv] -- (2-s2.0-105038594009, 59775920700) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-85181976602, 58805722900) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-73849149157, 57197579769) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-77957858516, 26637116200) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-77949585630, 26637116200) NOT in source CSV",
+        "[FAIL] Provenance [batch5_publication_evidence.csv] -- (2-s2.0-71449114986, 26637116200) NOT in source CSV",
+        "[FAIL] DOI->ID [batch3] 58830932700: 10.1109/icca.2010.5524407 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch3] 56967513900: 10.1109/mnet.010.2100509 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch3] 57221224211: 10.3390/fi17080350 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch4] 59775920700: 10.5121/ijcnc.2026.18401 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch4] 58771615400: 10.4108/eetiot.5210 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 57197579769: 10.1109/cisp.2009.5303557 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 58805722900: 10.1007/978-3-031-50818-9_35 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 59526508700: 10.1007/s00542-026-06031-2 -- source maps DOI to NOT FOUND",
+        "[FAIL] DOI->ID [batch5] 57819997900: 10.11591/eei.v14i3.9064 -- source maps DOI to NOT FOUND",
+        "[FAIL] Pub count [batch3] 56548128100 -- claimed 13, source has 0",
+        "[FAIL] Pub count [batch3] 58830932700 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch3] 57200439355 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch3] 57192958573 -- claimed 5, source has 0",
+        "[FAIL] Pub count [batch3] 56967513900 -- claimed 7, source has 0",
+        "[FAIL] Pub count [batch3] 57221224211 -- claimed 2, source has 0",
+        "[FAIL] Pub count [batch4] 57210434401 -- claimed 12, source has 1",
+        "[FAIL] Pub count [batch4] 59708261900 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch4] 59775920700 -- claimed 9, source has 0",
+        "[FAIL] Pub count [batch4] 58771615400 -- claimed 9, source has 1",
+        "[FAIL] Pub count [batch4] 60214163500 -- claimed 7, source has 1",
+        "[FAIL] Pub count [batch4] 59768494800 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 26637116200 -- claimed 4, source has 0",
+        "[FAIL] Pub count [batch5] 57197579769 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 58805722900 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 59526508700 -- claimed 8, source has 0",
+        "[FAIL] Pub count [batch5] 57819997900 -- claimed 3, source has 0",
+        "[FAIL] Pub count [batch5] 59663496400 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 59159284800 -- claimed 1, source has 0",
+        "[FAIL] Pub count [batch5] 57899449200 -- claimed 1, source has 0",
+        "[FAIL] All 186 export pairs verified in source CSV -- some export pairs not found in source"
+      ],
+      "traceback": false,
+      "verdict": "NEG-PASS"
+    }
+  ],
+  "originals_after": {
+    "data\\scopus\\Truong_Quang_Huy_Scopus_Sep2026.csv": "fa2e2a48ef3255905d3a14b0e63f052f7893815bbe91a35b2d643fd928d0f707",
+    "docs\\qa\\gate_d1r\\ictu_multi_scopus_ids.csv": "7f14c3a7b42ed648694e15baa74ff0c56a95ac7e0ca008e4b5f024e4cdd3554e",
+    "docs\\qa\\gate_d2\\batch1_full_csv_reconciliation.csv": "646e9f06f643420d03b3b3a668244e87d83f91823fbb79f6b145ea3df1b6020b",
+    "docs\\research\\02_ICTU_DATA_FINDINGS.md": "6cc3b224bb16befc7af9e12f66ade7dd3b28be08d245fc0cee7246deb6199527",
+    "docs\\qa\\gate_d2\\batch1_id_evidence.csv": "9c3ca17ec692c2b4cddf575c1a8271dc0cc7bd421ac9f0829ec0d2b7db44fc12",
+    "docs\\qa\\gate_d2\\batch2_id_evidence.csv": "be7f3c24317380587082db0188c00e543db6395172a9ecc296f84d0293dfe057",
+    "docs\\qa\\gate_d2\\batch3_id_evidence.csv": "7babc8a30cada07aca0beeda21ead619cdae5ec09c675182275992aaa5d63f7e",
+    "docs\\qa\\gate_d2\\batch4_id_evidence.csv": "e6a92a20e1c06b2e26f1b8cb954bf093f599069431ad53817e77e329ce131011",
+    "docs\\qa\\gate_d2\\batch5_id_evidence.csv": "1e57915f91e8507862fd89b1dba5910a99a4315afc9cc465c29c9d412c70b70b",
+    "docs\\qa\\gate_d2\\batch1_publication_evidence.csv": "92d622fe11ab1c29c8940799b69ac7b517c784da756ac09fc81b4d64bbb5abb4",
+    "docs\\qa\\gate_d2\\batch2_publication_evidence.csv": "118ecd53a9b09fd83ece7ad768a6b6f6fd4b293edd51bae4f5382a24b553cc99",
+    "docs\\qa\\gate_d2\\batch3_publication_evidence.csv": "0b43ea394bacde10b04767fbf662593ffec285836e38d2352f2155703a98d2e8",
+    "docs\\qa\\gate_d2\\batch4_publication_evidence.csv": "86bddf056f193929de6d9a2699c490a81807097dad5d7e58f8eb368d3a7bdd7d",
+    "docs\\qa\\gate_d2\\batch5_publication_evidence.csv": "9990b4a3ef20cfcfe3a7a28c2eb6420b67d4f6f41caee5a1f5974350b3e40a39",
+    "docs\\qa\\gate_d2\\batch2_browser_evidence.json": "d7da49e24982ec81179135649066b9b56d32b7b5abc94088e80381bb98bfd120",
+    "docs\\qa\\gate_d2\\batch3_browser_evidence.json": "c0211053abc97137d15626b25abed2b4ba319ce090e2c5fa34326b880e17d7ed",
+    "docs\\qa\\gate_d2\\batch4_browser_evidence.json": "5d582bdf849b19e06e96fdbc6c95b0e8f23f051e358c401eedb3fd595dd92ff5",
+    "docs\\qa\\gate_d2\\batch5_browser_evidence.json": "d1be8ed815a4f74cb384134f26cb5d83f6aee3e9e309eed4bd4beefb28395760",
+    "docs\\qa\\gate_d2\\validate_gate_d2.py": "1ff7143587bc0ebcdbd6c8797a6f3bddefc043b7ce196c41c2bf6c93139170ec"
+  },
+  "originals_unchanged": true
+}

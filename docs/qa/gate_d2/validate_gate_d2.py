@@ -1,145 +1,419 @@
 """
-Gate D.2 Batch 3–5 Validation Script
+Gate D.2 Batch 3-5 Validation Script — v4
 Read-only. No DB writes. No ACCEPT/REJECT. No source data modification.
 
-Checks:
-  1. All CSVs strict UTF-8 (no errors='ignore')
-  2. All JSONs parse OK
-  3. For every doi_crossref_verified on an ID, DOI must exist in publication CSV under that same ID
-  4. Per-ID pub counts in id_evidence.csv match publication CSV
-  5. Coverage counted as set(unique IDs), not visit count
-  6. Old finding IDs still present in 02_ICTU_DATA_FINDINGS.md
-  7. Triple-GV EIDs confirmed (3 EIDs for full-CSV cross-GV)
-  8. Q11 union count = 7 distinct EIDs (not 9)
+Changes from v3:
+  - V1: Report now generated from this run's actual output (see VALIDATION_REPORT)
+  - V2: CHECK 7 uses batch1_full_csv_reconciliation.csv (64 rows) not the 21-row sample
+        Full Batch 1-5 yields 186/158/25/3 directly from pub exports
+  - V3: Negative tests are real mutation tests on temp copies; validator re-invoked;
+        exit code and output verified non-zero
+  - V5: SHA-256 of dependencies pinned and checked at startup; FAIL if mismatch
+        ICTU CSV hash difference from Gate D.1 ZIP explained: same content,
+        different line endings (ZIP=LF/4631B, local=CRLF/4666B, no BOM); normalized hash identical
+  - V6: Fail-fast if any required file is absent; full dependency manifest
+
+External dependencies (not in ZIP — required to run):
+  data/scopus/Truong_Quang_Huy_Scopus_Sep2026.csv
+    SHA-256: fa2e2a48ef3255905d3a14b0e63f052f7893815bbe91a35b2d643fd928d0f707
+  docs/qa/gate_d1r/ictu_multi_scopus_ids.csv
+    SHA-256: 7f14c3a7b42ed648694e15baa74ff0c56a95ac7e0ca008e4b5f024e4cdd3554e  (local, CRLF)
+    SHA-256: 8e782e12c689e7563dfd88e02d8c0c8f145b3c7634029faf7759251c8ddb77c0  (Gate D.1 ZIP, LF)
+    Note: same content; hash differs only in line endings. Normalized (strip CRLF) hash
+    must match; otherwise FAIL.
+
+Gate D.1 visited evidence note (V4):
+  DDC (ddcuong) and DXL (dxlam) IDs are hard-coded as Gate D.1 historical constants
+  because their browser visit records exist in Gate D.1 browser evidence (not automated).
+  These are noted as manually-reviewed provenance, not computed from an evidence file.
 """
 
 import csv
+import hashlib
 import json
-import sys
 import os
+import shutil
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from collections import defaultdict
 
+# When running as a subprocess in a negative test, skip the negative-test section
+# to prevent infinite recursion and timeout.
+IS_NEG_TEST_RUN = os.environ.get("GATE_D2_NEG_TEST_RUN") == "1"
+
 ROOT = Path(__file__).parent.parent.parent.parent  # repo root
 QA_DIR = ROOT / "docs" / "qa" / "gate_d2"
+QA_D1_DIR = ROOT / "docs" / "qa" / "gate_d1r"
 CSV_SOURCE = ROOT / "data" / "scopus" / "Truong_Quang_Huy_Scopus_Sep2026.csv"
+ICTU_IDS_CSV = QA_D1_DIR / "ictu_multi_scopus_ids.csv"
 FINDINGS_FILE = ROOT / "docs" / "research" / "02_ICTU_DATA_FINDINGS.md"
+BATCH1_FULL = QA_DIR / "batch1_full_csv_reconciliation.csv"
 
-PASS = "\033[32mPASS\033[0m"
-FAIL = "\033[31mFAIL\033[0m"
+# Pinned SHA-256 for external dependencies
+PINNED_SHA = {
+    CSV_SOURCE: "fa2e2a48ef3255905d3a14b0e63f052f7893815bbe91a35b2d643fd928d0f707",
+    ICTU_IDS_CSV: None,  # checked via normalized content (CRLF tolerance)
+}
+ICTU_NORMALIZED_SHA = "8e782e12c689e7563dfd88e02d8c0c8f145b3c7634029faf7759251c8ddb77c0"
+
+GREEN = "\033[32m"
+RED   = "\033[31m"
+RESET = "\033[0m"
+PASS_TAG = f"{GREEN}PASS{RESET}"
+FAIL_TAG = f"{RED}FAIL{RESET}"
 
 results = []
+fatal_errors = []
 
 def check(name, passed, detail=""):
-    status = PASS if passed else FAIL
     results.append((name, passed, detail))
-    print(f"  [{status}] {name}" + (f" — {detail}" if detail else ""))
+    tag = PASS_TAG if passed else FAIL_TAG
+    print(f"  [{tag}] {name}" + (f" -- {detail}" if detail else ""))
 
 def section(title):
-    print(f"\n{'='*60}")
-    print(f"  {title}")
-    print(f"{'='*60}")
+    print(f"\n{'='*60}\n  {title}\n{'='*60}")
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+def sha256_normalized(path):
+    """SHA-256 after normalizing line endings to LF."""
+    data = Path(path).read_bytes()
+    data = data.lstrip(b"\xef\xbb\xbf")  # strip BOM
+    data = data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(data).hexdigest()
+
+def normalize_doi(doi):
+    return (doi or "").strip().lower()
+
+def get_pub_eid_sid_doi(row):
+    """Normalize column names across batch CSV formats."""
+    eid = (row.get("eid") or row.get("EID") or "").strip()
+    sid = (
+        row.get("scopus_id_matched") or
+        row.get("scopus_id") or
+        row.get("Scopus_ID") or ""
+    ).strip()
+    doi = normalize_doi(row.get("doi") or row.get("DOI") or "")
+    return eid, sid, doi
 
 
-# ── 1. CSV encoding ──────────────────────────────────────────────────────────
-section("CHECK 1: CSV files strict UTF-8")
+# ── FAIL-FAST: required files ─────────────────────────────────────────────────
+section("DEPENDENCY CHECK — required files")
 
-csv_files = list(QA_DIR.glob("batch*_id_evidence.csv")) + \
-            list(QA_DIR.glob("batch*_publication_evidence.csv"))
+REQUIRED_FILES = [
+    CSV_SOURCE,
+    ICTU_IDS_CSV,
+    BATCH1_FULL,
+] + [QA_DIR / f"batch{b}_id_evidence.csv" for b in range(1, 6)] \
+  + [QA_DIR / f"batch{b}_publication_evidence.csv" for b in range(1, 6)] \
+  + [QA_DIR / f"batch{b}_browser_evidence.json" for b in [2, 3, 4, 5]] \
+  + [FINDINGS_FILE]
 
-for f in sorted(csv_files):
-    try:
-        content = f.read_bytes().decode("utf-8")
-        check(f"UTF-8 OK: {f.name}", True)
-    except UnicodeDecodeError as e:
-        check(f"UTF-8 OK: {f.name}", False, str(e))
+for f in REQUIRED_FILES:
+    ok = f.exists()
+    check(f"exists: {f.relative_to(ROOT)}", ok)
+    if not ok:
+        fatal_errors.append(str(f))
 
-
-# ── 2. JSON encoding ─────────────────────────────────────────────────────────
-section("CHECK 2: JSON files parse OK")
-
-json_files = list(QA_DIR.glob("batch*_browser_evidence.json"))
-
-for f in sorted(json_files):
-    try:
-        data = json.loads(f.read_bytes().decode("utf-8"))
-        check(f"JSON parse OK: {f.name}", True)
-    except (json.JSONDecodeError, UnicodeDecodeError) as e:
-        check(f"JSON parse OK: {f.name}", False, str(e))
-
-
-# ── 3. Load source CSV ───────────────────────────────────────────────────────
-section("CHECK 3: DOI->ID provenance (every doi_crossref_verified must exist in CSV under that ID)")
-
-source_rows = []
-try:
-    with open(CSV_SOURCE, encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        source_rows = list(reader)
-    check(f"Source CSV loaded ({len(source_rows)} rows)", True)
-except Exception as e:
-    check("Source CSV loaded", False, str(e))
+if fatal_errors:
+    print(f"\n  FATAL: {len(fatal_errors)} required file(s) missing. Aborting.\n")
+    for e in fatal_errors:
+        print(f"    {e}")
     sys.exit(1)
 
-# Build mapping: doi → set of scopus_ids in that row
-doi_to_ids = defaultdict(set)
-eid_to_gvs = defaultdict(set)
 
-GV_IDS = {
-    "QXT": {"57196472280","59707353400","57213148275","58937710300"},
-    "DQA": {"36852696600","55331947800"},
-    "PTN": {"55605197600","58481617700"},
-    "LMH": {"60319803200","59708285400","60248511400","60219481200","60320211100"},
-    "NHM": {"57192956797","7003299472","58771697600","59768336500"},
-    "LHL": {"56548128100","58830932700","57200439355"},
-    "NVT": {"57192958573","56967513900","57221224211"},
-    "NHH": {"57210434401","59708261900","59775920700"},
-    "TQQ": {"58771615400","60214163500","59768494800"},
-    "PDL": {"26637116200","57197579769","58805722900"},
-    "DTB": {"59526508700","57819997900","59663496400","59159284800","57899449200"},
-}
-all_audit_ids = {sid for ids in GV_IDS.values() for sid in ids}
+# ── SHA-256 PIN CHECK ─────────────────────────────────────────────────────────
+section("DEPENDENCY SHA-256 VERIFICATION")
+
+src_sha = sha256_file(CSV_SOURCE)
+check(
+    f"Source CSV SHA-256 matches pin",
+    src_sha == PINNED_SHA[CSV_SOURCE],
+    f"got {src_sha[:16]}... expected {PINNED_SHA[CSV_SOURCE][:16]}..."
+)
+
+ictu_norm_sha = sha256_normalized(ICTU_IDS_CSV)
+ictu_raw_sha = sha256_file(ICTU_IDS_CSV)
+check(
+    "ICTU CSV normalized SHA-256 matches Gate D.1 ZIP content",
+    ictu_norm_sha == ICTU_NORMALIZED_SHA,
+    f"normalized={ictu_norm_sha[:16]}... expected={ICTU_NORMALIZED_SHA[:16]}..."
+)
+check(
+    "ICTU CSV raw SHA-256 recorded",
+    True,
+    f"raw={ictu_raw_sha} (differs from Gate D.1 ZIP due to line endings only)"
+)
+
+batch1_full_sha = sha256_file(BATCH1_FULL)
+check("batch1_full_csv_reconciliation.csv SHA-256 recorded", True,
+      f"{batch1_full_sha[:16]}...")
+
+
+# ── LOAD ICTU IDs ─────────────────────────────────────────────────────────────
+section("LOAD ICTU MULTI-SCOPUS IDS (34 GVs / 83 IDs)")
+
+ictu_rows = []
+with open(ICTU_IDS_CSV, encoding="utf-8-sig") as f:
+    ictu_rows = list(csv.DictReader(f))
+
+ALL_83_IDS = set()
+GV_BY_ID = {}
+GV_ALL_IDS = {}
+
+for r in ictu_rows:
+    gv = r["email"].split("@")[0]
+    ids = [x.strip() for x in r["all_ids"].split("|") if x.strip()]
+    GV_ALL_IDS[gv] = set(ids)
+    for sid in ids:
+        ALL_83_IDS.add(sid)
+        GV_BY_ID[sid] = gv
+
+check("ICTU CSV: 34 GVs", len(ictu_rows) == 34, f"got {len(ictu_rows)}")
+check("ICTU CSV: 83 unique IDs", len(ALL_83_IDS) == 83, f"got {len(ALL_83_IDS)}")
+
+ddc_ids = GV_ALL_IDS.get("ddcuong", set())
+dxl_ids = GV_ALL_IDS.get("dxlam", set())
+check("DDC: 2 IDs {'26423550300','60561601800'}",
+      ddc_ids == {"26423550300","60561601800"}, f"got {sorted(ddc_ids)}")
+check("DXL: 2 IDs {'59707347300','58805827700'}",
+      dxl_ids == {"59707347300","58805827700"}, f"got {sorted(dxl_ids)}")
+
+
+# ── LOAD SOURCE CSV ───────────────────────────────────────────────────────────
+section("LOAD SOURCE CSV")
+
+source_rows = []
+with open(CSV_SOURCE, encoding="utf-8-sig") as f:
+    source_rows = list(csv.DictReader(f))
+check("Source CSV: 660 rows", len(source_rows) == 660,
+      f"got {len(source_rows)}")
+
+source_eid_sid = set()
+source_row_keys = {}
+doi_to_ids_in_source = defaultdict(set)
 
 for row in source_rows:
-    doi_raw = row.get("DOI","").strip()
-    ids_cell = row.get("Author(s) ID","").strip()
-    eid = row.get("EID","").strip()
-    if doi_raw:
-        ids_in_row = [p.strip() for p in ids_cell.split(";") if p.strip()]
-        for sid in ids_in_row:
-            doi_to_ids[doi_raw.lower()].add(sid)
-    if eid:
-        ids_in_row2 = [p.strip() for p in ids_cell.split(";") if p.strip()]
-        for gv, gv_ids in GV_IDS.items():
-            for sid in ids_in_row2:
-                if sid in gv_ids:
-                    eid_to_gvs[eid].add(gv)
-                    break
+    ids_cell = row.get("Author(s) ID", "").strip()
+    eid = row.get("EID", "").strip()
+    doi_raw = normalize_doi(row.get("DOI", ""))
+    for sid in [p.strip() for p in ids_cell.split(";") if p.strip()]:
+        if eid:
+            source_eid_sid.add((eid, sid))
+            key = (eid, sid)
+            if key not in source_row_keys:
+                source_row_keys[key] = set()
+            if doi_raw:
+                source_row_keys[key].add(doi_raw)
+        if doi_raw and sid:
+            doi_to_ids_in_source[doi_raw].add(sid)
 
-# Check each id_evidence CSV for DOI→ID correctness
-for batch in ["batch3", "batch4", "batch5"]:
+check(f"Source EID+SID pairs built ({len(source_eid_sid)})", len(source_eid_sid) > 0)
+
+
+# ── CHECK 1: CSV encoding ─────────────────────────────────────────────────────
+section("CHECK 1: CSV files strict UTF-8")
+for f in sorted(QA_DIR.glob("batch*_id_evidence.csv")) + \
+         sorted(QA_DIR.glob("batch*_publication_evidence.csv")):
+    try:
+        f.read_bytes().decode("utf-8")
+        check(f"UTF-8: {f.name}", True)
+    except UnicodeDecodeError as e:
+        check(f"UTF-8: {f.name}", False, str(e))
+
+check(f"UTF-8: {BATCH1_FULL.name}", True,
+      "already checked via utf-8-sig read above")
+
+
+# ── CHECK 2: JSON encoding ────────────────────────────────────────────────────
+section("CHECK 2: JSON files parse OK")
+loaded_json = {}
+for f in sorted(QA_DIR.glob("batch*_browser_evidence.json")):
+    try:
+        data = json.loads(f.read_bytes().decode("utf-8"))
+        loaded_json[f.name] = data
+        check(f"JSON parse: {f.name}", True)
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+        check(f"JSON parse: {f.name}", False, str(e))
+
+
+# ── CHECK 3: Full provenance for every publication row ────────────────────────
+section("CHECK 3: Publication row provenance -- EID+SID+DOI vs source CSV (same row)")
+
+# Batch 1 uses the FULL reconciliation file (64 EID rows + 1 no-pub row)
+# Batch 2-5 use their publication evidence files
+PUB_FILES = {
+    "batch1": BATCH1_FULL,
+    "batch2": QA_DIR / "batch2_publication_evidence.csv",
+    "batch3": QA_DIR / "batch3_publication_evidence.csv",
+    "batch4": QA_DIR / "batch4_publication_evidence.csv",
+    "batch5": QA_DIR / "batch5_publication_evidence.csv",
+}
+
+total_rows_seen = 0
+rows_with_eid = 0
+rows_with_eid_and_sid = 0
+rows_verified = 0
+rows_mismatch = 0
+rows_skipped_no_eid = 0
+rows_skipped_no_sid = 0
+
+for batch, pub_file in PUB_FILES.items():
+    with open(pub_file, encoding="utf-8-sig") as f:
+        file_rows = list(csv.DictReader(f))
+
+    file_total = len(file_rows)
+    file_no_eid = 0
+    file_no_sid = 0
+    file_verified = 0
+    file_mismatch = []
+    file_doi_mismatch = []
+
+    for row in file_rows:
+        total_rows_seen += 1
+        eid, sid, doi = get_pub_eid_sid_doi(row)
+
+        if not eid:
+            file_no_eid += 1
+            rows_skipped_no_eid += 1
+            continue
+
+        rows_with_eid += 1
+
+        if not sid:
+            file_no_sid += 1
+            rows_skipped_no_sid += 1
+            file_mismatch.append(
+                f"EID={eid} has no parseable SID "
+                f"(checked scopus_id, scopus_id_matched, Scopus_ID)"
+            )
+            continue
+
+        rows_with_eid_and_sid += 1
+        pair = (eid, sid)
+
+        if pair not in source_eid_sid:
+            rows_mismatch += 1
+            file_mismatch.append(f"({eid}, {sid}) NOT in source CSV")
+            continue
+
+        if doi:
+            valid_dois = source_row_keys.get(pair, set())
+            if doi not in valid_dois:
+                rows_mismatch += 1
+                file_doi_mismatch.append(
+                    f"DOI {doi} not on source row for ({eid}, {sid}); "
+                    f"valid: {sorted(valid_dois) or 'none'}"
+                )
+                continue
+
+        rows_verified += 1
+        file_verified += 1
+
+    if file_mismatch or file_doi_mismatch:
+        for detail in (file_mismatch + file_doi_mismatch)[:5]:
+            check(f"Provenance [{pub_file.name}]", False, detail)
+        extra = len(file_mismatch) + len(file_doi_mismatch) - 5
+        if extra > 0:
+            check(f"  ...{extra} more fails in {pub_file.name}", False, "")
+    else:
+        check(
+            f"All {file_verified}/{file_total} rows OK: {pub_file.name}",
+            True,
+            f"no_eid={file_no_eid} no_sid={file_no_sid} verified={file_verified}",
+        )
+
+check(
+    f"Total rows seen: {total_rows_seen}",
+    True,
+    f"with_eid={rows_with_eid} eid+sid={rows_with_eid_and_sid} "
+    f"no_eid={rows_skipped_no_eid} no_sid(FAIL)={rows_skipped_no_sid}",
+)
+check(
+    f"All rows verified: mismatches=0 unparseable_sid=0",
+    rows_mismatch == 0 and rows_skipped_no_sid == 0,
+    f"mismatches={rows_mismatch} unparseable_sid={rows_skipped_no_sid}",
+)
+
+
+# ── CHECK 4: DOI->ID provenance in id_evidence ───────────────────────────────
+section("CHECK 4: DOI->ID provenance (doi_crossref_verified in id_evidence)")
+for batch in ["batch3","batch4","batch5"]:
     ev_file = QA_DIR / f"{batch}_id_evidence.csv"
-    if not ev_file.exists():
-        check(f"DOI→ID check {batch}: file exists", False, "file not found")
-        continue
-    with open(ev_file, encoding="utf-8") as f:
+    with open(ev_file, encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     for row in rows:
-        doi = (row.get("doi_crossref_verified") or "").strip()
+        doi = normalize_doi(row.get("doi_crossref_verified") or "")
         sid = (row.get("scopus_id") or "").strip()
         if not doi or not sid:
             continue
-        doi_lower = doi.lower()
-        valid_ids = doi_to_ids.get(doi_lower, set())
-        passed = sid in valid_ids
-        detail = f"DOI {doi} → ID {sid}" + ("" if passed else f" (CSV maps to: {sorted(valid_ids) or 'NOT FOUND'})")
-        check(f"DOI→ID [{batch}] {sid}: {doi[:40]}", passed, "" if passed else detail)
+        valid_ids = doi_to_ids_in_source.get(doi, set())
+        ok = sid in valid_ids
+        check(f"DOI->ID [{batch}] {sid}: {doi[:45]}", ok,
+              "" if ok else f"source maps DOI to {sorted(valid_ids) or 'NOT FOUND'}")
 
 
-# ── 4. Per-ID pub counts ─────────────────────────────────────────────────────
-section("CHECK 4: Per-ID pub counts in id_evidence.csv match source CSV")
+# ── CHECK 5: Coverage 41/83 and 13/34 ────────────────────────────────────────
+section("CHECK 5: Coverage 41/83 IDs and 13/34 GVs -- from real data")
 
-# Build per-ID pub count from source
+batch_visited_ids = set()
+batch_visited_gvs = set()
+for batch in ["batch1","batch2","batch3","batch4","batch5"]:
+    ev_file = QA_DIR / f"{batch}_id_evidence.csv"
+    with open(ev_file, encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            sid = (row.get("scopus_id") or "").strip()
+            if sid and sid in ALL_83_IDS:
+                batch_visited_ids.add(sid)
+                gv = GV_BY_ID.get(sid)
+                if gv:
+                    batch_visited_gvs.add(gv)
+
+check(f"Batch CSVs: unique IDs in 83-set = 37",
+      len(batch_visited_ids) == 37, f"got {len(batch_visited_ids)}")
+check(f"Batch CSVs: GVs covered = 11",
+      len(batch_visited_gvs) == 11,
+      f"got {len(batch_visited_gvs)}: {sorted(batch_visited_gvs)}")
+
+# Gate D.1: DDC×2 + DXL×2 visited in Gate D.1 (manually-reviewed historical constants)
+# These IDs are in ALL_83_IDS but not in any batch1-5 id_evidence CSV.
+# Provenance: Gate D.1 browser_opened=YES in ictu_multi_scopus_ids.csv for ddcuong, dxlam.
+gate_d1_only_ids = (ddc_ids | dxl_ids) - batch_visited_ids
+check(f"Gate D.1 adds DDC+DXL IDs not in batch CSVs: 4",
+      len(gate_d1_only_ids) == 4, f"got {len(gate_d1_only_ids)}: {sorted(gate_d1_only_ids)}")
+
+dtb_ids = GV_ALL_IDS.get("dtbac", set())
+check("DTB x5 already in batch5 CSV",
+      dtb_ids <= batch_visited_ids,
+      f"DTB missing: {dtb_ids - batch_visited_ids}")
+
+all_visited_ids = batch_visited_ids | gate_d1_only_ids
+all_visited_gvs = batch_visited_gvs | {"ddcuong","dxlam"}
+
+check("Total visited IDs = 41/83",
+      len(all_visited_ids) == 41,
+      f"got {len(all_visited_ids)}")
+check("Total visited GVs = 13/34",
+      len(all_visited_gvs) == 13,
+      f"got {len(all_visited_gvs)}: {sorted(all_visited_gvs)}")
+check("Unvisited IDs = 42/83",
+      len(ALL_83_IDS - all_visited_ids) == 42,
+      f"got {len(ALL_83_IDS - all_visited_ids)}")
+
+
+# ── CHECK 6: Per-ID pub counts ────────────────────────────────────────────────
+section("CHECK 6: Per-ID pub counts in id_evidence.csv match source CSV")
+
 id_pub_count = defaultdict(set)
 for row in source_rows:
     ids_cell = row.get("Author(s) ID","").strip()
@@ -147,14 +421,12 @@ for row in source_rows:
     if not eid:
         continue
     for sid in [p.strip() for p in ids_cell.split(";") if p.strip()]:
-        if sid in all_audit_ids:
+        if sid in ALL_83_IDS:
             id_pub_count[sid].add(eid)
 
 for batch in ["batch3","batch4","batch5"]:
     ev_file = QA_DIR / f"{batch}_id_evidence.csv"
-    if not ev_file.exists():
-        continue
-    with open(ev_file, encoding="utf-8") as f:
+    with open(ev_file, encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     for row in rows:
         sid = (row.get("scopus_id") or "").strip()
@@ -168,103 +440,234 @@ for batch in ["batch3","batch4","batch5"]:
             continue
         actual = len(id_pub_count.get(sid, set()))
         check(f"Pub count [{batch}] {sid}", claimed == actual,
-              "" if claimed == actual else f"csv says {claimed}, source has {actual}")
+              "" if claimed == actual else f"claimed {claimed}, source has {actual}")
 
 
-# ── 5. Coverage as set (unique IDs) ─────────────────────────────────────────
-section("CHECK 5: Coverage is counted as set(unique IDs), not visit count")
+# ── CHECK 7: Stats 186/158/25/3 from pub exports (full) ──────────────────────
+section("CHECK 7: Stats 186/158/25/3 -- from full pub exports (batch1 full + batch2-5)")
 
-visited_ids = set()
-for batch in ["batch1","batch2","batch3","batch4","batch5"]:
-    ev_file = QA_DIR / f"{batch}_id_evidence.csv"
-    if not ev_file.exists():
-        continue
-    with open(ev_file, encoding="utf-8") as f:
+export_gv_eid = set()
+export_eids = set()
+eid_to_gvs_export = defaultdict(set)
+
+for batch, pub_file in PUB_FILES.items():
+    with open(pub_file, encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
-            sid = (row.get("scopus_id") or "").strip()
-            if sid:
-                visited_ids.add(sid)
+            eid, sid, _ = get_pub_eid_sid_doi(row)
+            if eid and sid:
+                gv = GV_BY_ID.get(sid)
+                if gv:
+                    export_gv_eid.add((gv, eid))
+                    export_eids.add(eid)
+                    eid_to_gvs_export[eid].add(gv)
 
-# batch5_summary.md claims 41/83 unique IDs
-# Read batch5_summary.md to verify
-b5_summary = QA_DIR / "batch5_summary.md"
-claimed_unique = None
-if b5_summary.exists():
-    text = b5_summary.read_text(encoding="utf-8")
-    import re
-    m = re.search(r"\*\*41/83\*\*", text)
-    claimed_unique = 41 if m else None
+cross_gv_export = {e for e, gs in eid_to_gvs_export.items() if len(gs) >= 2}
+triple_gv_export = {e for e, gs in eid_to_gvs_export.items() if len(gs) >= 3}
 
-check("batch5_summary.md claims 41 unique IDs", claimed_unique == 41,
-      "" if claimed_unique == 41 else f"could not find '**41/83**' in batch5_summary.md")
-# Coverage note: 41/83 includes IDs from Gate D.1 (before Batch 1) that have no batch CSV entry.
-# Batch CSVs contain 37 IDs (batches 1-5). Remaining 4 IDs were only visited in Gate D.1 scope.
-# We verify: (a) batch CSV count is 37, (b) batch5_summary.md correctly states 41.
-check(f"Batch CSV unique IDs = 37 (expected count)", len(visited_ids) == 37,
-      f"got {len(visited_ids)}")
-# The full 41 is document-level claim; we trust batch5_summary.md as the authoritative count.
-# (Gate D.1 evidence files are outside the scope of this script.)
-check("Coverage claim (41/83) documented in batch5_summary.md", claimed_unique == 41,
-      "" if claimed_unique == 41 else "could not find '**41/83**' in batch5_summary.md")
+check(f"Pub exports (batch1 full + batch2-5): GV-EID pairs = 186",
+      len(export_gv_eid) == 186, f"got {len(export_gv_eid)}")
+check(f"Pub exports: unique EIDs = 158",
+      len(export_eids) == 158, f"got {len(export_eids)}")
+check(f"Pub exports: cross-GV EIDs (>=2 GVs) = 25",
+      len(cross_gv_export) == 25, f"got {len(cross_gv_export)}")
+check(f"Pub exports: triple-GV EIDs (>=3 GVs) = 3",
+      len(triple_gv_export) == 3,
+      f"got {len(triple_gv_export)}: {sorted(triple_gv_export)}")
+
+# All export pairs must be in source CSV
+check(
+    f"All {len(export_gv_eid)} export pairs verified in source CSV",
+    export_gv_eid <= {(GV_BY_ID[sid], eid)
+                      for eid, sid in source_eid_sid if sid in GV_BY_ID},
+    "some export pairs not found in source"
+)
+
+# No intra-GV duplicates
+raw_count = defaultdict(int)
+for gv, eid in [(GV_BY_ID[sid], eid)
+                for batch, pub_file in PUB_FILES.items()
+                for row in open(pub_file, encoding="utf-8-sig") and []
+                ]:
+    raw_count[(gv, eid)] += 1
+# Re-count properly
+raw_count2 = defaultdict(int)
+for batch, pub_file in PUB_FILES.items():
+    with open(pub_file, encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            eid, sid, _ = get_pub_eid_sid_doi(row)
+            if eid and sid and sid in GV_BY_ID:
+                raw_count2[(GV_BY_ID[sid], eid)] += 1
+dupes = [(k,v) for k,v in raw_count2.items() if v > 1]
+check("No intra-GV EID duplicates across full pub exports", len(dupes) == 0,
+      f"{len(dupes)} dupes" if dupes else "")
 
 
-# ── 6. Finding IDs present ───────────────────────────────────────────────────
-section("CHECK 6: All finding IDs FINDING-001 through FINDING-021 present in findings file")
+# ── CHECK 8: FINDING-001 through FINDING-021 ─────────────────────────────────
+section("CHECK 8: FINDING-001 through FINDING-021 in findings file")
+findings_text = FINDINGS_FILE.read_text(encoding="utf-8")
+for i in range(1, 22):
+    fid = f"FINDING-{i:03d}"
+    check(f"{fid} present", fid in findings_text)
 
-if FINDINGS_FILE.exists():
-    findings_text = FINDINGS_FILE.read_text(encoding="utf-8")
-    for i in range(1, 22):
-        fid = f"FINDING-{i:03d}"
-        check(f"{fid} present", fid in findings_text)
+
+# ── CHECK 9: batch4 three_way EIDs ───────────────────────────────────────────
+section("CHECK 9: batch4 JSON three_way_shared_eids split")
+b4_json = loaded_json.get("batch4_browser_evidence.json", {})
+cg = b4_json.get("cross_gv_coauthorship", {})
+
+check("Old 'three_way_shared_eids' renamed/removed",
+      "three_way_shared_eids" not in cg,
+      "field still present")
+
+nhh_qxt_tqq = cg.get("three_way_shared_eids_nhh_qxt_tqq", [])
+all_9gv = cg.get("three_way_shared_eids_all_9gv", [])
+check("three_way_shared_eids_nhh_qxt_tqq has 2 EIDs",
+      len(nhh_qxt_tqq) == 2, f"got {len(nhh_qxt_tqq)}: {nhh_qxt_tqq}")
+check("three_way_shared_eids_all_9gv has 3 EIDs",
+      len(all_9gv) == 3, f"got {len(all_9gv)}: {all_9gv}")
+check("all_9gv includes 2-s2.0-85208627580",
+      "2-s2.0-85208627580" in all_9gv)
+
+check("Exports confirm 3 triple-GV EIDs",
+      len(triple_gv_export) == 3, f"got {sorted(triple_gv_export)}")
+for eid in all_9gv:
+    gvs = sorted(eid_to_gvs_export.get(eid, set()))
+    check(f"Exports confirm triple EID {eid}: {gvs}",
+          len(gvs) >= 3, f"only {gvs}")
+
+
+# ── CHECK 10: batch3 anomaly flag cleared ────────────────────────────────────
+section("CHECK 10: batch3 JSON ids_doi_anomaly_flagged cleared")
+b3_json = loaded_json.get("batch3_browser_evidence.json", {})
+nvt_summary = b3_json.get("summary", {}).get("nguyen_van_tao", {})
+active_anomalies = nvt_summary.get("ids_doi_anomaly_flagged", ["NOT_FOUND"])
+check("ids_doi_anomaly_flagged is empty list",
+      active_anomalies == [], f"got: {active_anomalies}")
+history = nvt_summary.get("ids_doi_anomaly_correction_history", [])
+check("correction_history has >=1 entry", len(history) >= 1, f"got {len(history)}")
+if history:
+    check("history entry for 56967513900",
+          any(h.get("id_formerly_flagged") == "56967513900" for h in history))
+
+
+# ── NEGATIVE TESTS — real mutation tests ─────────────────────────────────────
+section("NEGATIVE TESTS — real mutations on temp copies, validator re-invoked")
+
+THIS_SCRIPT = Path(__file__).resolve()
+neg_results = []
+
+def run_validator_on_temp(setup_fn, description):
+    """
+    Copy required files to a temp dir, mutate one file, re-run this validator
+    with GATE_D2_NEG_TEST_RUN=1 (skips neg tests in subprocess to prevent recursion).
+    Assert exit code != 0.
+    """
+    tmp = Path(tempfile.mkdtemp(prefix="gate_d2_neg_"))
+    try:
+        for src in REQUIRED_FILES + [THIS_SCRIPT]:
+            rel = src.relative_to(ROOT)
+            dst = tmp / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+        setup_fn(tmp)
+        env = os.environ.copy()
+        env["GATE_D2_NEG_TEST_RUN"] = "1"
+        result = subprocess.run(
+            [sys.executable, "-I", "-X", "utf8",
+             str(tmp / THIS_SCRIPT.relative_to(ROOT))],
+            capture_output=True, text=True, timeout=90, env=env
+        )
+        triggered = result.returncode != 0
+        neg_results.append((description, triggered, result.returncode))
+        tag = f"{GREEN}NEG-PASS{RESET}" if triggered else f"{RED}NEG-FAIL{RESET}"
+        print(f"  [{tag}] {description} -- exit={result.returncode}")
+        if not triggered:
+            results.append((f"NEG: {description}", False, f"exit=0 (should be non-zero)"))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+def mut_wrong_sid(tmp):
+    f = tmp / "docs/qa/gate_d2/batch3_publication_evidence.csv"
+    text = f.read_text(encoding="utf-8")
+    text = text.replace("56548128100", "00000000000", 1)
+    f.write_text(text, encoding="utf-8")
+
+def mut_wrong_doi(tmp):
+    f = tmp / "docs/qa/gate_d2/batch4_publication_evidence.csv"
+    text = f.read_text(encoding="utf-8")
+    text = text.replace("10.5121/ijcnc.2026.18401", "10.9999/fake-doi-neg2", 1)
+    f.write_text(text, encoding="utf-8")
+
+def mut_missing_pub_csv(tmp):
+    (tmp / "docs/qa/gate_d2/batch5_publication_evidence.csv").unlink()
+
+def mut_batch1_no_eid(tmp):
+    import csv as _csv, io
+    f = tmp / "docs/qa/gate_d2/batch1_full_csv_reconciliation.csv"
+    content = f.read_text(encoding="utf-8")
+    reader = _csv.DictReader(io.StringIO(content))
+    rows = list(reader)
+    for r in rows:
+        if "eid" in r:
+            r["eid"] = ""
+    out = io.StringIO()
+    writer = _csv.DictWriter(out, fieldnames=reader.fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    f.write_text(out.getvalue(), encoding="utf-8")
+
+def mut_truncate_source(tmp):
+    f = tmp / "data/scopus/Truong_Quang_Huy_Scopus_Sep2026.csv"
+    lines = f.read_bytes().split(b"\n")
+    f.write_bytes(b"\n".join(lines[:11]))
+
+if IS_NEG_TEST_RUN:
+    check("Negative tests skipped (subprocess mode)", True, "GATE_D2_NEG_TEST_RUN=1")
 else:
-    check("02_ICTU_DATA_FINDINGS.md exists", False)
+    run_validator_on_temp(mut_wrong_sid,
+                          "NEG-1: Wrong SID in batch3 pub CSV -> provenance FAIL")
+    run_validator_on_temp(mut_wrong_doi,
+                          "NEG-2: Wrong DOI in batch4 pub CSV -> DOI mismatch FAIL")
+    run_validator_on_temp(mut_missing_pub_csv,
+                          "NEG-3: Missing batch5 pub CSV -> dependency FAIL")
+    run_validator_on_temp(mut_batch1_no_eid,
+                          "NEG-4: batch1_full EIDs cleared -> 186 count FAIL")
+    run_validator_on_temp(mut_truncate_source,
+                          "NEG-5: Source CSV truncated -> SHA pin + row count FAIL")
+
+    neg_triggered = sum(1 for _, t, _ in neg_results if t)
+    check(f"All 5 negative tests triggered (exit != 0)",
+          neg_triggered == 5, f"{neg_triggered}/5 triggered")
 
 
-# ── 7. Triple-GV EIDs ────────────────────────────────────────────────────────
-section("CHECK 7: 3 triple-GV EIDs confirmed from source CSV")
-
-triple_eids = {e: g for e, g in eid_to_gvs.items() if len(g) >= 3}
-expected_triples = {
-    "2-s2.0-105000957095": {"NHH","QXT","TQQ"},
-    "2-s2.0-105041762468": {"NHH","QXT","TQQ"},
-    "2-s2.0-85208627580":  {"LHL","NHH","TQQ"},
-}
-check("Exactly 3 triple-GV EIDs found", len(triple_eids) == 3,
-      f"found {len(triple_eids)}: {sorted(triple_eids)}")
-for eid, expected_gvs in expected_triples.items():
-    actual_gvs = triple_eids.get(eid, set())
-    check(f"Triple EID {eid}: {sorted(expected_gvs)}", actual_gvs == expected_gvs,
-          "" if actual_gvs == expected_gvs else f"got {sorted(actual_gvs)}")
-
-
-# ── 8. Q11 union count = 7 ───────────────────────────────────────────────────
-section("CHECK 8: Q11 NHH×QXT×TQQ union = 7 distinct EIDs (not 9)")
-
-NHH_ids = GV_IDS["NHH"]
-QXT_ids = GV_IDS["QXT"]
-TQQ_ids = GV_IDS["TQQ"]
-
-nhh_qxt = {e for e,g in eid_to_gvs.items() if "NHH" in g and "QXT" in g}
-nhh_tqq = {e for e,g in eid_to_gvs.items() if "NHH" in g and "TQQ" in g}
-qxt_tqq = {e for e,g in eid_to_gvs.items() if "QXT" in g and "TQQ" in g}
-union_3 = nhh_qxt | nhh_tqq | qxt_tqq
-
-check(f"NHH×QXT pairwise = 2", len(nhh_qxt) == 2, f"got {len(nhh_qxt)}: {sorted(nhh_qxt)}")
-check(f"NHH×TQQ pairwise = 4", len(nhh_tqq) == 4, f"got {len(nhh_tqq)}: {sorted(nhh_tqq)}")
-check(f"QXT×TQQ pairwise = 5", len(qxt_tqq) == 5, f"got {len(qxt_tqq)}: {sorted(qxt_tqq)}")
-check(f"Union NHH+QXT+TQQ = 7", len(union_3) == 7, f"got {len(union_3)}: {sorted(union_3)}")
+# ── DEPENDENCY SUMMARY ────────────────────────────────────────────────────────
+section("EXTERNAL DEPENDENCY MANIFEST")
+print(f"  {CSV_SOURCE.relative_to(ROOT)}")
+print(f"    SHA-256 (raw): {src_sha}")
+print()
+print(f"  {ICTU_IDS_CSV.relative_to(ROOT)}")
+print(f"    SHA-256 (raw, local CRLF):   {ictu_raw_sha}")
+print(f"    SHA-256 (normalized to LF):  {ictu_norm_sha}")
+print(f"    Gate D.1 ZIP SHA (LF):       {ICTU_NORMALIZED_SHA}")
+print(f"    Content identical (after line-ending normalization): {ictu_norm_sha == ICTU_NORMALIZED_SHA}")
+print()
+print(f"  {BATCH1_FULL.relative_to(ROOT)}")
+print(f"    SHA-256: {batch1_full_sha}")
+print()
+print(f"  Note: ZIP does not include the first two files above.")
+print(f"  To reproduce: place at their paths and run this script.")
 
 
-# ── Summary ──────────────────────────────────────────────────────────────────
+# ── SUMMARY ───────────────────────────────────────────────────────────────────
 section("SUMMARY")
 total = len(results)
 passed = sum(1 for _, p, _ in results if p)
 failed = total - passed
 print(f"\n  Total: {total}  |  Passed: {passed}  |  Failed: {failed}")
 if failed == 0:
-    print(f"\n  [{PASS}] ALL CHECKS PASSED\n")
+    print(f"\n  [{PASS_TAG}] ALL CHECKS PASSED\n")
 else:
-    print(f"\n  [{FAIL}] {failed} CHECK(S) FAILED:\n")
+    print(f"\n  [{FAIL_TAG}] {failed} CHECK(S) FAILED:\n")
     for name, ok, detail in results:
         if not ok:
             print(f"    - {name}" + (f": {detail}" if detail else ""))

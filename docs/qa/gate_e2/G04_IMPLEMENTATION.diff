@@ -1,0 +1,1377 @@
+# G04 scoped diff. Baseline = accepted G01/G02/G03 working tree (not Git HEAD).
+# scopus_author_normalizer.py baseline = HEAD + G03 diff (verified identical to G03_IMPLEMENTATION.diff, 107/107 changed lines).
+# test_author_position_drift.py baseline = file reconstructed from G03_IMPLEMENTATION.diff (verified identical, 393/393 lines).
+diff --git a/backend/app/services/normalization/scopus_author_normalizer.py b/backend/app/services/normalization/scopus_author_normalizer.py
+index a1c3be4..26a8531 100644
+--- a/backend/app/services/normalization/scopus_author_normalizer.py
++++ b/backend/app/services/normalization/scopus_author_normalizer.py
+@@ -16,7 +16,8 @@ Pipeline:
+ M2.7 lecturer matching is explicitly OUT OF SCOPE.
+ 
+ Key invariants enforced:
+-  1. scopus_authors.scopus_id UNIQUE — identity barrier; upsert-safe via savepoint.
++  1. scopus_authors.scopus_id UNIQUE — identity barrier; each insert runs in its
++     own SAVEPOINT and only a recognized unique violation is recovered (G04).
+   2. scopus_author_name_variants(scopus_author_id, variant_type, variant_name) UNIQUE — additive.
+   3. publication_authors(publication_id, author_order) UNIQUE — first-wins.
+   4. publication_authors(publication_id, scopus_author_id) UNIQUE — idempotent link.
+@@ -26,6 +27,7 @@ Key invariants enforced:
+ 
+ from __future__ import annotations
+ 
++import copy
+ import re
+ import uuid
+ from dataclasses import dataclass, field
+@@ -52,6 +54,64 @@ if TYPE_CHECKING:
+ VARIANT_DISPLAY = "AUTHOR_DISPLAY"
+ VARIANT_FULL_NAME = "AUTHOR_FULL_NAME"
+ 
++# ---------------------------------------------------------------------------
++# G04 — recognized unique constraints (names from the initial migration
++# e5b3cf21c1d12b64 and the frozen naming convention in models/base.py)
++# ---------------------------------------------------------------------------
++
++UNIQUE_VIOLATION_SQLSTATE = "23505"
++UQ_SCOPUS_AUTHOR_ID = "uq_scopus_authors_scopus_id"
++UQ_AUTHOR_NAME_VARIANT = "uq_author_name_variants"
++UQ_PUBLICATION_AUTHOR = "uq_publication_authors_author"
++UQ_PUBLICATION_AUTHOR_ORDER = "uq_publication_authors_order"
++_LINK_UNIQUE_CONSTRAINTS = frozenset({UQ_PUBLICATION_AUTHOR, UQ_PUBLICATION_AUTHOR_ORDER})
++
++
++def integrity_violation(exc: IntegrityError) -> tuple[str | None, str | None]:
++    """Return (SQLSTATE, constraint name) reported by the driver, if any.
++
++    No message parsing: an unidentified violation is never treated as a
++    recognized one, so callers fail closed.
++    """
++    orig = getattr(exc, "orig", None)
++    if orig is None:
++        return None, None
++    sqlstate = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
++    diag = getattr(orig, "diag", None)
++    constraint = getattr(diag, "constraint_name", None) if diag is not None else None
++    return sqlstate, constraint
++
++
++def _insert_in_savepoint(
++    db: Session, obj: object, recoverable: frozenset[str]
++) -> IntegrityError | None:
++    """Insert one ORM row inside its own SAVEPOINT.
++
++    Returns None when the row was flushed, or the IntegrityError when it was
++    rejected by one of the ``recoverable`` unique constraints. The caller must
++    then prove the conflicting row exists by re-querying its exact key, or
++    raise the returned error. Any other integrity error propagates unchanged
++    so the batch owner rolls back the whole batch and reports FAILED.
++
++    Order matters: ``begin_nested()`` flushes all pending state before it
++    emits SAVEPOINT, even with autoflush=False. The explicit flush below
++    keeps earlier state outside the recovery scope, so its failure can never
++    be mistaken for this row's conflict. The object is added only inside the
++    savepoint; on rollback SQLAlchemy expunges it and leaves earlier rows of
++    the batch intact. The outer transaction is never rolled back here.
++    """
++    db.flush()
++    try:
++        with db.begin_nested():
++            db.add(obj)
++            db.flush()
++    except IntegrityError as exc:
++        sqlstate, constraint = integrity_violation(exc)
++        if sqlstate == UNIQUE_VIOLATION_SQLSTATE and constraint in recoverable:
++            return exc
++        raise
++    return None
++
+ # ---------------------------------------------------------------------------
+ # Author occurrence — parsed from one raw row
+ # ---------------------------------------------------------------------------
+@@ -359,6 +419,19 @@ class AuthorNormalizer:
+         self.errors = AuthorNormalizationErrors()
+         self.position_discrepancies: dict[tuple[str, str, int, int], dict] = {}
+ 
++    def batch_checkpoint(self) -> tuple:
++        """Copy the in-memory run state before a batch transaction starts."""
++        return copy.deepcopy((self.counters, self.errors, self.position_discrepancies))
++
++    def restore_batch_checkpoint(self, checkpoint: tuple) -> None:
++        """Discard counters, errors and G03 observations of a rolled-back batch.
++
++        After the batch rollback none of its rows exist, so the FAILED summary
++        must not report them as created, existing or observed. A replay
++        re-derives them from the unchanged raw records.
++        """
++        self.counters, self.errors, self.position_discrepancies = copy.deepcopy(checkpoint)
++
+     def record_occurrences(
+         self,
+         occurrences: list[AuthorOccurrence],
+@@ -427,23 +500,21 @@ class AuthorNormalizer:
+             created_at=datetime.now(UTC),
+             updated_at=datetime.now(UTC),
+         )
+-        db.add(author)
+-        try:
+-            db.flush()  # Get the ID without committing
++        conflict = _insert_in_savepoint(db, author, frozenset({UQ_SCOPUS_AUTHOR_ID}))
++        if conflict is None:
+             self.counters.authors_created += 1
+             self.counters._seen_scopus_ids.add(occ.scopus_id)
+             return author
+-        except IntegrityError:
+-            db.rollback()
+-            db.flush()
+-            # Race: another thread created it simultaneously
+-            existing = db.query(ScopusAuthor).filter(
+-                ScopusAuthor.scopus_id == occ.scopus_id
+-            ).first()
+-            if existing is not None:
+-                self.counters.authors_existing += 1
+-                return existing
+-            raise
++
++        # Race: a concurrent transaction committed this scopus_id first. Only
++        # the savepoint was rolled back; earlier rows of this batch survive.
++        existing = db.query(ScopusAuthor).filter(
++            ScopusAuthor.scopus_id == occ.scopus_id
++        ).first()
++        if existing is None:
++            raise conflict
++        self.counters.authors_existing += 1
++        return existing
+ 
+     def _ensure_variant(
+         self,
+@@ -474,14 +545,20 @@ class AuthorNormalizer:
+             first_seen_raw_record_id=raw_record_id,
+             created_at=datetime.now(UTC),
+         )
+-        db.add(variant)
+-        try:
+-            db.flush()
++        conflict = _insert_in_savepoint(db, variant, frozenset({UQ_AUTHOR_NAME_VARIANT}))
++        if conflict is None:
+             self.counters.variants_created += 1
+-        except IntegrityError:
+-            db.rollback()
+-            db.flush()
+-            self.counters.variants_existing += 1
++            return
++
++        # Count it as existing only once the exact unique key is proven to exist.
++        existing = db.query(ScopusAuthorNameVariant).filter(
++            ScopusAuthorNameVariant.scopus_author_id == author_id,
++            ScopusAuthorNameVariant.variant_type == variant_type,
++            ScopusAuthorNameVariant.variant_name == variant_name,
++        ).first()
++        if existing is None:
++            raise conflict
++        self.counters.variants_existing += 1
+ 
+     def _ensure_publication_author_link(
+         self,
+@@ -490,6 +567,8 @@ class AuthorNormalizer:
+         publication_id: uuid.UUID,
+         author_order: int | None,
+         occ: AuthorOccurrence,
++        *,
++        _after_conflict: IntegrityError | None = None,
+     ) -> None:
+         """Ensure publication-author link, record conflicts without silent overwrite."""
+         # Check exact existing link
+@@ -547,20 +626,29 @@ class AuthorNormalizer:
+             )
+             return
+ 
++        if _after_conflict is not None:
++            # A recognized unique violation, yet neither the pair nor the slot
++            # is visible: the conflicting row cannot be proven. Fail closed.
++            raise _after_conflict
++
+         link = PublicationAuthor(
+             publication_id=publication_id,
+             scopus_author_id=author_id,
+             author_order=author_order,
+             created_at=datetime.now(UTC),
+         )
+-        db.add(link)
+-        try:
+-            db.flush()
++        conflict = _insert_in_savepoint(db, link, _LINK_UNIQUE_CONSTRAINTS)
++        if conflict is None:
+             self.counters.publication_author_links_created += 1
+-        except IntegrityError:
+-            db.rollback()
+-            db.flush()
+-            self.counters.publication_author_links_existing += 1
++            return
++
++        # Race: a concurrent transaction committed this pair or slot first.
++        # Re-classify through the replay path above (pair → G03 drift check,
++        # slot → AUTHOR_ORDER_CONFLICT). If neither row can be proven, the
++        # re-entry raises instead of counting an unproven link.
++        self._ensure_publication_author_link(
++            db, author_id, publication_id, author_order, occ, _after_conflict=conflict,
++        )
+ 
+     def _record_position_discrepancy(
+         self, link: PublicationAuthor, observed_order: int, occ: AuthorOccurrence,
+@@ -756,6 +844,8 @@ def normalize_authors_for_import(
+ 
+     for offset in range(0, len(raw_records), batch_size):
+         batch = raw_records[offset : offset + batch_size]
++        # The batch is the unit of work: it commits whole or rolls back whole.
++        checkpoint = normalizer.batch_checkpoint()
+ 
+         try:
+             for raw_record in batch:
+@@ -786,8 +876,19 @@ def normalize_authors_for_import(
+ 
+             db.commit()
+ 
+-        except Exception:
++        except Exception as exc:
+             db.rollback()
++            normalizer.restore_batch_checkpoint(checkpoint)
++            normalizer.errors.add(
++                batch[0].row_number,
++                "AUTHOR_BATCH_ROLLED_BACK",
++                f"Rows {batch[0].row_number}-{batch[-1].row_number} were rolled back "
++                f"after {type(exc).__name__}; no author, variant or link from this "
++                "batch was persisted. Earlier committed batches are kept.",
++                first_row_number=batch[0].row_number,
++                last_row_number=batch[-1].row_number,
++                error_type=type(exc).__name__,
++            )
+             normalizer.finalize(db, import_id, status="FAILED")
+             raise
+ 
+diff --git a/backend/tests/unit/test_author_position_drift.py b/backend/tests/unit/test_author_position_drift.py
+index 76e2dd1..79b3f9c 100644
+--- a/backend/tests/unit/test_author_position_drift.py
++++ b/backend/tests/unit/test_author_position_drift.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++import contextlib
+ import copy
+ import json
+ import uuid
+@@ -98,6 +99,10 @@ class FakeSession:
+                 assert slot not in positions
+                 positions.add(slot)
+ 
++    def begin_nested(self):
++        # G04 inserts run in a savepoint; no conflict is ever raised here.
++        return contextlib.nullcontext()
++
+     def commit(self):
+         self.commits += 1  # In memory only; no SQLAlchemy Session/engine exists.
+ 
+diff --git a/backend/tests/unit/test_author_normalizer_transactions.py b/backend/tests/unit/test_author_normalizer_transactions.py
+new file mode 100644
+index 0000000..eca53d0
+--- /dev/null
++++ b/backend/tests/unit/test_author_normalizer_transactions.py
+@@ -0,0 +1,567 @@
++"""G04: transaction control flow of author normalization, using no database.
++
++The fake session below models only what G04 relies on: pending -> flushed ->
++committed state, SAVEPOINT rollback, the four unique keys plus the CHECK and
++FK constraints of the three tables, and rows committed by a concurrent writer.
++These tests prove control flow, ordering and counter bookkeeping. They do NOT
++prove PostgreSQL transaction safety; see
++tests/integration/test_author_normalizer_transactions_pg.py for that.
++"""
++
++from __future__ import annotations
++
++import contextlib
++import uuid
++from pathlib import Path
++from types import SimpleNamespace
++
++import pytest
++from sqlalchemy.exc import IntegrityError
++
++from app.models.identity import LecturerScopusIdentity, MappingReview
++from app.models.publication import (
++    PublicationAuthor,
++    PublicationRawSource,
++    ScopusAuthor,
++    ScopusAuthorNameVariant,
++)
++from app.models.scopus_raw import RawScopusRecord, ScopusImport
++from app.services.normalization.scopus_author_normalizer import (
++    UQ_AUTHOR_NAME_VARIANT,
++    UQ_PUBLICATION_AUTHOR,
++    UQ_PUBLICATION_AUTHOR_ORDER,
++    UQ_SCOPUS_AUTHOR_ID,
++    AuthorNormalizer,
++    AuthorOccurrence,
++    integrity_violation,
++    normalize_authors_for_import,
++)
++
++
++def uid(number: int) -> uuid.UUID:
++    return uuid.UUID(int=number)
++
++
++IMPORT_ID = uid(900)
++PUB_1, PUB_2, PUB_MISSING = uid(1), uid(2), uid(404)
++
++
++def driver_error(sqlstate: str, constraint: str | None) -> IntegrityError:
++    diag = SimpleNamespace(constraint_name=constraint)
++    return IntegrityError("INSERT ...", {}, SimpleNamespace(pgcode=sqlstate, diag=diag))
++
++
++# Constraint name, SQLSTATE and key, mirroring models/publication.py and the
++# initial migration. Each key returns None when the constraint does not apply.
++CONSTRAINTS = {
++    ScopusAuthor: [("uq_scopus_authors_scopus_id", "23505", lambda r: r.scopus_id)],
++    ScopusAuthorNameVariant: [(
++        "uq_author_name_variants", "23505",
++        lambda r: (r.scopus_author_id, r.variant_type, r.variant_name),
++    )],
++    PublicationAuthor: [
++        ("uq_publication_authors_order", "23505", lambda r: (r.publication_id, r.author_order)),
++        ("uq_publication_authors_author", "23505",
++         lambda r: (r.publication_id, r.scopus_author_id)),
++    ],
++}
++
++
++class Query:
++    def __init__(self, rows):
++        self.rows = rows
++
++    def filter(self, *conditions):
++        for condition in conditions:
++            name, value = condition.left.key, condition.right.value
++            if isinstance(value, (list, tuple)):
++                self.rows = [row for row in self.rows if getattr(row, name) in value]
++            else:
++                self.rows = [row for row in self.rows if getattr(row, name) == value]
++        return self
++
++    def order_by(self, *args):
++        return self
++
++    def populate_existing(self):
++        return self
++
++    def all(self):
++        return list(self.rows)
++
++    def first(self):
++        return next(iter(self.rows), None)
++
++
++class TxSession:
++    """In-memory session: committed rows, one open transaction, savepoints."""
++
++    MODELS = (ScopusAuthor, ScopusAuthorNameVariant, PublicationAuthor,
++              ScopusImport, RawScopusRecord, PublicationRawSource)
++
++    def __init__(self, publications=(PUB_1, PUB_2)):
++        self.publications = set(publications)
++        self.committed = {model: [] for model in self.MODELS}
++        self.txn: list[object] = []      # flushed, not committed
++        self.pending: list[object] = []  # added, not flushed
++        self.savepoints: list[tuple[int, int]] = []
++        self.races: list[tuple[type, object, object]] = []
++        self.log: list[str] = []
++        self.item = ScopusImport(
++            id=IMPORT_ID, status="APPLIED", total_records=1, normalization_summary={},
++        )
++        self.committed[ScopusImport].append(self.item)
++
++    # -- visibility -------------------------------------------------------
++    def visible(self, model):
++        return self.committed[model] + [row for row in self.txn if type(row) is model]
++
++    def query(self, model):
++        assert model in self.MODELS, f"Unexpected model queried: {model}"
++        return Query(self.visible(model))
++
++    # -- concurrency ------------------------------------------------------
++    def race(self, model, key, winner):
++        """A concurrent writer commits ``winner`` just before our INSERT of key."""
++        self.races.append((model, key, winner))
++
++    # -- unit of work -----------------------------------------------------
++    def add(self, obj):
++        assert type(obj) in self.MODELS, f"Unexpected model added: {type(obj)}"
++        self.log.append(f"add:{type(obj).__name__}")
++        self.pending.append(obj)
++
++    def flush(self):
++        self.log.append(f"flush:{len(self.pending)}")
++        while self.pending:
++            obj = self.pending[0]
++            self._check(obj)
++            if getattr(obj, "id", None) is None:
++                obj.id = uuid.uuid4()
++            self.txn.append(self.pending.pop(0))
++
++    def _check(self, obj):
++        model = type(obj)
++        for race_model, key, winner in list(self.races):
++            if race_model is model and any(fn(obj) == key for _, _, fn in CONSTRAINTS[model]):
++                self.races.remove((race_model, key, winner))
++                self.committed[model].append(winner)
++        if model is PublicationAuthor:
++            if obj.author_order is None or obj.author_order < 1:
++                raise driver_error("23514", "ck_publication_authors_author_order")
++            if obj.publication_id not in self.publications:
++                raise driver_error("23503", "fk_publication_authors_publication_id_publications")
++        for name, sqlstate, fn in CONSTRAINTS.get(model, []):
++            if any(fn(row) == fn(obj) for row in self.visible(model)):
++                raise driver_error(sqlstate, name)
++
++    @contextlib.contextmanager
++    def _savepoint(self):
++        self.log.append("SAVEPOINT")
++        self.savepoints.append((len(self.txn), len(self.pending)))
++        try:
++            yield
++        except BaseException:
++            txn_mark, pending_mark = self.savepoints.pop()
++            del self.txn[txn_mark:]
++            del self.pending[pending_mark:]
++            self.log.append("ROLLBACK TO SAVEPOINT")
++            raise
++        self.flush()
++        self.savepoints.pop()
++        self.log.append("RELEASE SAVEPOINT")
++
++    def begin_nested(self):
++        self.log.append("begin_nested")
++        self.flush()  # SQLAlchemy flushes unconditionally before SAVEPOINT.
++        return self._savepoint()
++
++    def commit(self):
++        self.flush()
++        self.log.append("COMMIT")
++        for obj in self.txn:
++            self.committed[type(obj)].append(obj)
++        self.txn.clear()
++
++    def rollback(self):
++        self.log.append("ROLLBACK")
++        self.txn.clear()
++        self.pending.clear()
++        self.savepoints.clear()
++
++    def expire_all(self):
++        pass
++
++
++def occurrence(author: int = 100, order: int = 1, *, raw: int = 10) -> AuthorOccurrence:
++    return AuthorOccurrence(
++        scopus_id=str(58000000000 + author), display_name=f"Synthetic {author}",
++        full_name=None, author_order=order, embedded_id_matches=True,
++        row_number=raw, raw_record_id=uid(raw), import_id=IMPORT_ID,
++    )
++
++
++def committed_author(author: int) -> ScopusAuthor:
++    return ScopusAuthor(id=uid(author), scopus_id=str(58000000000 + author),
++                        preferred_name=f"Synthetic {author}")
++
++
++# ---------------------------------------------------------------------------
++# Constraint identification
++# ---------------------------------------------------------------------------
++
++@pytest.mark.parametrize(("orig", "expected"), [
++    (SimpleNamespace(pgcode="23505", diag=SimpleNamespace(constraint_name="uq_x")),
++     ("23505", "uq_x")),
++    (SimpleNamespace(sqlstate="23503", diag=SimpleNamespace(constraint_name="fk_x")),
++     ("23503", "fk_x")),
++    (SimpleNamespace(pgcode="23505", diag=None), ("23505", None)),
++    (SimpleNamespace(pgcode="23505", args=("uq_scopus_authors_scopus_id",)), ("23505", None)),
++])
++def test_integrity_violation_reads_sqlstate_and_constraint_without_message_parsing(
++    orig, expected,
++):
++    assert integrity_violation(IntegrityError("INSERT", {}, orig)) == expected
++
++
++def test_recognized_constraint_names_match_the_migrations():
++    # Static check of the migration source; P5 checks the live catalog.
++    versions = Path(__file__).resolve().parents[2] / "alembic" / "versions"
++    initial = (versions / "e5b3cf21c1d12b64_0001_initial_schema.py").read_text(encoding="utf-8")
++    names = [UQ_SCOPUS_AUTHOR_ID, UQ_AUTHOR_NAME_VARIANT, UQ_PUBLICATION_AUTHOR,
++             UQ_PUBLICATION_AUTHOR_ORDER, "ck_publication_authors_author_order",
++             "fk_publication_authors_publication_id_publications"]
++    for name in names:
++        assert f'op.f("{name}")' in initial, name
++    for later in versions.glob("*.py"):
++        if later.name.startswith("e5b3cf21c1d12b64"):
++            continue
++        source = later.read_text(encoding="utf-8")
++        assert not any(name in source for name in names), later.name
++
++
++def test_integrity_violation_without_driver_error():
++    exc = IntegrityError("INSERT", {}, None)
++    exc.orig = None
++    assert integrity_violation(exc) == (None, None)
++
++
++# ---------------------------------------------------------------------------
++# Savepoint ordering and the pending-state boundary
++# ---------------------------------------------------------------------------
++
++def test_insert_flushes_pending_state_before_savepoint_and_adds_inside_it():
++    db, normalizer = TxSession(), AuthorNormalizer()
++    normalizer._upsert_author(db, occurrence())
++    assert db.log == [
++        "flush:0", "begin_nested", "flush:0", "SAVEPOINT",
++        "add:ScopusAuthor", "flush:1", "flush:0", "RELEASE SAVEPOINT",
++    ]
++    assert "ROLLBACK" not in db.log
++
++
++def test_pending_duplicate_is_flushed_outside_recovery_scope_and_fails_closed():
++    # A pending row with a *recognized* constraint must still not be recovered:
++    # its failure belongs to earlier state, not to the row being inserted.
++    db, normalizer = TxSession(), AuthorNormalizer()
++    db.committed[ScopusAuthor].append(committed_author(100))
++    db.pending.append(ScopusAuthor(scopus_id=str(58000000100), preferred_name="dup"))
++    with pytest.raises(IntegrityError) as raised:
++        normalizer._ensure_variant(db, uid(100), "AUTHOR_DISPLAY", "Synthetic 100", uid(10))
++    assert integrity_violation(raised.value) == ("23505", UQ_SCOPUS_AUTHOR_ID)
++    assert "begin_nested" not in db.log and "ROLLBACK" not in db.log
++    assert normalizer.counters.variants_existing == 0
++    assert normalizer.counters.variants_created == 0
++
++
++# ---------------------------------------------------------------------------
++# Expected unique races: earlier writes survive, counters follow outcomes
++# ---------------------------------------------------------------------------
++
++def test_author_race_keeps_earlier_batch_writes_and_counts_winner_as_existing():
++    db, normalizer = TxSession(), AuthorNormalizer()
++    first = normalizer._upsert_author(db, occurrence(101))
++    normalizer._ensure_publication_author_link(db, first.id, PUB_1, 1, occurrence(101))
++    winner = committed_author(102)
++    db.race(ScopusAuthor, winner.scopus_id, winner)
++
++    result = normalizer._upsert_author(db, occurrence(102))
++
++    assert result is winner
++    assert first in db.txn and len(db.visible(PublicationAuthor)) == 1
++    assert "ROLLBACK" not in db.log and "ROLLBACK TO SAVEPOINT" in db.log
++    assert normalizer.counters.authors_created == 1
++    assert normalizer.counters.authors_existing == 1
++    assert normalizer.counters.publication_author_links_created == 1
++
++
++def test_variant_race_counts_existing_only_after_exact_key_is_proven():
++    db, normalizer = TxSession(), AuthorNormalizer()
++    db.committed[ScopusAuthor].append(committed_author(100))
++    normalizer._ensure_variant(db, uid(100), "AUTHOR_DISPLAY", "Earlier", uid(10))
++    winner = ScopusAuthorNameVariant(
++        id=uid(7), scopus_author_id=uid(100), variant_type="AUTHOR_FULL_NAME",
++        variant_name="Synthetic 100", variant_name_normalized="synthetic 100",
++    )
++    db.race(ScopusAuthorNameVariant, (uid(100), "AUTHOR_FULL_NAME", "Synthetic 100"), winner)
++
++    normalizer._ensure_variant(db, uid(100), "AUTHOR_FULL_NAME", "Synthetic 100", uid(10))
++
++    assert [v.variant_name for v in db.txn] == ["Earlier"]
++    assert normalizer.counters.variants_created == 1
++    assert normalizer.counters.variants_existing == 1
++
++
++def test_link_pair_race_reclassifies_through_g03_drift_without_overwrite():
++    db, normalizer = TxSession(), AuthorNormalizer()
++    winner = PublicationAuthor(id=uid(8), publication_id=PUB_1,
++                               scopus_author_id=uid(100), author_order=2)
++    db.race(PublicationAuthor, (PUB_1, uid(100)), winner)
++
++    normalizer._ensure_publication_author_link(db, uid(100), PUB_1, 4, occurrence(order=4))
++
++    assert db.visible(PublicationAuthor) == [winner] and winner.author_order == 2
++    assert normalizer.counters.publication_author_links_created == 0
++    assert normalizer.counters.publication_author_links_existing == 1
++    assert normalizer.counters.conflicts == 1
++    drift, = normalizer.position_discrepancies.values()
++    assert (drift["existing_author_order"], drift["observed_author_order"]) == (2, 4)
++
++
++def test_link_slot_race_records_author_order_conflict():
++    db, normalizer = TxSession(), AuthorNormalizer()
++    winner = PublicationAuthor(id=uid(8), publication_id=PUB_1,
++                               scopus_author_id=uid(555), author_order=3)
++    db.race(PublicationAuthor, (PUB_1, 3), winner)
++
++    normalizer._ensure_publication_author_link(db, uid(100), PUB_1, 3, occurrence(order=3))
++
++    assert db.visible(PublicationAuthor) == [winner]
++    assert normalizer.counters.publication_author_links_created == 0
++    assert normalizer.counters.publication_author_links_existing == 0
++    assert normalizer.counters.conflicts == 1
++    assert normalizer.errors.errors[0]["code"] == "AUTHOR_ORDER_CONFLICT"
++
++
++# ---------------------------------------------------------------------------
++# Unexpected or unproven violations fail closed
++# ---------------------------------------------------------------------------
++
++@pytest.mark.parametrize(("publication_id", "order", "expected"), [
++    (PUB_MISSING, 1, ("23503", "fk_publication_authors_publication_id_publications")),
++    (PUB_1, 0, ("23514", "ck_publication_authors_author_order")),
++])
++def test_fk_and_check_violations_propagate_and_are_never_counted(
++    publication_id, order, expected,
++):
++    db, normalizer = TxSession(), AuthorNormalizer()
++    with pytest.raises(IntegrityError) as raised:
++        normalizer._ensure_publication_author_link(
++            db, uid(100), publication_id, order, occurrence(order=order),
++        )
++    assert integrity_violation(raised.value) == expected
++    assert "ROLLBACK" not in db.log and db.visible(PublicationAuthor) == []
++    assert normalizer.counters.publication_author_links_existing == 0
++    assert normalizer.counters.publication_author_links_created == 0
++
++
++def test_unrecognized_unique_constraint_propagates(monkeypatch):
++    db, normalizer = TxSession(), AuthorNormalizer()
++    monkeypatch.setitem(CONSTRAINTS, ScopusAuthor, [
++        ("uq_some_future_constraint", "23505", lambda r: r.preferred_name),
++    ])
++    db.committed[ScopusAuthor].append(ScopusAuthor(id=uid(9), scopus_id="1",
++                                                   preferred_name="Synthetic 100"))
++    with pytest.raises(IntegrityError):
++        normalizer._upsert_author(db, occurrence(100))
++    assert normalizer.counters.authors_existing == 0
++
++
++@pytest.mark.parametrize("helper", ["author", "variant", "link"])
++def test_recognized_conflict_without_provable_row_raises(helper, monkeypatch):
++    # The driver reports the expected constraint but the re-query finds nothing.
++    db, normalizer = TxSession(), AuthorNormalizer()
++    name = {"author": UQ_SCOPUS_AUTHOR_ID, "variant": UQ_AUTHOR_NAME_VARIANT,
++            "link": UQ_PUBLICATION_AUTHOR}[helper]
++
++    def phantom_flush():
++        if db.pending and db.savepoints:
++            raise driver_error("23505", name)
++        TxSession.flush(db)
++
++    monkeypatch.setattr(db, "flush", phantom_flush)
++    with pytest.raises(IntegrityError):
++        if helper == "author":
++            normalizer._upsert_author(db, occurrence())
++        elif helper == "variant":
++            normalizer._ensure_variant(db, uid(100), "AUTHOR_DISPLAY", "X", uid(10))
++        else:
++            normalizer._ensure_publication_author_link(db, uid(100), PUB_1, 1, occurrence())
++    counters = normalizer.counters
++    assert (counters.authors_existing, counters.variants_existing,
++            counters.publication_author_links_existing) == (0, 0, 0)
++    assert "ROLLBACK" not in db.log
++
++
++def test_order_constraint_is_recognized_only_for_links():
++    db, normalizer = TxSession(), AuthorNormalizer()
++    db.committed[ScopusAuthor].append(committed_author(100))
++
++    def wrong_constraint_flush():
++        if db.pending and db.savepoints:
++            raise driver_error("23505", UQ_PUBLICATION_AUTHOR_ORDER)
++        TxSession.flush(db)
++
++    db.flush = wrong_constraint_flush
++    with pytest.raises(IntegrityError):
++        normalizer._ensure_variant(db, uid(100), "AUTHOR_DISPLAY", "X", uid(10))
++
++
++# ---------------------------------------------------------------------------
++# Batch owner: atomic failure, honest counters, G03 observations
++# ---------------------------------------------------------------------------
++
++def raw_record(raw: int, ids: list[int]) -> RawScopusRecord:
++    sids = [str(58000000000 + author) for author in ids]
++    return RawScopusRecord(
++        id=uid(raw), import_id=IMPORT_ID, row_number=raw, validation_status="VALID",
++        raw_payload={
++            "Authors": ";".join(f"Synthetic {sid}" for sid in sids),
++            "Author full names": ";".join(f"Synthetic {sid} ({sid})" for sid in sids),
++            "Author(s) ID": ";".join(sids),
++        },
++    )
++
++
++def batch_session(rows: list[tuple[RawScopusRecord, uuid.UUID]]) -> TxSession:
++    db = TxSession()
++    db.item.total_records = len(rows)
++    for record, publication_id in rows:
++        db.committed[RawScopusRecord].append(record)
++        db.committed[PublicationRawSource].append(
++            PublicationRawSource(publication_id=publication_id, raw_record_id=record.id),
++        )
++    return db
++
++
++def authors_summary(db: TxSession) -> dict:
++    return db.item.normalization_summary["authors"]
++
++
++def test_failed_batch_rolls_back_whole_and_summary_reports_only_committed_batches():
++    db = batch_session([
++        (raw_record(10, [101, 102]), PUB_1),
++        (raw_record(11, [103]), PUB_MISSING),  # FK violation on the link insert
++    ])
++    with pytest.raises(IntegrityError):
++        normalize_authors_for_import(db, IMPORT_ID, cancel_check_interval=1)
++
++    assert {a.scopus_id for a in db.committed[ScopusAuthor]} == {"58000000101", "58000000102"}
++    assert len(db.committed[PublicationAuthor]) == 2 and db.txn == []
++    summary = authors_summary(db)
++    assert summary["status"] == "FAILED"
++    assert summary["authors_created"] == 2
++    assert summary["publication_author_links_created"] == 2
++    assert summary["variants_created"] == 4
++    assert summary["raw_records_processed"] == 1
++    assert summary["unique_authors_seen"] == 2
++    rolled_back, = (e for e in summary["errors"] if e["code"] == "AUTHOR_BATCH_ROLLED_BACK")
++    assert (rolled_back["first_row_number"], rolled_back["last_row_number"]) == (11, 11)
++    assert rolled_back["error_type"] == "IntegrityError"
++
++
++def test_rolled_back_batch_does_not_report_g03_observations_as_recorded():
++    db = batch_session([
++        (raw_record(10, [101, 100]), PUB_1),  # drift: author 100 stored at 1
++        (raw_record(11, [100, 103]), PUB_2),  # drift on PUB_2, then FK failure
++        (raw_record(12, [104]), PUB_MISSING),
++    ])
++    db.committed[ScopusAuthor].append(committed_author(100))
++    db.committed[PublicationAuthor] += [
++        PublicationAuthor(id=uid(81), publication_id=PUB_1,
++                          scopus_author_id=uid(100), author_order=1),
++        PublicationAuthor(id=uid(82), publication_id=PUB_2,
++                          scopus_author_id=uid(100), author_order=2),
++    ]
++    with pytest.raises(IntegrityError):
++        normalize_authors_for_import(db, IMPORT_ID, cancel_check_interval=2)
++
++    summary = authors_summary(db)
++    assert summary["status"] == "FAILED"
++    # Batch 1 (rows 10-11) committed both drift observations; batch 2 had none.
++    assert sorted(d["publication_id"] for d in summary["position_discrepancies"]) == sorted(
++        [str(PUB_1), str(PUB_2)]
++    )
++
++
++def test_g03_observation_of_failed_batch_is_discarded():
++    db = batch_session([
++        (raw_record(10, [101]), PUB_1),
++        (raw_record(11, [101, 100]), PUB_2),  # drift on PUB_2 ...
++        (raw_record(12, [104]), PUB_MISSING),  # ... in the same failing batch
++    ])
++    db.committed[ScopusAuthor].append(committed_author(100))
++    db.committed[PublicationAuthor].append(PublicationAuthor(
++        id=uid(82), publication_id=PUB_2, scopus_author_id=uid(100), author_order=1,
++    ))
++    with pytest.raises(IntegrityError):
++        normalize_authors_for_import(db, IMPORT_ID, cancel_check_interval=1)
++    # Batches: [10] committed, [11] committed with drift, [12] failed.
++    assert len(authors_summary(db)["position_discrepancies"]) == 1
++
++    db2 = batch_session([
++        (raw_record(10, [101]), PUB_1),
++        (raw_record(11, [101, 102]), PUB_1),
++        (raw_record(12, [101, 100]), PUB_2),  # drift on PUB_2 ...
++        (raw_record(13, [104]), PUB_MISSING),  # ... in the same failing batch
++    ])
++    db2.committed[ScopusAuthor].append(committed_author(100))
++    db2.committed[PublicationAuthor].append(PublicationAuthor(
++        id=uid(82), publication_id=PUB_2, scopus_author_id=uid(100), author_order=1,
++    ))
++    with pytest.raises(IntegrityError):
++        normalize_authors_for_import(db2, IMPORT_ID, cancel_check_interval=2)
++    # Batches: [10, 11] committed, [12, 13] failed — the drift seen in row 12
++    # and the slot conflict of row 12 were not persisted, so neither is reported.
++    summary = authors_summary(db2)
++    assert "position_discrepancies" not in summary
++    assert summary["conflicts"] == 0
++
++
++def test_replay_is_idempotent_for_authors_variants_and_links():
++    db = batch_session([(raw_record(10, [101, 102]), PUB_1), (raw_record(11, [101]), PUB_2)])
++    first = normalize_authors_for_import(db, IMPORT_ID, cancel_check_interval=1)
++    rows = {model: len(db.committed[model]) for model in
++            (ScopusAuthor, ScopusAuthorNameVariant, PublicationAuthor)}
++    second = normalize_authors_for_import(db, IMPORT_ID, cancel_check_interval=1)
++
++    assert (first.authors_created, first.variants_created,
++            first.publication_author_links_created) == (2, 4, 3)
++    assert (second.authors_created, second.variants_created,
++            second.publication_author_links_created) == (0, 0, 0)
++    assert (second.authors_existing, second.variants_existing,
++            second.publication_author_links_existing) == (3, 6, 3)
++    assert rows == {model: len(db.committed[model]) for model in rows}
++    assert authors_summary(db)["status"] == "COMPLETED"
++    assert "ROLLBACK" not in db.log
++
++
++def test_race_recovery_and_failed_batch_leave_reviewer_identity_untouched():
++    identity = LecturerScopusIdentity(
++        id=uid(700), lecturer_id=uid(701), scopus_author_id=uid(102),
++        status="APPROVED", version=3,
++    )
++    review = MappingReview(
++        id=uid(702), identity_id=identity.id, reviewer_user_id=uid(703),
++        action="APPROVE", from_status="CANDIDATE", to_status="APPROVED",
++        evidence_snapshot={"synthetic": True},
++    )
++    before = (dict(identity.__dict__), dict(review.__dict__))
++    db = batch_session([(raw_record(10, [102]), PUB_1), (raw_record(11, [103]), PUB_MISSING)])
++    winner = committed_author(102)
++    db.race(ScopusAuthor, winner.scopus_id, winner)
++    with pytest.raises(IntegrityError):
++        normalize_authors_for_import(db, IMPORT_ID, cancel_check_interval=1)
++    # TxSession rejects any identity/review model, so none was queried or added.
++    assert (identity.__dict__, review.__dict__) == before
++    assert identity.status == "APPROVED" and identity.version == 3
+diff --git a/backend/tests/integration/test_author_normalizer_transactions_pg.py b/backend/tests/integration/test_author_normalizer_transactions_pg.py
+new file mode 100644
+index 0000000..da9d5f5
+--- /dev/null
++++ b/backend/tests/integration/test_author_normalizer_transactions_pg.py
+@@ -0,0 +1,525 @@
++"""G04: PostgreSQL transaction behavior of author normalization.
++
++Requires TEST_DATABASE_URL pointing to an allowlisted disposable database; the
++conftest guard (tests/db_safety_guard.py) re-verifies the target before every
++test and before cleanup. Each test works in its own schema, which is dropped
++afterwards. Nothing here may run against the application database.
++
++Races are made deterministic in two ways:
++- a hook commits the conflicting row from a second connection immediately
++  before our INSERT, after our pre-check already missed it (P1, P6);
++- a real two-connection race where our INSERT blocks on an uncommitted row
++  until the other transaction commits (P2), with bounded waits.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import threading
++import time
++import uuid
++from collections.abc import Callable, Generator
++from datetime import UTC, datetime
++
++import pytest
++from sqlalchemy import create_engine, text
++from sqlalchemy.engine import Engine
++from sqlalchemy.exc import IntegrityError, PendingRollbackError
++from sqlalchemy.orm import Session, sessionmaker
++
++import app.services.normalization.scopus_author_normalizer as author_module
++from app.models.base import Base
++from app.models.publication import (
++    Publication,
++    PublicationAuthor,
++    ScopusAuthor,
++    ScopusAuthorNameVariant,
++)
++from app.models.scopus_raw import RawScopusRecord, ScopusImport
++from app.services.normalization.scopus_author_normalizer import (
++    UQ_AUTHOR_NAME_VARIANT,
++    UQ_PUBLICATION_AUTHOR,
++    UQ_PUBLICATION_AUTHOR_ORDER,
++    UQ_SCOPUS_AUTHOR_ID,
++    AuthorNormalizer,
++    integrity_violation,
++    normalize_authors_for_import,
++)
++from app.services.normalization.scopus_normalizer import normalize_import
++from tests.db_safety_guard import assert_safe_for_destructive_test
++
++LOCK_WAIT_SECONDS = 15
++THREAD_JOIN_SECONDS = 30
++
++
++# ---------------------------------------------------------------------------
++# Fixtures: one disposable schema per test inside the verified test database
++# ---------------------------------------------------------------------------
++
++@pytest.fixture
++def pg(isolated_db_engine: Engine | None) -> Generator[sessionmaker, None, None]:
++    if isolated_db_engine is None:
++        pytest.skip("No isolated PostgreSQL test database available.")
++    schema = f"g04_txn_{uuid.uuid4().hex}"
++    with isolated_db_engine.begin() as conn:
++        conn.execute(text(f'CREATE SCHEMA "{schema}"'))
++    engine = create_engine(
++        isolated_db_engine.url,
++        pool_pre_ping=True,
++        future=True,
++        connect_args={
++            "options": f"-csearch_path={schema} -cstatement_timeout=30000 "
++                       f"-clock_timeout={LOCK_WAIT_SECONDS * 2}s"
++        },
++    )
++    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
++    factory.schema = schema  # type: ignore[attr-defined]
++    try:
++        Base.metadata.create_all(bind=engine)
++        yield factory
++    finally:
++        engine.dispose()
++        assert_safe_for_destructive_test(isolated_db_engine)
++        with isolated_db_engine.begin() as conn:
++            conn.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
++
++
++def _sid(n: int) -> str:
++    return str(58000000000 + n)
++
++
++def _payload(authors: list[int]) -> dict:
++    sids = [_sid(n) for n in authors]
++    return {
++        "Authors": ";".join(f"Synthetic {sid}" for sid in sids),
++        "Author full names": ";".join(f"Synthetic {sid} ({sid})" for sid in sids),
++        "Author(s) ID": ";".join(sids),
++        "Title": "G04 synthetic title " + "-".join(sids),
++    }
++
++
++def make_applied_import(
++    factory: sessionmaker, rows: list[tuple[str, list[int]]],
++) -> uuid.UUID:
++    """Create a synthetic import with one raw record per (eid, authors) row,
++    then run M2.6A so publications and provenance exist and it is APPLIED."""
++    import_id = uuid.uuid4()
++    with factory() as db:
++        db.add(ScopusImport(
++            id=import_id, file_name=f"g04_{import_id.hex}.csv",
++            file_sha256=hashlib.sha256(import_id.bytes).hexdigest(),
++            total_records=len(rows), valid_records=len(rows), invalid_records=0,
++            status="STAGED", version=1,
++            created_at=datetime.now(UTC), updated_at=datetime.now(UTC),
++        ))
++        db.commit()
++        for row_number, (eid, authors) in enumerate(rows, start=1):
++            payload = _payload(authors)
++            db.add(RawScopusRecord(
++                id=uuid.uuid4(), import_id=import_id, row_number=row_number,
++                row_hash=hashlib.sha256(f"{import_id}{row_number}".encode()).hexdigest(),
++                eid_raw=eid, doi_raw=None, raw_payload=payload,
++                validation_status="VALID", validation_errors=None,
++                created_at=datetime.now(UTC),
++            ))
++        db.commit()
++        normalize_import(db, import_id)
++        assert db.get(ScopusImport, import_id).status == "APPLIED"
++    return import_id
++
++
++def counts(factory: sessionmaker) -> dict[str, int]:
++    with factory() as db:
++        return {
++            "authors": db.query(ScopusAuthor).count(),
++            "variants": db.query(ScopusAuthorNameVariant).count(),
++            "links": db.query(PublicationAuthor).count(),
++        }
++
++
++def author_ids(factory: sessionmaker) -> set[str]:
++    with factory() as db:
++        return {a.scopus_id for a in db.query(ScopusAuthor).all()}
++
++
++def authors_summary(factory: sessionmaker, import_id: uuid.UUID) -> dict:
++    with factory() as db:
++        return db.get(ScopusImport, import_id).normalization_summary["authors"]
++
++
++def commit_from_other_connection(factory: sessionmaker, build: Callable[[Session], object]):
++    with factory() as other:
++        other.add(build(other))
++        other.commit()
++
++
++def hook_before_insert(monkeypatch, match: Callable[[object], bool], action: Callable[[], None]):
++    """Run ``action`` once, right before the matching INSERT's savepoint."""
++    real = author_module._insert_in_savepoint
++    fired = []
++
++    def hooked(db, obj, recoverable):
++        if not fired and match(obj):
++            fired.append(obj)
++            action()
++        return real(db, obj, recoverable)
++
++    monkeypatch.setattr(author_module, "_insert_in_savepoint", hooked)
++    return fired
++
++
++# ---------------------------------------------------------------------------
++# P5 — constraint names and SQLSTATEs as reported by the real driver
++# ---------------------------------------------------------------------------
++
++def test_p5_constraint_names_exist_in_postgresql(pg):
++    with pg() as db:
++        names = set(db.execute(text(
++            "SELECT c.conname FROM pg_constraint c "
++            "JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = :schema"
++        ), {"schema": pg.schema}).scalars())
++    assert {
++        UQ_SCOPUS_AUTHOR_ID, UQ_AUTHOR_NAME_VARIANT, UQ_PUBLICATION_AUTHOR,
++        UQ_PUBLICATION_AUTHOR_ORDER, "ck_publication_authors_author_order",
++        "fk_publication_authors_publication_id_publications",
++        "fk_publication_authors_scopus_author_id_scopus_authors",
++    } <= names
++
++
++def test_p5_driver_reports_sqlstate_and_constraint_for_each_violation(pg):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p5", [1, 2])])
++    with pg() as db:
++        normalize_authors_for_import(db, import_id)
++    with pg() as db:
++        pub = db.query(Publication).one()
++        a1, a2 = (db.query(ScopusAuthor).filter(ScopusAuthor.scopus_id == _sid(n)).one()
++                  for n in (1, 2))
++        # Each case violates exactly one constraint.
++        cases = [
++            (ScopusAuthor(scopus_id=_sid(1), preferred_name="dup"),
++             ("23505", UQ_SCOPUS_AUTHOR_ID)),
++            (ScopusAuthorNameVariant(
++                scopus_author_id=a1.id, variant_type="AUTHOR_DISPLAY",
++                variant_name=f"Synthetic {_sid(1)}", variant_name_normalized="x"),
++             ("23505", UQ_AUTHOR_NAME_VARIANT)),
++            (PublicationAuthor(publication_id=pub.id, scopus_author_id=a1.id, author_order=9),
++             ("23505", UQ_PUBLICATION_AUTHOR)),
++            (PublicationAuthor(publication_id=uuid.uuid4(), scopus_author_id=a2.id,
++                               author_order=1),
++             ("23503", "fk_publication_authors_publication_id_publications")),
++        ]
++        for obj, expected in cases:
++            with pytest.raises(IntegrityError) as raised, db.begin_nested():
++                db.add(obj)
++                db.flush()
++            assert integrity_violation(raised.value) == expected
++        # The outer transaction survived every savepoint rollback.
++        assert db.query(ScopusAuthor).count() == 2
++        db.rollback()
++
++    with pg() as db:
++        pub = db.query(Publication).one()
++        lone = ScopusAuthor(scopus_id=_sid(3), preferred_name="lone")
++        db.add(lone)
++        db.flush()
++        with pytest.raises(IntegrityError) as raised, db.begin_nested():
++            db.add(PublicationAuthor(publication_id=pub.id, scopus_author_id=lone.id,
++                                     author_order=0))
++            db.flush()
++        assert integrity_violation(raised.value) == (
++            "23514", "ck_publication_authors_author_order")
++        with pytest.raises(IntegrityError) as raised, db.begin_nested():
++            db.add(PublicationAuthor(publication_id=pub.id, scopus_author_id=lone.id,
++                                     author_order=1))
++            db.flush()
++        assert integrity_violation(raised.value) == ("23505", UQ_PUBLICATION_AUTHOR_ORDER)
++        db.rollback()
++
++
++# ---------------------------------------------------------------------------
++# P1 — earlier valid writes survive an expected uniqueness conflict
++# ---------------------------------------------------------------------------
++
++def test_p1_author_race_keeps_earlier_batch_writes(pg, monkeypatch):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p1a", [1]), ("2-s2.0-g04p1b", [2])])
++    fired = hook_before_insert(
++        monkeypatch,
++        lambda obj: isinstance(obj, ScopusAuthor) and obj.scopus_id == _sid(2),
++        lambda: commit_from_other_connection(
++            pg, lambda _: ScopusAuthor(scopus_id=_sid(2), preferred_name="winner")),
++    )
++    with pg() as db:
++        result = normalize_authors_for_import(db, import_id)  # one batch: rows 1 and 2
++
++    assert fired, "the race hook did not fire"
++    assert author_ids(pg) == {_sid(1), _sid(2)}
++    # Author 1 and its variants/link were flushed before the conflict and survive.
++    assert counts(pg) == {"authors": 2, "variants": 4, "links": 2}
++    assert (result.authors_created, result.authors_existing) == (1, 1)
++    summary = authors_summary(pg, import_id)
++    assert summary["status"] == "COMPLETED"
++    assert summary["authors_created"] == 1 and summary["publication_author_links_created"] == 2
++
++
++# ---------------------------------------------------------------------------
++# P2 — two sessions race on the same Scopus author (real lock wait)
++# ---------------------------------------------------------------------------
++
++def _wait_for_lock_waiter(pg: sessionmaker, deadline: float) -> bool:
++    with pg() as probe:
++        while time.monotonic() < deadline:
++            waiting = probe.execute(text(
++                "SELECT count(*) FROM pg_stat_activity "
++                "WHERE datname = current_database() AND wait_event_type = 'Lock' "
++                "AND pid <> pg_backend_pid()"
++            )).scalar_one()
++            if waiting:
++                return True
++            probe.rollback()
++            time.sleep(0.05)
++    return False
++
++
++def test_p2_concurrent_sessions_create_one_author_and_keep_prior_writes(pg):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p2a", [1]), ("2-s2.0-g04p2b", [2])])
++    holder = pg()
++    outcome: dict[str, object] = {}
++
++    def run_normalization():
++        try:
++            with pg() as db:
++                outcome["counters"] = normalize_authors_for_import(db, import_id)
++        except BaseException as exc:  # reported to the main thread
++            outcome["error"] = exc
++
++    worker = threading.Thread(target=run_normalization, daemon=True)
++    try:
++        holder.add(ScopusAuthor(scopus_id=_sid(2), preferred_name="holder"))
++        holder.flush()  # row lock held, not committed: invisible to the worker
++        worker.start()
++        assert _wait_for_lock_waiter(pg, time.monotonic() + LOCK_WAIT_SECONDS), (
++            "worker never blocked on the uncommitted author row")
++        holder.commit()
++        worker.join(THREAD_JOIN_SECONDS)
++        assert not worker.is_alive(), "worker did not finish in time"
++    finally:
++        holder.rollback()
++        holder.close()
++        worker.join(THREAD_JOIN_SECONDS)
++
++    assert "error" not in outcome, outcome.get("error")
++    counters = outcome["counters"]
++    assert (counters.authors_created, counters.authors_existing) == (1, 1)
++    with pg() as db:
++        assert db.query(ScopusAuthor).filter(ScopusAuthor.scopus_id == _sid(2)).count() == 1
++    assert counts(pg) == {"authors": 2, "variants": 4, "links": 2}
++    assert authors_summary(pg, import_id)["status"] == "COMPLETED"
++
++
++# ---------------------------------------------------------------------------
++# P3/P4 — unexpected FK and CHECK violations roll back the whole batch
++# ---------------------------------------------------------------------------
++
++def test_p3_fk_violation_rolls_back_batch_and_reports_failed(pg, monkeypatch):
++    import_id = make_applied_import(
++        pg, [("2-s2.0-g04p3a", [1]), ("2-s2.0-g04p3b", [2, 3]), ("2-s2.0-g04p3c", [4])])
++    with pg() as db:
++        row2 = db.query(RawScopusRecord).filter(RawScopusRecord.row_number == 2).one().id
++    real = AuthorNormalizer.record_occurrences
++
++    def broken_provenance(self, occurrences, db, mapping):
++        if occurrences and occurrences[0].raw_record_id == row2:
++            mapping = {**mapping, row2: uuid.uuid4()}  # publication does not exist
++        return real(self, occurrences, db, mapping)
++
++    monkeypatch.setattr(AuthorNormalizer, "record_occurrences", broken_provenance)
++    with pytest.raises(IntegrityError) as raised, pg() as db:
++        normalize_authors_for_import(db, import_id, cancel_check_interval=1)
++
++    assert integrity_violation(raised.value)[0] == "23503"
++    # Batch 1 committed; batch 2 (author 2 was flushed before its link failed)
++    # left nothing; batch 3 never ran.
++    assert author_ids(pg) == {_sid(1)}
++    assert counts(pg) == {"authors": 1, "variants": 2, "links": 1}
++    summary = authors_summary(pg, import_id)
++    assert summary["status"] == "FAILED"
++    assert (summary["authors_created"], summary["variants_created"],
++            summary["publication_author_links_created"],
++            summary["publication_author_links_existing"]) == (1, 2, 1, 0)
++    assert summary["raw_records_processed"] == 1
++    assert any(e["code"] == "AUTHOR_BATCH_ROLLED_BACK" for e in summary["errors"])
++
++
++def test_p4_check_violation_rolls_back_batch(pg, monkeypatch):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p4a", [1]), ("2-s2.0-g04p4b", [2])])
++    real_parse = author_module.parse_author_occurrences
++
++    def zero_position(raw_record):
++        occurrences, errors = real_parse(raw_record)
++        if raw_record.row_number == 2:
++            for occ in occurrences:
++                occ.author_order = 0
++        return occurrences, errors
++
++    monkeypatch.setattr(author_module, "parse_author_occurrences", zero_position)
++    with pytest.raises(IntegrityError) as raised, pg() as db:
++        normalize_authors_for_import(db, import_id, cancel_check_interval=1)
++    assert integrity_violation(raised.value) == ("23514", "ck_publication_authors_author_order")
++    assert author_ids(pg) == {_sid(1)}
++    assert authors_summary(pg, import_id)["status"] == "FAILED"
++
++
++# ---------------------------------------------------------------------------
++# P6 — duplicate author-order and pair races (G03 compatible)
++# ---------------------------------------------------------------------------
++
++def test_p6_slot_race_records_conflict_without_overwrite(pg, monkeypatch):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p6", [1])])
++    with pg() as db:
++        pub_id = db.query(Publication).one().id
++    commit_from_other_connection(
++        pg, lambda _: ScopusAuthor(id=uuid.UUID(int=77), scopus_id=_sid(77),
++                                   preferred_name="slot owner"))
++    hook_before_insert(
++        monkeypatch, lambda obj: isinstance(obj, PublicationAuthor),
++        lambda: commit_from_other_connection(pg, lambda _: PublicationAuthor(
++            publication_id=pub_id, scopus_author_id=uuid.UUID(int=77), author_order=1)),
++    )
++    with pg() as db:
++        counters = normalize_authors_for_import(db, import_id)
++
++    assert (counters.publication_author_links_created,
++            counters.publication_author_links_existing, counters.conflicts) == (0, 0, 1)
++    with pg() as db:
++        link, = db.query(PublicationAuthor).all()
++        assert (link.scopus_author_id, link.author_order) == (uuid.UUID(int=77), 1)
++    summary = authors_summary(pg, import_id)
++    assert summary["status"] == "COMPLETED"
++    assert any(e["code"] == "AUTHOR_ORDER_CONFLICT" for e in summary["errors"])
++
++
++def test_p6_pair_race_with_other_position_is_g03_drift(pg, monkeypatch):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p6b", [5, 1])])  # author 1 at position 2
++    with pg() as db:
++        pub_id = db.query(Publication).one().id
++
++    def winner_link():
++        with pg() as other:
++            author = other.query(ScopusAuthor).filter(ScopusAuthor.scopus_id == _sid(1)).one()
++            other.add(PublicationAuthor(publication_id=pub_id, scopus_author_id=author.id,
++                                        author_order=7))
++            other.commit()
++
++    # Author 1 must already be committed for the other connection to link it.
++    commit_from_other_connection(pg, lambda _: ScopusAuthor(scopus_id=_sid(1),
++                                                            preferred_name="pre"))
++    hook_before_insert(
++        monkeypatch,
++        lambda obj: isinstance(obj, PublicationAuthor) and obj.author_order == 2,
++        winner_link,
++    )
++    with pg() as db:
++        counters = normalize_authors_for_import(db, import_id)
++
++    assert counters.publication_author_links_existing == 1
++    summary = authors_summary(pg, import_id)
++    drift, = summary["position_discrepancies"]  # G03 observation, committed
++    assert (drift["existing_author_order"], drift["observed_author_order"]) == (7, 2)
++    with pg() as db:
++        stored = db.query(PublicationAuthor).filter(
++            PublicationAuthor.author_order == 7).one()
++        assert stored.publication_id == pub_id  # canonical position not overwritten
++
++
++# ---------------------------------------------------------------------------
++# P7 — pending state is flushed outside the recovery scope
++# ---------------------------------------------------------------------------
++
++def test_p7_pending_duplicate_fails_closed_before_savepoint(pg):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p7", [1])])
++    with pg() as db:
++        normalize_authors_for_import(db, import_id)
++    with pg() as db:
++        author = db.query(ScopusAuthor).one()
++        db.add(ScopusAuthor(scopus_id=_sid(1), preferred_name="pending duplicate"))
++        normalizer = AuthorNormalizer()
++        with pytest.raises(IntegrityError) as raised:
++            normalizer._ensure_variant(db, author.id, "AUTHOR_DISPLAY", "new", uuid.uuid4())
++        assert integrity_violation(raised.value) == ("23505", UQ_SCOPUS_AUTHOR_ID)
++        assert normalizer.counters.variants_existing == 0
++        # Not recovered: the outer transaction must now be rolled back by its owner.
++        with pytest.raises(PendingRollbackError):
++            db.query(ScopusAuthor).count()
++        db.rollback()
++
++
++# ---------------------------------------------------------------------------
++# P8 — replay is idempotent
++# ---------------------------------------------------------------------------
++
++def test_p8_replay_is_idempotent(pg):
++    import_id = make_applied_import(pg, [("2-s2.0-g04p8a", [1, 2]), ("2-s2.0-g04p8b", [2])])
++    with pg() as db:
++        first = normalize_authors_for_import(db, import_id, cancel_check_interval=1)
++    before = counts(pg)
++    with pg() as db:
++        second = normalize_authors_for_import(db, import_id, cancel_check_interval=1)
++    assert counts(pg) == before == {"authors": 2, "variants": 4, "links": 3}
++    assert (first.authors_created, second.authors_created, second.authors_existing) == (2, 0, 3)
++    assert second.publication_author_links_existing == 3
++    assert authors_summary(pg, import_id)["status"] == "COMPLETED"
++
++
++# ---------------------------------------------------------------------------
++# P9/P10 — G03 observations: kept when committed, dropped with a rolled-back batch
++# ---------------------------------------------------------------------------
++
++def test_p10_g03_observations_follow_transaction_outcome(pg, monkeypatch):
++    # Import A fixes author 1 at position 1 on both publications.
++    first = make_applied_import(pg, [("2-s2.0-g04d1", [1]), ("2-s2.0-g04d2", [1])])
++    with pg() as db:
++        normalize_authors_for_import(db, first)
++    # Import B re-observes both publications with author 1 at position 2, then
++    # row 3 fails. Batch size 2: rows 1-2 (both drifts) commit, row 3 fails.
++    second = make_applied_import(
++        pg, [("2-s2.0-g04d1", [9, 1]), ("2-s2.0-g04d2", [9, 1]), ("2-s2.0-g04d3", [3])])
++    with pg() as db:
++        row3 = db.query(RawScopusRecord).filter(
++            RawScopusRecord.import_id == second, RawScopusRecord.row_number == 3).one().id
++    real = AuthorNormalizer.record_occurrences
++
++    def fail_row3(self, occurrences, db, mapping):
++        if occurrences and occurrences[0].raw_record_id == row3:
++            mapping = {**mapping, row3: uuid.uuid4()}
++        return real(self, occurrences, db, mapping)
++
++    monkeypatch.setattr(AuthorNormalizer, "record_occurrences", fail_row3)
++    with pytest.raises(IntegrityError), pg() as db:
++        normalize_authors_for_import(db, second, cancel_check_interval=2)
++    summary = authors_summary(pg, second)
++    assert summary["status"] == "FAILED"
++    assert len(summary["position_discrepancies"]) == 2  # both from the committed batch
++
++    # Import C: the drift row shares its batch with the failing row.
++    third = make_applied_import(pg, [
++        ("2-s2.0-g04d5", [3]), ("2-s2.0-g04d6", [4]),
++        ("2-s2.0-g04d1", [9, 1]), ("2-s2.0-g04d7", [6]),
++    ])
++    with pg() as db:
++        row4 = db.query(RawScopusRecord).filter(
++            RawScopusRecord.import_id == third, RawScopusRecord.row_number == 4).one().id
++
++    def fail_row4(self, occurrences, db, mapping):
++        if occurrences and occurrences[0].raw_record_id == row4:
++            mapping = {**mapping, row4: uuid.uuid4()}
++        return real(self, occurrences, db, mapping)
++
++    monkeypatch.setattr(AuthorNormalizer, "record_occurrences", fail_row4)
++    with pytest.raises(IntegrityError), pg() as db:
++        normalize_authors_for_import(db, third, cancel_check_interval=2)
++    # Batch [1, 2] commits; batch [3, 4] rolls back, so the drift and slot
++    # conflict observed in row 3 are not reported as recorded.
++    summary = authors_summary(pg, third)
++    assert summary["status"] == "FAILED"
++    assert "position_discrepancies" not in summary
++    assert summary["conflicts"] == 0

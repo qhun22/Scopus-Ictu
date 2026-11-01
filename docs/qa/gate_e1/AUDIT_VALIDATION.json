@@ -1,0 +1,294 @@
+{
+  "audit": "SCOPUS–ICTU Gate E.1",
+  "date_local": "2026-10-29",
+  "timezone": "Asia/Bangkok",
+  "baseline_head": "4bb69f6efaac945399b1c191fc12879ad1c62885",
+  "handover": {
+    "gate_e1_existed_before": false,
+    "existing_outside_scope_work_preserved": true,
+    "previous_independent_audit_reused": true
+  },
+  "execution_boundary": {
+    "database_connections": 0,
+    "database_writes": 0,
+    "real_imports": 0,
+    "migrations": 0,
+    "identity_decisions": 0,
+    "source_changes": 0,
+    "commits": 0,
+    "pushes": 0,
+    "allowed_write_root": "docs/qa/gate_e1/"
+  },
+  "verification": {
+    "requirement_rows": 18,
+    "requirement_ids_complete": true,
+    "accepted_requirement_wording_preserved": true,
+    "classifications": {
+      "PARTIAL": 12,
+      "MISSING": 5,
+      "DEFECT_CONFIRMED": 1
+    },
+    "finding_ids_accounted_for": 31,
+    "finding_011_treatment": "Academic notice independent of identity; no invented R-ID; optional TC-22/P3.",
+    "proposed_synthetic_cases": 23,
+    "source_ranges_checked": 159,
+    "source_files_referenced": 72,
+    "named_test_symbols_exist": true,
+    "existing_repository_tests": "INSPECTED_NOT_EXECUTED",
+    "frontend_build_and_browser": "NOT_EXECUTED",
+    "runtime_db_state": "NOT_VERIFIABLE",
+    "deployed_migrations": "NOT_VERIFIABLE"
+  },
+  "synthetic_in_memory_probes": [
+    {
+      "probe": "openalex_entity_overrides_raw_name",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": "Different Entity Person"
+    },
+    {
+      "probe": "aggregator_orcid_bridge_bypasses_name",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": {
+        "status": "VERIFIED",
+        "name": "Different Entity Person"
+      }
+    },
+    {
+      "probe": "multiple_affiliations_preserved",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": [
+        "Other Institute",
+        "ICTU Synthetic Faculty"
+      ]
+    },
+    {
+      "probe": "missing_authors_not_identifier_conflict",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": "NO_EXTERNAL_AUTHOR_LIST"
+    },
+    {
+      "probe": "crossref_full_author_list",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": 7
+    },
+    {
+      "probe": "structured_scopus_ids_not_carried",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": [
+        "source_id",
+        "staff_code",
+        "full_name",
+        "full_name_normalized",
+        "institutional_email",
+        "tel",
+        "academic_degree",
+        "academic_rank",
+        "position",
+        "faculty",
+        "department",
+        "specialization",
+        "gender",
+        "date_of_birth",
+        "phone",
+        "profile_url",
+        "orcid",
+        "is_active",
+        "provenance",
+        "known_publications",
+        "account"
+      ]
+    },
+    {
+      "probe": "structured_duplicate_orcid_rejected",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": "DUPLICATE_LECTURER_IDENTITY"
+    },
+    {
+      "probe": "duplicate_url_first_row_selected",
+      "result": "PASS_CURRENT_BEHAVIOR",
+      "observed": {
+        "input_rows": 2,
+        "mapped_urls": 1,
+        "selected": "first row"
+      }
+    }
+  ],
+  "probe_interpretation": "PASS_CURRENT_BEHAVIOR means an assertion about actual current behavior passed; unsafe behavior is intentionally reproduced, not accepted as correct. No pytest/conftest/application startup or database engine was loaded.",
+  "local_source_inventory": {
+    "available": true,
+    "lecturer_count": 410,
+    "lecturer_file_sha256": "c12252e02cbf73c58ae3add65a5b6b925f5e0fcd75273bd7e0a3cc28c8a0accb",
+    "lecturer_keys": [
+      "academic_degree",
+      "academic_rank",
+      "counts",
+      "department",
+      "discovery_source",
+      "extra_fields",
+      "faculty",
+      "full_name",
+      "google_scholar_url",
+      "institutional_email",
+      "is_active",
+      "lost_labels",
+      "normalized",
+      "observed_labels",
+      "orcid",
+      "orcid_url",
+      "position",
+      "preserved_labels",
+      "profile_url",
+      "provenance",
+      "public_publication_links",
+      "source",
+      "source_display_name",
+      "source_fields",
+      "source_id",
+      "specialisation"
+    ],
+    "link_rows": 328,
+    "linked_lecturer_count": 48,
+    "publication_count": 1907,
+    "duplicate_source_ids": 0,
+    "orcid_value_shapes": {
+      "str": 372,
+      "NoneType": 38
+    },
+    "duplicate_orcid_values": 10,
+    "profiles_in_orcid_collisions": 20,
+    "profiles_with_raw_publication_links": 106,
+    "multi_id_table_rows": 34,
+    "multi_id_distinct_ids": 83,
+    "ambiguous_table_rows": 10,
+    "unknown_table_rows": 59,
+    "total_distinct_inventory_ids": 152,
+    "multi_vs_other_id_overlap": 0
+  },
+  "integrity": {
+    "protected_tree_checks": {
+      "backend/app": {
+        "before": {
+          "files": 139,
+          "sha256": "580d8ab35faa8bfd17b4eb20dcb0ad8bc345181f6a92697edf33d10fbad81e93"
+        },
+        "after": {
+          "files": 139,
+          "sha256": "580d8ab35faa8bfd17b4eb20dcb0ad8bc345181f6a92697edf33d10fbad81e93"
+        },
+        "unchanged": true
+      },
+      "backend/alembic": {
+        "before": {
+          "files": 16,
+          "sha256": "e9d6d887a442ad810d0b703a39c1e4e3dc4728ca93e26049e6bf1f02869270d8"
+        },
+        "after": {
+          "files": 16,
+          "sha256": "e9d6d887a442ad810d0b703a39c1e4e3dc4728ca93e26049e6bf1f02869270d8"
+        },
+        "unchanged": true
+      },
+      "backend/tests": {
+        "before": {
+          "files": 79,
+          "sha256": "c00ce3917bdc5dd839688c156b98254f3d2f6f617fb9e6d58f9204acdb7fd912"
+        },
+        "after": {
+          "files": 79,
+          "sha256": "c00ce3917bdc5dd839688c156b98254f3d2f6f617fb9e6d58f9204acdb7fd912"
+        },
+        "unchanged": true
+      },
+      "backend/scripts": {
+        "before": {
+          "files": 22,
+          "sha256": "c3e78f657dad8e60a5ed1d9659137c0c146321e6713f2ab83a4c7a73ce2955de"
+        },
+        "after": {
+          "files": 22,
+          "sha256": "c3e78f657dad8e60a5ed1d9659137c0c146321e6713f2ab83a4c7a73ce2955de"
+        },
+        "unchanged": true
+      },
+      "frontend/src": {
+        "before": {
+          "files": 92,
+          "sha256": "bc9b17765f3ddf93fe0077893fa0841c7aac91c281435815318e495111927d2b"
+        },
+        "after": {
+          "files": 92,
+          "sha256": "bc9b17765f3ddf93fe0077893fa0841c7aac91c281435815318e495111927d2b"
+        },
+        "unchanged": true
+      },
+      "docs/research": {
+        "before": {
+          "files": 3,
+          "sha256": "0435fe80a035b6089eca7123d8968d24bece11054f0f99309d1043e4fa9aa767"
+        },
+        "after": {
+          "files": 3,
+          "sha256": "0435fe80a035b6089eca7123d8968d24bece11054f0f99309d1043e4fa9aa767"
+        },
+        "unchanged": true
+      },
+      "docs/qa/gate_d3": {
+        "before": {
+          "files": 275,
+          "sha256": "f8f0be8b7f291f1d9c70d061e59b935e29487022cfa6a4e0acf3f7df0b42fe12"
+        },
+        "after": {
+          "files": 275,
+          "sha256": "f8f0be8b7f291f1d9c70d061e59b935e29487022cfa6a4e0acf3f7df0b42fe12"
+        },
+        "unchanged": true
+      },
+      "docs/qa/gate_d4": {
+        "before": {
+          "files": 303,
+          "sha256": "c79590f8860832931daf1c5aceb4389d2378e1dc8e57c88d31532692a1ae32a2"
+        },
+        "after": {
+          "files": 303,
+          "sha256": "c79590f8860832931daf1c5aceb4389d2378e1dc8e57c88d31532692a1ae32a2"
+        },
+        "unchanged": true
+      }
+    },
+    "git_head_unchanged": true,
+    "outside_gate_git_status_unchanged": true,
+    "source_ranges_checked": 159,
+    "source_files_referenced": 72,
+    "core_deliverables": [
+      "AS_IS_ARCHITECTURE.md",
+      "REQUIREMENT_IMPLEMENTATION_MATRIX.csv",
+      "IMPORT_DATA_FLOW_AUDIT.md",
+      "IDENTITY_EVIDENCE_GAP_ANALYSIS.md",
+      "TEST_CASE_DESIGN.md",
+      "IMPLEMENTATION_ROADMAP.md",
+      "EXECUTIVE_SUMMARY.md"
+    ],
+    "document_hashes": {
+      "AS_IS_ARCHITECTURE.md": "b56400c490b2cca00f86235efaffa035fc03de1ab5c554ecaf7a36dab49ae631",
+      "REQUIREMENT_IMPLEMENTATION_MATRIX.csv": "b1da1c472c9d87b01f5bc52328c95220a0052196d11eb9a74742dca83b46be56",
+      "IMPORT_DATA_FLOW_AUDIT.md": "dacfa8e91e6b7617dd08fa716d8606d12eee4f59447fe4752fb5d099b591e961",
+      "IDENTITY_EVIDENCE_GAP_ANALYSIS.md": "3e46a8ade2f2d28d4e52b2f485c1df28e88bdd2833e7270c6aa11da81a0299ff",
+      "TEST_CASE_DESIGN.md": "99500f49869556cea1d884b3ad6b16ca841acad93ec980a112bdd6264692b2c6",
+      "IMPLEMENTATION_ROADMAP.md": "8b0ed994c4e195b72e45772b30e43383a050723c2607890d8482ff7607198ab3",
+      "EXECUTIVE_SUMMARY.md": "8fe1c85f0e1a25672bc72a03b7a81ff975376116cb238eb55e539aba81edfa3b"
+    },
+    "current_git_status": " M docs/qa/gate_d2/batch3_browser_evidence.json\n M docs/qa/gate_d2/batch4_browser_evidence.json\n M docs/qa/gate_d2/validate_gate_d2.py\n M docs/research/01_RESEARCH_KNOWLEDGE.md\n M docs/research/02_ICTU_DATA_FINDINGS.md\n M docs/research/03_THESIS_DEFENSE_NOTES.md\n?? docs/qa/gate_d2/MANIFEST_v4.txt\n?? docs/qa/gate_d2/VALIDATION_REPORT_FINAL_20261028.md\n?? docs/qa/gate_d2/gate_d2_batch3to5_final_closeout_20261028.zip\n?? docs/qa/gate_d2/gate_d2_batch3to5_validator_fixed_20261028.zip\n?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip\n?? docs/qa/gate_d2/gate_d2_batch3to5_validator_v4_20261028.zip.sha256\n?? docs/qa/gate_d2/neg_test_evidence.py\n?? docs/qa/gate_d2/neg_test_evidence_20261028.json\n?? docs/qa/gate_d2/validate_v4_run_log.txt\n?? docs/qa/gate_d3/\n?? docs/qa/gate_d4/\n?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip\n?? docs/qa/gate_d4_ambiguous_unassigned_20261029.zip.sha256\n?? docs/qa/gate_d4_evidence_errata_20261029.zip\n?? docs/qa/gate_d4_evidence_errata_20261029.zip.sha256\n?? docs/qa/gate_e1/\n"
+  },
+  "limitations": [
+    "No deployed lecturer/import/identity counts verified.",
+    "No live URL collisions or concurrent rollback outcomes established.",
+    "No runtime UI behavior verified.",
+    "Application append-only conventions do not establish deployed DB immutability.",
+    "Gate D acceptance inherited from owner; no research re-adjudication."
+  ],
+  "packaging_policy": {
+    "diff": "Exact text additions against absent docs/qa/gate_e1 baseline; includes seven deliverables, SOURCE_REFERENCES.csv and this report.",
+    "manifest": "Hashes all payload files including DOCUMENTATION_CHANGES.diff; excludes manifest itself, ZIP and external ZIP checksum to avoid self-reference.",
+    "archive": "Documentation only; ZIP CRC, member set, member content and manifest checked separately after creation; ZIP SHA-256 stored outside ZIP."
+  }
+}

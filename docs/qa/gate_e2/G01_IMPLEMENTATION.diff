@@ -1,0 +1,413 @@
+diff --git a/backend/app/services/lecturer_dataset/known_publication_ingestion.py b/backend/app/services/lecturer_dataset/known_publication_ingestion.py
+index 1adabb2..52e3e52 100644
+--- a/backend/app/services/lecturer_dataset/known_publication_ingestion.py
++++ b/backend/app/services/lecturer_dataset/known_publication_ingestion.py
+@@ -251,6 +251,18 @@ def _validate_attribution(attr: CrawPublicationAttribution) -> IngestionError |
+     return None
+ 
+ 
++def _ambiguous_lecturer_error(url: str, lecturer_ids: set[uuid.UUID]) -> IngestionError:
++    ids = ", ".join(sorted(str(lecturer_id) for lecturer_id in lecturer_ids))
++    return IngestionError(
++        code="AMBIGUOUS_LECTURER",
++        message=(
++            f"Craw lecturer profile URL matches multiple canonical lecturers ({ids}); "
++            "resolve the duplicate repository_profile_url before ingesting publications"
++        ),
++        craw_source_id=url,
++    )
++
++
+ def plan_known_publications(
+     existing_keys: Iterable[str],
+     attributions: Sequence[CrawPublicationAttribution],
+@@ -332,22 +344,23 @@ class KnownPublicationIngestionService:
+     # Lecturers index for deterministic mapping
+     # ----------------------------------------------------------------
+     @staticmethod
+-    def _build_lecturer_index(db: Session) -> dict[str, uuid.UUID]:
+-        """Map ``repository_profile_url`` -> ``lecturer.id``.
++    def _build_lecturer_index(db: Session) -> dict[str, set[uuid.UUID]]:
++        """Map each exact ``repository_profile_url`` to its distinct lecturer IDs.
+ 
+-        Prefers non-null URLs. Lecturers without a profile URL cannot
+-        be matched from a Craw source and will be reported as unmapped.
++        Repeated rows for one lecturer are not ambiguous. Multiple lecturer IDs
++        for one URL must never be resolved by query order. Keep existing exact
++        URL matching; lecturers without a URL are reported as unmapped.
+         """
+         rows = db.execute(
+             select(Lecturer.id, Lecturer.repository_profile_url).where(
+                 Lecturer.repository_profile_url.is_not(None)
+             )
+         ).all()
+-        by_url: dict[str, uuid.UUID] = {}
++        by_url: dict[str, set[uuid.UUID]] = {}
+         for lid, url in rows:
+             if not url:
+                 continue
+-            by_url.setdefault(url, lid)
++            by_url.setdefault(url, set()).add(lid)
+         return by_url
+ 
+     # ----------------------------------------------------------------
+@@ -358,11 +371,9 @@ class KnownPublicationIngestionService:
+     ) -> dict[str, list[LecturerSourceSnapshot]]:
+         """Map ``snapshot_hash`` -> list of matching existing snapshots.
+ 
+-        Multiple snapshots may share a hash if the same content was
+-        captured for two different lecturers (e.g., two lecturers with
+-        the same profile URL would be impossible, but the index is
+-        ``(hash, lecturer_id)`` so we keep the existing index as a
+-        list and let the caller filter).
++        Multiple snapshots may share a hash if the same content was captured
++        for different lecturers. The reuse key is ``(hash, lecturer_id)``, so
++        keep a list and let the caller filter after unambiguous URL mapping.
+         """
+         hashes_list = list(set(hashes))
+         if not hashes_list:
+@@ -401,8 +412,14 @@ class KnownPublicationIngestionService:
+         for src in sources:
+             url = src.craw_source_id
+             seen_urls[url] += 1
+-            if url in by_url:
+-                mapped[url] = by_url[url]
++            lecturer_ids = by_url.get(url, set())
++            if len(lecturer_ids) > 1:
++                ambiguous.append(url)
++                invalid_records += 1
++                errors.append(_ambiguous_lecturer_error(url, lecturer_ids))
++                continue
++            if lecturer_ids:
++                mapped[url] = next(iter(lecturer_ids))
+             else:
+                 unmapped.append(url)
+                 invalid_records += 1
+@@ -542,7 +559,8 @@ class KnownPublicationIngestionService:
+         Reuses existing snapshots and known-publication rows when the
+         content-addressed keys already exist. Never mutates the
+         ``lecturers`` table. On any SQLAlchemy error the entire
+-        transaction is rolled back.
++        transaction is rolled back. Ambiguous URLs are reported and skipped;
++        unrelated unambiguous source records remain eligible for ingestion.
+         """
+         by_url = self._build_lecturer_index(db)
+         now = datetime.now(UTC)
+@@ -556,7 +574,13 @@ class KnownPublicationIngestionService:
+         per_source: list[tuple[CrawLecturerSource, str, list[CrawPublicationAttribution]]] = []
+         for src in sources:
+             url = src.craw_source_id
+-            if url not in by_url:
++            lecturer_ids = by_url.get(url, set())
++            if len(lecturer_ids) > 1:
++                ambiguous.append(url)
++                invalid_records += 1
++                errors.append(_ambiguous_lecturer_error(url, lecturer_ids))
++                continue
++            if not lecturer_ids:
+                 unmapped.append(url)
+                 invalid_records += 1
+                 errors.append(
+@@ -618,7 +642,8 @@ class KnownPublicationIngestionService:
+         try:
+             for src, h, valid_attributions in per_source:
+                 url = src.craw_source_id
+-                lecturer_id = by_url[url]
++                # Only singleton mappings entered per_source above.
++                lecturer_id = next(iter(by_url[url]))
+                 snap = snap_by_key.get((h, str(lecturer_id)))
+                 if snap is None:
+                     # Detect within-snapshot DOI/title collisions BEFORE
+@@ -801,4 +826,4 @@ __all__ = [
+     "normalize_doi_n0",
+     "normalize_title_t0",
+     "plan_known_publications",
+-]
+\ No newline at end of file
++]
+diff --git a/backend/tests/unit/test_known_publication_ingestion.py b/backend/tests/unit/test_known_publication_ingestion.py
+index 1a410a4..b427d6a 100644
+--- a/backend/tests/unit/test_known_publication_ingestion.py
++++ b/backend/tests/unit/test_known_publication_ingestion.py
+@@ -7,6 +7,7 @@ service's real SELECT queries are exercised against a stubbed result.
+ """
+ from __future__ import annotations
+ 
++import copy
+ import re
+ import uuid
+ 
+@@ -125,24 +126,29 @@ class _FakeSession:
+         self,
+         *,
+         lecturer_index: dict[str, uuid.UUID] | None = None,
++        lecturer_rows: list[tuple[uuid.UUID, str | None]] | None = None,
+         existing_snapshots: list | None = None,
+         existing_kps: list | None = None,
+     ):
+         self._lecturer_index = lecturer_index or {}
++        self._lecturer_rows = lecturer_rows
+         self.snapshots: list = list(existing_snapshots or [])
+         self.kps: list = list(existing_kps or [])
+         self.added: list = []
++        self.statements: list[str] = []
+ 
+     def execute(self, stmt):
+         from sqlalchemy import Select
++
++        desc = str(stmt).lower()
++        self.statements.append(desc)
+         if not isinstance(stmt, Select):
+             return _FakeResult([])
+-        desc = str(stmt).lower()
+         if "repository_profile_url" in desc:
+             # SELECT id, repository_profile_url ...
+-            rows = [
+-                (lid, url) for url, lid in self._lecturer_index.items()
+-            ]
++            rows = self._lecturer_rows
++            if rows is None:
++                rows = [(lid, url) for url, lid in self._lecturer_index.items()]
+             return _FakeResult(rows)
+         if "lecturer_known_publications" in desc:
+             return _FakeResult(self.kps)
+@@ -170,6 +176,239 @@ class _FakeSession:
+ # ---------------------------------------------------------------------------
+ # Ingestion contract tests
+ # ---------------------------------------------------------------------------
++class TestLecturerUrlMapping:
++    URL = "https://example.invalid/lecturer/shared/"
++    OTHER_URL = "https://example.invalid/lecturer/unique/"
++    FIRST_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
++    SECOND_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
++    OTHER_ID = uuid.UUID("00000000-0000-0000-0000-000000000003")
++
++    @staticmethod
++    def _source(url, *, with_publication=True):
++        return CrawLecturerSource(
++            craw_source_id=url,
++            craw_full_name="Synthetic Lecturer",
++            raw_payload={"source_id": url, "full_name": "Synthetic Lecturer"},
++            publication_attributions=(CrawPublicationAttribution(
++                source_publication_url="https://example.invalid/publication/one/",
++                title_raw="Synthetic Publication",
++                doi_raw=None,
++                published_year=2024,
++            ),) if with_publication else (),
++        )
++
++    @pytest.mark.parametrize("repeat_count", [1, 3])
++    def test_one_distinct_canonical_id_maps_even_with_repeated_query_rows(self, repeat_count):
++        sess = _FakeSession(lecturer_rows=[(self.FIRST_ID, self.URL)] * repeat_count)
++        service = KnownPublicationIngestionService()
++        source = self._source(self.URL)
++
++        preview = service.preview(sess, [source])
++        assert preview.mapped_lecturer_count == 1
++        assert preview.ambiguous_lecturer_count == 0
++        assert preview.errors == ()
++        assert preview.snapshots_to_create == preview.known_publications_to_create == 1
++        assert sess.added == []
++
++        result = service.apply(sess, [source])
++        assert result.ambiguous_lecturers == ()
++        assert result.errors == ()
++        assert result.snapshots_created == result.known_publications_created == 1
++        assert sess.snapshots[0].lecturer_id == self.FIRST_ID
++        assert sess.kps[0].lecturer_id == self.FIRST_ID
++
++    def test_duplicate_source_rows_do_not_create_false_mapping_ambiguity(self):
++        sess = _FakeSession(lecturer_rows=[(self.FIRST_ID, self.URL)] * 2)
++        service = KnownPublicationIngestionService()
++        source = self._source(self.URL, with_publication=False)
++
++        preview = service.preview(sess, [source, source])
++        assert preview.source_lecturer_count == 2
++        assert preview.mapped_lecturer_count == 1
++        assert preview.ambiguous_lecturer_count == preview.invalid_records == 0
++        assert preview.errors == ()
++
++        result = service.apply(sess, [source, source])
++        assert result.ambiguous_lecturers == ()
++        assert result.invalid_records == 0
++        assert result.snapshots_created == result.snapshots_reused == 1
++        assert len(sess.snapshots) == 1
++        assert sess.snapshots[0].lecturer_id == self.FIRST_ID
++
++    @pytest.mark.parametrize("reverse_rows", [False, True])
++    def test_preview_reports_two_distinct_canonical_ids_without_planning_writes(
++        self, reverse_rows
++    ):
++        rows = [(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)]
++        sess = _FakeSession(lecturer_rows=list(reversed(rows)) if reverse_rows else rows)
++
++        preview = KnownPublicationIngestionService().preview(sess, [self._source(self.URL)])
++
++        assert preview.ambiguous_lecturer_count == preview.invalid_records == 1
++        assert preview.mapped_lecturer_count == preview.unmapped_lecturer_count == 0
++        assert preview.snapshots_to_create == preview.known_publications_to_create == 0
++        assert len(preview.errors) == 1
++        error = preview.errors[0]
++        assert error.code == "AMBIGUOUS_LECTURER"
++        assert error.craw_source_id == self.URL
++        assert "repository_profile_url" in error.message
++        assert str(self.FIRST_ID) in error.message and str(self.SECOND_ID) in error.message
++        assert sess.added == []
++
++    @pytest.mark.parametrize("reverse_rows", [False, True])
++    def test_direct_apply_cannot_choose_either_ambiguous_lecturer(self, reverse_rows):
++        rows = [(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)]
++        sess = _FakeSession(lecturer_rows=list(reversed(rows)) if reverse_rows else rows)
++
++        result = KnownPublicationIngestionService().apply(sess, [self._source(self.URL)])
++
++        assert result.ambiguous_lecturers == (self.URL,)
++        assert result.unmapped_lecturers == ()
++        assert result.invalid_records == 1
++        assert [error.code for error in result.errors] == ["AMBIGUOUS_LECTURER"]
++        assert result.snapshots_created == result.known_publications_created == 0
++        assert result.snapshots_reused == result.known_publications_reused == 0
++        assert sess.added == sess.snapshots == sess.kps == []
++
++    def test_ambiguity_error_and_result_do_not_depend_on_query_order(self):
++        rows = [(self.SECOND_ID, self.URL), (self.FIRST_ID, self.URL)]
++        service = KnownPublicationIngestionService()
++        source = self._source(self.URL)
++
++        previews = [service.preview(_FakeSession(lecturer_rows=r), [source])
++                    for r in (rows, list(reversed(rows)))]
++        results = [service.apply(_FakeSession(lecturer_rows=r), [source])
++                   for r in (rows, list(reversed(rows)))]
++
++        assert previews[0] == previews[1]
++        assert results[0] == results[1]
++        assert previews[0].errors == results[0].errors
++        assert len(previews[0].errors) == 1
++        message = previews[0].errors[0].message
++        assert message.index(str(self.FIRST_ID)) < message.index(str(self.SECOND_ID))
++
++    def test_unrelated_valid_url_remains_usable_and_only_it_is_written(self):
++        sess = _FakeSession(lecturer_rows=[
++            (self.FIRST_ID, self.URL),
++            (self.OTHER_ID, self.OTHER_URL),
++            (self.SECOND_ID, self.URL),
++        ])
++        service = KnownPublicationIngestionService()
++        sources = [self._source(self.URL), self._source(self.OTHER_URL)]
++
++        preview = service.preview(sess, sources)
++        assert preview.mapped_lecturer_count == preview.ambiguous_lecturer_count == 1
++        assert preview.snapshots_to_create == preview.known_publications_to_create == 1
++
++        result = service.apply(sess, sources)
++        assert result.ambiguous_lecturers == (self.URL,)
++        assert result.snapshots_created == result.known_publications_created == 1
++        assert {row.lecturer_id for row in sess.added} == {self.OTHER_ID}
++        assert sess.snapshots[0].source_url == self.OTHER_URL
++
++    def test_unmapped_url_still_reports_unmapped(self):
++        sess = _FakeSession(lecturer_rows=[(self.FIRST_ID, self.URL)])
++        service = KnownPublicationIngestionService()
++        source = self._source(self.OTHER_URL)
++
++        preview = service.preview(sess, [source])
++        result = service.apply(sess, [source])
++
++        assert preview.unmapped_lecturer_count == 1
++        assert preview.ambiguous_lecturer_count == 0
++        assert result.unmapped_lecturers == (self.OTHER_URL,)
++        assert result.ambiguous_lecturers == ()
++        assert [error.code for error in result.errors] == ["UNMAPPED_LECTURER"]
++        assert sess.added == []
++
++    def test_existing_cli_and_web_preview_guard_blocks_ambiguous_records(self):
++        from scripts.ingest_craw_known_publications import (
++            CrawInput,
++            blocking_problems,
++            preview_summary,
++        )
++
++        source = self._source(self.URL)
++        sess = _FakeSession(lecturer_rows=[
++            (self.FIRST_ID, self.URL),
++            (self.SECOND_ID, self.URL),
++        ])
++        preview = KnownPublicationIngestionService().preview(sess, [source])
++
++        summary = preview_summary(preview)
++        assert summary["ambiguous_lecturer_count"] == 1
++        assert summary["error_codes"] == {"AMBIGUOUS_LECTURER": 1}
++        assert "1 lecturers are ambiguous" in blocking_problems(CrawInput([source], {}), preview)
++        assert sess.added == []
++
++    @pytest.mark.parametrize("other_url", [
++        URL.rstrip("/"),
++        URL.replace("example.invalid", "EXAMPLE.INVALID"),
++        " " + URL + " ",
++    ])
++    def test_existing_exact_url_matching_semantics_are_unchanged(self, other_url):
++        sess = _FakeSession(lecturer_rows=[
++            (self.FIRST_ID, self.URL),
++            (self.SECOND_ID, other_url),
++        ])
++        service = KnownPublicationIngestionService()
++
++        preview = service.preview(sess, [self._source(self.URL)])
++        result = service.apply(sess, [self._source(self.URL)])
++
++        assert preview.mapped_lecturer_count == 1
++        assert preview.ambiguous_lecturer_count == 0
++        assert result.ambiguous_lecturers == ()
++        assert sess.kps[0].lecturer_id == self.FIRST_ID
++        assert sess.snapshots[0].source_url == self.URL
++
++    def test_existing_evidence_is_preserved_and_identity_tables_are_not_accessed(self):
++        source = self._source(self.URL)
++        snapshot = kpi.LecturerSourceSnapshot(
++            id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
++            lecturer_id=self.FIRST_ID,
++            snapshot_hash=kpi._hash_payload(source.raw_payload),
++            raw_payload=source.raw_payload,
++            validation_errors=[],
++        )
++        known_publication = kpi.LecturerKnownPublication(
++            id=uuid.UUID("00000000-0000-0000-0000-000000000005"),
++            lecturer_id=self.FIRST_ID,
++            snapshot_id=snapshot.id,
++            title_raw="Synthetic Publication",
++            title_normalized="synthetic publication",
++        )
++        sess = _FakeSession(
++            lecturer_rows=[(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)],
++            existing_snapshots=[snapshot],
++            existing_kps=[known_publication],
++        )
++        def persisted_fields(row):
++            return {k: v for k, v in row.__dict__.items() if k != "_sa_instance_state"}
++
++        before_snapshot = copy.deepcopy(persisted_fields(snapshot))
++        before_publication = copy.deepcopy(persisted_fields(known_publication))
++
++        service = KnownPublicationIngestionService()
++        assert service.preview(sess, [source]).ambiguous_lecturer_count == 1
++        assert service.apply(sess, [source]).ambiguous_lecturers == (self.URL,)
++
++        assert sess.added == []
++        assert sess.snapshots == [snapshot] and sess.kps == [known_publication]
++        assert persisted_fields(snapshot) == before_snapshot
++        assert persisted_fields(known_publication) == before_publication
++        # No identity/review reads or added objects: this is a unit boundary
++        # assertion, not a claim of testing existing decisions in a real DB.
++        protected_tables = (
++            "lecturer_scopus_identities",
++            "identity_evidence",
++            "mapping_reviews",
++            "lecturer_scopus_candidates",
++            "lecturer_scopus_candidate_reviews",
++        )
++        assert not any(table in stmt for table in protected_tables for stmt in sess.statements)
++
++
+ class TestIngestionContract:
+     def _service(self):
+         return KnownPublicationIngestionService()

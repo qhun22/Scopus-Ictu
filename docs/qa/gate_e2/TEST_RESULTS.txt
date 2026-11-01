@@ -1,0 +1,207 @@
+Gate E.2 / P0-A / G01 — actual run outputs
+Date: 2026-10-29 (Asia/Bangkok)
+
+1. PRE-FIX: initial 14-case regression class, before changing the backend
+Working directory: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+Command:
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD='1'; & '..\.venv\Scripts\python.exe' -B -m pytest --noconftest -p no:cacheprovider tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping -q
+Exit code: 1
+...FFFFFF....F                                                           [100%]
+================================== FAILURES ===================================
+_ TestLecturerUrlMapping.test_preview_reports_two_distinct_canonical_ids_without_planning_writes[False] _
+
+self = <test_known_publication_ingestion.TestLecturerUrlMapping object at 0x00000210C8EDF490>
+reverse_rows = False
+
+    @pytest.mark.parametrize("reverse_rows", [False, True])
+    def test_preview_reports_two_distinct_canonical_ids_without_planning_writes(
+        self, reverse_rows
+    ):
+        rows = [(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)]
+        sess = _FakeSession(lecturer_rows=list(reversed(rows)) if reverse_rows else rows)
+    
+        preview = KnownPublicationIngestionService().preview(sess, [self._source(self.URL)])
+    
+>       assert preview.ambiguous_lecturer_count == preview.invalid_records == 1
+E       assert 0 == 1
+E        +  where 0 = IngestionPreview(source_lecturer_count=1, source_publication_attribution_count=1, mapped_lecturer_count=1, unmapped_le..._duplicates_within_snapshot=0, invalid_records=0, conflicts=0, errors=(), source_urls_collapsed_into_existing_record=0).invalid_records
+
+tests\unit\test_known_publication_ingestion.py:245: AssertionError
+_ TestLecturerUrlMapping.test_preview_reports_two_distinct_canonical_ids_without_planning_writes[True] _
+
+self = <test_known_publication_ingestion.TestLecturerUrlMapping object at 0x00000210C7AFED50>
+reverse_rows = True
+
+    @pytest.mark.parametrize("reverse_rows", [False, True])
+    def test_preview_reports_two_distinct_canonical_ids_without_planning_writes(
+        self, reverse_rows
+    ):
+        rows = [(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)]
+        sess = _FakeSession(lecturer_rows=list(reversed(rows)) if reverse_rows else rows)
+    
+        preview = KnownPublicationIngestionService().preview(sess, [self._source(self.URL)])
+    
+>       assert preview.ambiguous_lecturer_count == preview.invalid_records == 1
+E       assert 0 == 1
+E        +  where 0 = IngestionPreview(source_lecturer_count=1, source_publication_attribution_count=1, mapped_lecturer_count=1, unmapped_le..._duplicates_within_snapshot=0, invalid_records=0, conflicts=0, errors=(), source_urls_collapsed_into_existing_record=0).invalid_records
+
+tests\unit\test_known_publication_ingestion.py:245: AssertionError
+_ TestLecturerUrlMapping.test_direct_apply_cannot_choose_either_ambiguous_lecturer[False] _
+
+self = <test_known_publication_ingestion.TestLecturerUrlMapping object at 0x00000210C7BA1150>
+reverse_rows = False
+
+    @pytest.mark.parametrize("reverse_rows", [False, True])
+    def test_direct_apply_cannot_choose_either_ambiguous_lecturer(self, reverse_rows):
+        rows = [(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)]
+        sess = _FakeSession(lecturer_rows=list(reversed(rows)) if reverse_rows else rows)
+    
+        result = KnownPublicationIngestionService().apply(sess, [self._source(self.URL)])
+    
+>       assert result.ambiguous_lecturers == (self.URL,)
+E       AssertionError: assert () == ('https://exa...rer/shared/',)
+E         
+E         Right contains one more item: 'https://example.invalid/lecturer/shared/'
+E         Use -v to get more diff
+
+tests\unit\test_known_publication_ingestion.py:263: AssertionError
+_ TestLecturerUrlMapping.test_direct_apply_cannot_choose_either_ambiguous_lecturer[True] _
+
+self = <test_known_publication_ingestion.TestLecturerUrlMapping object at 0x00000210C9F52AD0>
+reverse_rows = True
+
+    @pytest.mark.parametrize("reverse_rows", [False, True])
+    def test_direct_apply_cannot_choose_either_ambiguous_lecturer(self, reverse_rows):
+        rows = [(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)]
+        sess = _FakeSession(lecturer_rows=list(reversed(rows)) if reverse_rows else rows)
+    
+        result = KnownPublicationIngestionService().apply(sess, [self._source(self.URL)])
+    
+>       assert result.ambiguous_lecturers == (self.URL,)
+E       AssertionError: assert () == ('https://exa...rer/shared/',)
+E         
+E         Right contains one more item: 'https://example.invalid/lecturer/shared/'
+E         Use -v to get more diff
+
+tests\unit\test_known_publication_ingestion.py:263: AssertionError
+_ TestLecturerUrlMapping.test_ambiguity_error_and_result_do_not_depend_on_query_order _
+
+self = <test_known_publication_ingestion.TestLecturerUrlMapping object at 0x00000210CA08D850>
+
+    def test_ambiguity_error_and_result_do_not_depend_on_query_order(self):
+        rows = [(self.SECOND_ID, self.URL), (self.FIRST_ID, self.URL)]
+        service = KnownPublicationIngestionService()
+        source = self._source(self.URL)
+    
+        previews = [service.preview(_FakeSession(lecturer_rows=r), [source])
+                    for r in (rows, list(reversed(rows)))]
+        results = [service.apply(_FakeSession(lecturer_rows=r), [source])
+                   for r in (rows, list(reversed(rows)))]
+    
+        assert previews[0] == previews[1]
+        assert results[0] == results[1]
+        assert previews[0].errors == results[0].errors
+>       message = previews[0].errors[0].message
+                  ^^^^^^^^^^^^^^^^^^^^^
+E       IndexError: tuple index out of range
+
+tests\unit\test_known_publication_ingestion.py:284: IndexError
+_ TestLecturerUrlMapping.test_unrelated_valid_url_remains_usable_and_only_it_is_written _
+
+self = <test_known_publication_ingestion.TestLecturerUrlMapping object at 0x00000210CA08DB50>
+
+    def test_unrelated_valid_url_remains_usable_and_only_it_is_written(self):
+        sess = _FakeSession(lecturer_rows=[
+            (self.FIRST_ID, self.URL),
+            (self.OTHER_ID, self.OTHER_URL),
+            (self.SECOND_ID, self.URL),
+        ])
+        service = KnownPublicationIngestionService()
+        sources = [self._source(self.URL), self._source(self.OTHER_URL)]
+    
+        preview = service.preview(sess, sources)
+>       assert preview.mapped_lecturer_count == preview.ambiguous_lecturer_count == 1
+E       assert 2 == 0
+E        +  where 2 = IngestionPreview(source_lecturer_count=2, source_publication_attribution_count=2, mapped_lecturer_count=2, unmapped_le..._duplicates_within_snapshot=0, invalid_records=0, conflicts=0, errors=(), source_urls_collapsed_into_existing_record=0).mapped_lecturer_count
+E        +  and   0 = IngestionPreview(source_lecturer_count=2, source_publication_attribution_count=2, mapped_lecturer_count=2, unmapped_le..._duplicates_within_snapshot=0, invalid_records=0, conflicts=0, errors=(), source_urls_collapsed_into_existing_record=0).ambiguous_lecturer_count
+
+tests\unit\test_known_publication_ingestion.py:297: AssertionError
+_ TestLecturerUrlMapping.test_existing_evidence_is_preserved_and_identity_tables_are_not_accessed _
+
+self = <test_known_publication_ingestion.TestLecturerUrlMapping object at 0x00000210CA051CC0>
+
+    def test_existing_evidence_is_preserved_and_identity_tables_are_not_accessed(self):
+        import copy
+    
+        source = self._source(self.URL)
+        snapshot = kpi.LecturerSourceSnapshot(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
+            lecturer_id=self.FIRST_ID,
+            snapshot_hash=kpi._hash_payload(source.raw_payload),
+            raw_payload=source.raw_payload,
+            validation_errors=[],
+        )
+        known_publication = kpi.LecturerKnownPublication(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000005"),
+            lecturer_id=self.FIRST_ID,
+            snapshot_id=snapshot.id,
+            title_raw="Synthetic Publication",
+            title_normalized="synthetic publication",
+        )
+        sess = _FakeSession(
+            lecturer_rows=[(self.FIRST_ID, self.URL), (self.SECOND_ID, self.URL)],
+            existing_snapshots=[snapshot],
+            existing_kps=[known_publication],
+        )
+        before_snapshot = copy.deepcopy(snapshot.__dict__)
+        before_publication = copy.deepcopy(known_publication.__dict__)
+        # Simulate immutable pre-existing decisions; the ingestion boundary must
+        # never query or write their tables, irrespective of review status.
+        decisions = {str(self.FIRST_ID): {"status": "APPROVED", "review": "ACCEPT"},
+                     str(self.SECOND_ID): {"status": "REJECTED", "review": "REJECT"}}
+        before_decisions = copy.deepcopy(decisions)
+    
+        service = KnownPublicationIngestionService()
+>       assert service.preview(sess, [source]).ambiguous_lecturer_count == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = IngestionPreview(source_lecturer_count=1, source_publication_attribution_count=1, mapped_lecturer_count=1, unmapped_le..._duplicates_within_snapshot=0, invalid_records=0, conflicts=0, errors=(), source_urls_collapsed_into_existing_record=0).ambiguous_lecturer_count
+E        +    where IngestionPreview(source_lecturer_count=1, source_publication_attribution_count=1, mapped_lecturer_count=1, unmapped_le..._duplicates_within_snapshot=0, invalid_records=0, conflicts=0, errors=(), source_urls_collapsed_into_existing_record=0) = preview(<test_known_publication_ingestion._FakeSession object at 0x00000210CA0028D0>, [CrawLecturerSource(craw_source_id='https://example.invalid/lecturer/shared/', craw_full_name='Synthetic Lecturer', ra...l='https://example.invalid/publication/one/', title_raw='Synthetic Publication', doi_raw=None, published_year=2024),))])
+E        +      where preview = <app.services.lecturer_dataset.known_publication_ingestion.KnownPublicationIngestionService object at 0x00000210CA189550>.preview
+
+tests\unit\test_known_publication_ingestion.py:374: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping::test_preview_reports_two_distinct_canonical_ids_without_planning_writes[False]
+FAILED tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping::test_preview_reports_two_distinct_canonical_ids_without_planning_writes[True]
+FAILED tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping::test_direct_apply_cannot_choose_either_ambiguous_lecturer[False]
+FAILED tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping::test_direct_apply_cannot_choose_either_ambiguous_lecturer[True]
+FAILED tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping::test_ambiguity_error_and_result_do_not_depend_on_query_order
+FAILED tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping::test_unrelated_valid_url_remains_usable_and_only_it_is_written
+FAILED tests/unit/test_known_publication_ingestion.py::TestLecturerUrlMapping::test_existing_evidence_is_preserved_and_identity_tables_are_not_accessed
+7 failed, 7 passed in 1.21s
+
+
+2. FINAL: complete ingestion unit module, including 15 new cases
+Working directory: D:\DataFolder\ProjectIctu\DoAn\Scopus-Ictu\backend
+Command:
+$env:PYTEST_DISABLE_PLUGIN_AUTOLOAD='1'; & '..\.venv\Scripts\python.exe' -B -c "import sys, socket, pytest; socket.socket.connect = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError('Network connections forbidden in pure unit run')); result = pytest.main(['--noconftest', '-p', 'no:cacheprovider', 'tests/unit/test_known_publication_ingestion.py', '-q']); forbidden = [name for name in sys.modules if name in ('app.main', 'app.core.database', 'tests.conftest') or name.endswith('.conftest')]; print('Database/application/conftest modules loaded:', forbidden); assert not forbidden, forbidden; raise SystemExit(result)"
+Exit code: 0
+.......................................                                  [100%]
+39 passed in 1.02s
+Database/application/conftest modules loaded: []
+
+
+3. LINT / SCOPED DIFF CHECK
+Ruff command (repository root):
+& '.\.venv\Scripts\python.exe' -B -m ruff check --no-cache backend/app/services/lecturer_dataset/known_publication_ingestion.py backend/tests/unit/test_known_publication_ingestion.py
+Whole-file Ruff result: NOT CLEAN; 12 diagnostics remain. No --fix was run.
+Baseline comparison fed both git-show HEAD source and current source as UTF-8 stdin to:
+python -B -m ruff check --no-cache --output-format json --stdin-filename <same-source-path> -
+Compared multisets of (code, message, exact source line), allowing resolved diagnostics but no new diagnostics.
+Scoped whitespace command:
+git diff --check -- backend/app/services/lecturer_dataset/known_publication_ingestion.py backend/tests/unit/test_known_publication_ingestion.py
+Comparison/scoped-check exit code: 0
+{"ruff_baseline_comparison": {"backend/app/services/lecturer_dataset/known_publication_ingestion.py": {"baseline_diagnostics": 6, "current_diagnostics": 6, "new_diagnostics": 0, "resolved_diagnostics": 0, "codes": {"I001": 1, "UP035": 1, "E501": 4}}, "backend/tests/unit/test_known_publication_ingestion.py": {"baseline_diagnostics": 7, "current_diagnostics": 6, "new_diagnostics": 0, "resolved_diagnostics": 1, "codes": {"E501": 5, "I001": 1}}}, "scoped_git_diff_check": "PASS"}
+
+
+Database/HTTP/CLI integration tests: NOT_EXECUTED. No migrations or real imports.
+The pure service tests use only _FakeSession; the shared CLI/web blocking function is tested without invoking its database entry points.

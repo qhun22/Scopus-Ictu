@@ -1,7 +1,7 @@
 # 03 — Ghi chú bảo vệ đồ án
 
 **Tạo lần đầu:** 2026-10-27  
-**Cập nhật gần nhất:** 2026-10-28 (v1.6 — Q11: 9→7 distinct EIDs, thêm triple EID thứ 3 LHL×NHH×TQQ, sửa tên Quách Xuân Trưởng)  
+**Cập nhật gần nhất:** 2026-10-29 (v2.3 — errata E17: Q17)  
 **Mục đích:** Chuẩn bị câu hỏi hội đồng, câu trả lời ngắn + chuyên sâu, và bằng chứng thực tế.
 
 > **Cách dùng:** Mỗi câu hỏi có (a) câu trả lời 30–60 giây, (b) giải thích sâu nếu hỏi tiếp, (c) ví dụ từ dữ liệu thực tế ICTU. Phần "Không được khẳng định" nhắc những điều chưa có bằng chứng.
@@ -46,7 +46,7 @@ DOI `10.1371/journal.pone.0321009` — PLOS ONE trực tiếp ghi nhận `nhminh
 
 **Bằng chứng:** FINDING-010 trong 02_ICTU_DATA_FINDINGS.md.
 
-**Không được khẳng định:** Không phải tất cả IDs đều có bằng chứng E5. Phần lớn dừng ở E4 (profile accessible). Chưa ACCEPT/REJECT bất kỳ liên kết nào trong audit.
+**Không được khẳng định:** Không phải tất cả IDs đều có bằng chứng E5. **[CORRECTED v1.7 — B7]** Trong Batch 3–5, Scopus Preview body đều là `UNABLE_TO_DISPLAY` — chỉ đạt E3 (BROWSER_OPENED: page title load được). E4 (PROFILE_ACCESSIBLE) yêu cầu tên + affiliation đọc được từ body. Thực tế: phần lớn IDs dừng ở E3; một số có PUBLICATION_NAME_CORROBORATED hoặc PUBLICATION_CORROBORATED riêng nhờ CrossRef DOI check. Chưa ACCEPT/REJECT bất kỳ liên kết nào trong audit.
 
 **Slide:** Có thể dùng thang bằng chứng dạng sơ đồ. Bổ sung ví dụ email nhà xuất bản.
 
@@ -211,7 +211,7 @@ Khi nhiều hơn 2 giảng viên ICTU cùng là đồng tác giả trên một b
 
 **Giải thích chuyên sâu:**
 - Trong Batch 4, 2 EIDs (`2-s2.0-105000957095`, `2-s2.0-105041762468`) xuất hiện trong cả 3 cặp: NHH×QXT, NHH×TQQ, QXT×TQQ — đây là bài có 3 GVs đồng tác giả: TS. Ngô Hữu Huy, TS. Quách Xuân Trưởng, TS. Trần Quang Quý.
-- Có thêm triple-GV EID thứ 3: `2-s2.0-85208627580` xuất hiện ở LHL×NHH và LHL×TQQ và NHH×TQQ — bài có 3 GVs: TS. Lê Hải Lâm, TS. Ngô Hữu Huy, TS. Trần Quang Quý.
+- Có thêm triple-GV EID thứ 3: `2-s2.0-85208627580` xuất hiện ở LHL×NHH và LHL×TQQ và NHH×TQQ — bài có 3 GVs: **TS. Lê Hùng Linh** (LHL), TS. Ngô Hữu Huy, TS. Trần Quang Quý. *[CORRECTED v1.7: tên đúng là Lê Hùng Linh, không phải Lê Hải Lâm — xem B6 errata]*
 - **[CORRECTED 2026-10-28]** Nếu cộng theo cặp NHH×QXT + NHH×TQQ + QXT×TQQ: 2+4+5 = 11 pairwise occurrences, nhưng **union 3 cặp chỉ là 7 EIDs duy nhất** — vì 2 EIDs (`2-s2.0-105000957095`, `2-s2.0-105041762468`) xuất hiện trong cả 3 cặp, bị đếm 3 lần thay vì 1 lần. Công thức: union − 2×(bị đếm dư) = 11 − 2×2 = 7. *(Không phải 9 như phiên bản v1.3–v1.5.)*
 - Công thức đúng: dùng union của tất cả EIDs có ≥2 GVs, không cộng pairwise.
 
@@ -223,6 +223,112 @@ Khi nhiều hơn 2 giảng viên ICTU cùng là đồng tác giả trên một b
 **Không được khẳng định:** Chưa xác nhận 3-way authorship từ publisher — chỉ từ CSV Scopus. Tên "TS. Quách Xuân Trưởng" dùng theo ICTU-WEB; tên tắt trong tài liệu là QXT.
 
 **Slide:** Không cần. Dùng khi bị hỏi về phương pháp đếm/dedup.
+
+**Bổ sung (Batch 6, 2026-10-28):** Hai EID trên (`2-s2.0-105000957095`, `2-s2.0-105041762468`) trở thành EID **4 GV** khi thêm TS. Nguyễn Đức Bình. Lũy kế 13 GV: 230 cặp (GV, EID), 186 EID duy nhất, 37 EID ≥2 GV. Đây là ví dụ rõ nhất cho việc không được cộng theo cặp: một bài 4 GV xuất hiện trong 6 cặp pairwise.
+
+---
+
+## Q12 — Hồ sơ Scopus ghi một trường khác, có phải là người khác không? *(từ Batch 6)*
+
+**Câu trả lời ngắn (30 giây):**
+Không thể kết luận từ một trường thông tin. Affiliation trên hồ sơ Scopus là một nguồn, affiliation và email trên từng công bố là nguồn khác. Khi hai nguồn mâu thuẫn, hệ thống đánh dấu bằng chứng mâu thuẫn và chuyển cho reviewer, không tự chọn bên nào.
+
+**Ví dụ thực tế:**
+- ICTU-WEB liệt kê 58771657000 là ID thứ hai của TS. Nguyễn Đức Bình.
+- Hồ sơ Scopus của ID này ghi **HCMC University of Technology and Engineering**.
+- Nhưng cả 5 công bố của ID này trong CSV đều có metadata Springer ghi ICTU và email `ndbinh@ictu.edu.vn`, và Crossref ghi ORCID 0000-0002-1258-394X — chính là ORCID trên hồ sơ ID chính.
+- Hồ sơ có 7 bài, CSV chỉ có 5. Hai bài còn lại không xem được ở chế độ Preview.
+
+**Bài học thiết kế:**
+- Phân biệt bằng chứng cấp hồ sơ và cấp công bố.
+- ORCID cũng cần ghi nguồn: trên hồ sơ, trên công bố, hay trên ICTU Repository.
+- Trạng thái đúng ở đây là CONFLICTING_EVIDENCE + IDENTITY_UNVERIFIED, dù bằng chứng công bố rất mạnh.
+
+**Không được khẳng định:** Rằng 58771657000 chắc chắn thuộc TS. Nguyễn Đức Bình, hoặc chắc chắn chứa bài của người khác. Cả hai đều chưa được kiểm chứng.
+
+**Bằng chứng:** `docs/qa/gate_d3/batch6_browser_evidence.json`, `batch6_doi_verification.csv`; FINDING-022, FINDING-023.
+
+**Slide:** Có thể dùng làm ví dụ cho "vì sao cần reviewer" — một bảng 3 cột: hồ sơ / công bố / ORCID.
+
+**Bổ sung (Batch 7, 2026-10-29):** Ca thứ hai, khác bản chất: 60320483500 được ICTU-WEB liệt kê cho ThS. Nguyễn Văn Việt, hồ sơ Scopus ghi Hanoi University of Science and Technology, nhưng **không có công bố nào trong CSV** để đối chiếu. Ở ca Bình, bằng chứng công bố ủng hộ ICTU; ở ca Việt, không có bằng chứng công bố nào. Cả hai đều là CONFLICTING_EVIDENCE + IDENTITY_UNVERIFIED nhưng lý do khác nhau (FINDING-022 vs FINDING-025).
+
+---
+
+## Q13 — Email tác giả trên bài báo có đủ để xác định danh tính không? *(từ Batch 7)*
+
+**Câu trả lời ngắn (30 giây):**
+Không. Email là bằng chứng mạnh nhưng có thể sai do nhà xuất bản nhập liệu. Hệ thống chỉ coi email là bằng chứng khi nó khớp cùng vị trí tác giả và tên, và ưu tiên kết hợp với ORCID, affiliation.
+
+**Ví dụ thực tế:**
+- Bài `10.1007/978-3-031-80943-9_3` (Springer): email `ndbinh@ictu.edu.vn` được gán cho **hai** tác giả khác nhau — Nguyễn Đức Bình và Vũ Đức Thái.
+- Bài `10.1007/978-3-031-49529-8_3`: Nguyễn Đức Bình dùng email `binhnd@ictu.edu.vn` thay vì `ndbinh@...`, dù ORCID trên Crossref là của cùng một người.
+
+**Bài học thiết kế:** Không có trường đơn lẻ nào (tên, email, ORCID, affiliation) đủ để tự động xác nhận danh tính; mỗi trường đều đã có ví dụ sai trong dữ liệu ICTU (tên: FINDING-020; ORCID: FINDING-005; affiliation hồ sơ: FINDING-022; email: FINDING-024).
+
+**Không được khẳng định:** `binhnd@` là email sai — có thể là alias hoặc email cũ; chưa xác minh với ICTU.
+
+**Bằng chứng:** `docs/qa/gate_d3/batch7/raw_metadata/springer_meta_browser_20261029.json` (đã kiểm SHA-256 chép lại).
+
+**Slide:** Có — bảng "mỗi trường đều có thể sai" với 4 ví dụ thực tế là lập luận mạnh cho human-in-the-loop.
+
+---
+
+## Q14 — Nếu đã xác nhận một Scopus ID thuộc giảng viên, có thể tính mọi bài trên ID đó cho giảng viên không? *(từ Gate D.3 mission)*
+
+**Câu trả lời ngắn (30 giây):**
+Không. Scopus có thể gộp bài của hai người trùng tên vào một ID. Vì vậy hệ thống xác nhận liên kết ở cấp ID, nhưng vẫn cho reviewer gắn cờ hoặc loại từng công bố có bằng chứng mâu thuẫn.
+
+**Ví dụ thực tế (FINDING-026 — HIGH-PRIORITY POTENTIAL IDENTITY CONFLICT, chưa kết luận chính thức):**
+- Scopus ID 57211884261, ICTU liệt kê cho Nguyễn Thị Hải Anh, có hai bài:
+  - Heliyon 2024 — kinh doanh trực tuyến, tác giả thuộc Khoa Nghệ thuật và Truyền thông, ICTU. Hồ sơ ORCID **0009-0005-2135-2544** (Hải Anh Nguyễn Thị) tự nhận bài này, và cũng tự nhận bài IJLTER nằm trên ID thứ hai 58482267400 của cô.
+  - Physica Scripta 2026 — graphene, tác giả thuộc Viện Hàn lâm KH&CN Việt Nam. Hồ sơ ORCID **0009-0007-0103-6055** (Institute of Material Sciences – VAST) tự nhận bài này.
+- Hai danh tính ORCID khác nhau, mỗi bên nhận một bài trên cùng một Scopus ID.
+
+**Điểm tinh tế:**
+- Bài vật lý có đồng tác giả ICTU khác → vẫn là bài của ICTU khi đếm cấp trường; nhưng điều đó **không** chứng minh bài thuộc GV Hải Anh. Đếm cấp trường (EID) và cấp GV (GV, EID) phải tách nhau.
+- Theo ORCID tự khai, GV đã chuyển sang Trường Ngoại ngữ – ĐHTN từ 03/2024. Danh sách ICTU không chứng minh nơi công tác hiện tại → affiliation cần có thời gian hiệu lực.
+
+**Không được khẳng định:** Scopus đã chính thức trộn hồ sơ. Chưa xem được hồ sơ Scopus (Preview lỗi), chưa có quyết định reviewer. *(Bản trước của Q14 dựa vào một ORCID do OpenAlex gán cho bài Heliyon; ORCID đó không liệt kê bài này nên đã rút — xem errata E12. Đây cũng là ví dụ tốt để trả lời Q15.)*
+
+**Slide:** Có — đây là ví dụ mạnh nhất cho "review theo từng công bố".
+
+---
+
+## Q15 — Dữ liệu từ OpenAlex / nguồn tổng hợp có dùng làm bằng chứng được không? *(từ Gate D.3 mission)*
+
+**Câu trả lời ngắn:**
+Có, nhưng chỉ phần văn bản gốc (tên tác giả, affiliation như nhà xuất bản ghi). Phần "thực thể tác giả" mà nguồn tổng hợp tự gom — gồm tên hiển thị và ORCID — đã sai trong 6 ca thực tế, nên không dùng làm bằng chứng danh tính.
+
+**Ví dụ:** Nhà xuất bản ghi "Nguyen To Huu", OpenAlex gom vào thực thể "Nguyen Huu Chi"; Crossref ghi ORCID 0009-0000-8317-2454 cho Vũ Việt Dũng, OpenAlex gán ORCID của một người ở Na Uy (FINDING-027).
+
+**Bài học:** Ngay cả các hệ thống lớn cũng gặp đúng bài toán đồ án đang giải: tách và gộp danh tính tác giả. Vì vậy mỗi bằng chứng phải lưu **tầng nguồn**.
+
+---
+
+## Q16 — Affiliation khác ICTU trên bài báo có phải dấu hiệu sai người không? *(từ Gate D.3 mission)*
+
+**Câu trả lời ngắn:**
+Thường là không. 7/17 giảng viên có bài ghi đồng thời ICTU và nơi học tập/hợp tác (HUST-MICA, Budapest, Irkutsk, Viện Hàn lâm, ĐHQG HN, Đài Loan). Chỉ bài **không có ICTU** mới cần xem xét — trong **các DOI đã chọn kiểm tra và có metadata đọc được** (59 dòng, 56 DOI) chỉ có đúng một bài như vậy, và đó chính là ca FINDING-026. *(Đã sửa 2026-10-29: bản trước nói "trong 34 ID", vượt quá phạm vi mẫu.)*
+
+---
+
+## Q17 — ORCID của giảng viên có liệt kê bài báo, vậy Scopus ID đó có phải của giảng viên không? *(từ Gate D.4)*
+
+**Câu trả lời ngắn:**
+Chưa chắc. Mọi đồng tác giả đều có thể liệt kê bài trong ORCID của mình. ORCID chỉ chứng minh người đó viết **bài**; muốn chứng minh người đó là **tác giả ở vị trí** gắn với Scopus ID thì cần ORCID do nhà xuất bản ghi tại **đúng vị trí đó** và được hồ sơ ORCID xác nhận. ~~hoặc ORCID nhận bài **và** tên khớp.~~ *(Đã sửa 2026-10-29, E17: "ORCID nhận bài + tên khớp" chỉ hỗ trợ ứng viên, vì đồng tác giả cùng tên vẫn có thể là người nhận — ví dụ UNA-09 chỉ khớp tên viết tắt "Yen, V. H.".)*
+
+**Ví dụ thực tế (FINDING-029):** Khi chưa có quy tắc này, PGS.TS. Phùng Trung Nghĩa bị đề xuất làm "ứng viên mạnh" cho 4 Scopus ID của 4 người khác — vì thầy là đồng tác giả của các bài đó.
+
+**Bài học thiết kế:** Bằng chứng phải gắn với vị trí tác giả (author slot), cùng nguyên tắc với FINDING-021 (DOI phải gắn đúng Scopus ID trên cùng dòng).
+
+---
+
+## Q18 — Scopus ID "chưa rõ chủ sở hữu" mà không khớp giảng viên nào thì có phải không thuộc ICTU? *(từ Gate D.4)*
+
+**Câu trả lời ngắn:**
+Không. 39/69 ID không khớp 410 hồ sơ giảng viên, nhưng một số rõ ràng gắn với ICTU: ví dụ 3 ID của Đàm Thanh Phương (một bài ghi "College of Information and Communication Technology" — tên cũ của ICTU), 2 ID của Nguyễn Vũ Hải (cùng một ORCID, đồng tác giả với 7 giảng viên ICTU). Đó có thể là cựu giảng viên, nhân viên hoặc sinh viên. Hệ thống cần trạng thái "tác giả ICTU chưa khớp giảng viên", không được ép gán vào giảng viên trùng tên.
+
+**Không được khẳng định:** Vai trò thực của những người này tại ICTU (chưa xác minh).
 
 ---
 
@@ -238,6 +344,16 @@ Khi nhiều hơn 2 giảng viên ICTU cùng là đồng tác giả trên một b
 | DQA 7/53 pubs | Không (dễ gây nhầm) | Có — giải thích coverage limit |
 | "Page not found" LMH | Không | Có — giải thích NOT_FOUND |
 | Coverage 41/83 IDs unique (Batch 5) | Có — bảng coverage, ghi rõ là unique visited coverage | — |
+| Coverage 45/83 IDs, 15/34 GV (Batch 6) | Có — thay số Batch 5 bằng số này nếu trình bày sau Batch 6 | — |
+| Hồ sơ HCM-UTE vs công bố ICTU (Q12) | Có — ví dụ CONFLICTING_EVIDENCE | — |
+| EID 4 GV đồng tác giả | Không | Có — khi bị hỏi về dedup |
+| Coverage 49/83 IDs, 17/34 GV (Batch 7) | Có — thay số Batch 6 nếu trình bày sau Batch 7 | — |
+| "Mỗi trường đều có thể sai" (Q13) | Có — 4 ví dụ: tên, ORCID, affiliation hồ sơ, email | — |
+| EID 5 GV đồng tác giả | Không | Có — khi bị hỏi về dedup cấp trường |
+| Coverage 83/83 ID, 34/34 GV **visited** (Gate D.3 mission) | Có — ghi rõ VISITED ≠ VERIFIED; PROFILE_ACCESSIBLE 0/34 cho nhiệm vụ | — |
+| Nghi vấn hồ sơ Scopus chứa bài của hai người (Q14) | Có — ví dụ mạnh nhất cho review cấp công bố; trình bày là **nghi vấn HIGH-PRIORITY**, không phải kết luận | — |
+| Thực thể OpenAlex sai (Q15) | Không | Có — khi bị hỏi về nguồn dữ liệu thứ cấp |
+| Bảng truy vết phát hiện → yêu cầu (R-01…R-12) | Có — 1 slide: phát hiện → invariant → test case | — |
 
 ---
 
@@ -252,3 +368,10 @@ Khi nhiều hơn 2 giảng viên ICTU cùng là đồng tác giả trên một b
 | 2026-10-27 | v1.4 | Batch 5: coverage 46/83 IDs (14/34 GVs). |
 | 2026-10-28 | v1.5 | Errata: coverage sửa 41/83 unique, 13/34 GVs (DTB×5 đã counted từ Gate D.1). |
 | 2026-10-28 | v1.6 | Q11: 9→7 distinct EIDs; thêm triple EID thứ 3 (2-s2.0-85208627580, LHL×NHH×TQQ); sửa tên "Quách Xuân Trưởng" (không phải "Quản Xuân Trường"). |
+| 2026-10-28 | v1.7 | B6: Q11 sửa "TS. Lê Hải Lâm" → "TS. Lê Hùng Linh" (LHL). B7: Q2 sửa "phần lớn dừng ở E4" → đúng là E3 khi body UNABLE_TO_DISPLAY; phân biệt rõ E3 (BROWSER_OPENED) vs E4 (PROFILE_ACCESSIBLE). |
+| 2026-10-28 | v1.8 | Gate D.3 Batch 6: thêm Q12 (affiliation hồ sơ vs công bố, CONFLICTING_EVIDENCE); bổ sung Q11 (EID 4 GV, lũy kế 230/186/37); cập nhật bảng slide (coverage 45/83, 15/34). Không xóa câu hỏi cũ. |
+| 2026-10-29 | v1.9 | Gate D.3 Batch 7: thêm Q13 (email publisher không đủ làm khóa danh tính); bổ sung Q12 (ca 60320483500 — mâu thuẫn không có bằng chứng công bố); bảng slide coverage 49/83, 17/34. Không xóa câu hỏi cũ. |
+| 2026-10-29 | v2.0 | Gate D.3 mission A/B/C: thêm Q14 (trộn hồ sơ, review cấp công bố), Q15 (nguồn tổng hợp), Q16 (dual affiliation); bảng slide coverage 83/83 visited, truy vết R-01…R-12. Không xóa câu hỏi cũ. |
+| 2026-10-29 | v2.1 | Scientific errata: Q14 hạ xuống nghi vấn HIGH-PRIORITY, thay ORCID OpenAlex bằng ORCID registry 0009-0005-2135-2544, thêm điểm affiliation có thời hạn; Q16 giới hạn phạm vi mẫu DOI. |
+| 2026-10-29 | v2.2 | Gate D.4: thêm Q17 (ORCID đồng tác giả ≠ tác giả tại vị trí) và Q18 (NO_CANDIDATE ≠ không thuộc ICTU). Không xóa câu hỏi cũ. |
+| 2026-10-29 | v2.3 | Errata E17: Q17 — chỉ ORCID nhà xuất bản tại đúng vị trí + registry xác nhận mới chứng minh vị trí tác giả. |
