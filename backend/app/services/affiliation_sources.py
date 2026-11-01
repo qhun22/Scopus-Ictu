@@ -23,13 +23,14 @@ import json
 import re
 from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from app.services.affiliation_import import EntryInput, OrgInput, ResolutionInput
 from app.services.author_affiliation import (
+    ALIGNMENT_POLICY_VERSION,
     UNRESOLVED,
     VERIFIED,
     AuthorAffiliationLink,
@@ -278,8 +279,14 @@ def build_inputs(
                 }
                 retrieved = datetime.fromisoformat(record["retrieved_at"])
                 work_id = work.get("id") if source == "openalex" else work.get("DOI")
+            # Identical raw metadata under a changed trust policy is a new
+            # resolution version, not a replay of a historical VERIFIED entity.
+            payload["alignment_policy_version"] = ALIGNMENT_POLICY_VERSION
             payload_sha = hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
             n_slots, n_ext = len(slots), len(externals)
+            # These are source observations, not assigned authorships. Keep
+            # them even when a count/identifier conflict selects no author.
+            authorship_observations = [asdict(author) for author in externals]
             for link in links:
                 key = (eid, link.scopus_id, source)
                 seen_keys.add(key)
@@ -298,7 +305,16 @@ def build_inputs(
                         continue
                     else:
                         cross_matched += 1
-                evidence: dict[str, Any] = {}
+                evidence: dict[str, Any] = {
+                    "alignment_policy_version": ALIGNMENT_POLICY_VERSION,
+                    "source_authorship_observations": authorship_observations,
+                    "source_observation": {
+                        **link.observation,
+                        "source_work_id": work_id,
+                        "source_doi": doi if record is not None else None,
+                        "retrieved_at": retrieved.isoformat() if retrieved is not None else None,
+                    },
+                }
                 orcid = None
                 if link.status == VERIFIED:
                     m = _ORCID_EVIDENCE.match(link.evidence or "")
@@ -311,15 +327,15 @@ def build_inputs(
                             if (i.get("type") or "").casefold() == "scopus author id" and i.get("source")
                         }
                     )
-                    evidence = {
+                    evidence.update({
                         "orcid": orcid,
                         "scopus_id_declared_in_orcid_record": link.scopus_id,
                         "orcid_record_retrieved_at": record_info.get("retrieved_at"),
                         "declared_by": declared_by,
-                    }
+                    })
                 elif link.status != UNRESOLVED:
-                    evidence = {"scopus_author_count": n_slots, "external_author_count": n_ext,
-                                "name_tokens_equal": True, "same_position": True}
+                    evidence.update({"scopus_author_count": n_slots, "external_author_count": n_ext,
+                                     "name_tokens_equal": True, "same_position": True})
                 inputs.append(
                     ResolutionInput(
                         eid=eid,

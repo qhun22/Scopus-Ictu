@@ -96,6 +96,7 @@ def _openalex(doi: str, names: list[tuple[str, str | None]]) -> dict:
             "id": "https://openalex.org/W1", "doi": f"https://doi.org/{doi}",
             "authorships": [
                 {
+                    "raw_author_name": n,
                     "author": {"display_name": n, "orcid": f"https://orcid.org/{o}" if o else None},
                     "raw_affiliation_strings": [f"Dept of {n}, Univ X"],
                     "affiliations": [{"raw_affiliation_string": f"Dept of {n}, Univ X", "institution_ids": ["I1"]}],
@@ -110,7 +111,8 @@ def _openalex(doi: str, names: list[tuple[str, str | None]]) -> dict:
 def _bundle(directory: Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "openalex_works.jsonl").write_text(
-        json.dumps(_openalex("10.1/one", [("Ann A.", ORCID), ("Bob Beta", None)])) + "\n", encoding="utf-8"
+        json.dumps(_openalex("10.1/one", [("Ann Alpha", ORCID), ("Bob Beta", None)])) + "\n",
+        encoding="utf-8",
     )
     (directory / "crossref_works.jsonl").write_text(
         json.dumps({"retrieved_at": RETRIEVED, "source": "crossref", "query_doi": "10.1/one", "http": 404}) + "\n",
@@ -243,7 +245,7 @@ def test_full_flow_without_any_lecturer(client, as_role, db_session, world, bund
     # the paper absent from the bundle stays UNRESOLVED with no invented unit.
     e1 = client.get("/api/v1/publications/E1").json()
     first, second = e1["authors"]
-    assert first["affiliation_status"] == "VERIFIED" and first["affiliations"]
+    assert first["affiliation_status"] == "CORROBORATED" and first["affiliations"]
     assert second["affiliation_status"] == "CORROBORATED" and second["affiliation_status"] != "VERIFIED"
     e2 = client.get("/api/v1/publications/E2").json()
     assert e2["authors"][0]["affiliation_status"] == "UNRESOLVED" and e2["authors"][0]["affiliations"] == []
@@ -316,7 +318,7 @@ def test_survey_jsonl_for_other_papers_does_not_block_an_unrelated_csv(client, a
     )
 
     bridge = {ORCID: parse_orcid_scopus_ids([{"type": "Scopus Author ID", "value": "111111"}])}
-    work = _openalex("10.1/one", [("Ann A.", ORCID), ("Bob Beta", None)])["work"]
+    work = _openalex("10.1/one", [("Ann Alpha", ORCID), ("Bob Beta", None)])["work"]
     slots = parse_scopus_author_slots("111111; 222222", "Alpha, Ann (111111); Beta, Bob (222222)")
     rows = []
     for source in ("openalex", "crossref"):

@@ -251,6 +251,18 @@ def _validate_attribution(attr: CrawPublicationAttribution) -> IngestionError | 
     return None
 
 
+def _ambiguous_lecturer_error(url: str, lecturer_ids: set[uuid.UUID]) -> IngestionError:
+    ids = ", ".join(sorted(str(lecturer_id) for lecturer_id in lecturer_ids))
+    return IngestionError(
+        code="AMBIGUOUS_LECTURER",
+        message=(
+            f"Craw lecturer profile URL matches multiple canonical lecturers ({ids}); "
+            "resolve the duplicate repository_profile_url before ingesting publications"
+        ),
+        craw_source_id=url,
+    )
+
+
 def plan_known_publications(
     existing_keys: Iterable[str],
     attributions: Sequence[CrawPublicationAttribution],
@@ -332,22 +344,23 @@ class KnownPublicationIngestionService:
     # Lecturers index for deterministic mapping
     # ----------------------------------------------------------------
     @staticmethod
-    def _build_lecturer_index(db: Session) -> dict[str, uuid.UUID]:
-        """Map ``repository_profile_url`` -> ``lecturer.id``.
+    def _build_lecturer_index(db: Session) -> dict[str, set[uuid.UUID]]:
+        """Map each exact ``repository_profile_url`` to its distinct lecturer IDs.
 
-        Prefers non-null URLs. Lecturers without a profile URL cannot
-        be matched from a Craw source and will be reported as unmapped.
+        Repeated rows for one lecturer are not ambiguous. Multiple lecturer IDs
+        for one URL must never be resolved by query order. Keep existing exact
+        URL matching; lecturers without a URL are reported as unmapped.
         """
         rows = db.execute(
             select(Lecturer.id, Lecturer.repository_profile_url).where(
                 Lecturer.repository_profile_url.is_not(None)
             )
         ).all()
-        by_url: dict[str, uuid.UUID] = {}
+        by_url: dict[str, set[uuid.UUID]] = {}
         for lid, url in rows:
             if not url:
                 continue
-            by_url.setdefault(url, lid)
+            by_url.setdefault(url, set()).add(lid)
         return by_url
 
     # ----------------------------------------------------------------
@@ -358,11 +371,9 @@ class KnownPublicationIngestionService:
     ) -> dict[str, list[LecturerSourceSnapshot]]:
         """Map ``snapshot_hash`` -> list of matching existing snapshots.
 
-        Multiple snapshots may share a hash if the same content was
-        captured for two different lecturers (e.g., two lecturers with
-        the same profile URL would be impossible, but the index is
-        ``(hash, lecturer_id)`` so we keep the existing index as a
-        list and let the caller filter).
+        Multiple snapshots may share a hash if the same content was captured
+        for different lecturers. The reuse key is ``(hash, lecturer_id)``, so
+        keep a list and let the caller filter after unambiguous URL mapping.
         """
         hashes_list = list(set(hashes))
         if not hashes_list:
@@ -401,8 +412,14 @@ class KnownPublicationIngestionService:
         for src in sources:
             url = src.craw_source_id
             seen_urls[url] += 1
-            if url in by_url:
-                mapped[url] = by_url[url]
+            lecturer_ids = by_url.get(url, set())
+            if len(lecturer_ids) > 1:
+                ambiguous.append(url)
+                invalid_records += 1
+                errors.append(_ambiguous_lecturer_error(url, lecturer_ids))
+                continue
+            if lecturer_ids:
+                mapped[url] = next(iter(lecturer_ids))
             else:
                 unmapped.append(url)
                 invalid_records += 1
@@ -535,14 +552,18 @@ class KnownPublicationIngestionService:
     # APPLY (transactional)
     # ----------------------------------------------------------------
     def apply(
-        self, db: Session, sources: Sequence[CrawLecturerSource]
+        self, db: Session, sources: Sequence[CrawLecturerSource], *, commit: bool = True
     ) -> IngestionResult:
         """Apply the ingestion in a single transaction.
+
+        ``commit=False`` flushes instead of committing, so a caller can write its own audit
+        event in the same transaction (data and audit are then both-or-neither).
 
         Reuses existing snapshots and known-publication rows when the
         content-addressed keys already exist. Never mutates the
         ``lecturers`` table. On any SQLAlchemy error the entire
-        transaction is rolled back.
+        transaction is rolled back. Ambiguous URLs are reported and skipped;
+        unrelated unambiguous source records remain eligible for ingestion.
         """
         by_url = self._build_lecturer_index(db)
         now = datetime.now(UTC)
@@ -556,7 +577,13 @@ class KnownPublicationIngestionService:
         per_source: list[tuple[CrawLecturerSource, str, list[CrawPublicationAttribution]]] = []
         for src in sources:
             url = src.craw_source_id
-            if url not in by_url:
+            lecturer_ids = by_url.get(url, set())
+            if len(lecturer_ids) > 1:
+                ambiguous.append(url)
+                invalid_records += 1
+                errors.append(_ambiguous_lecturer_error(url, lecturer_ids))
+                continue
+            if not lecturer_ids:
                 unmapped.append(url)
                 invalid_records += 1
                 errors.append(
@@ -618,7 +645,8 @@ class KnownPublicationIngestionService:
         try:
             for src, h, valid_attributions in per_source:
                 url = src.craw_source_id
-                lecturer_id = by_url[url]
+                # Only singleton mappings entered per_source above.
+                lecturer_id = next(iter(by_url[url]))
                 snap = snap_by_key.get((h, str(lecturer_id)))
                 if snap is None:
                     # Detect within-snapshot DOI/title collisions BEFORE
@@ -772,7 +800,10 @@ class KnownPublicationIngestionService:
                     )
                     kp_created += 1
 
-            db.commit()
+            if commit:
+                db.commit()
+            else:
+                db.flush()          # the caller commits data and its audit event together
         except Exception:
             db.rollback()
             raise

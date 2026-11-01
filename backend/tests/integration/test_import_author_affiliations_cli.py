@@ -33,6 +33,7 @@ def _openalex(doi: str, names: list[tuple[str, str | None]]) -> dict:
             "doi": f"https://doi.org/{doi}",
             "authorships": [
                 {
+                    "raw_author_name": n,
                     "author": {"display_name": n, "orcid": f"https://orcid.org/{o}" if o else None},
                     "raw_affiliation_strings": [f"Dept of {n}, Univ X"],
                     "affiliations": [{"raw_affiliation_string": f"Dept of {n}, Univ X", "institution_ids": ["I1"]}],
@@ -82,7 +83,7 @@ def _survey(tmp_path: Path, rows: list[dict], works: list[dict]) -> tuple[Path, 
 
 
 ROWS = [{"EID": "E1", "DOI": "10.1/one", "Author(s) ID": "111111; 222222", "Author full names": "Alpha, Ann (111111); Beta, Bob (222222)"}]
-WORKS = [_openalex("10.1/one", [("Ann A.", ORCID), ("Bob Beta", None)])]
+WORKS = [_openalex("10.1/one", [("Ann Alpha", ORCID), ("Bob Beta", None)])]
 
 
 def test_inputs_are_rebuilt_from_raw_metadata_and_consistent(tmp_path) -> None:
@@ -90,11 +91,15 @@ def test_inputs_are_rebuilt_from_raw_metadata_and_consistent(tmp_path) -> None:
     built = cli.build_inputs(survey, csv_path)
     assert built.mismatches == [] and built.stats["inputs"] == 4  # 2 authors x 2 sources
     by = {(i.scopus_id, i.source_system): i for i in built.inputs}
-    verified = by[("111111", "openalex")]
-    assert verified.link_status == "VERIFIED" and verified.external_author_orcid == ORCID
-    assert verified.evidence["declared_by"] == ["Scopus - Elsevier"] and verified.link_method == "ORCID_SCOPUS_ID_BRIDGE"
-    assert [e.raw_text for e in verified.entries] == ["Dept of Ann A., Univ X"]
-    assert verified.entries[0].organization.source_org_id == "I1"
+    corroborated = by[("111111", "openalex")]
+    assert corroborated.link_status == "CORROBORATED"
+    assert corroborated.external_author_orcid is None
+    assert corroborated.link_method == "POSITION_COUNT_NAME"
+    observation = corroborated.evidence["source_observation"]
+    assert observation["raw_author_name"] == "Ann Alpha"
+    assert observation["openalex_author_entity"]["orcid"] == f"https://orcid.org/{ORCID}"
+    assert [e.raw_text for e in corroborated.entries] == ["Dept of Ann Alpha, Univ X"]
+    assert corroborated.entries[0].organization.source_org_id == "I1"
     assert by[("222222", "openalex")].link_status == "CORROBORATED" and by[("222222", "openalex")].evidence["name_tokens_equal"]
     assert by[("111111", "crossref")].link_status == "UNRESOLVED" and not by[("111111", "crossref")].entries
     # payload version is the same for every author of one paper+source and differs between sources

@@ -8,10 +8,11 @@ creates a Scopus identity.
 
 Link status (how sure we are that external authorship == Scopus slot)
 ---------------------------------------------------------------------
-``VERIFIED``     a persistent identifier chain connects the two systems:
-                 the external author's ORCID, and a public ORCID record that
+``VERIFIED``     a publisher identifier chain connects the two systems:
+                 a Crossref author's ORCID, and a public ORCID record that
                  itself declares the Scopus Author ID of the slot.  The
                  identifier is the proof; name/position are not used.
+                 OpenAlex entity ORCIDs are observations, never this proof.
 ``CORROBORATED`` no shared identifier, but the author lists have the same
                  length, the external authorship sits at the same position and
                  its name tokens equal the Scopus name tokens, and nothing
@@ -32,11 +33,12 @@ import re
 import unicodedata
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 VERIFIED = "VERIFIED"
 CORROBORATED = "CORROBORATED"
 UNRESOLVED = "UNRESOLVED"
+ALIGNMENT_POLICY_VERSION = "author-affiliation/2"
 
 R_NO_EXTERNAL_WORK = "NO_EXTERNAL_WORK"
 R_NO_AUTHOR_LIST = "NO_EXTERNAL_AUTHOR_LIST"
@@ -46,6 +48,8 @@ R_ORDER_INCONSISTENT = "ORDER_INCONSISTENT_WITH_VERIFIED_ID"
 R_ID_CONFLICT = "ID_CONFLICT"
 R_ID_AMBIGUOUS = "ID_AMBIGUOUS"
 R_POSITION_CLAIMED = "POSITION_CLAIMED_BY_OTHER_ID"
+R_NO_RAW_NAME = "NO_RAW_AUTHOR_NAME"
+R_ENTITY_NAME_CONFLICT = "OPENALEX_ENTITY_NAME_CONFLICT"
 
 _SCOPUS_ID_RE = re.compile(r"(?:authorId=|authid/detail\.uri\?authorId=)?(\d{6,13})")
 _ORCID_RE = re.compile(r"(\d{4}-\d{4}-\d{4}-\d{3}[\dX])")
@@ -87,6 +91,10 @@ class ExternalAuthorship:
     raw_affiliations: tuple[str, ...] = ()
     organizations: tuple[ExternalOrganization, ...] = ()
     entries: tuple[AffiliationEntry, ...] = ()
+    raw_author_name: str | None = None
+    entity_id: str | None = None
+    entity_display_name: str | None = None
+    entity_orcid: str | None = None  # as reported by the aggregator, not publisher proof
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +110,8 @@ class AuthorAffiliationLink:
     raw_affiliations: tuple[str, ...] = ()
     organizations: tuple[ExternalOrganization, ...] = ()
     entries: tuple[AffiliationEntry, ...] = ()
+    # Retain observations even when affiliation assignment is withheld.
+    observation: dict = field(default_factory=dict)
 
     @property
     def has_affiliation(self) -> bool:
@@ -209,11 +219,14 @@ def parse_openalex_authorships(work: Mapping) -> list[ExternalAuthorship]:
             ExternalAuthorship(
                 source="openalex",
                 position=i,
-                display_name=author.get("display_name") or a.get("raw_author_name") or "",
-                orcid=_orcid(author.get("orcid")),
+                display_name=a.get("raw_author_name") or "",
                 raw_affiliations=raws,
                 organizations=orgs,
                 entries=_openalex_entries(a, orgs, raws),
+                raw_author_name=a.get("raw_author_name"),
+                entity_id=author.get("id"),
+                entity_display_name=author.get("display_name"),
+                entity_orcid=author.get("orcid"),
             )
         )
     return out
@@ -234,6 +247,7 @@ def parse_crossref_authors(work: Mapping) -> list[ExternalAuthorship]:
                 orcid=_orcid(a.get("ORCID")),
                 raw_affiliations=raws,
                 entries=tuple(AffiliationEntry(r) for r in raws),
+                raw_author_name=name,
             )
         )
     return out
@@ -256,16 +270,37 @@ def parse_orcid_scopus_ids(external_identifiers: Iterable[Mapping] | None) -> fr
 
 # --------------------------------------------------------------------------- alignment
 def _link(slot: ScopusAuthorSlot, ext: ExternalAuthorship | None, status: str, **kw) -> AuthorAffiliationLink:
+    source = kw.pop("source")
+    observation = {
+        "source": source,
+        "authorship_source": ext.source if ext else None,
+        "source_tier": (
+            "PUBLISHER" if ext and ext.source == "crossref"
+            else "AGGREGATOR_RAW" if ext and ext.source == "openalex" else None
+        ),
+        "scopus_author_id": slot.scopus_id,
+        "author_order": slot.author_order,
+        "external_position": ext.position if ext else None,
+        "raw_author_name": (ext.raw_author_name or ext.display_name or None) if ext else None,
+        "raw_affiliations": list(ext.raw_affiliations) if ext else [],
+        "publisher_orcid": ext.orcid if ext and ext.source == "crossref" else None,
+        "openalex_author_entity": {
+            "id": ext.entity_id,
+            "display_name": ext.entity_display_name,
+            "orcid": ext.entity_orcid or ext.orcid,
+        } if ext and ext.source == "openalex" else None,
+    }
     return AuthorAffiliationLink(
         scopus_id=slot.scopus_id,
         author_order=slot.author_order,
-        source=kw.pop("source"),
+        source=source,
         status=status,
         external_position=ext.position if ext else None,
         external_name=ext.display_name if ext else None,
         raw_affiliations=ext.raw_affiliations if ext and status != UNRESOLVED else (),
         organizations=ext.organizations if ext and status != UNRESOLVED else (),
         entries=ext.entries if ext and status != UNRESOLVED else (),
+        observation=observation,
         **kw,
     )
 
@@ -283,11 +318,13 @@ def align_paper(
     if not externals:
         return [_link(s, None, UNRESOLVED, source=source, reason=R_NO_AUTHOR_LIST) for s in slots]
 
-    # 1. identifier chains: external ORCID -> ORCID record -> Scopus Author ID of this paper
+    # 1. Publisher ORCID -> registry external ID -> Scopus author on this paper.
+    # Gate on both the context and authorship: relabeling an OpenAlex observation
+    # must not turn an aggregator entity identifier into publisher evidence.
     claims: dict[str, list[tuple[ExternalAuthorship, str]]] = {}
     ambiguous_external: set[int] = set()
     for ext in externals:
-        if not ext.orcid:
+        if source != "crossref" or ext.source != "crossref" or not ext.orcid:
             continue
         hits = bridge.get(ext.orcid, frozenset()) & paper_ids
         if len(hits) == 1:
@@ -331,6 +368,13 @@ def align_paper(
         ext = externals[slot.author_order - 1] if slot.author_order - 1 < len(externals) else None
         if ext is None:
             links.append(_link(slot, None, UNRESOLVED, source=source, reason=R_COUNT_MISMATCH))
+        elif ext.source == "openalex" and not ext.display_name.strip():
+            links.append(_link(slot, ext, UNRESOLVED, source=source, reason=R_NO_RAW_NAME))
+        elif (
+            ext.source == "openalex" and ext.entity_display_name
+            and not names_match(ext.display_name, ext.entity_display_name)
+        ):
+            links.append(_link(slot, ext, UNRESOLVED, source=source, reason=R_ENTITY_NAME_CONFLICT))
         elif ext.position in ambiguous_external:
             links.append(_link(slot, ext, UNRESOLVED, source=source, reason=R_ID_AMBIGUOUS))
         elif ext.position in claimed_positions:
@@ -349,6 +393,7 @@ def unresolved_no_work(slots: Sequence[ScopusAuthorSlot], *, source: str) -> lis
 
 
 __all__ = [
+    "ALIGNMENT_POLICY_VERSION",
     "AffiliationEntry",
     "AuthorAffiliationLink",
     "CORROBORATED",

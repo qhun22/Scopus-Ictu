@@ -16,7 +16,8 @@ Pipeline:
 M2.7 lecturer matching is explicitly OUT OF SCOPE.
 
 Key invariants enforced:
-  1. scopus_authors.scopus_id UNIQUE — identity barrier; upsert-safe via savepoint.
+  1. scopus_authors.scopus_id UNIQUE — identity barrier; each insert runs in its
+     own SAVEPOINT and only a recognized unique violation is recovered (G04).
   2. scopus_author_name_variants(scopus_author_id, variant_type, variant_name) UNIQUE — additive.
   3. publication_authors(publication_id, author_order) UNIQUE — first-wins.
   4. publication_authors(publication_id, scopus_author_id) UNIQUE — idempotent link.
@@ -26,6 +27,7 @@ Key invariants enforced:
 
 from __future__ import annotations
 
+import copy
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -53,6 +55,64 @@ VARIANT_DISPLAY = "AUTHOR_DISPLAY"
 VARIANT_FULL_NAME = "AUTHOR_FULL_NAME"
 
 # ---------------------------------------------------------------------------
+# G04 — recognized unique constraints (names from the initial migration
+# e5b3cf21c1d12b64 and the frozen naming convention in models/base.py)
+# ---------------------------------------------------------------------------
+
+UNIQUE_VIOLATION_SQLSTATE = "23505"
+UQ_SCOPUS_AUTHOR_ID = "uq_scopus_authors_scopus_id"
+UQ_AUTHOR_NAME_VARIANT = "uq_author_name_variants"
+UQ_PUBLICATION_AUTHOR = "uq_publication_authors_author"
+UQ_PUBLICATION_AUTHOR_ORDER = "uq_publication_authors_order"
+_LINK_UNIQUE_CONSTRAINTS = frozenset({UQ_PUBLICATION_AUTHOR, UQ_PUBLICATION_AUTHOR_ORDER})
+
+
+def integrity_violation(exc: IntegrityError) -> tuple[str | None, str | None]:
+    """Return (SQLSTATE, constraint name) reported by the driver, if any.
+
+    No message parsing: an unidentified violation is never treated as a
+    recognized one, so callers fail closed.
+    """
+    orig = getattr(exc, "orig", None)
+    if orig is None:
+        return None, None
+    sqlstate = getattr(orig, "pgcode", None) or getattr(orig, "sqlstate", None)
+    diag = getattr(orig, "diag", None)
+    constraint = getattr(diag, "constraint_name", None) if diag is not None else None
+    return sqlstate, constraint
+
+
+def _insert_in_savepoint(
+    db: Session, obj: object, recoverable: frozenset[str]
+) -> IntegrityError | None:
+    """Insert one ORM row inside its own SAVEPOINT.
+
+    Returns None when the row was flushed, or the IntegrityError when it was
+    rejected by one of the ``recoverable`` unique constraints. The caller must
+    then prove the conflicting row exists by re-querying its exact key, or
+    raise the returned error. Any other integrity error propagates unchanged
+    so the batch owner rolls back the whole batch and reports FAILED.
+
+    Order matters: ``begin_nested()`` flushes all pending state before it
+    emits SAVEPOINT, even with autoflush=False. The explicit flush below
+    keeps earlier state outside the recovery scope, so its failure can never
+    be mistaken for this row's conflict. The object is added only inside the
+    savepoint; on rollback SQLAlchemy expunges it and leaves earlier rows of
+    the batch intact. The outer transaction is never rolled back here.
+    """
+    db.flush()
+    try:
+        with db.begin_nested():
+            db.add(obj)
+            db.flush()
+    except IntegrityError as exc:
+        sqlstate, constraint = integrity_violation(exc)
+        if sqlstate == UNIQUE_VIOLATION_SQLSTATE and constraint in recoverable:
+            return exc
+        raise
+    return None
+
+# ---------------------------------------------------------------------------
 # Author occurrence — parsed from one raw row
 # ---------------------------------------------------------------------------
 
@@ -64,7 +124,7 @@ class AuthorOccurrence:
     scopus_id: str
     display_name: str
     full_name: str | None  # None if the field was empty
-    author_order: int  # 1-based position in the author list
+    author_order: int | None  # Parser emits 1-based positions; None means unknown.
     embedded_id_matches: bool  # True if full-name embedded ID == scopus_id
     row_number: int  # Row number in source CSV (for error reporting)
 
@@ -112,7 +172,7 @@ class AuthorNormalizationErrors:
 
     errors: list[dict] = field(default_factory=list)
 
-    def add(self, row_number: int, code: str, message: str, **extra: str) -> None:
+    def add(self, row_number: int, code: str, message: str, **extra: str | int) -> None:
         self.errors.append(
             {
                 "row_number": row_number,
@@ -320,12 +380,57 @@ def normalize_name(name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _position_discrepancy_key(item: dict) -> tuple[str, str, int, int]:
+    return (
+        item["publication_id"], item["scopus_author_id"],
+        item["existing_author_order"], item["observed_author_order"],
+    )
+
+
+def _merge_position_discrepancies(previous: list[dict], current: list[dict]) -> list[dict]:
+    """Keep all drift provenance, deterministically, outside the 50-error sample.
+
+    One discrepancy per publication/author/position pair, with distinct raw
+    observations. Replaying an import or writing a checkpoint adds no duplicates.
+    Never mutate the previously persisted JSON value in place.
+    """
+    merged: dict[tuple[str, str, int, int], dict] = {}
+    observations: dict[tuple[str, str, int, int], dict[tuple[str, str, int], dict]] = {}
+    for item in [*previous, *current]:
+        key = _position_discrepancy_key(item)
+        merged.setdefault(key, {**item})
+        sources = observations.setdefault(key, {})
+        for source in item["observations"]:
+            source_key = (source["import_id"], source["raw_record_id"], source["row_number"])
+            sources[source_key] = dict(source)
+    return [
+        {**merged[key], "observations": [
+            observations[key][source_key] for source_key in sorted(observations[key])
+        ]}
+        for key in sorted(merged)
+    ]
+
+
 class AuthorNormalizer:
     """Normalizes authors for a Scopus import."""
 
     def __init__(self) -> None:
         self.counters = AuthorNormalizationCounters()
         self.errors = AuthorNormalizationErrors()
+        self.position_discrepancies: dict[tuple[str, str, int, int], dict] = {}
+
+    def batch_checkpoint(self) -> tuple:
+        """Copy the in-memory run state before a batch transaction starts."""
+        return copy.deepcopy((self.counters, self.errors, self.position_discrepancies))
+
+    def restore_batch_checkpoint(self, checkpoint: tuple) -> None:
+        """Discard counters, errors and G03 observations of a rolled-back batch.
+
+        After the batch rollback none of its rows exist, so the FAILED summary
+        must not report them as created, existing or observed. A replay
+        re-derives them from the unchanged raw records.
+        """
+        self.counters, self.errors, self.position_discrepancies = copy.deepcopy(checkpoint)
 
     def record_occurrences(
         self,
@@ -395,23 +500,21 @@ class AuthorNormalizer:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        db.add(author)
-        try:
-            db.flush()  # Get the ID without committing
+        conflict = _insert_in_savepoint(db, author, frozenset({UQ_SCOPUS_AUTHOR_ID}))
+        if conflict is None:
             self.counters.authors_created += 1
             self.counters._seen_scopus_ids.add(occ.scopus_id)
             return author
-        except IntegrityError:
-            db.rollback()
-            db.flush()
-            # Race: another thread created it simultaneously
-            existing = db.query(ScopusAuthor).filter(
-                ScopusAuthor.scopus_id == occ.scopus_id
-            ).first()
-            if existing is not None:
-                self.counters.authors_existing += 1
-                return existing
-            raise
+
+        # Race: a concurrent transaction committed this scopus_id first. Only
+        # the savepoint was rolled back; earlier rows of this batch survive.
+        existing = db.query(ScopusAuthor).filter(
+            ScopusAuthor.scopus_id == occ.scopus_id
+        ).first()
+        if existing is None:
+            raise conflict
+        self.counters.authors_existing += 1
+        return existing
 
     def _ensure_variant(
         self,
@@ -442,22 +545,30 @@ class AuthorNormalizer:
             first_seen_raw_record_id=raw_record_id,
             created_at=datetime.now(UTC),
         )
-        db.add(variant)
-        try:
-            db.flush()
+        conflict = _insert_in_savepoint(db, variant, frozenset({UQ_AUTHOR_NAME_VARIANT}))
+        if conflict is None:
             self.counters.variants_created += 1
-        except IntegrityError:
-            db.rollback()
-            db.flush()
-            self.counters.variants_existing += 1
+            return
+
+        # Count it as existing only once the exact unique key is proven to exist.
+        existing = db.query(ScopusAuthorNameVariant).filter(
+            ScopusAuthorNameVariant.scopus_author_id == author_id,
+            ScopusAuthorNameVariant.variant_type == variant_type,
+            ScopusAuthorNameVariant.variant_name == variant_name,
+        ).first()
+        if existing is None:
+            raise conflict
+        self.counters.variants_existing += 1
 
     def _ensure_publication_author_link(
         self,
         db: "Session",
         author_id: uuid.UUID,
         publication_id: uuid.UUID,
-        author_order: int,
+        author_order: int | None,
         occ: AuthorOccurrence,
+        *,
+        _after_conflict: IntegrityError | None = None,
     ) -> None:
         """Ensure publication-author link, record conflicts without silent overwrite."""
         # Check exact existing link
@@ -467,8 +578,29 @@ class AuthorNormalizer:
         ).first()
 
         if existing_link is not None:
-            # Idempotent: same publication + same author → NO-OP
+            # Identity is unchanged. Only differing *known* positions are drift.
             self.counters.publication_author_links_existing += 1
+            if (
+                existing_link.author_order is not None
+                and author_order is not None
+                and existing_link.author_order != author_order
+            ):
+                self._record_position_discrepancy(existing_link, author_order, occ)
+            return
+
+        if author_order is None:
+            # The table requires a positive position; do not invent a slot or
+            # enter IntegrityError recovery for an unknown observation.
+            self.errors.add(
+                occ.row_number,
+                "AUTHOR_ORDER_MISSING",
+                "No known author position; publication-author link was not created.",
+                publication_id=str(publication_id),
+                scopus_author_id=str(author_id),
+                scopus_id=occ.scopus_id,
+                raw_record_id=str(occ.raw_record_id),
+                import_id=str(occ.import_id),
+            )
             return
 
         # Check if the author_order slot is occupied by a different author
@@ -494,20 +626,65 @@ class AuthorNormalizer:
             )
             return
 
+        if _after_conflict is not None:
+            # A recognized unique violation, yet neither the pair nor the slot
+            # is visible: the conflicting row cannot be proven. Fail closed.
+            raise _after_conflict
+
         link = PublicationAuthor(
             publication_id=publication_id,
             scopus_author_id=author_id,
             author_order=author_order,
             created_at=datetime.now(UTC),
         )
-        db.add(link)
-        try:
-            db.flush()
+        conflict = _insert_in_savepoint(db, link, _LINK_UNIQUE_CONSTRAINTS)
+        if conflict is None:
             self.counters.publication_author_links_created += 1
-        except IntegrityError:
-            db.rollback()
-            db.flush()
-            self.counters.publication_author_links_existing += 1
+            return
+
+        # Race: a concurrent transaction committed this pair or slot first.
+        # Re-classify through the replay path above (pair → G03 drift check,
+        # slot → AUTHOR_ORDER_CONFLICT). If neither row can be proven, the
+        # re-entry raises instead of counting an unproven link.
+        self._ensure_publication_author_link(
+            db, author_id, publication_id, author_order, occ, _after_conflict=conflict,
+        )
+
+    def _record_position_discrepancy(
+        self, link: PublicationAuthor, observed_order: int, occ: AuthorOccurrence,
+    ) -> None:
+        """Report a metadata discrepancy, without changing authorship or identity."""
+        discrepancy = {
+            "code": "AUTHOR_POSITION_DRIFT",
+            "publication_id": str(link.publication_id),
+            "publication_author_id": str(link.id),
+            "scopus_author_id": str(link.scopus_author_id),
+            "scopus_id": occ.scopus_id,
+            "existing_author_order": link.author_order,
+            "observed_author_order": observed_order,
+        }
+        key = _position_discrepancy_key(discrepancy)
+        observation = {
+            "import_id": str(occ.import_id),
+            "raw_record_id": str(occ.raw_record_id),
+            "row_number": occ.row_number,
+        }
+        if key not in self.position_discrepancies:
+            self.position_discrepancies[key] = {**discrepancy, "observations": []}
+            self.counters.conflicts += 1
+            self.errors.add(
+                occ.row_number,
+                "AUTHOR_POSITION_DRIFT",
+                f"Author {occ.scopus_id} in publication {link.publication_id}: "
+                f"stored position {link.author_order}, observed position {observed_order}; "
+                "association preserved; author order alone does not imply an identity error.",
+                **{k: v for k, v in discrepancy.items() if k != "code"},
+                import_id=observation["import_id"],
+                raw_record_id=observation["raw_record_id"],
+            )
+        sources = self.position_discrepancies[key]["observations"]
+        if observation not in sources:
+            sources.append(observation)
 
     def finalize(
         self,
@@ -539,6 +716,16 @@ class AuthorNormalizer:
         }
         if self.errors.errors:
             author_summary["errors"] = self.errors.to_list()
+
+        # Keep the complete diagnostic across startup/progress/failure/final
+        # checkpoints and replays. Other summary counters remain per-run.
+        previous_authors = existing.get("authors") or {}
+        discrepancies = _merge_position_discrepancies(
+            previous_authors.get("position_discrepancies", []),
+            list(self.position_discrepancies.values()),
+        )
+        if discrepancies:
+            author_summary["position_discrepancies"] = discrepancies
 
         # Merge: update only the 'authors' nested key
         item.normalization_summary = {**existing, "authors": author_summary}
@@ -657,6 +844,8 @@ def normalize_authors_for_import(
 
     for offset in range(0, len(raw_records), batch_size):
         batch = raw_records[offset : offset + batch_size]
+        # The batch is the unit of work: it commits whole or rolls back whole.
+        checkpoint = normalizer.batch_checkpoint()
 
         try:
             for raw_record in batch:
@@ -687,8 +876,19 @@ def normalize_authors_for_import(
 
             db.commit()
 
-        except Exception:
+        except Exception as exc:
             db.rollback()
+            normalizer.restore_batch_checkpoint(checkpoint)
+            normalizer.errors.add(
+                batch[0].row_number,
+                "AUTHOR_BATCH_ROLLED_BACK",
+                f"Rows {batch[0].row_number}-{batch[-1].row_number} were rolled back "
+                f"after {type(exc).__name__}; no author, variant or link from this "
+                "batch was persisted. Earlier committed batches are kept.",
+                first_row_number=batch[0].row_number,
+                last_row_number=batch[-1].row_number,
+                error_type=type(exc).__name__,
+            )
             normalizer.finalize(db, import_id, status="FAILED")
             raise
 

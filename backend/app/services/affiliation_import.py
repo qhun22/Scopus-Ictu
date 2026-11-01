@@ -170,6 +170,7 @@ def apply_cross_source_policy(inputs: Sequence[ResolutionInput]) -> tuple[list[R
                     link_method=None,
                     unresolved_reason=WITHHELD_REASON,
                     evidence={
+                        **item.evidence,
                         "withheld_link_status": item.link_status,
                         "conflicting_sources": sorted({c.source_system for c in culprits}),
                         "conflict_reasons": sorted({c.unresolved_reason for c in culprits}),
