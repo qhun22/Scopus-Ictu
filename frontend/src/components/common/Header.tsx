@@ -83,6 +83,7 @@ export default function Header({
     if (location.pathname.startsWith("/publications/")) return t.nav.publications;
     switch (location.pathname) {
       case "/home":
+      case "/":
         return t.nav.home;
       case "/search":
         return locale === "vi" ? "Tra cứu" : "Search";
@@ -200,8 +201,17 @@ export default function Header({
           </button>
         </div>
 
-        {/* User profile dropdown */}
+        {/* User profile or sign-in action */}
         <div className="relative" ref={dropdownRef}>
+          {!user ? (
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="h-10 rounded-[5px] bg-[#3A5FC3] px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#304fa8] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+            >
+              {t.header.login}
+            </button>
+          ) : (
           <button
             type="button"
             onClick={() => setDropdownOpen((prev) => !prev)}
@@ -233,9 +243,10 @@ export default function Header({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
+          )}
 
           {/* Dropdown Menu */}
-          {dropdownOpen && (
+          {user && dropdownOpen && (
             <div className="absolute right-0 top-full mt-3 w-full min-w-[130px] md:min-w-0 md:inset-x-0 z-50 animate-in fade-in zoom-in-95 duration-100">
               <button
                 type="button"

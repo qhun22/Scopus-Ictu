@@ -128,7 +128,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
   // ── LECTURER nav groups ────────────────────────────────────────
   const lecturerGroups: NavGroup[] = [
     {
-      items: [{ to: "/home", label: t.nav.home, icon: ICONS.home }],
+      items: [{ to: "/", label: t.nav.home, icon: ICONS.home }],
     },
     {
       heading: t.nav.groupLookup,

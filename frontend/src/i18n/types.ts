@@ -74,11 +74,13 @@ export interface TranslationSchema {
     openMenu: string;
     system: string;
     roleBadge: string;
+    login: string;
   };
   home: {
     welcome: string;
     welcomeGuest: string;
     welcomeSubtitle: string;
+    loginAction: string;
     quickSearchTitle: string;
     quickSearchPlaceholder: string;
     searchBtn: string;

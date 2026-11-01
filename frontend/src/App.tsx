@@ -50,7 +50,7 @@ function RootRedirect() {
       </div>
     );
   }
-  return <Navigate to={isAuthenticated ? "/home" : "/login"} replace />;
+  return <Navigate to={isAuthenticated ? "/home" : "/"} replace />;
 }
 
 export default function App() {
@@ -62,8 +62,10 @@ export default function App() {
             <PageVisitProvider>
             <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<HomePage />} />
+          </Route>
 
           {/* Authenticated Application Shell */}
           <Route element={<ProtectedRoute />}>

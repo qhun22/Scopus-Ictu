@@ -73,12 +73,14 @@ export const vi: TranslationSchema = {
     openMenu: "Mở menu",
     system: "Hệ thống",
     roleBadge: "Vai trò",
+    login: "Đăng nhập",
   },
   home: {
     welcome: "Xin chào",
     welcomeGuest: "Quý Thầy/Cô",
     welcomeSubtitle:
       "Chào mừng bạn đến với Cổng thông tin Scopus ICTU — Hệ thống định danh và đối sánh hồ sơ giảng viên.",
+    loginAction: "Đăng nhập",
     quickSearchTitle: "Tra cứu nhanh",
     quickSearchPlaceholder:
       "Tìm giảng viên, công bố, DOI hoặc Scopus Author ID...",

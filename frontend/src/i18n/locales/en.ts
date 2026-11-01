@@ -73,12 +73,14 @@ export const en: TranslationSchema = {
     openMenu: "Open menu",
     system: "System",
     roleBadge: "Role",
+    login: "Sign in",
   },
   home: {
     welcome: "Welcome",
     welcomeGuest: "Faculty Member",
     welcomeSubtitle:
       "Welcome to ICTU Scopus Portal — Lecturer identity reconciliation and publication matching system.",
+    loginAction: "Sign in",
     quickSearchTitle: "Quick Search",
     quickSearchPlaceholder:
       "Search lecturers, publications, DOI or Scopus Author ID...",

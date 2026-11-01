@@ -26,7 +26,7 @@ interface QuickAction {
 }
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { t, locale } = useI18n();
 
@@ -452,9 +452,18 @@ export default function HomePage() {
               {safeName}
             </span>
           </h1>
-          <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-            {t.home.welcomeSubtitle}
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+              {t.home.welcomeSubtitle}
+            </p>
+            {!isAuthenticated && (
+              <Link to="/login" className="shrink-0">
+                <Button type="button" variant="primary">
+                  {t.home.loginAction}
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
       </section>
 
