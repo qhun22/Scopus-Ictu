@@ -33,11 +33,13 @@ import {
   getReviewCandidate,
   getReviewCandidates,
   getReviewContext,
+  revokeReviewCandidate,
 } from "../../api/reviews";
 import { generateCandidates } from "../../api/matching";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { useToast } from "../../contexts/ToastContext";
+import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n/I18nContext";
 import Badge from "../../components/ui/Badge";
 import UiButton from "../../components/ui/Button";
@@ -228,6 +230,7 @@ function emptyQueueCopy(
 
 export default function ApprovalQueuePage() {
   const toast = useToast();
+  const { user } = useAuth();
   const { t: fullT, locale } = useI18n();
   const t = fullT.approvalQueue;
   const [status, setStatus] = useState<CandidateStatus>("PENDING");
@@ -253,6 +256,10 @@ export default function ApprovalQueuePage() {
   // Triggers returned by the server on a 422; the server is the final authority even if the detail policy was stale.
   const [serverReasonTriggers, setServerReasonTriggers] = useState<ReviewReasonTrigger[]>([]);
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [revocationOpen, setRevocationOpen] = useState(false);
+  const [revocationReason, setRevocationReason] = useState("");
+  const [revocationSubmitting, setRevocationSubmitting] = useState(false);
+  const [revocationError, setRevocationError] = useState<string | null>(null);
 
   const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -352,6 +359,44 @@ export default function ApprovalQueuePage() {
     setDecisionReason("");
     setReasonError(null);
     setServerReasonTriggers([]);
+  };
+
+  const closeRevocation = () => {
+    if (revocationSubmitting) return;
+    setRevocationOpen(false);
+    setRevocationReason("");
+    setRevocationError(null);
+  };
+
+  const submitRevocation = async () => {
+    if (!detail || revocationSubmitting) return;
+    const reason = revocationReason.trim();
+    if (!reason) {
+      setRevocationError(t.revokeReasonRequired);
+      return;
+    }
+
+    setRevocationSubmitting(true);
+    setRevocationError(null);
+    try {
+      await revokeReviewCandidate(detail.candidate_id, {
+        candidate_version: detail.candidate_version,
+        reason,
+      });
+      toast.success(t.revokeSuccessTitle, t.revokeSuccessMessage);
+      setRevocationOpen(false);
+      setRevocationReason("");
+      await refreshQueueAndDetail();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setRevocationError(getApiErrorMessage(error, t.conflictDefault));
+        if (selectedCandidateId) await loadDetail(selectedCandidateId);
+      } else {
+        setRevocationError(getApiErrorMessage(error, t.revokeFailedTitle));
+      }
+    } finally {
+      setRevocationSubmitting(false);
+    }
   };
 
   const refreshQueueAndDetail = useCallback(async () => {
@@ -876,10 +921,63 @@ export default function ApprovalQueuePage() {
                   <Button type="primary" onClick={() => setDecisionAction("ACCEPT")}>{t.acceptAction}</Button>
                 </Space>
               )}
+              {user?.role === "ADMIN" && detail.candidate_status === "ACCEPTED" && (
+                <Button
+                  danger
+                  onClick={() => {
+                    setRevocationError(null);
+                    setRevocationOpen(true);
+                  }}
+                >
+                  {t.revokeAction}
+                </Button>
+              )}
             </div>
           </div>
           </div>
         ) : <Empty description={t.noDetailData} className="py-10" />}
+      </Modal>
+
+      <Modal
+        open={revocationOpen && detail !== null}
+        title={t.revokeModalTitle}
+        okText={t.confirmRevokeOk}
+        okButtonProps={{ danger: true, disabled: revocationReason.trim().length === 0 }}
+        cancelText={t.cancel}
+        confirmLoading={revocationSubmitting}
+        closable={!revocationSubmitting}
+        maskClosable={!revocationSubmitting}
+        onOk={() => void submitRevocation()}
+        onCancel={closeRevocation}
+      >
+        {detail && (
+          <div className="space-y-4">
+            <Alert showIcon type="warning" message={t.revokeModalText} />
+            <Descriptions size="small" column={1} colon={false}>
+              <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
+              <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name} ({detail.scopus_author.scopus_id})</Descriptions.Item>
+            </Descriptions>
+            <div>
+              <label htmlFor="review-revoke-reason" className="mb-1.5 block font-semibold text-slate-700">
+                {t.revokeReasonLabel} <span className="text-rose-600">*</span>
+              </label>
+              <Input.TextArea
+                id="review-revoke-reason"
+                value={revocationReason}
+                rows={4}
+                maxLength={4000}
+                showCount
+                status={revocationError ? "error" : undefined}
+                placeholder={t.revokeReasonPlaceholder}
+                onChange={(event) => {
+                  setRevocationReason(event.target.value);
+                  if (event.target.value.trim()) setRevocationError(null);
+                }}
+              />
+              {revocationError && <div className="mt-1 text-sm text-rose-600" role="alert">{revocationError}</div>}
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal

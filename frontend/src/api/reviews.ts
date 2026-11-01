@@ -8,6 +8,8 @@ import {
   ReviewContext,
   ReviewDecisionRequest,
   ReviewDecisionResponse,
+  ReviewRevocationRequest,
+  ReviewRevocationResponse,
   ReviewHistoryQueryParams,
   ReviewHistoryResponse,
   ReviewQueueResponse,
@@ -65,6 +67,16 @@ export function decideReviewCandidate(
 ): Promise<ReviewDecisionResponse> {
   return apiPost<ReviewDecisionResponse, ReviewDecisionRequest>(
     `/api/v1/reviews/candidates/${encodeURIComponent(candidateId)}/reviews`,
+    request,
+  );
+}
+
+export function revokeReviewCandidate(
+  candidateId: string,
+  request: ReviewRevocationRequest,
+): Promise<ReviewRevocationResponse> {
+  return apiPost<ReviewRevocationResponse, ReviewRevocationRequest>(
+    `/api/v1/reviews/candidates/${encodeURIComponent(candidateId)}/revocation`,
     request,
   );
 }

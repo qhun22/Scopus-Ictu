@@ -641,6 +641,16 @@ export interface TranslationSchema {
     ambiguityNoOthers: string;
     ambiguitySharedWarning: string;
     currentStatusLabel: string;
+    revokeAction: string;
+    revokeModalTitle: string;
+    revokeModalText: string;
+    revokeReasonLabel: string;
+    revokeReasonPlaceholder: string;
+    revokeReasonRequired: string;
+    confirmRevokeOk: string;
+    revokeSuccessTitle: string;
+    revokeSuccessMessage: string;
+    revokeFailedTitle: string;
     rejectAction: string;
     acceptAction: string;
     noDetailData: string;

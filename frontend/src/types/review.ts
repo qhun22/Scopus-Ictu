@@ -199,3 +199,17 @@ export interface ReviewDecisionResponse {
   resulting_identity_id: string | null;
   idempotent: boolean;
 }
+
+export interface ReviewRevocationRequest {
+  candidate_version: number;
+  reason: string;
+}
+
+export interface ReviewRevocationResponse {
+  review_id: string;
+  candidate_id: string;
+  candidate_status: "PENDING";
+  candidate_version: number;
+  revoked_identity_id: string;
+  identity_status: "REVOKED";
+}
