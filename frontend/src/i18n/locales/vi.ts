@@ -228,7 +228,7 @@ export const vi: TranslationSchema = {
     completed: "Hoàn thành",
     failed: "Thất bại",
     inProgress: "Đang xử lý...",
-    cancelled: "Đã hủy",
+    cancelled: "Đã hủy nhập",
     noHistory: "Chưa có lần nhập dữ liệu nào.",
     importId: "Mã phiên nhập",
     close: "Đóng",

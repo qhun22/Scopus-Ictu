@@ -296,6 +296,81 @@ def _ensure_dt(val: Any) -> datetime:
 LECTURER_IMPORT_CANCELLED_ACTION = "LECTURER_DATASET_IMPORT_CANCELLED"
 
 
+SUPERSEDED_ACTION = "LECTURER_DATASET_SUPERSEDED"
+
+
+def supersede_earlier_lecturer_imports(db: Session, digest: str, actor: User) -> int:
+    """Mark earlier, still-applied imports of the SAME file content as superseded.
+
+    The newest import of identical content stays active; older ones get a "superseded" marker so the
+    history does not show two active copies. Nothing is rolled back and no lecturer record is touched:
+    the data they created is still in use by the newest import.
+    """
+
+    audits = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.entity_type == "lecturer_dataset",
+            AuditEvent.action == "LECTURER_DATASET_IMPORTED",
+        )
+        .order_by(AuditEvent.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    same = [a for a in audits if _safe_dict(a.event_metadata).get("file_sha256") == digest]
+    if len(same) < 2:
+        return 0
+    newest, older = same[0], same[1:]
+    markers = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.entity_type == "lecturer_dataset",
+            AuditEvent.action.in_(
+                [
+                    "LECTURER_DATASET_ROLLED_BACK",
+                    "LECTURER_DATASET_HISTORY_DELETED",
+                    SUPERSEDED_ACTION,
+                ]
+            ),
+        )
+        .all()
+    )
+    ended: set[uuid.UUID] = set()
+    for marker in markers:
+        if marker.entity_id is not None:
+            ended.add(marker.entity_id)
+        raw_id = _safe_dict(marker.event_metadata).get("import_id")
+        if raw_id:
+            try:
+                ended.add(uuid.UUID(str(raw_id)))
+            except (ValueError, TypeError):
+                pass
+    count = 0
+    for audit in older:
+        if audit.id in ended or audit.entity_id in ended:
+            continue
+        db.add(
+            AuditEvent(
+                entity_type="lecturer_dataset",
+                entity_id=audit.entity_id or audit.id,
+                action=SUPERSEDED_ACTION,
+                actor_type="USER",
+                actor_user_id=actor.id,
+                before_state={"status": "IMPORTED"},
+                after_state={"status": "SUPERSEDED"},
+                event_metadata={
+                    "import_id": str(audit.id),
+                    "superseded_by": str(newest.id),
+                    "file_sha256": digest,
+                },
+            )
+        )
+        count += 1
+    if count:
+        db.commit()
+    return count
+
+
 def find_duplicate_lecturer_import(db: Session, digest: str) -> AuditEvent | None:
     """Latest still-applied lecturer import whose file had the same SHA-256.
 
@@ -321,7 +396,11 @@ def find_duplicate_lecturer_import(db: Session, digest: str) -> AuditEvent | Non
         .filter(
             AuditEvent.entity_type == "lecturer_dataset",
             AuditEvent.action.in_(
-                ["LECTURER_DATASET_ROLLED_BACK", "LECTURER_DATASET_HISTORY_DELETED"]
+                [
+                    "LECTURER_DATASET_ROLLED_BACK",
+                    "LECTURER_DATASET_HISTORY_DELETED",
+                    SUPERSEDED_ACTION,
+                ]
             ),
         )
         .all()
@@ -488,6 +567,19 @@ def list_imports(
             except (ValueError, TypeError):
                 pass
 
+    superseded_ids: set[uuid.UUID] = set()
+    for a in db.query(AuditEvent).filter(
+        AuditEvent.entity_type == "lecturer_dataset", AuditEvent.action == SUPERSEDED_ACTION
+    ):
+        if a.entity_id is not None:
+            superseded_ids.add(a.entity_id)
+        raw_id = _safe_dict(a.event_metadata).get("import_id")
+        if raw_id:
+            try:
+                superseded_ids.add(uuid.UUID(str(raw_id)))
+            except (ValueError, TypeError):
+                pass
+
     hidden_history_ids: set[uuid.UUID] = {
         a.entity_id for a in hidden_history_audits if a.entity_id is not None
     }
@@ -522,14 +614,20 @@ def list_imports(
         warnings = int(after.get("warnings") or meta.get("warnings") or conflicts)
         actor_name = lecturer_actors.get(audit.actor_user_id) if audit.actor_user_id else None
         dt = _ensure_dt(audit.created_at)
+        is_superseded = not is_rolled_back and (
+            audit.id in superseded_ids
+            or (audit.entity_id is not None and audit.entity_id in superseded_ids)
+        )
         lecturer_responses.append(
             ScopusImportResponse(
                 id=audit.id,
                 type="LECTURERS",
                 file_name=meta.get("filename", "ictu_lecturers.json"),
-                status="CANCELLED" if is_rolled_back else "IMPORTED",
+                status=(
+                    "CANCELLED" if is_rolled_back else "SUPERSEDED" if is_superseded else "IMPORTED"
+                ),
                 total_records=total,
-                imported_records=created + updated,
+                imported_records=0 if is_rolled_back else min(total, created + updated + unchanged),
                 failed_records=0,
                 processed_records=total,
                 progress_percent=100,
@@ -656,6 +754,16 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
             .first()
         )
         is_rolled_back = rb_check is not None
+        is_superseded = not is_rolled_back and (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.entity_type == "lecturer_dataset",
+                AuditEvent.action == SUPERSEDED_ACTION,
+                (AuditEvent.entity_id == audit.entity_id) | (AuditEvent.entity_id == audit.id),
+            )
+            .first()
+            is not None
+        )
 
         after = _safe_dict(audit.after_state)
         meta = _safe_dict(audit.event_metadata)
@@ -675,9 +783,9 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
             id=audit.id,
             type="LECTURERS",
             file_name=meta.get("filename", "ictu_lecturers.json"),
-            status="CANCELLED" if is_rolled_back else "IMPORTED",
+            status="CANCELLED" if is_rolled_back else "SUPERSEDED" if is_superseded else "IMPORTED",
             total_records=total,
-            imported_records=created + updated,
+            imported_records=0 if is_rolled_back else min(total, created + updated + unchanged),
             failed_records=0,
             processed_records=total,
             progress_percent=100,

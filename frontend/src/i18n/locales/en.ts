@@ -228,7 +228,7 @@ export const en: TranslationSchema = {
     completed: "Completed",
     failed: "Failed",
     inProgress: "Processing",
-    cancelled: "Cancelled",
+    cancelled: "Import cancelled",
     noHistory: "No data imports yet.",
     importId: "Import ID",
     close: "Close",

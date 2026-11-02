@@ -35,6 +35,30 @@ from app.models.master_lecturer import (
 )
 
 
+CRAW_SOURCE_SYSTEM = "ictu_craw"
+
+
+def _ever_created_lecturer_ids(db: Session) -> set[uuid.UUID]:
+    """Lecturer ids recorded as created by any lecturer-dataset import (active or rolled back)."""
+
+    found: set[uuid.UUID] = set()
+    for audit in db.query(AuditEvent).filter(
+        AuditEvent.entity_type == "lecturer_dataset",
+        AuditEvent.action == "LECTURER_DATASET_IMPORTED",
+    ):
+        raw = (
+            (audit.event_metadata or {}).get("created_lecturer_ids")
+            or (audit.after_state or {}).get("created_lecturer_ids")
+            or []
+        )
+        for value in raw:
+            try:
+                found.add(uuid.UUID(str(value)))
+            except (ValueError, TypeError):
+                pass
+    return found
+
+
 class LecturerRollbackError(RuntimeError):
     """Raised when import rollback is blocked or fails."""
 
@@ -153,6 +177,9 @@ class LecturerRollbackService:
         all_batch_lecturer_ids = {
             s.lecturer_id for s in snapshots if s.lecturer_id is not None
         }.union(batch_created_lecturer_ids)
+        # Lecturers created by ANY import. When an earlier creator was rolled back while a later
+        # import still covered them, they were kept; once nothing covers them any more they go too.
+        ever_created_lecturer_ids = _ever_created_lecturer_ids(db)
 
         # 4. Categorize every touched lecturer
         to_delete_lecturer_ids: set[uuid.UUID] = set()
@@ -173,7 +200,11 @@ class LecturerRollbackService:
                 .all()
             )
 
-            other_snaps = [s for s in all_snapshots if s.id not in batch_snapshot_ids]
+            other_snaps = [
+                s
+                for s in all_snapshots
+                if s.id not in batch_snapshot_ids and s.source_system != CRAW_SOURCE_SYSTEM
+            ]
 
             if len(other_snaps) > 0:
                 # CASE B & C: Pre-existing / Multi-source with prior snapshot
@@ -184,7 +215,10 @@ class LecturerRollbackService:
                     to_restore_lecturers.append((lecturer, prev_canonical))
                 # Other provenance owns this lecturer too, so this import may
                 # restore it but must never delete it.
-            elif lecturer_id in batch_created_lecturer_ids:
+            elif (
+                lecturer_id in batch_created_lecturer_ids
+                or lecturer_id in ever_created_lecturer_ids
+            ):
                 # CASE A: Explicitly recorded as created by this batch via
                 # created_lecturer_ids (authoritative source). Queued for removal;
                 # the blocker check below will raise 409 if a user or identity
@@ -274,74 +308,7 @@ class LecturerRollbackService:
             #   lecturer_source_snapshots, lecturer_scopus_candidates (+ their
             #   observations/evidence/reviews).
             if to_delete_lecturer_ids:
-                # D0. Auto-remove LECTURER-role user accounts linked to deleted profiles.
-                if lecturer_role_users_to_delete:
-                    user_ids = [u.id for u in lecturer_role_users_to_delete]
-                    db.query(UserNotification).filter(
-                        UserNotification.user_id.in_(user_ids)
-                    ).delete(synchronize_session=False)
-                    for user in lecturer_role_users_to_delete:
-                        db.delete(user)
-                    db.flush()
-
-                # D1. Extra snapshots outside this batch (same FK guard as B/C).
-                extra_snaps = (
-                    db.query(LecturerSourceSnapshot)
-                    .filter(
-                        LecturerSourceSnapshot.lecturer_id.in_(to_delete_lecturer_ids),
-                        LecturerSourceSnapshot.id.not_in(batch_snapshot_ids)
-                        if batch_snapshot_ids
-                        else True,
-                    )
-                    .all()
-                )
-                if extra_snaps:
-                    extra_snap_ids = {s.id for s in extra_snaps}
-                    db.query(LecturerKnownPublication).filter(
-                        LecturerKnownPublication.snapshot_id.in_(extra_snap_ids)
-                    ).delete(synchronize_session=False)
-                    db.query(LecturerSourceSnapshot).filter(
-                        LecturerSourceSnapshot.id.in_(extra_snap_ids)
-                    ).delete(synchronize_session=False)
-
-                # D2. Scopus candidate cascade:
-                #   reviews → evidence → observations → candidates
-                candidate_ids_rows = (
-                    db.query(LecturerScopusCandidate.id)
-                    .filter(
-                        LecturerScopusCandidate.lecturer_id.in_(to_delete_lecturer_ids)
-                    )
-                    .all()
-                )
-                if candidate_ids_rows:
-                    candidate_ids = {row.id for row in candidate_ids_rows}
-                    obs_ids_rows = (
-                        db.query(LecturerScopusCandidateObservation.id)
-                        .filter(
-                            LecturerScopusCandidateObservation.candidate_id.in_(
-                                candidate_ids
-                            )
-                        )
-                        .all()
-                    )
-                    if obs_ids_rows:
-                        obs_ids = {row.id for row in obs_ids_rows}
-                        db.query(LecturerScopusCandidateEvidence).filter(
-                            LecturerScopusCandidateEvidence.observation_id.in_(obs_ids)
-                        ).delete(synchronize_session=False)
-                    db.query(LecturerScopusCandidateReview).filter(
-                        LecturerScopusCandidateReview.candidate_id.in_(candidate_ids)
-                    ).delete(synchronize_session=False)
-                    db.query(LecturerScopusCandidateObservation).filter(
-                        LecturerScopusCandidateObservation.candidate_id.in_(candidate_ids)
-                    ).delete(synchronize_session=False)
-                    db.query(LecturerScopusCandidate).filter(
-                        LecturerScopusCandidate.id.in_(candidate_ids)
-                    ).delete(synchronize_session=False)
-
-                db.query(Lecturer).filter(
-                    Lecturer.id.in_(to_delete_lecturer_ids)
-                ).delete(synchronize_session=False)
+                self._purge_lecturers(db, to_delete_lecturer_ids, lecturer_role_users_to_delete, batch_snapshot_ids)
 
             # E. Append-only: Record rollback audit event without deleting the original import audit
             filename = meta.get("filename", "ictu_lecturers.json")
@@ -389,8 +356,153 @@ class LecturerRollbackService:
             rolled_back_at=now,
         )
 
+    def purge_orphans(self, db: Session, *, actor: User) -> int:
+        """Remove imported lecturers that no import covers any more. Returns how many were removed.
+
+        Same safety as a rollback: a non-LECTURER account or a Scopus identity on any of them blocks it.
+        """
+
+        orphan_ids = find_orphaned_imported_lecturers(db)
+        if not orphan_ids:
+            return 0
+        users = db.query(User).filter(User.lecturer_id.in_(orphan_ids)).all()
+        blocking = [u for u in users if u.role != "LECTURER"]
+        identities = (
+            db.query(LecturerScopusIdentity)
+            .filter(LecturerScopusIdentity.lecturer_id.in_(orphan_ids))
+            .count()
+        )
+        if blocking or identities:
+            raise LecturerRollbackError(
+                "LECTURER_IMPORT_IN_USE",
+                "Có hồ sơ giảng viên mồ côi đang gắn tài khoản hệ thống hoặc định danh Scopus.",
+                status_code=409,
+                data={"linked_accounts": len(blocking), "dependent_identities": identities},
+            )
+        try:
+            self._purge_lecturers(db, orphan_ids, [u for u in users if u.role == "LECTURER"], set())
+            db.add(
+                AuditEvent(
+                    entity_type="lecturer_dataset",
+                    entity_id=uuid.uuid4(),
+                    action="LECTURER_ORPHANS_PURGED",
+                    actor_type="USER",
+                    actor_user_id=actor.id,
+                    before_state=None,
+                    after_state={"removed": len(orphan_ids)},
+                    event_metadata={"removed": len(orphan_ids)},
+                )
+            )
+            db.commit()
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise LecturerRollbackError(
+                "LECTURER_ORPHAN_PURGE_FAILED",
+                "Không thể dọn hồ sơ giảng viên mồ côi do lỗi cơ sở dữ liệu.",
+                status_code=500,
+            ) from exc
+        return len(orphan_ids)
+
+    def _purge_lecturers(
+        self,
+        db: Session,
+        to_delete_lecturer_ids: set[uuid.UUID],
+        lecturer_role_users_to_delete: list[User],
+        batch_snapshot_ids: set[uuid.UUID],
+    ) -> None:
+        """Delete lecturers and every dependent row (FK order matters)."""
+
+        # D0. Auto-remove LECTURER-role user accounts linked to deleted profiles.
+        if lecturer_role_users_to_delete:
+            user_ids = [u.id for u in lecturer_role_users_to_delete]
+            db.query(UserNotification).filter(
+                UserNotification.user_id.in_(user_ids)
+            ).delete(synchronize_session=False)
+            for user in lecturer_role_users_to_delete:
+                db.delete(user)
+            db.flush()
+
+        # D1. Extra snapshots outside this batch (same FK guard as B/C).
+        extra_snaps = (
+            db.query(LecturerSourceSnapshot)
+            .filter(
+                LecturerSourceSnapshot.lecturer_id.in_(to_delete_lecturer_ids),
+                LecturerSourceSnapshot.id.not_in(batch_snapshot_ids)
+                if batch_snapshot_ids
+                else True,
+            )
+            .all()
+        )
+        if extra_snaps:
+            extra_snap_ids = {s.id for s in extra_snaps}
+            db.query(LecturerKnownPublication).filter(
+                LecturerKnownPublication.snapshot_id.in_(extra_snap_ids)
+            ).delete(synchronize_session=False)
+            db.query(LecturerSourceSnapshot).filter(
+                LecturerSourceSnapshot.id.in_(extra_snap_ids)
+            ).delete(synchronize_session=False)
+
+        # D2. Scopus candidate cascade:
+        #   reviews → evidence → observations → candidates
+        candidate_ids_rows = (
+            db.query(LecturerScopusCandidate.id)
+            .filter(
+                LecturerScopusCandidate.lecturer_id.in_(to_delete_lecturer_ids)
+            )
+            .all()
+        )
+        if candidate_ids_rows:
+            candidate_ids = {row.id for row in candidate_ids_rows}
+            obs_ids_rows = (
+                db.query(LecturerScopusCandidateObservation.id)
+                .filter(
+                    LecturerScopusCandidateObservation.candidate_id.in_(
+                        candidate_ids
+                    )
+                )
+                .all()
+            )
+            if obs_ids_rows:
+                obs_ids = {row.id for row in obs_ids_rows}
+                db.query(LecturerScopusCandidateEvidence).filter(
+                    LecturerScopusCandidateEvidence.observation_id.in_(obs_ids)
+                ).delete(synchronize_session=False)
+            db.query(LecturerScopusCandidateReview).filter(
+                LecturerScopusCandidateReview.candidate_id.in_(candidate_ids)
+            ).delete(synchronize_session=False)
+            db.query(LecturerScopusCandidateObservation).filter(
+                LecturerScopusCandidateObservation.candidate_id.in_(candidate_ids)
+            ).delete(synchronize_session=False)
+            db.query(LecturerScopusCandidate).filter(
+                LecturerScopusCandidate.id.in_(candidate_ids)
+            ).delete(synchronize_session=False)
+
+        db.query(Lecturer).filter(
+            Lecturer.id.in_(to_delete_lecturer_ids)
+        ).delete(synchronize_session=False)
+
+
+def find_orphaned_imported_lecturers(db: Session) -> set[uuid.UUID]:
+    """Imported lecturers no import covers any more (every creating import was rolled back)."""
+
+    created = _ever_created_lecturer_ids(db)
+    if not created:
+        return set()
+    existing = {row[0] for row in db.query(Lecturer.id).filter(Lecturer.id.in_(created)).all()}
+    covered = {
+        row[0]
+        for row in db.query(LecturerSourceSnapshot.lecturer_id)
+        .filter(
+            LecturerSourceSnapshot.lecturer_id.in_(existing),
+            LecturerSourceSnapshot.source_system != CRAW_SOURCE_SYSTEM,
+        )
+        .all()
+    }
+    return existing - covered
+
 
 __all__ = [
+    "find_orphaned_imported_lecturers",
     "LecturerRollbackError",
     "LecturerRollbackService",
     "LecturerRollbackSummary",

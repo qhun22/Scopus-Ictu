@@ -75,3 +75,48 @@ def test_an_import_with_the_same_content_as_an_earlier_one_is_flagged_as_a_dupli
     assert first.id not in flagged                              # the original is not a duplicate
     assert flagged[second.id]["import_id"] == str(first.id)
     assert flagged[second.id]["file_name"] == "first.csv"
+
+
+def _lecturer_import_audit(db, *, sha: str, at: datetime, actor_id, unchanged: int = 5):
+    from app.models.audit import AuditEvent
+
+    import uuid as _uuid
+
+    audit = AuditEvent(
+        entity_type="lecturer_dataset", entity_id=_uuid.uuid4(), action="LECTURER_DATASET_IMPORTED",
+        actor_type="USER", actor_user_id=actor_id, before_state=None,
+        after_state={"status": "IMPORTED", "created": 0, "updated": 0, "unchanged": unchanged,
+                     "record_count": unchanged},
+        event_metadata={"filename": "synthetic.json", "file_sha256": sha}, created_at=at,
+    )
+    db.add(audit)
+    db.flush()
+    return audit
+
+
+def test_confirming_an_identical_lecturer_file_supersedes_the_earlier_import_without_rolling_back(db):
+    from app.models.governance import User
+    from app.services.scopus_import_service import list_imports, supersede_earlier_lecturer_imports
+
+    _clear(db)
+    db.execute(text("DELETE FROM users WHERE email = 'a@example.invalid'"))
+    sha = hashlib.sha256(b"same lecturer file").hexdigest()
+    now = datetime.now(UTC)
+    admin = User(email="a@example.invalid", password_hash="x", display_name="Admin", role="ADMIN")
+    db.add(admin)
+    db.flush()
+    older = _lecturer_import_audit(db, sha=sha, at=now - timedelta(hours=1), actor_id=admin.id)
+    newest = _lecturer_import_audit(db, sha=sha, at=now, actor_id=admin.id)
+    other = _lecturer_import_audit(db, sha=hashlib.sha256(b"different file").hexdigest(), at=now,
+                                   actor_id=admin.id)
+    db.commit()
+
+    assert supersede_earlier_lecturer_imports(db, sha, admin) == 1
+    assert supersede_earlier_lecturer_imports(db, sha, admin) == 0          # idempotent
+
+    by_id = {item.id: item for item in list_imports(db)}
+    assert by_id[older.id].status == "SUPERSEDED"
+    assert by_id[newest.id].status == "IMPORTED"
+    assert by_id[other.id].status == "IMPORTED"
+    # "Loaded" counts every record now present, so an all-unchanged re-import reads 5 / 5, not 0 / 5.
+    assert by_id[newest.id].imported_records == by_id[newest.id].total_records == 5

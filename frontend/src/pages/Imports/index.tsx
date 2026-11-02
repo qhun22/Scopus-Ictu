@@ -91,6 +91,8 @@ const cancelledStatusBadgeClassName =
   "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
 const activeStatusBadgeClassName =
   "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
+const supersededStatusBadgeClassName =
+  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50";
 const abnormalStatusBadgeClassName =
   "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700 hover:bg-amber-50";
 const needsProcessingBadgeClassName =
@@ -360,6 +362,8 @@ export default function ImportsPage() {
     }
     if (item.status === "FAILED") return t.imports.failed;
     if (item.status === "CANCELLED") return cancelledLabel(item);
+    // A newer import of the same file now holds the data: nothing was rolled back.
+    if (item.status === "SUPERSEDED") return locale === "vi" ? "Đã thay thế" : "Superseded";
     if (item.type === "LECTURERS") {
       if (isAwaitingConfirmation(item)) {
         if (item.duplicate_of) return locale === "vi" ? "Bất thường" : "Abnormal";
@@ -396,13 +400,16 @@ export default function ImportsPage() {
     const isActive = label === (locale === "vi" ? "Hoạt động" : "Active");
     const isNeedsProcessing = label === (locale === "vi" ? "Chờ xử lý" : "Awaiting processing");
     const isAbnormal = label === (locale === "vi" ? "Bất thường" : "Abnormal");
+    const isSuperseded = item.status === "SUPERSEDED";
     const isProcessing = ACTIVE_STATUSES.includes(item.status) || isBusy;
     return (
       <span
         className={
           item.status === "CANCELLED" && !isBusy
             ? cancelledStatusBadgeClassName
-            : isActive
+            : isSuperseded
+              ? supersededStatusBadgeClassName
+              : isActive
               ? activeStatusBadgeClassName
               : isAbnormal && !isBusy
                 ? abnormalStatusBadgeClassName

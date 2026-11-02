@@ -8,6 +8,7 @@ export type ImportStatus =
   | "APPLIED"
   | "FAILED"
   | "CANCELLED"
+  | "SUPERSEDED"
   | "IMPORTED";
 
 export interface NormalizationData {

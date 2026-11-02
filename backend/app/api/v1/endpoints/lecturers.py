@@ -49,6 +49,7 @@ from app.services.lecturer_dataset.parser import (
 )
 from app.services.scopus_import_service import (
     find_duplicate_lecturer_import,
+    supersede_earlier_lecturer_imports,
     record_cancelled_lecturer_import,
 )
 from app.services.user_admin_service import to_admin_response, update_user
@@ -1144,6 +1145,9 @@ async def import_lecturer_dataset(
             code=exc.code,
             data={"conflicts": exc.conflicts} if exc.conflicts else None,
         ) from exc
+    # An earlier import of the very same content is now redundant: mark it superseded (nothing is
+    # rolled back, because the newest import still uses the data).
+    supersede_earlier_lecturer_imports(db, hashlib.sha256(content).hexdigest(), admin)
     return LecturerImportResponse(
         dataset=_lecturer_import_dataset_meta(result.dataset),
         summary={
