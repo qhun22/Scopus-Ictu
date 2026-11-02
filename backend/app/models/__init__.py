@@ -33,6 +33,7 @@ from app.models import (  # noqa: F401  (registration side effect)
     candidate,
     governance,
     identity,
+    lecturer_primary_scopus,
     master_lecturer,
     publication,
     publication_exclusion,

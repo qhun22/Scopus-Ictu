@@ -1,8 +1,9 @@
-import { ApiRequestOptions, apiGet } from "./client";
+import { ApiRequestOptions, apiGet, apiPost } from "./client";
 import {
   ApprovedScopusIdentity,
   LecturerScopusProfile,
   LecturerPublicationsResponse,
+  PrimaryIdentityResult,
 } from "../types/lecturerScopus";
 
 export function getMyLecturerProfile(
@@ -31,5 +32,36 @@ export function getMyLecturerPublications(
   return apiGet<LecturerPublicationsResponse>(
     `/api/v1/lecturers/me/publications?${query.toString()}`,
     options,
+  );
+}
+
+/** ADMIN/REVIEWER: approved Scopus IDs of one lecturer (with the main-ID label). */
+export function getLecturerScopusIdentities(
+  lecturerId: string,
+  options: ApiRequestOptions = {},
+): Promise<ApprovedScopusIdentity[]> {
+  return apiGet<ApprovedScopusIdentity[]>(
+    `/api/v1/lecturers/${encodeURIComponent(lecturerId)}/scopus/identities`,
+    options,
+  );
+}
+
+export function setPrimaryScopusIdentity(
+  lecturerId: string,
+  body: { identity_id: string; reason: string },
+): Promise<PrimaryIdentityResult> {
+  return apiPost<PrimaryIdentityResult, typeof body>(
+    `/api/v1/lecturers/${encodeURIComponent(lecturerId)}/scopus/primary-identity`,
+    body,
+  );
+}
+
+export function clearPrimaryScopusIdentity(
+  lecturerId: string,
+  body: { reason: string },
+): Promise<PrimaryIdentityResult> {
+  return apiPost<PrimaryIdentityResult, typeof body>(
+    `/api/v1/lecturers/${encodeURIComponent(lecturerId)}/scopus/primary-identity/clear`,
+    body,
   );
 }

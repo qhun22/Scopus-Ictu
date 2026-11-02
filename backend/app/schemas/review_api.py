@@ -25,6 +25,52 @@ class ReviewDecisionRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=4000)
 
 
+class MergeGuideLecturer(BaseModel):
+    lecturer_id: uuid.UUID
+    scopus_ids: list[str]
+    primary_scopus_id: str | None = None
+
+
+class MergeGuideResponse(BaseModel):
+    """The ICTU merge guide restricted to the asked lecturers. A hint only: nothing is decided."""
+
+    available: bool
+    source_url: str | None = None
+    retrieved_at: str | None = None
+    items: list[MergeGuideLecturer] = []
+
+
+class ReviewGroupItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_id: uuid.UUID
+    observation_id: uuid.UUID
+    candidate_version: int = Field(..., ge=1)
+
+
+class ReviewGroupAcceptRequest(BaseModel):
+    """Accept every proposed Scopus ID of one lecturer together. One shared reason is required."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[ReviewGroupItem] = Field(..., min_length=2, max_length=10)
+    reason: str = Field(..., min_length=1, max_length=4000)
+    primary_candidate_id: uuid.UUID | None = None
+
+
+class ReviewGroupAcceptedItem(BaseModel):
+    candidate_id: uuid.UUID
+    review_id: uuid.UUID
+    resulting_identity_id: uuid.UUID
+    candidate_version: int
+
+
+class ReviewGroupAcceptResponse(BaseModel):
+    lecturer_id: uuid.UUID
+    accepted: list[ReviewGroupAcceptedItem]
+    primary_identity_id: uuid.UUID | None = None
+
+
 class ReviewRevocationRequest(BaseModel):
     """ADMIN-only compensation of an earlier ACCEPT. The reason is mandatory."""
 
@@ -54,6 +100,14 @@ class ReviewAuthorSummary(BaseModel):
     preferred_name: str
 
 
+class ReviewFit(BaseModel):
+    """Degree of fit with its grounds. A read-only aid, never a decision or a probability."""
+
+    level: Literal["HIGH", "MEDIUM", "LOW", "INSUFFICIENT"]
+    reasons: list[str] = Field(default_factory=list)
+    ictu_affiliation_papers: int = 0
+
+
 class ReviewQueueItem(BaseModel):
     candidate_id: uuid.UUID
     candidate_status: CandidateStatus
@@ -69,6 +123,7 @@ class ReviewQueueItem(BaseModel):
     # Read-only warning: the same Scopus Author ID is proposed for >1 lecturer.
     candidate_count_for_scopus_author: int = 1
     is_shared_scopus_author: bool = False
+    fit: ReviewFit | None = None
     created_at: datetime
     updated_at: datetime
     last_seen_at: datetime
@@ -287,6 +342,7 @@ class ReviewCandidateDetailResponse(BaseModel):
     )
     ambiguity: ReviewAmbiguityContext
     review_policy: ReviewDecisionPolicy = Field(default_factory=ReviewDecisionPolicy)
+    fit: ReviewFit | None = None
 
 
 class ReviewDecisionResponse(BaseModel):

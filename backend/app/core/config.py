@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     craw_source_dir: str | None = Field(None, validation_alias="CRAW_SOURCE_DIR")
 
+    # ICTU "Scopus account merge guide" saved as JSON by the operator (a review hint, read-only).
+    # Optional: without it the reviewer simply gets no hint. Never a path from a request.
+    merge_guide_file: str | None = Field(None, validation_alias="MERGE_GUIDE_FILE")
+
     # ------------------------------------------------------------------
     # Online affiliation enrichment (Priority 1).  Each run writes its own
     # bundle under this directory (never the offline AFFILIATION_SOURCE_DIR

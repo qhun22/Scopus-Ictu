@@ -28,6 +28,7 @@ from app.schemas.lecturer_scopus_projection import (
     LecturerPublicationRead,
     PaginatedLecturerPublicationsRead,
 )
+from app.services.primary_scopus_identity import primary_view
 from app.services.publication_exclusions import not_excluded
 
 DEFAULT_PAGE_SIZE = 20
@@ -135,6 +136,7 @@ class LecturerScopusProjectionService:
                 )
             )
 
+        label = primary_view(self._session, lecturer_id)
         return [
             ApprovedIdentitySummaryRead(
                 identity_id=identity.id,
@@ -146,6 +148,9 @@ class LecturerScopusProjectionService:
                 evidence=evidence_by_identity[identity.id],
                 created_at=identity.created_at,
                 updated_at=identity.updated_at,
+                publication_count=label.publication_counts.get(identity.id, 0),
+                is_primary=label.primary_identity_id == identity.id,
+                is_suggested_primary=label.suggested_identity_id == identity.id,
             )
             for identity, author in identity_rows
         ]

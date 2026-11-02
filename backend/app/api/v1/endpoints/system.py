@@ -19,6 +19,26 @@ router = APIRouter()
 _CONFIRM_PHRASE = "ICTU"
 _logger = logging.getLogger(__name__)
 
+# Append-only history tables refuse TRUNCATE through these guard triggers (migrations
+# d0b14a77c8e2 and e4a1b7c92d10). The reset is the one deliberate, ADMIN-confirmed wipe of
+# everything, and TRUNCATE ... CASCADE reaches those tables through their foreign keys.
+_TRUNCATE_GUARDS = ("sc_hybrid_forbid_truncate", "lpee_forbid_truncate", "lpse_forbid_truncate")
+
+
+def _quote(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def _truncate_guards(db: Session) -> list[tuple[str, str]]:
+    """(table, trigger) pairs of TRUNCATE guards present in the current schema."""
+
+    rows = db.execute(text(
+        "SELECT c.relname, t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid "
+        "WHERE NOT t.tgisinternal AND t.tgname = ANY(:names) "
+        "AND c.relnamespace = CAST(current_schema() AS regnamespace)"
+    ), {"names": list(_TRUNCATE_GUARDS)}).all()
+    return [(r[0], r[1]) for r in rows]
+
 
 
 @router.post("/reset", status_code=200)
@@ -46,6 +66,12 @@ def reset_system(
             "created_at, updated_at, auth_version FROM users WHERE role = 'ADMIN'"
         )).fetchall()
 
+        # 1b. Lift the TRUNCATE guards of append-only history tables for THIS transaction only;
+        #     they are re-armed below, and a failure rolls the whole transaction back.
+        guards = _truncate_guards(db)
+        for table, trigger in guards:
+            db.execute(text(f"ALTER TABLE {_quote(table)} DISABLE TRIGGER {_quote(trigger)}"))
+
         # 2. TRUNCATE CASCADE everything including users — simplest way to clear
         #    the entire FK graph without manually resolving dependency order.
         db.execute(text(
@@ -65,6 +91,10 @@ def reset_system(
             "lecturer_known_publications, lecturer_source_snapshots, "
             "lecturers RESTART IDENTITY CASCADE"
         ))
+
+        for table, trigger in guards:
+            db.execute(text(
+                f"ALTER TABLE {_quote(table)} ENABLE ALWAYS TRIGGER {_quote(trigger)}"))
 
         # 3. Restore ADMIN accounts.
         for row in admins:

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Annotated, TypeVar
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -21,12 +22,17 @@ from app.schemas.lecturer_scopus_projection import (
     PaginatedLecturerPublicationsRead,
 )
 from app.services.lecturer_scopus_projection import LecturerScopusProjectionService
+from app.services.primary_scopus_identity import (
+    PrimaryIdentityError,
+    PrimaryIdentityService,
+)
 
 router = APIRouter()
 
 DatabaseSession = Annotated[Session, Depends(get_session)]
 LecturerUser = Annotated[User, Depends(require_role("LECTURER"))]
 AdminUser = Annotated[User, Depends(require_role("ADMIN"))]
+StaffUser = Annotated[User, Depends(require_role("ADMIN", "REVIEWER"))]
 Page = Annotated[int, Query(ge=1)]
 PageSize = Annotated[int, Query(ge=1, le=100)]
 
@@ -158,7 +164,7 @@ def get_admin_profile(
 )
 def get_admin_identities(
     lecturer_id: uuid.UUID,
-    _admin: AdminUser,
+    _staff: StaffUser,
     db: DatabaseSession,
 ) -> list[ApprovedIdentitySummaryRead]:
     service = LecturerScopusProjectionService(db)
@@ -182,6 +188,77 @@ def get_admin_publications(
     return _read(
         lambda: _publications_response(service, lecturer_id, page, page_size)
     )
+
+
+class PrimaryIdentityRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    identity_id: uuid.UUID
+    reason: str = Field(..., min_length=1, max_length=4000)
+
+
+class ClearPrimaryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: str = Field(..., min_length=1, max_length=4000)
+
+
+class PrimaryIdentityResponse(BaseModel):
+    lecturer_id: uuid.UUID
+    primary_identity_id: uuid.UUID | None
+    suggested_identity_id: uuid.UUID | None
+
+
+def _primary_change(db: Session, lecturer_id: uuid.UUID, call) -> PrimaryIdentityResponse:
+    try:
+        view = call()
+    except PrimaryIdentityError as exc:
+        db.rollback()
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The change conflicted with the persisted state.",
+            code="PRIMARY_ID_PERSISTENCE_CONFLICT",
+        ) from exc
+    return PrimaryIdentityResponse(
+        lecturer_id=lecturer_id,
+        primary_identity_id=view.primary_identity_id,
+        suggested_identity_id=view.suggested_identity_id,
+    )
+
+
+@router.post(
+    "/{lecturer_id}/scopus/primary-identity",
+    response_model=PrimaryIdentityResponse,
+    summary="Choose one approved Scopus ID as the lecturer's main ID (display label only)",
+)
+def set_primary_identity(
+    lecturer_id: uuid.UUID,
+    request: PrimaryIdentityRequest,
+    staff: StaffUser,
+    db: DatabaseSession,
+) -> PrimaryIdentityResponse:
+    service = PrimaryIdentityService(db)
+    return _primary_change(db, lecturer_id, lambda: service.set_primary(
+        lecturer_id, request.identity_id, staff.id, request.reason))
+
+
+@router.post(
+    "/{lecturer_id}/scopus/primary-identity/clear",
+    response_model=PrimaryIdentityResponse,
+    summary="Remove the lecturer's chosen main Scopus ID label",
+)
+def clear_primary_identity(
+    lecturer_id: uuid.UUID,
+    request: ClearPrimaryRequest,
+    staff: StaffUser,
+    db: DatabaseSession,
+) -> PrimaryIdentityResponse:
+    service = PrimaryIdentityService(db)
+    return _primary_change(db, lecturer_id, lambda: service.clear_primary(
+        lecturer_id, staff.id, request.reason))
 
 
 __all__ = ["router"]

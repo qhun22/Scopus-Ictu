@@ -16,6 +16,13 @@ export interface ReviewAuthorSummary {
   preferred_name: string;
 }
 
+/** Degree of fit with its grounds: an aid for the reviewer, never a decision or a probability. */
+export interface ReviewFit {
+  level: "HIGH" | "MEDIUM" | "LOW" | "INSUFFICIENT";
+  reasons: string[];
+  ictu_affiliation_papers: number;
+}
+
 export interface ReviewQueueItem {
   candidate_id: string;
   candidate_status: CandidateStatus;
@@ -31,6 +38,7 @@ export interface ReviewQueueItem {
   /** Number of candidate roots proposing the SAME Scopus Author ID (any lecturer). */
   candidate_count_for_scopus_author?: number;
   is_shared_scopus_author?: boolean;
+  fit?: ReviewFit | null;
   created_at: string;
   updated_at: string;
   last_seen_at: string;
@@ -121,6 +129,7 @@ export interface ReviewCandidateDetail {
   current_observation: ReviewObservation;
   name_evidence: ReviewNameEvidence[];
   publication_evidence: ReviewPublicationEvidence[];
+  fit?: ReviewFit | null;
   ambiguity: {
     candidate_count_for_lecturer: number;
     is_ambiguous: boolean;
@@ -212,4 +221,29 @@ export interface ReviewRevocationResponse {
   candidate_version: number;
   revoked_identity_id: string;
   identity_status: "REVOKED";
+}
+
+export interface ReviewGroupItem {
+  candidate_id: string;
+  observation_id: string;
+  candidate_version: number;
+}
+
+export interface ReviewGroupAcceptRequest {
+  items: ReviewGroupItem[];
+  reason: string;
+  primary_candidate_id: string | null;
+}
+
+export interface ReviewGroupAcceptedItem {
+  candidate_id: string;
+  review_id: string;
+  resulting_identity_id: string;
+  candidate_version: number;
+}
+
+export interface ReviewGroupAcceptResponse {
+  lecturer_id: string;
+  accepted: ReviewGroupAcceptedItem[];
+  primary_identity_id: string | null;
 }

@@ -173,8 +173,8 @@ def test_migration_is_the_single_new_head_on_top_of_the_previous_head():
     module = _migration_module()
     assert (module.revision, module.down_revision) == ("a77e01c33ee1", "a1b2c3d4e5f6")
     revisions, downs = _revision_graph()
-    # Append-only chain: the head moves on with each accepted revision (now G09 exclusions).
-    assert set(revisions) - downs == {"e4a1b7c92d10"}
+    # Append-only chain: the head moves on with each accepted revision (now the main-ID label).
+    assert set(revisions) - downs == {"f2b8c3d19a47"}
     assert "a77e01c33ee1" in downs  # Accepted staging revision is the parent, never rewritten.
 
 

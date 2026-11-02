@@ -43,6 +43,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n/I18nContext";
 import Badge from "../../components/ui/Badge";
 import UiButton from "../../components/ui/Button";
+import FitBadge, { fitLevelLabel, fitReasonText } from "./FitBadge";
+import GroupReviewPanel from "./GroupReviewPanel";
+import PrimaryIdPanel from "./PrimaryIdPanel";
 import { CANDIDATE_STATUS_TONE } from "../../components/ui/reviewTones";
 import { reconciliationLabel, ruleLabel, surfaceLabel } from "./ruleLabels";
 import type { TranslationSchema } from "../../i18n/types";
@@ -236,6 +239,8 @@ export default function ApprovalQueuePage() {
   const [status, setStatus] = useState<CandidateStatus>("PENDING");
   const [evidenceFilter, setEvidenceFilter] = useState<EvidenceFilter>("all");
   const [ambiguityFilter, setAmbiguityFilter] = useState<AmbiguitySelection>("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [items, setItems] = useState<ReviewQueueItem[]>([]);
@@ -272,6 +277,7 @@ export default function ApprovalQueuePage() {
         status,
         evidence_category: evidenceFilter === "all" ? undefined : evidenceFilter,
         ambiguity: ambiguityFilter === "all" ? undefined : ambiguityFilter,
+        q: search || undefined,
         page,
         page_size: pageSize,
       });
@@ -284,7 +290,16 @@ export default function ApprovalQueuePage() {
     } finally {
       setQueueLoading(false);
     }
-  }, [ambiguityFilter, evidenceFilter, page, pageSize, status, t.loadQueueError]);
+  }, [ambiguityFilter, evidenceFilter, page, pageSize, search, status, t.loadQueueError]);
+
+  // Apply the search text shortly after typing stops, always from the first page.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   const loadDetail = useCallback(async (candidateId: string) => {
     setDetailLoading(true);
@@ -528,9 +543,44 @@ export default function ApprovalQueuePage() {
         <p className="text-sm text-slate-600">{t.generateConfirmText}</p>
       </Modal>
 
+      {/* ── Review by lecturer group (lecturers with 2+ pending Scopus IDs) ───── */}
+      {status === "PENDING" && (
+        <GroupReviewPanel
+          locale={locale === "en" ? "en" : "vi"}
+          refreshKey={total}
+          onChanged={() => void loadQueue()}
+        />
+      )}
+
       {/* ── Filter Bar ──────────────────────────────────────────────────── */}
       <div className="rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs">
         <div className="flex flex-wrap items-end gap-3">
+          {/* Tìm kiếm */}
+          <div className="flex min-w-[220px] flex-1 flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600" htmlFor="review-queue-search">
+              {locale === "en" ? "Search" : "Tìm kiếm"}
+            </label>
+            <div className="relative">
+              <svg className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                id="review-queue-search"
+                type="text"
+                value={searchInput}
+                maxLength={120}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder={
+                  locale === "en"
+                    ? "Lecturer name or e-mail, Scopus name or ID…"
+                    : "Tên hoặc email giảng viên, tên hoặc ID tác giả Scopus…"
+                }
+                className="h-8 w-full rounded-[5px] border border-slate-200 bg-white pl-8 pr-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                data-testid="review-queue-search"
+              />
+            </div>
+          </div>
+
           {/* Trạng thái */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-600">{t.statusLabel}</label>
@@ -616,6 +666,9 @@ export default function ApprovalQueuePage() {
                   <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.colScopusAuthor}</th>
                   <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.colStatus}</th>
                   <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.colEvidence}</th>
+                  <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">
+                    {locale === "en" ? "Degree of fit" : "Mức phù hợp"}
+                  </th>
                   <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.colAmbiguityContext}</th>
                   <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-28">{t.colActions}</th>
                 </tr>
@@ -623,7 +676,7 @@ export default function ApprovalQueuePage() {
               <tbody className="divide-y divide-slate-100">
                 {queueLoading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
                         <span>{t.loadingQueue}</span>
@@ -632,7 +685,7 @@ export default function ApprovalQueuePage() {
                   </tr>
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-1.5">
                         <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -690,6 +743,9 @@ export default function ApprovalQueuePage() {
                             <div className="mt-1 text-[10px] text-slate-400">{format(t.nameOnlyCount, { count: item.name_evidence_count })}</div>
                           </div>
                         )}
+                      </td>
+                      <td className="px-4 py-3.5 text-center align-middle">
+                        {item.fit ? <FitBadge fit={item.fit} locale={locale === "en" ? "en" : "vi"} /> : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-3.5 align-middle">
                         <div className="flex flex-col items-start gap-1">
@@ -781,7 +837,7 @@ export default function ApprovalQueuePage() {
         width={1040}
         footer={null}
         centered
-        destroyOnClose
+        destroyOnHidden
         maskClosable={!decisionSubmitting}
         closable={!decisionSubmitting}
         onCancel={closeDetail}
@@ -837,6 +893,27 @@ export default function ApprovalQueuePage() {
                 </Descriptions>
               </Card>
             </div>
+
+            {detail.fit && (
+              <section className="rounded-[5px] border border-slate-200 bg-white p-3.5" data-testid="fit-section">
+                <div className="flex flex-wrap items-center gap-3">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    {locale === "en" ? "Degree of fit and its grounds" : "Mức độ phù hợp và căn cứ"}
+                  </h3>
+                  <FitBadge fit={detail.fit} locale={locale === "en" ? "en" : "vi"} />
+                </div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-700">
+                  {detail.fit.reasons.map((code) => (
+                    <li key={code}>{fitReasonText(code, locale === "en" ? "en" : "vi", detail.fit?.ictu_affiliation_papers ?? 0)}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11px] text-slate-500">
+                  {locale === "en"
+                    ? `"${fitLevelLabel(detail.fit.level, "en")}" is an aid for the reviewer. It is not a probability and confirms nothing; the decision stays with the reviewer.`
+                    : `"${fitLevelLabel(detail.fit.level, "vi")}" chỉ là gợi ý cho người duyệt. Đây không phải xác suất và không tự xác nhận; quyết định vẫn thuộc người duyệt.`}
+                </p>
+              </section>
+            )}
 
             <Divider orientation="left">{t.sectionNameEvidence}</Divider>
             {detail.name_evidence.length > 0 ? (
@@ -907,6 +984,10 @@ export default function ApprovalQueuePage() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {detail.candidate_status === "ACCEPTED" && (
+              <PrimaryIdPanel lecturerId={detail.lecturer.id} locale={locale === "en" ? "en" : "vi"} />
             )}
 
           </div>

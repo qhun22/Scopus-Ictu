@@ -6,7 +6,7 @@ import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -40,6 +40,12 @@ from app.schemas.review_api import (
     ReviewDecisionResponse,
     ReviewLecturerDetail,
     ReviewLecturerSummary,
+    MergeGuideLecturer,
+    MergeGuideResponse,
+    ReviewFit,
+    ReviewGroupAcceptRequest,
+    ReviewGroupAcceptResponse,
+    ReviewGroupAcceptedItem,
     ReviewObservationResponse,
     ReviewRevocationRequest,
     ReviewRevocationResponse,
@@ -76,6 +82,20 @@ from app.services.candidate_review_service import (
     StaleCandidateVersionError,
 )
 from app.services.candidate_evidence_read import serialize_review_evidence
+from app.services.candidate_group_review import (
+    GroupDuplicateError,
+    GroupItem,
+    GroupMismatchError,
+    GroupPrimaryNotInGroupError,
+    GroupReasonRequiredError,
+    GroupSharedAuthorError,
+    GroupSizeError,
+    accept_group,
+)
+from app.services import merge_guide
+from app.services.candidate_fit import assess_fit, ictu_affiliation_paper_counts
+from app.services.text_folding import contains_folded
+from app.services.primary_scopus_identity import PrimaryIdentityError
 from app.services.review_reason_policy import accept_reason_policy
 
 router = APIRouter()
@@ -139,6 +159,7 @@ def _queue_statement(
     candidate_status: str,
     evidence_category: str | None,
     ambiguity: str | None,
+    search: str | None = None,
 ):
     reviewable = current_reviewable_candidates_subquery(candidate_status)
     evidence_counts = _evidence_counts_subquery()
@@ -196,6 +217,17 @@ def _queue_statement(
             sharing_counts.c.scopus_author_id == LecturerScopusCandidate.scopus_author_id,
         )
     )
+    # Every word must appear in the lecturer name / e-mail or the Scopus name / ID, ignoring case
+    # and Vietnamese diacritics.
+    for token in (search or "").split()[:8]:
+        statement = statement.where(
+            or_(
+                contains_folded(Lecturer.full_name, token),
+                contains_folded(func.coalesce(Lecturer.email, ""), token),
+                contains_folded(ScopusAuthor.preferred_name, token),
+                contains_folded(ScopusAuthor.scopus_id, token),
+            )
+        )
     if evidence_category == "publication-supported":
         statement = statement.where(publication_count > 0)
     elif evidence_category == "name-only":
@@ -229,6 +261,12 @@ def _domain_error_response(exc: CandidateReviewError) -> APIError:
         CandidateNotAcceptedError: 409,
         IdentityRevokedError: 409,
         RevocationReasonRequiredError: 422,
+        GroupSizeError: 422,
+        GroupDuplicateError: 422,
+        GroupMismatchError: 422,
+        GroupPrimaryNotInGroupError: 422,
+        GroupReasonRequiredError: 422,
+        GroupSharedAuthorError: 422,
     }
     data: dict[str, object] = {}
     if isinstance(exc, ReviewReasonRequiredForWeakEvidenceError):
@@ -329,6 +367,7 @@ def list_review_candidates(
         default=None, pattern="^(publication-supported|name-only)$"
     ),
     ambiguity: str | None = Query(default=None, pattern="^(ambiguous|unique)$"),
+    q: str | None = Query(default=None, max_length=120),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ) -> ReviewQueueResponse:
@@ -338,6 +377,7 @@ def list_review_candidates(
         candidate_status=status,
         evidence_category=evidence_category,
         ambiguity=ambiguity,
+        search=q,
     )
     total = db.scalar(
         select(func.count()).select_from(statement.order_by(None).subquery())
@@ -349,7 +389,23 @@ def list_review_candidates(
         )
         .offset((page - 1) * page_size)
         .limit(page_size)
-    ).mappings()
+    ).mappings().all()
+    ictu_papers = ictu_affiliation_paper_counts(db, {row["scopus_author_id"] for row in rows})
+
+    def _fit(row) -> ReviewFit:
+        assessed = assess_fit(
+            name_evidence_count=int(row["name_evidence_count"]),
+            publication_support_count=int(row["publication_support_count"]),
+            ictu_affiliation_papers=ictu_papers.get(row["scopus_author_id"], 0),
+            is_shared_author=int(row["candidate_count_for_scopus_author"]) > 1,
+            is_ambiguous_lecturer=int(row["candidate_count_for_lecturer"]) > 1,
+        )
+        return ReviewFit(
+            level=assessed.level,
+            reasons=list(assessed.reasons),
+            ictu_affiliation_papers=assessed.ictu_affiliation_papers,
+        )
+
     items = [
         ReviewQueueItem(
             candidate_id=row["candidate_id"],
@@ -371,6 +427,7 @@ def list_review_candidates(
             is_ambiguous=int(row["candidate_count_for_lecturer"]) > 1,
             candidate_count_for_scopus_author=int(row["candidate_count_for_scopus_author"]),
             is_shared_scopus_author=int(row["candidate_count_for_scopus_author"]) > 1,
+            fit=_fit(row),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             last_seen_at=row["last_seen_at"],
@@ -378,6 +435,29 @@ def list_review_candidates(
         for row in rows
     ]
     return ReviewQueueResponse(items=items, total=int(total), page=page, page_size=page_size)
+
+
+def _detail_fit(
+    db: Session,
+    *,
+    author_id: uuid.UUID,
+    name_evidence_count: int,
+    publication_support_count: int,
+    is_shared_author: bool,
+    is_ambiguous_lecturer: bool,
+) -> ReviewFit:
+    assessed = assess_fit(
+        name_evidence_count=name_evidence_count,
+        publication_support_count=publication_support_count,
+        ictu_affiliation_papers=ictu_affiliation_paper_counts(db, {author_id}).get(author_id, 0),
+        is_shared_author=is_shared_author,
+        is_ambiguous_lecturer=is_ambiguous_lecturer,
+    )
+    return ReviewFit(
+        level=assessed.level,
+        reasons=list(assessed.reasons),
+        ictu_affiliation_papers=assessed.ictu_affiliation_papers,
+    )
 
 
 @router.get(
@@ -536,6 +616,14 @@ def review_candidate_detail(
             accept_reason_required=reason_policy.required,
             accept_reason_triggers=list(reason_policy.triggers),
         ),
+        fit=_detail_fit(
+            db,
+            author_id=author.id,
+            name_evidence_count=len(name_evidence),
+            publication_support_count=len(publication_evidence),
+            is_shared_author=author_candidate_count > 1,
+            is_ambiguous_lecturer=candidate_count > 1,
+        ),
     )
 
 
@@ -598,6 +686,81 @@ def decide_review_candidate(
 
 
 AdminUser = Annotated[User, Depends(require_role("ADMIN"))]
+
+
+@router.get(
+    "/merge-guide",
+    response_model=MergeGuideResponse,
+    summary="ICTU merge-guide hint (IDs and main ID) for the listed lecturers; decides nothing",
+)
+def get_merge_guide(
+    _reviewer: ReviewerUser,
+    db: DatabaseSession,
+    lecturer_ids: Annotated[list[uuid.UUID], Query(max_length=200)],
+) -> MergeGuideResponse:
+    guide = merge_guide.load_merge_guide()
+    if guide is None:
+        return MergeGuideResponse(available=False)
+    found = merge_guide.guides_for_lecturers(db, guide, set(lecturer_ids))
+    return MergeGuideResponse(
+        available=True,
+        source_url=guide.source_url,
+        retrieved_at=guide.retrieved_at,
+        items=[
+            MergeGuideLecturer(
+                lecturer_id=g.lecturer_id,
+                scopus_ids=list(g.scopus_ids),
+                primary_scopus_id=g.primary_scopus_id,
+            )
+            for g in found
+        ],
+    )
+
+
+@router.post(
+    "/lecturers/{lecturer_id}/group-accept",
+    response_model=ReviewGroupAcceptResponse,
+    summary="Accept all proposed Scopus IDs of one lecturer in one transaction",
+)
+def group_accept_lecturer_candidates(
+    lecturer_id: uuid.UUID,
+    request: ReviewGroupAcceptRequest,
+    reviewer: ReviewerUser,
+    db: DatabaseSession,
+) -> ReviewGroupAcceptResponse:
+    """Each member keeps every single-decision rule; the group commits or rolls back as one."""
+
+    try:
+        result = accept_group(
+            db,
+            lecturer_id=lecturer_id,
+            items=[GroupItem(i.candidate_id, i.observation_id, i.candidate_version)
+                   for i in request.items],
+            reviewer_user_id=reviewer.id,
+            reason=request.reason,
+            primary_candidate_id=request.primary_candidate_id,
+        )
+    except CandidateReviewError as exc:
+        db.rollback()
+        raise _domain_error_response(exc) from exc
+    except PrimaryIdentityError as exc:
+        db.rollback()
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise APIError(
+            status_code=409,
+            detail="Group review conflicted with current persisted state.",
+            code="REVIEW_PERSISTENCE_CONFLICT",
+        ) from exc
+    return ReviewGroupAcceptResponse(
+        lecturer_id=result.lecturer_id,
+        accepted=[ReviewGroupAcceptedItem(
+            candidate_id=r.candidate_id, review_id=r.review_id,
+            resulting_identity_id=r.resulting_identity_id,
+            candidate_version=r.candidate_version) for r in result.results],
+        primary_identity_id=result.primary_identity_id,
+    )
 
 
 @router.post(

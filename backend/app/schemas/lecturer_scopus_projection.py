@@ -38,6 +38,11 @@ class ApprovedIdentitySummaryRead(BaseModel):
     evidence: list[IdentityEvidenceSummaryRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
+    # Display label only (never a merge): distinct publications of this ID, whether a human chose
+    # it as the main ID, and, when nobody has, which ID has the most publications.
+    publication_count: int = 0
+    is_primary: bool = False
+    is_suggested_primary: bool = False
 
 
 class LecturerPublicationRead(BaseModel):

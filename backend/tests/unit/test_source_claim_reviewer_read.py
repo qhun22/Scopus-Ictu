@@ -27,6 +27,7 @@ from app.models.candidate import (
 from app.models.identity import LecturerScopusIdentity
 from app.models.source_staging import SourceRuleSet
 from app.schemas import review_api
+from app.services.candidate_fit import assess_fit, ictu_affiliation_paper_counts
 from app.services.candidate_evidence_read import (
     _history,
     serialize_review_evidence,
@@ -72,7 +73,7 @@ def detail_function(source=None):
     """
     path = Path(__file__).parents[2] / "app/api/v1/endpoints/reviews.py"
     tree = ast.parse(source if source is not None else path.read_text(encoding="utf-8"))
-    names = {"_serialize_uuid", "_source_ref_ids", "review_candidate_detail"}
+    names = {"_serialize_uuid", "_source_ref_ids", "_detail_fit", "review_candidate_detail"}
     functions = [copy.deepcopy(n) for n in tree.body
                  if isinstance(n, ast.FunctionDef) and n.name in names]
     for node in functions:
@@ -85,7 +86,9 @@ def detail_function(source=None):
                  "APIError": APIError, "ObservationNotFoundError": ObservationNotFoundError,
                  "current_reviewable_observation": current_reviewable_observation,
                  "accept_reason_policy": accept_reason_policy,
-                 "serialize_review_evidence": serialize_review_evidence}
+                 "serialize_review_evidence": serialize_review_evidence,
+                 "assess_fit": assess_fit,
+                 "ictu_affiliation_paper_counts": ictu_affiliation_paper_counts}
     exec(compile(ast.fix_missing_locations(module), str(path), "exec"), namespace)
     return namespace["review_candidate_detail"]
 

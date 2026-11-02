@@ -295,8 +295,17 @@ class CandidateReviewService:
       - Fails closed on all race conditions.
     """
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, auto_commit: bool = True) -> None:
         self._session = session
+        # False lets a caller run several decisions in ONE transaction (group review): each
+        # decision flushes, and the caller commits or rolls back everything together.
+        self._auto_commit = auto_commit
+
+    def _finish(self) -> None:
+        if self._auto_commit:
+            self._session.commit()
+        else:
+            self._session.flush()
 
     # ------------------------------------------------------------------
     # Public operations
@@ -834,7 +843,7 @@ class CandidateReviewService:
         )
 
         # 17. Commit once
-        self._session.commit()
+        self._finish()
 
         return AcceptResult(
             review_id=review.id,
@@ -953,7 +962,7 @@ class CandidateReviewService:
                 "version": candidate.version},
             reason=reason,
         )
-        self._session.commit()
+        self._finish()
         return RevokeResult(
             review_id=review.id,
             candidate_id=candidate.id,
@@ -1107,7 +1116,7 @@ class CandidateReviewService:
         )
 
         # 13. Commit once
-        self._session.commit()
+        self._finish()
 
         return RejectResult(
             review_id=review.id,

@@ -104,10 +104,10 @@ def test_migration_is_the_single_new_head_on_top_of_the_accepted_one():
             revisions.add(found.group(1))
         if down:
             downs.update(re.findall(r'"([^"]+)"', down.group(1)))
-    # The chain keeps growing (B2-E hardening d0b14a77c8e2, then G09 e4a1b7c92d10); the
+    # The chain keeps growing (B2-E hardening d0b14a77c8e2, G09 e4a1b7c92d10, main-ID label f2b8c3d19a47); the
     # published revisions below the head are never rewritten.
-    assert revisions - downs == {"e4a1b7c92d10"}, "exactly one head"
-    assert {"d0b14a77c8e2", "c99a03e55ff3", "b88f02d44ff2"} <= downs
+    assert revisions - downs == {"f2b8c3d19a47"}, "exactly one head"
+    assert {"e4a1b7c92d10", "d0b14a77c8e2", "c99a03e55ff3", "b88f02d44ff2"} <= downs
 
 
 def test_migration_tables_match_the_models_item_by_item():

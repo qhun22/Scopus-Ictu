@@ -28,6 +28,18 @@ export interface ApprovedScopusIdentity {
   evidence: IdentityEvidenceSummary[];
   created_at: string;
   updated_at: string;
+  /** Display label only: distinct publications of this ID. */
+  publication_count?: number;
+  /** A human chose this ID as the lecturer's main ID. */
+  is_primary?: boolean;
+  /** Nobody chose yet; this ID has the most publications. */
+  is_suggested_primary?: boolean;
+}
+
+export interface PrimaryIdentityResult {
+  lecturer_id: string;
+  primary_identity_id: string | null;
+  suggested_identity_id: string | null;
 }
 
 export interface LecturerPublication {
