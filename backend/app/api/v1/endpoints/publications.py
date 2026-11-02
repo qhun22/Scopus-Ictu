@@ -8,23 +8,26 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_role
+from app.api.dependencies import get_optional_current_user, require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import AuditEvent, User
 from app.schemas.publication_api import PublicationDetailResponse, PublicationListResponse
 from app.schemas.publication_export import PublicationExportDataset, PublicationExportResponse
+from app.services import normalization_compare
 from app.services.publication_export import export_publications
 from app.services.publication_queries import get_publication_detail, list_publications
 
 router = APIRouter()
-# LECTURER gets read-only list/detail (academic lookup); see ``_for_role`` for
-# what is withheld.  Export stays ADMIN-only.
-PublicationReader = Annotated[User, Depends(require_role("ADMIN", "REVIEWER", "LECTURER"))]
+# Guests and authenticated users may read the public list/detail. Export stays
+# ADMIN-only.
+PublicationReader = Annotated[User | None, Depends(get_optional_current_user)]
 PublicationAdmin = Annotated[User, Depends(require_role("ADMIN"))]
+PublicationStaff = Annotated[User, Depends(require_role("ADMIN", "REVIEWER"))]
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
 
@@ -36,15 +39,15 @@ def _database_unavailable(exc: SQLAlchemyError) -> APIError:
     )
 
 
-def _for_role(result: PublicationDetailResponse, reader: User) -> PublicationDetailResponse:
-    """Withhold administrative data from LECTURER (read-only academic lookup).
+def _for_role(result: PublicationDetailResponse, reader: User | None) -> PublicationDetailResponse:
+    """Withhold internal data from guests and LECTURER readers.
 
     Authors, affiliations and their evidence stay visible.  Internal import
     provenance (file names/hashes, row numbers) and the approved lecturer links
     (staff code, ORCID of other lecturers) are removed.
     """
 
-    if reader.role != "LECTURER":
+    if reader is not None and reader.role != "LECTURER":
         return result
     return result.model_copy(update={"provenance": [], "approved_lecturer_links": []})
 
@@ -169,6 +172,57 @@ def export_publication_endpoint(
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
         },
+    )
+
+
+class NormalizationCompareField(BaseModel):
+    field: str
+    raw: str | None
+    stored: str | None
+    canonical: str | None
+    status: str
+
+
+class NormalizationCompareSource(BaseModel):
+    file_name: str
+    row_number: int
+    row_hash: str
+
+
+class NormalizationCompareResponse(BaseModel):
+    eid: str
+    sources: list[NormalizationCompareSource]
+    fields: list[NormalizationCompareField]
+
+
+@router.get("/{eid}/normalization-compare", response_model=NormalizationCompareResponse)
+def normalization_compare_endpoint(
+    eid: str, _staff: PublicationStaff, db: DatabaseSession
+) -> NormalizationCompareResponse:
+    """Raw CSV value vs stored value vs canonical form, field by field (read-only)."""
+
+    try:
+        result = normalization_compare.build_compare(db, eid)
+    except SQLAlchemyError as exc:
+        raise _database_unavailable(exc) from exc
+    if result is None:
+        raise APIError(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy công bố.",
+            code="PUBLICATION_NOT_FOUND",
+        )
+    return NormalizationCompareResponse(
+        eid=result.eid,
+        sources=[
+            NormalizationCompareSource(file_name=s.file_name, row_number=s.row_number, row_hash=s.row_hash)
+            for s in result.sources
+        ],
+        fields=[
+            NormalizationCompareField(
+                field=f.field, raw=f.raw, stored=f.stored, canonical=f.canonical, status=f.status
+            )
+            for f in result.fields
+        ],
     )
 
 

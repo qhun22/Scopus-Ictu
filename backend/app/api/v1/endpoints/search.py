@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import require_role
+from app.api.dependencies import get_optional_current_user
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import User
@@ -22,8 +22,8 @@ from app.services.search_queries import (
 )
 
 router = APIRouter()
-# LECTURER may look up publications and Scopus authors; the lecturer group is withheld.
-SearchReader = Annotated[User, Depends(require_role("ADMIN", "REVIEWER", "LECTURER"))]
+# Guests and authenticated users may search public publications and Scopus authors.
+SearchReader = Annotated[User | None, Depends(get_optional_current_user)]
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
 
@@ -65,6 +65,6 @@ def global_search_endpoint(
             code="DATABASE_UNAVAILABLE",
         ) from exc
 
-    if reader.role == "LECTURER":
+    if reader is None or reader.role == "LECTURER":
         return result.model_copy(update={"lecturers": []})
     return result

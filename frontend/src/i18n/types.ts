@@ -75,6 +75,7 @@ export interface TranslationSchema {
     system: string;
     roleBadge: string;
     login: string;
+    notLoggedIn: string;
   };
   home: {
     welcome: string;

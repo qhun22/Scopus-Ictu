@@ -10,9 +10,13 @@ const TOP_BAR_HIDE_MS = 460;
 
 interface PageLoadingBarProps {
   isSidebarCollapsed?: boolean;
+  showOverlay?: boolean;
 }
 
-export default function PageLoadingBar({ isSidebarCollapsed = false }: PageLoadingBarProps) {
+export default function PageLoadingBar({
+  isSidebarCollapsed = false,
+  showOverlay = true,
+}: PageLoadingBarProps) {
   const location = useLocation();
   const { hasVisited, markVisited } = usePageVisit();
   const { t } = useI18n();
@@ -73,7 +77,7 @@ export default function PageLoadingBar({ isSidebarCollapsed = false }: PageLoadi
       )}
 
       {/* ── Full-page overlay — first visit only ── */}
-      {overlayVisible && (
+      {showOverlay && overlayVisible && (
         <div
           aria-label={t.common.loading}
           aria-live="polite"

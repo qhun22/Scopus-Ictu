@@ -1,6 +1,6 @@
 /** Canonical publication read API client — A1 contract. */
 
-import { apiDownload, apiGet } from "./client";
+import { ApiRequestOptions, apiDownload, apiGet } from "./client";
 import {
   PublicationDetailResponse,
   PublicationListQuery,
@@ -105,4 +105,24 @@ export async function exportPublicationsJson(
   }
 
   return { blob, filename, recordCount };
+}
+
+export interface NormalizationCompare {
+  eid: string;
+  sources: Array<{ file_name: string; row_number: number; row_hash: string }>;
+  fields: Array<{
+    field: string;
+    raw: string | null;
+    stored: string | null;
+    canonical: string | null;
+    status: "SAME" | "CLEANED" | "CHANGED" | "MISSING";
+  }>;
+}
+
+/** ADMIN/REVIEWER: raw CSV value vs stored value vs canonical form (read-only). */
+export function getNormalizationCompare(eid: string, options: ApiRequestOptions = {}): Promise<NormalizationCompare> {
+  return apiGet<NormalizationCompare>(
+    `/api/v1/publications/${encodeURIComponent(eid)}/normalization-compare`,
+    options,
+  );
 }

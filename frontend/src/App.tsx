@@ -65,21 +65,15 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/publications" element={<PublicationsPage />} />
+            <Route path="/publications/:eid" element={<PublicationDetailPage />} />
           </Route>
 
           {/* Authenticated Application Shell */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
-              {/* Universal landing route */}
-              <Route path="/home" element={<HomePage />} />
-
-              {/* Read-only academic lookup: ADMIN, REVIEWER and LECTURER */}
-              <Route element={<RoleRoute allowedRoles={["ADMIN", "REVIEWER", "LECTURER"]} />}>
-                <Route path="/search" element={<SearchPage />} />
-                <Route path="/publications" element={<PublicationsPage />} />
-                <Route path="/publications/:eid" element={<PublicationDetailPage />} />
-              </Route>
-
               {/* Lecturer Routes */}
               <Route element={<RoleRoute allowedRoles={["LECTURER"]} />}>
                 <Route

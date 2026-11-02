@@ -4,6 +4,7 @@ import { ApiError } from "../../api/client";
 import { getApiErrorCode, getApiErrorMessage } from "../../api/errors";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
+import PageLoadingBar from "../../components/PageLoadingBar";
 
 const LOGIN_TRANSITION_MS = 3500;
 
@@ -126,7 +127,9 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#eef2f7] px-4 py-10 sm:px-6">
+    <>
+      <PageLoadingBar showOverlay={false} />
+      <main className="flex min-h-screen items-center justify-center bg-[#eef2f7] px-4 py-10 sm:px-6">
       <div className="w-full max-w-[960px] overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.06)]">
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Cột trái: Branding ICTU */}
@@ -405,6 +408,7 @@ export default function LoginPage() {
           </section>
         </div>
       </div>
-    </main>
+      </main>
+    </>
   );
 }

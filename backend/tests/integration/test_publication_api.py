@@ -15,7 +15,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 import app.api.v1.endpoints.publications as publications_endpoint
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_optional_current_user
 from app.core.database import get_session
 from app.main import app
 from app.models.base import Base
@@ -96,6 +96,7 @@ def authenticate():
     def _authenticate(role: str) -> None:
         current_user = _user(role)
         app.dependency_overrides[get_current_user] = lambda: current_user
+        app.dependency_overrides[get_optional_current_user] = lambda: current_user
 
     return _authenticate
 
@@ -540,9 +541,10 @@ def test_list_allows_admin_and_reviewer(
     assert response.json()["total"] == 5
 
 
-def test_list_requires_authentication(client: TestClient) -> None:
+def test_list_is_public_for_guests(client: TestClient, catalog) -> None:
     response = client.get("/api/v1/publications")
-    assert response.status_code == 401
+    assert response.status_code == 200
+    assert response.json()["total"] == 5
 
 
 def test_list_allows_lecturer_read_only(client: TestClient, authenticate, catalog) -> None:
@@ -806,9 +808,15 @@ def test_detail_auth_and_metadata(
     assert body["volume"] is None
 
 
-def test_detail_requires_authentication(client: TestClient) -> None:
+def test_detail_for_guest_withholds_internal_data(client: TestClient, authenticate, catalog) -> None:
+    admin = _get(client, "ADMIN", "/api/v1/publications/EID-2024-A", authenticate).json()
+    app.dependency_overrides.pop(get_optional_current_user, None)
     response = client.get("/api/v1/publications/EID-2024-A")
-    assert response.status_code == 401
+    assert response.status_code == 200
+    body = response.json()
+    for key in ("eid", "title", "doi", "authors"):
+        assert body[key] == admin[key], key
+    assert body["provenance"] == [] and body["approved_lecturer_links"] == []
 
 
 def test_detail_for_lecturer_withholds_administrative_data(

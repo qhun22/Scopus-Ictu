@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_optional_current_user
 from app.core.database import get_session
 from app.main import app
 from app.models.base import Base
@@ -84,6 +84,7 @@ def authenticate():
             updated_at=datetime.now(UTC),
         )
         app.dependency_overrides[get_current_user] = lambda: current_user
+        app.dependency_overrides[get_optional_current_user] = lambda: current_user
 
     return _authenticate
 
@@ -208,8 +209,17 @@ def seeded(db_session: Session) -> None:
     db_session.commit()
 
 
-def test_search_requires_authentication(client: TestClient) -> None:
-    assert client.get(SEARCH_URL, params={"q": "alpha"}).status_code == 401
+def test_search_is_public_for_guests_and_hides_the_lecturer_group(
+    client: TestClient, authenticate, seeded
+) -> None:
+    authenticate("ADMIN")
+    admin = client.get(SEARCH_URL, params={"q": "alpha"}).json()
+    app.dependency_overrides.pop(get_optional_current_user, None)
+    response = client.get(SEARCH_URL, params={"q": "alpha"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["lecturers"] == []
+    assert body["publications"] == admin["publications"]
 
 
 def test_search_for_lecturer_hides_the_lecturer_group(client: TestClient, authenticate, seeded) -> None:

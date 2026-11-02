@@ -62,7 +62,7 @@ export default function Header({
           ? "Bạn đã đăng xuất khỏi hệ thống."
           : "You have been logged out of the system.",
       );
-      navigate("/login", { replace: true });
+      navigate("/home", { replace: true });
     } catch {
       toast.error(
         locale === "vi" ? "Lỗi đăng xuất" : "Logout error",
@@ -70,7 +70,7 @@ export default function Header({
           ? "Không thể hoàn tất đăng xuất trên máy chủ."
           : "Could not complete logout on the server.",
       );
-      navigate("/login", { replace: true });
+      navigate("/home", { replace: true });
     } finally {
       setIsLoggingOut(false);
     }
@@ -203,15 +203,6 @@ export default function Header({
 
         {/* User profile or sign-in action */}
         <div className="relative" ref={dropdownRef}>
-          {!user ? (
-            <button
-              type="button"
-              onClick={() => navigate("/login")}
-              className="h-10 rounded-[5px] bg-[#3A5FC3] px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-[#304fa8] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-            >
-              {t.header.login}
-            </button>
-          ) : (
           <button
             type="button"
             onClick={() => setDropdownOpen((prev) => !prev)}
@@ -220,15 +211,15 @@ export default function Header({
             aria-haspopup="true"
           >
             <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-sm shrink-0">
-              {safeName.charAt(0).toUpperCase()}
+              {user ? safeName.charAt(0).toUpperCase() : t.home.welcomeGuest.charAt(0).toUpperCase()}
             </div>
 
             <div className="hidden flex-col md:flex min-w-0 max-w-[140px] lg:max-w-[180px]">
               <span className="text-xs font-semibold text-slate-800 leading-tight truncate">
-                {safeName}
+                {user ? safeName : t.home.welcomeGuest}
               </span>
               <span className="text-[10px] text-slate-500 leading-tight truncate">
-                {user?.email}
+                {user ? user?.email : t.header.notLoggedIn}
               </span>
             </div>
 
@@ -243,29 +234,51 @@ export default function Header({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          )}
 
           {/* Dropdown Menu */}
-          {user && dropdownOpen && (
+          {dropdownOpen && (
             <div className="absolute right-0 top-full mt-3 w-full min-w-[130px] md:min-w-0 md:inset-x-0 z-50 animate-in fade-in zoom-in-95 duration-100">
-              <button
-                type="button"
-                disabled={isLoggingOut}
-                onClick={handleLogout}
-                className="group flex h-10 w-full cursor-pointer items-center gap-1.5 sm:gap-2.5 rounded-[5px] border border-slate-200 bg-slate-50/95 hover:bg-rose-50/90 hover:border-rose-200 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left shadow-lg backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:opacity-50"
-              >
-                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm shrink-0 transition-transform group-hover:scale-105">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </div>
+              {user ? (
+                <button
+                  type="button"
+                  disabled={isLoggingOut}
+                  onClick={handleLogout}
+                  className="group flex h-10 w-full cursor-pointer items-center gap-1.5 sm:gap-2.5 rounded-[5px] border border-slate-200 bg-slate-50/95 hover:bg-rose-50/90 hover:border-rose-200 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left shadow-lg backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:opacity-50"
+                >
+                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm shrink-0 transition-transform group-hover:scale-105">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                  </div>
 
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-rose-600 leading-tight truncate">
-                    {isLoggingOut ? t.header.loggingOut : t.header.logout}
-                  </span>
-                </div>
-              </button>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-semibold text-rose-600 leading-tight truncate">
+                      {isLoggingOut ? t.header.loggingOut : t.header.logout}
+                    </span>
+                  </div>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    navigate("/login");
+                  }}
+                  className="group flex h-10 w-full cursor-pointer items-center gap-1.5 sm:gap-2.5 rounded-[5px] border border-slate-200 bg-slate-50/95 hover:bg-blue-50/90 hover:border-blue-200 py-1 pl-1.5 sm:pl-2 pr-2 sm:pr-3 text-left shadow-lg backdrop-blur-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+                >
+                  <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-white shadow-sm shrink-0 transition-transform group-hover:scale-105">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4m-5-4l5-5m0 0l-5-5m5 5H3" />
+                    </svg>
+                  </div>
+
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-semibold text-[#3A5FC3] leading-tight truncate">
+                      {t.header.login}
+                    </span>
+                  </div>
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -5,6 +5,7 @@ import { getApiErrorMessage } from "../../api/errors";
 import { getPublicationByEid } from "../../api/publications";
 import { PublicationDetailResponse } from "../../types/publication";
 import { useAuth } from "../../contexts/AuthContext";
+import NormalizationCompareCard from "./NormalizationCompareCard";
 import { useI18n } from "../../i18n";
 import { AffiliationSummaryBar, AuthorAffiliationCell } from "./AuthorAffiliations";
 import { EvidenceBasisCell, LinkStatusBadge, ReviewDecisionCell } from "./LinkEvidence";
@@ -349,6 +350,8 @@ export default function PublicationDetailPage() {
           </div>
         )}
       </section>
+
+      {!isLecturer && user && <NormalizationCompareCard eid={publication.eid} locale={locale === "en" ? "en" : "vi"} />}
 
       {/* ── Section D: Safe Provenance (always visible) ────────────────── */}
       <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">

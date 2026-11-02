@@ -167,6 +167,18 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    request: Request,
+    response: Response,
+    db: Annotated[Session, Depends(get_session)],
+) -> User | None:
+    """Return the authenticated user, or None when no session was supplied."""
+
+    if not get_token_from_request(request):
+        return None
+    return get_current_user(request, response, db)
+
+
 def require_role(*allowed_roles: str) -> Callable[..., User]:
     """Build a dependency that authorizes only the supplied server-side roles."""
 

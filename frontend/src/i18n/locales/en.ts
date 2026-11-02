@@ -74,10 +74,11 @@ export const en: TranslationSchema = {
     system: "System",
     roleBadge: "Role",
     login: "Sign in",
+    notLoggedIn: "Not signed in",
   },
   home: {
     welcome: "Welcome",
-    welcomeGuest: "Faculty Member",
+    welcomeGuest: "Guest",
     welcomeSubtitle:
       "Welcome to ICTU Scopus Portal — Lecturer identity reconciliation and publication matching system.",
     loginAction: "Sign in",
