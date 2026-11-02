@@ -71,6 +71,8 @@ export interface ScopusImport {
   processed_records: number;
   progress_percent: number;
   duplicate_candidates: number;
+  /** An earlier import holds the very same file content: allowed, but flagged "abnormal". */
+  duplicate_of?: { import_id: string; file_name: string; imported_at: string } | null;
   row_errors: Array<{ row_number?: number; code?: string; message?: string }>;
   error_summary: Record<string, unknown> | null;
   normalization: NormalizationData | null;
@@ -122,6 +124,16 @@ export function getImportHistory(
 ): Promise<ImportHistoryResponse> {
   const query = includeArchived ? "?include_archived=true" : "";
   return apiGet<ImportHistoryResponse>(`/api/v1/imports${query}`);
+}
+
+export interface ImportPrerequisites {
+  lecturer_count: number;
+  scopus_import_ready: boolean;
+}
+
+/** The school's lecturer data must exist before a Scopus CSV can be imported. */
+export function getImportPrerequisites(): Promise<ImportPrerequisites> {
+  return apiGet<ImportPrerequisites>("/api/v1/imports/prerequisites");
 }
 
 export function getImportDetail(id: string): Promise<ScopusImport> {

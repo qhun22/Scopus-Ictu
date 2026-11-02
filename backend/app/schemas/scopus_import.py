@@ -91,6 +91,9 @@ class ScopusImportResponse(BaseModel):
     lecturer_summary: dict | None = None
     # M2.6B: nested author normalization counters
     normalization_summary: dict | None = None
+    # Set when an earlier import already holds the very same file content (same SHA-256).
+    # {"import_id", "file_name", "imported_at"}; the import itself is allowed, flagged "abnormal".
+    duplicate_of: dict | None = None
 
 
 class UnifiedImportStats(BaseModel):

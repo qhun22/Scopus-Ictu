@@ -6,6 +6,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, UploadFile, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,7 @@ from app.core.config import settings
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import User
+from app.models.master_lecturer import Lecturer
 from app.schemas.scopus_import import (
     ScopusImportConfigResponse,
     ScopusImportListResponse,
@@ -67,6 +69,12 @@ async def upload_scopus_import(
     if file is None:
         raise APIError(
             status_code=422, detail="Vui lòng chọn tệp CSV cần nhập.", code="INVALID_IMPORT_FILE"
+        )
+    if _active_lecturer_count(db) == 0:
+        raise APIError(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cần nhập danh sách giảng viên của trường (tệp JSON) trước khi nhập tệp Scopus.",
+            code="LECTURER_DATA_REQUIRED",
         )
 
     try:
@@ -129,6 +137,20 @@ async def upload_scopus_import(
         return result
     finally:
         await file.close()
+
+
+def _active_lecturer_count(db: Session) -> int:
+    return int(
+        db.scalar(select(func.count()).select_from(Lecturer).where(Lecturer.is_active.is_(True))) or 0
+    )
+
+
+@router.get("/prerequisites")
+def import_prerequisites(_admin: AdminUser, db: DatabaseSession) -> dict:
+    """What must exist before a Scopus CSV can be imported: the school's lecturer data."""
+
+    count = _active_lecturer_count(db)
+    return {"lecturer_count": count, "scopus_import_ready": count > 0}
 
 
 @router.get("", response_model=ScopusImportListResponse)

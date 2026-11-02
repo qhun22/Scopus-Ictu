@@ -1,6 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
-import DuplicateImportDialog from "../common/DuplicateImportDialog";
 import { previewLecturerDataset } from "../../api/lecturerImport";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
@@ -55,12 +54,13 @@ export interface LecturerDatasetImportCardHandle {
 }
 
 export interface LecturerDatasetImportCardProps {
-  onPreviewGenerated?: (preview: PreviewResponse, file: File) => void;
+  onPreviewGenerated?: (
+    preview: PreviewResponse,
+    file: File,
+    duplicateOf?: { importId: string; filename: string; importedAt: string } | null,
+  ) => void;
   onFileCleared?: () => void;
   onFileSelected?: (file: File) => void;
-  onViewPrevious?: (importId: string) => void;
-  /** Hide the duplicate dialog while another modal (import detail) is on top. */
-  dialogSuspended?: boolean;
   isImporting?: boolean;
 }
 
@@ -84,8 +84,6 @@ const LecturerDatasetImportCard = forwardRef<
     onPreviewGenerated,
     onFileCleared,
     onFileSelected,
-    onViewPrevious,
-    dialogSuspended = false,
     isImporting = false,
   },
   ref,
@@ -99,11 +97,9 @@ const LecturerDatasetImportCard = forwardRef<
   const [dragging, setDragging] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [isFileExiting, setIsFileExiting] = useState(false);
-  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
 
   const clearFile = () => {
     setSelectedFile(null);
-    setDuplicateWarning(null);
     setSelectionError("");
     setIsFileExiting(false);
     if (inputRef.current) inputRef.current.value = "";
@@ -147,12 +143,11 @@ const LecturerDatasetImportCard = forwardRef<
     }
 
     setSelectionError("");
-    setDuplicateWarning(null);
     setSelectedFile(file);
     onFileSelected?.(file);
   };
 
-  const handlePreview = async (allowDuplicate = false) => {
+  const handlePreview = async (allowDuplicate = false, knownDuplicate: DuplicateWarning | null = null) => {
     if (!selectedFile || previewing || isImporting) return;
     setPreviewing(true);
     try {
@@ -160,7 +155,14 @@ const LecturerDatasetImportCard = forwardRef<
         previewLecturerDataset(selectedFile, allowDuplicate),
         new Promise((resolve) => setTimeout(resolve, 1500)),
       ]);
-      setDuplicateWarning(null);
+      if (knownDuplicate) {
+        toast.warning(
+          locale === "vi" ? "Tệp trùng đợt nhập trước (Bất thường)" : "Same file as an earlier import (Abnormal)",
+          locale === "vi"
+            ? "Bạn vẫn có thể xác nhận nhập. Bấm 'Chi tiết' trong danh sách để xem đợt nhập trước."
+            : "You can still confirm the import. Click 'Details' in the list to see the earlier import.",
+        );
+      }
       if (response.conflicts && response.conflicts.length > 0) {
         toast.warning(
           locale === "vi" ? "Cảnh báo trùng tên" : "Duplicate Name Warnings",
@@ -169,7 +171,7 @@ const LecturerDatasetImportCard = forwardRef<
             : `${response.conflicts.length} duplicate name candidates detected. Separate records will be retained.`,
         );
       }
-      onPreviewGenerated?.(response, selectedFile);
+      onPreviewGenerated?.(response, selectedFile, knownDuplicate);
       setSelectedFile(null);
       if (inputRef.current) inputRef.current.value = "";
     } catch (error) {
@@ -178,7 +180,9 @@ const LecturerDatasetImportCard = forwardRef<
         const importedAt = errorField(error, "duplicate_imported_at");
         const filename = errorField(error, "duplicate_filename");
         if (importId && importedAt && filename) {
-          setDuplicateWarning({ importId, importedAt, filename });
+          // Not blocked: carry on to the preview and let the import be flagged "abnormal".
+          setPreviewing(false);
+          await handlePreview(true, { importId, importedAt, filename });
           return;
         }
       }
@@ -345,19 +349,6 @@ const LecturerDatasetImportCard = forwardRef<
           </div>
         </div>
       )}
-
-      <DuplicateImportDialog
-        open={Boolean(duplicateWarning && selectedFile) && !dialogSuspended}
-        fileName={selectedFile?.name ?? ""}
-        previousFileName={duplicateWarning?.filename}
-        previousImportedAt={duplicateWarning?.importedAt}
-        loading={previewing}
-        onCancel={() => setDuplicateWarning(null)}
-        onViewPrevious={() => {
-          if (duplicateWarning) onViewPrevious?.(duplicateWarning.importId);
-        }}
-        onConfirm={() => handlePreview(true)}
-      />
 
       {selectionError && (
         <div

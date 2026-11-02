@@ -435,6 +435,7 @@ def list_imports(
     scopus_ids = [item.id for item in items]
     usage_map = compute_usage_for_imports(db, scopus_ids)
     archive_map = resolve_archive_state_for_imports(db, scopus_ids)
+    duplicates = duplicate_map(db, items)
     scopus_responses = []
     for item in items:
         if not include_archived and archive_map.get(item.id, False):
@@ -445,6 +446,7 @@ def list_imports(
                 performed_by=names.get(item.id, "Không xác định"),
                 usage=usage_map.get(item.id),
                 archived=archive_map.get(item.id, False),
+                duplicate_of=duplicates.get(item.id),
             )
         )
 
@@ -618,6 +620,7 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
             performed_by=_actor_names(db, [item.id]).get(item.id, "Không xác định"),
             usage=compute_usage_for_import(db, item.id),
             archived=is_archived(db, item.id),
+            duplicate_of=duplicate_map(db, [item]).get(item.id),
         )
 
     audit = (
@@ -1018,6 +1021,7 @@ def to_import_response(
     performed_by: str | None,
     usage: ImportUsageInfo | None = None,
     archived: bool = False,
+    duplicate_of: dict | None = None,
 ) -> ScopusImportResponse:
     is_cancelled = item.status == "CANCELLED"
     processed = 0 if is_cancelled else (item.valid_records + item.invalid_records)
@@ -1067,7 +1071,37 @@ def to_import_response(
         usage=usage_info.to_dict(),
         scopus_summary=item.error_summary,
         normalization_summary=item.normalization_summary,
+        duplicate_of=duplicate_of,
     )
+
+
+def duplicate_map(db: Session, items: list[ScopusImport]) -> dict[uuid.UUID, dict]:
+    """For each import, the latest EARLIER completed import with the same file content, if any."""
+
+    digests = {item.file_sha256 for item in items}
+    if not digests:
+        return {}
+    earlier = (
+        db.query(ScopusImport)
+        .filter(ScopusImport.file_sha256.in_(digests), ScopusImport.status.in_(COMPLETED_STATUSES))
+        .order_by(ScopusImport.created_at.desc())
+        .all()
+    )
+    found: dict[uuid.UUID, dict] = {}
+    for item in items:
+        for candidate in earlier:
+            if (
+                candidate.id != item.id
+                and candidate.file_sha256 == item.file_sha256
+                and candidate.created_at < item.created_at
+            ):
+                found[item.id] = {
+                    "import_id": str(candidate.id),
+                    "file_name": candidate.file_name,
+                    "imported_at": candidate.created_at.isoformat(),
+                }
+                break
+    return found
 
 
 def _latest_by_hash(db: Session, digest: str, statuses: frozenset[str]) -> ScopusImport | None:

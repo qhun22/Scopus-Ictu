@@ -12,6 +12,7 @@ import {
   getImportConfig,
   getImportDetail,
   getImportHistory,
+  getImportPrerequisites,
   uploadScopusCsv,
   CONFIRMED_IMPORTS_KEY,
   getConfirmedImportIds,
@@ -19,7 +20,6 @@ import {
 import { ApiError } from "../../api/client";
 import { cancelLecturerDatasetImport, importLecturerDataset } from "../../api/lecturerImport";
 import ConfirmModal from "../../components/common/ConfirmModal";
-import DuplicateImportDialog from "../../components/common/DuplicateImportDialog";
 import ModalPortal from "../../components/common/ModalPortal";
 import LecturerDatasetImportCard, {
   LecturerDatasetImportCardHandle,
@@ -91,17 +91,13 @@ const cancelledStatusBadgeClassName =
   "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
 const activeStatusBadgeClassName =
   "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
+const abnormalStatusBadgeClassName =
+  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700 hover:bg-amber-50";
 const needsProcessingBadgeClassName =
   "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
 const typeBadgeClassName = badgeClassName;
 const userBadgeClassName = badgeClassName;
 const ACTIVE_STATUSES: ImportStatus[] = ["RECEIVED", "PARSING", "VALIDATED"];
-
-interface DuplicateWarning {
-  importId: string;
-  filename: string;
-  importedAt: string;
-}
 
 function errorField(error: ApiError, field: string): string | undefined {
   if (typeof error.body !== "object" || error.body === null) return undefined;
@@ -139,11 +135,13 @@ export default function ImportsPage() {
     preview: PreviewResponse;
     file: File;
     at: string;
+    duplicate?: { importId: string; filename: string; importedAt: string } | null;
   } | null>(null);
+  // Scopus CSV needs the school's lecturer data first.
+  const [lecturerCount, setLecturerCount] = useState<number | null>(null);
   const [lecturerImporting, setLecturerImporting] = useState(false);
   const [lecturerCancelling, setLecturerCancelling] = useState(false);
   const [activeResultPanel, setActiveResultPanel] = useState<"scopus_checked" | "lecturer_preview" | null>(null);
-  const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null);
   const [isScopusFileExiting, setIsScopusFileExiting] = useState(false);
   const [pendingImport, setPendingImport] = useState<ScopusImport | null>(null);
   void pendingImport;
@@ -228,6 +226,7 @@ export default function ImportsPage() {
       const stored = JSON.parse(serialized) as {
         preview: PreviewResponse;
         at: string;
+        duplicate?: { importId: string; filename: string; importedAt: string } | null;
       };
       if (!stored.preview?.filename || !stored.at) {
         throw new Error("Invalid pending lecturer preview");
@@ -237,7 +236,7 @@ export default function ImportsPage() {
         sessionStorage.removeItem(PENDING_LECTURER_PREVIEW_KEY);
         return;
       }
-      setLecturerPreview({ preview: stored.preview, file, at: stored.at });
+      setLecturerPreview({ preview: stored.preview, file, at: stored.at, duplicate: stored.duplicate ?? null });
     } catch (error) {
       sessionStorage.removeItem(PENDING_LECTURER_PREVIEW_KEY);
       await clearPendingLecturerFile().catch(() => undefined);
@@ -363,6 +362,7 @@ export default function ImportsPage() {
     if (item.status === "CANCELLED") return cancelledLabel(item);
     if (item.type === "LECTURERS") {
       if (isAwaitingConfirmation(item)) {
+        if (item.duplicate_of) return locale === "vi" ? "Bất thường" : "Abnormal";
         return locale === "vi" ? "Chờ xử lý" : "Awaiting processing";
       }
       if (isWarningStatus(item)) {
@@ -375,10 +375,14 @@ export default function ImportsPage() {
       return locale === "vi" ? "Hoạt động" : "Active";
     }
     if (item.status === "STAGED") {
+      const confirmed = confirmedImportIds.includes(item.id) || Boolean(item.normalization_summary);
+      if (item.duplicate_of && !confirmed) {
+        return locale === "vi" ? "Bất thường" : "Abnormal";
+      }
       if (isWarningStatus(item)) {
         return locale === "vi" ? "Cảnh báo" : "Warning";
       }
-      if (confirmedImportIds.includes(item.id) || item.normalization_summary) {
+      if (confirmed) {
         return locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization";
       }
       return locale === "vi" ? "Chờ xử lý" : "Awaiting processing";
@@ -391,6 +395,7 @@ export default function ImportsPage() {
     const label = statusLabel(item);
     const isActive = label === (locale === "vi" ? "Hoạt động" : "Active");
     const isNeedsProcessing = label === (locale === "vi" ? "Chờ xử lý" : "Awaiting processing");
+    const isAbnormal = label === (locale === "vi" ? "Bất thường" : "Abnormal");
     const isProcessing = ACTIVE_STATUSES.includes(item.status) || isBusy;
     return (
       <span
@@ -399,7 +404,9 @@ export default function ImportsPage() {
             ? cancelledStatusBadgeClassName
             : isActive
               ? activeStatusBadgeClassName
-              : isNeedsProcessing || isBusy
+              : isAbnormal && !isBusy
+                ? abnormalStatusBadgeClassName
+                : isNeedsProcessing || isBusy
                 ? needsProcessingBadgeClassName
                 : statusBadgeClassName
         }
@@ -549,6 +556,10 @@ export default function ImportsPage() {
 
   const selectFile = (file: File | undefined) => {
     if (!file || uploading) return;
+    if (lecturerDataMissing) {
+      setSelectionError(lecturerDataMessage);
+      return;
+    }
     const extension = file.name.includes(".")
       ? `.${file.name.split(".").pop()?.toLowerCase()}`
       : "";
@@ -570,7 +581,6 @@ export default function ImportsPage() {
     }
 
     setSelectionError("");
-    setDuplicateWarning(null);
     setSelectedFile(file);
   };
 
@@ -578,7 +588,6 @@ export default function ImportsPage() {
     if (uploading) return;
     setSelectedFile(null);
     setSelectionError("");
-    setDuplicateWarning(null);
     setIsScopusFileExiting(false);
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -596,18 +605,44 @@ export default function ImportsPage() {
     } catch {
       // non-critical error
     }
+    try {
+      setLecturerCount((await getImportPrerequisites()).lecturer_count);
+    } catch {
+      // non-critical: the server still enforces the rule
+    }
   };
 
-  const startImport = async (allowDuplicate = false) => {
+  useEffect(() => {
+    void getImportPrerequisites()
+      .then((res) => setLecturerCount(res.lecturer_count))
+      .catch(() => setLecturerCount(null));
+  }, []);
+
+  const lecturerDataMissing = lecturerCount === 0;
+  const lecturerDataMessage =
+    locale === "vi"
+      ? "Cần nhập danh sách giảng viên của trường (tệp JSON) trước khi nhập tệp Scopus."
+      : "Import the school's lecturer list (JSON) before importing a Scopus file.";
+
+  const startImport = async () => {
     if (!selectedFile || uploading) return;
     setUploading(true);
     setSelectionError("");
     try {
-      await Promise.all([
-        uploadScopusCsv(selectedFile, allowDuplicate),
-        new Promise((resolve) => setTimeout(resolve, 1500)),
-      ]);
-      setDuplicateWarning(null);
+      // An identical file is not refused: it is imported and flagged "Bất thường" for the reviewer.
+      let wasDuplicate = false;
+      const upload = async () => {
+        try {
+          return await uploadScopusCsv(selectedFile, false);
+        } catch (error) {
+          if (error instanceof ApiError && error.code === "DUPLICATE_IMPORT_CONFIRMATION_REQUIRED") {
+            wasDuplicate = true;
+            return uploadScopusCsv(selectedFile, true);
+          }
+          throw error;
+        }
+      };
+      await Promise.all([upload(), new Promise((resolve) => setTimeout(resolve, 1500))]);
       setSelectedFile(null);
       if (inputRef.current) inputRef.current.value = "";
       sessionStorage.removeItem(PENDING_SCOPUS_IMPORT_KEY);
@@ -615,22 +650,27 @@ export default function ImportsPage() {
       if (activeResultPanel === "scopus_checked") {
         setActiveResultPanel(null);
       }
-      toast.success(
-        t.imports.successTitle,
-        locale === "vi"
-          ? "Đã nạp tệp thành công (Trạng thái: Chờ xử lý). Bạn có thể bấm 'Chi tiết' trong danh sách để xem và xử lý tiếp."
-          : "File uploaded successfully (Status: Awaiting processing). You can click 'Details' in the list to proceed."
-      );
+      if (wasDuplicate) {
+        toast.warning(
+          locale === "vi" ? "Đã nạp tệp (Bất thường)" : "File uploaded (Abnormal)",
+          locale === "vi"
+            ? "Nội dung tệp trùng với một đợt nhập trước nên được đánh dấu 'Bất thường'. Bấm 'Chi tiết' trong danh sách để xem rồi xác nhận nhập."
+            : "The file content matches an earlier import, so it is marked 'Abnormal'. Click 'Details' in the list to review and confirm."
+        );
+      } else {
+        toast.success(
+          t.imports.successTitle,
+          locale === "vi"
+            ? "Đã nạp tệp thành công (Trạng thái: Chờ xử lý). Bạn có thể bấm 'Chi tiết' trong danh sách để xem và xử lý tiếp."
+            : "File uploaded successfully (Status: Awaiting processing). You can click 'Details' in the list to proceed."
+        );
+      }
       await refreshHistory();
     } catch (error: unknown) {
-      if (error instanceof ApiError && error.code === "DUPLICATE_IMPORT_CONFIRMATION_REQUIRED") {
-        const importId = errorField(error, "duplicate_of_import_id");
-        const importedAt = errorField(error, "duplicate_imported_at");
-        const filename = errorField(error, "duplicate_filename");
-        if (importId && importedAt && filename) {
-          setDuplicateWarning({ importId, importedAt, filename });
-          return;
-        }
+      if (error instanceof ApiError && error.code === "LECTURER_DATA_REQUIRED") {
+        setLecturerCount(0);
+        setSelectionError(lecturerDataMessage);
+        return;
       }
       if (error instanceof ApiError && error.code === "IMPORT_ALREADY_PROCESSING") {
         const existingId = errorField(error, "existing_import_id");
@@ -1058,10 +1098,10 @@ export default function ImportsPage() {
     }
   };
 
-  const viewDuplicateImport = async () => {
-    if (!duplicateWarning) return;
+  const viewPreviousImport = async (importId: string | undefined) => {
+    if (!importId) return;
     try {
-      const previous = await getImportDetail(duplicateWarning.importId);
+      const previous = await getImportDetail(importId);
       setDetail(previous);
       setDetailOpen(true);
     } catch (error: unknown) {
@@ -1071,6 +1111,10 @@ export default function ImportsPage() {
 
   const handleHeaderAddClick = () => {
     if (uploading) return;
+    if (lecturerDataMissing) {
+      toast.warning(locale === "vi" ? "Cần dữ liệu giảng viên" : "Lecturer data required", lecturerDataMessage);
+      return;
+    }
     inputRef.current?.click();
   };
 
@@ -1094,6 +1138,13 @@ export default function ImportsPage() {
         processed_records: lecturerPreview.preview.summary.valid,
         progress_percent: 100,
         duplicate_candidates: lecturerPreview.preview.summary.conflicts,
+        duplicate_of: lecturerPreview.duplicate
+          ? {
+              import_id: lecturerPreview.duplicate.importId,
+              file_name: lecturerPreview.duplicate.filename,
+              imported_at: lecturerPreview.duplicate.importedAt,
+            }
+          : null,
         row_errors: [],
         error_summary: null,
         normalization: null,
@@ -1326,9 +1377,23 @@ export default function ImportsPage() {
             </div>
           </div>
 
+          {lecturerDataMissing && (
+            <div
+              className="mt-4 rounded-[5px] border border-amber-300 bg-white p-3 text-xs font-semibold text-amber-700"
+              role="alert"
+              data-testid="lecturer-data-required"
+            >
+              {lecturerDataMessage}
+            </div>
+          )}
+
           {!selectedFile ? (
             <div
-              onClick={() => !uploading && inputRef.current?.click()}
+              onClick={() => {
+                if (uploading) return;
+                if (lecturerDataMissing) setSelectionError(lecturerDataMessage);
+                else inputRef.current?.click();
+              }}
               onDragEnter={(event) => {
                 event.preventDefault();
                 if (!uploading) setDragging(true);
@@ -1431,44 +1496,19 @@ export default function ImportsPage() {
             </div>
           )}
 
-          <DuplicateImportDialog
-            open={Boolean(duplicateWarning && selectedFile) && !detailOpen}
-            fileName={selectedFile?.name ?? ""}
-            previousFileName={duplicateWarning?.filename}
-            previousImportedAt={duplicateWarning?.importedAt}
-            loading={uploading}
-            onCancel={() => setDuplicateWarning(null)}
-            onViewPrevious={() => void viewDuplicateImport()}
-            onConfirm={() => startImport(true)}
-          />
         </section>
 
         {/* Right Box: Dữ liệu giảng viên ICTU */}
         <LecturerDatasetImportCard
           ref={lecturerCardRef}
           isImporting={lecturerImporting}
-          dialogSuspended={detailOpen}
-          onViewPrevious={(importId) => {
-            void (async () => {
-              try {
-                const previous = await getImportDetail(importId);
-                setDetail(previous);
-                setDetailOpen(true);
-              } catch (error: unknown) {
-                toast.error(
-                  t.imports.errorTitle,
-                  error instanceof ApiError ? error.message : t.imports.loadError,
-                );
-              }
-            })();
-          }}
-          onPreviewGenerated={(preview, file) => {
+          onPreviewGenerated={(preview, file, duplicateOf) => {
             const at = new Date().toISOString();
-            setLecturerPreview({ preview, file, at });
+            setLecturerPreview({ preview, file, at, duplicate: duplicateOf ?? null });
             setActiveResultPanel("lecturer_preview");
             sessionStorage.setItem(
               PENDING_LECTURER_PREVIEW_KEY,
-              JSON.stringify({ preview, at }),
+              JSON.stringify({ preview, at, duplicate: duplicateOf ?? null }),
             );
             void savePendingLecturerFile(file).catch((error: unknown) => {
               sessionStorage.removeItem(PENDING_LECTURER_PREVIEW_KEY);
@@ -1619,9 +1659,7 @@ export default function ImportsPage() {
                     <td className="px-3 py-3.5 align-middle whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className={`flex h-8 w-8 items-center justify-center rounded-[5px] border shrink-0 shadow-2xs ${
-                          item.type === "LECTURERS"
-                            ? "bg-violet-50 text-violet-600 border-violet-100/80"
-                            : "bg-blue-50 text-[#3A5FC3] border-blue-100/80"
+                          "bg-blue-50 text-[#3A5FC3] border-blue-100/80"
                         }`}>
                           {item.type === "LECTURERS" ? (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1798,6 +1836,43 @@ export default function ImportsPage() {
               </header>
 
               <div className="min-h-48 overflow-y-auto p-4 sm:p-5">
+                {detail?.duplicate_of &&
+                  !confirmedImportIds.includes(detail.id) &&
+                  !detail.normalization_summary && (
+                    <div
+                      className="mb-4 rounded-[5px] border border-amber-300 bg-white p-4"
+                      role="alert"
+                      data-testid="duplicate-import-banner"
+                    >
+                      <h3 className="text-sm font-bold text-amber-700">
+                        {locale === "vi" ? "Tệp dữ liệu đã được nhập trước đó" : "This file was imported before"}
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-600">
+                        {locale === "vi"
+                          ? "Hệ thống phát hiện tệp có nội dung trùng với một đợt nhập trước. Đợt này được đánh dấu \"Bất thường\"; bạn vẫn có thể xác nhận nhập hoặc hủy tiến trình."
+                          : "The file content matches an earlier import. This one is marked \"Abnormal\"; you can still confirm the import or cancel."}
+                      </p>
+                      <dl className="mt-2 space-y-0.5 text-xs text-slate-700">
+                        <div>
+                          <dt className="inline font-semibold">{locale === "vi" ? "Tệp đã chọn: " : "Selected file: "}</dt>
+                          <dd className="inline break-all">{detail.file_name}</dd>
+                        </div>
+                        <div>
+                          <dt className="inline font-semibold">{locale === "vi" ? "Đợt nhập trước: " : "Earlier import: "}</dt>
+                          <dd className="inline break-all">
+                            {detail.duplicate_of.file_name} · {formatDate(detail.duplicate_of.imported_at)}
+                          </dd>
+                        </div>
+                      </dl>
+                      <button
+                        type="button"
+                        className="mt-3 inline-flex h-badge w-40 cursor-pointer items-center justify-center rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50"
+                        onClick={() => void viewPreviousImport(detail.duplicate_of?.import_id)}
+                      >
+                        {locale === "vi" ? "Xem đợt trước" : "View earlier import"}
+                      </button>
+                    </div>
+                  )}
                 {detailLoading || !detail ? (
                   <div className="flex min-h-40 items-center justify-center">
                     <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
