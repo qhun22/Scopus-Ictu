@@ -922,12 +922,12 @@ export default function LecturersPage() {
                         {lec.account ? (
                           <span
                             title={getAccountRoleLabel(lec.account.role)}
-                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-violet-400 bg-white px-2.5 py-0.5 text-xs font-bold text-violet-700"
+                            className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-violet-400 bg-white px-2.5 py-0.5 text-xs font-bold text-violet-700"
                           >
                             {getAccountRoleLabel(lec.account.role)}
                           </span>
                         ) : (
-                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
+                          <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
                             {locale === "vi" ? "Chưa cấp" : "Not Linked"}
                           </span>
                         )}
@@ -938,20 +938,20 @@ export default function LecturersPage() {
                         {lec.account && !lec.account.is_active ? (
                           <span
                             title={locale === "vi" ? "Tài khoản đang bị khóa" : "Account locked"}
-                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-rose-300 bg-white px-2.5 py-0.5 text-xs font-bold text-rose-700"
+                            className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-rose-300 bg-white px-2.5 py-0.5 text-xs font-bold text-rose-700"
                           >
                             <span>{locale === "vi" ? "Đã khóa" : "Locked"}</span>
                           </span>
                         ) : lec.has_warning ? (
                           <span
                             title={lec.warning_reason || (locale === "vi" ? "Cần rà soát trùng tên" : "Review duplicate")}
-                            className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700"
+                            className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700"
                           >
                             <span>{locale === "vi" ? "Cảnh báo" : "Warning"}</span>
                           </span>
                         ) : (
-                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 py-0.5 text-xs font-bold text-emerald-600">
-                            <span>{locale === "vi" ? "Hoạt động" : "Active"}</span>
+                          <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 py-0.5 text-xs font-bold text-emerald-600">
+                            <span>{locale === "vi" ? "Đang hoạt động" : "Active"}</span>
                           </span>
                         )}
                       </td>
@@ -961,7 +961,7 @@ export default function LecturersPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenDetailModal(lec)}
-                          className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors cursor-pointer"
+                          className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors cursor-pointer"
                         >
                           {locale === "vi" ? "Chi tiết" : "Detail"}
                         </button>
@@ -1552,7 +1552,7 @@ export default function LecturersPage() {
 
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
                           <span className="font-semibold text-slate-600">{locale === "vi" ? "Phương thức đăng nhập" : "Login method"}</span>
-                          <span className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
+                          <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
                             Email
                           </span>
                         </div>
@@ -1561,14 +1561,14 @@ export default function LecturersPage() {
                           <span className="font-semibold text-slate-600">{locale === "vi" ? "Trạng thái tài khoản" : "Account status"}</span>
                           {/* Same status label as the "Trạng thái" column of the list. */}
                           <span
-                            className={`inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border px-2.5 py-0.5 text-xs font-bold ${
+                            className={`inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border px-2.5 py-0.5 text-xs font-bold ${
                               selectedLecturer.account.is_active
                                 ? "border-emerald-400 bg-white text-emerald-600"
                                 : "border-rose-300 bg-white text-rose-700"
                             }`}
                           >
                             {selectedLecturer.account.is_active
-                              ? (locale === "vi" ? "Hoạt động" : "Active")
+                              ? (locale === "vi" ? "Đang hoạt động" : "Active")
                               : (locale === "vi" ? "Đã khóa" : "Locked")}
                           </span>
                         </div>

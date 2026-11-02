@@ -88,15 +88,15 @@ const badgeClassName =
   "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
 const statusBadgeClassName = badgeClassName;
 const cancelledStatusBadgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
 const activeStatusBadgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
 const supersededStatusBadgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50";
 const abnormalStatusBadgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700 hover:bg-amber-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700 hover:bg-amber-50";
 const needsProcessingBadgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
 const typeBadgeClassName = badgeClassName;
 const userBadgeClassName = badgeClassName;
 const ACTIVE_STATUSES: ImportStatus[] = ["RECEIVED", "PARSING", "VALIDATED"];
@@ -372,11 +372,11 @@ export default function ImportsPage() {
       if (isWarningStatus(item)) {
         return locale === "vi" ? "Cảnh báo" : "Warning";
       }
-      return item.failed_records > 0 ? t.imports.completedWithErrors : (locale === "vi" ? "Hoạt động" : "Active");
+      return item.failed_records > 0 ? t.imports.completedWithErrors : (locale === "vi" ? "Đang hoạt động" : "Active");
     }
     // Scopus imports
     if (item.status === "APPLIED" || isInUse(item)) {
-      return locale === "vi" ? "Hoạt động" : "Active";
+      return locale === "vi" ? "Đang hoạt động" : "Active";
     }
     if (item.status === "STAGED") {
       const confirmed = confirmedImportIds.includes(item.id) || Boolean(item.normalization_summary);
@@ -391,13 +391,13 @@ export default function ImportsPage() {
       }
       return locale === "vi" ? "Chờ xử lý" : "Awaiting processing";
     }
-    return locale === "vi" ? "Hoạt động" : "Active";
+    return locale === "vi" ? "Đang hoạt động" : "Active";
   };
 
   const renderStatusBadge = (item: ScopusImport) => {
     const isBusy = confirmingImportId === item.id || cancellingImportId === item.id;
     const label = statusLabel(item);
-    const isActive = label === (locale === "vi" ? "Hoạt động" : "Active");
+    const isActive = label === (locale === "vi" ? "Đang hoạt động" : "Active");
     const isNeedsProcessing = label === (locale === "vi" ? "Chờ xử lý" : "Awaiting processing");
     const isAbnormal = label === (locale === "vi" ? "Bất thường" : "Abnormal");
     const isSuperseded = item.status === "SUPERSEDED";
