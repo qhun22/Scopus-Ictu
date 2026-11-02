@@ -37,9 +37,14 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.affiliation import PublicationAuthorAffiliationResolution
+from app.models.affiliation import (
+    PublicationAuthorAffiliation,
+    PublicationAuthorAffiliationResolution,
+)
 from app.models.affiliation_override import OVERRIDE_CONFIDENCE_VALUES, PublicationAuthorAffiliationOverride
+from app.models.candidate import LecturerScopusCandidate
 from app.models.governance import AuditEvent
+from app.models.identity import LecturerScopusIdentity
 from app.models.publication import Publication, PublicationAuthor, ScopusAuthor
 from app.services.text_folding import fold_text
 
@@ -125,6 +130,7 @@ class NeedsReviewItem:
     # so the ADMIN review UI can show the full list and pre-fill edit forms
     # without a second round-trip.
     overrides: list[PublicationAuthorAffiliationOverride]
+    doi: str | None = None
 
 
 def _validate_text(affiliation_text: str, confidence: str, evidence_url: str, reason: str) -> None:
@@ -200,6 +206,86 @@ def add_override(db: Session, cmd: AddOverrideCommand) -> PublicationAuthorAffil
     db.commit()
     db.refresh(row)
     return row
+
+
+MAX_BULK_OVERRIDES = 100
+
+
+def add_overrides_bulk(
+    db: Session, commands: list[AddOverrideCommand]
+) -> list[PublicationAuthorAffiliationOverride]:
+    """Add the same unit statement to several positions of ONE Scopus author, all or none.
+
+    Every position still gets its own row, evidence and audit event. A convenience for an
+    ADMIN who has checked each paper; nothing is inferred and nothing is applied elsewhere.
+    """
+
+    if not commands:
+        raise AffiliationOverrideError("EMPTY_BULK", "Chưa chọn vị trí nào.", 422)
+    if len(commands) > MAX_BULK_OVERRIDES:
+        raise AffiliationOverrideError(
+            "BULK_TOO_LARGE", f"Tối đa {MAX_BULK_OVERRIDES} vị trí mỗi lần.", 422
+        )
+    ids = [c.publication_author_id for c in commands]
+    if len(set(ids)) != len(ids):
+        raise AffiliationOverrideError("BULK_DUPLICATE_POSITION", "Một vị trí bị chọn hai lần.", 422)
+    for cmd in commands:
+        _validate_text(cmd.affiliation_text, cmd.confidence, cmd.evidence_url, cmd.reason)
+    authors = {a.id: a for a in db.scalars(select(PublicationAuthor).where(PublicationAuthor.id.in_(ids))).all()}
+    if len(authors) != len(ids):
+        raise PublicationAuthorNotFound
+    if len({a.scopus_author_id for a in authors.values()}) != 1:
+        raise AffiliationOverrideError(
+            "BULK_MIXED_AUTHORS", "Các vị trí phải thuộc cùng một tác giả Scopus.", 422
+        )
+
+    rows: list[PublicationAuthorAffiliationOverride] = []
+    try:
+        for cmd in commands:
+            row = PublicationAuthorAffiliationOverride(
+                publication_author_id=cmd.publication_author_id,
+                affiliation_text=cmd.affiliation_text.strip(),
+                confidence=cmd.confidence,
+                status="ACTIVE",
+                evidence_url=cmd.evidence_url.strip(),
+                reason=cmd.reason.strip(),
+                created_by_user_id=cmd.actor_user_id,
+                updated_by_user_id=cmd.actor_user_id,
+            )
+            db.add(row)
+            db.flush()
+            db.add(
+                AuditEvent(
+                    entity_type=ENTITY_TYPE,
+                    entity_id=row.id,
+                    action=CREATED_ACTION,
+                    actor_type="USER",
+                    actor_user_id=cmd.actor_user_id,
+                    before_state=None,
+                    after_state={
+                        "affiliation_text": row.affiliation_text,
+                        "confidence": row.confidence,
+                        "evidence_url": row.evidence_url,
+                        "status": row.status,
+                    },
+                    reason=row.reason,
+                    event_metadata={
+                        "publication_author_id": str(cmd.publication_author_id),
+                        "version": row.version,
+                        "bulk": True,
+                    },
+                )
+            )
+            rows.append(row)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        if "uq_paao_active_position_text" in str(exc.orig):
+            raise DuplicateActiveOverride from exc
+        raise
+    for row in rows:
+        db.refresh(row)
+    return rows
 
 
 def update_override(db: Session, cmd: UpdateOverrideCommand) -> PublicationAuthorAffiliationOverride:
@@ -324,19 +410,40 @@ def list_needs_review(
     offset: int = 0,
     query: str | None = None,
     reason_kind: str | None = None,
+    ictu_only: bool = False,
 ) -> tuple[list[NeedsReviewItem], int]:
     """Publication-author positions that are UNRESOLVED, have conflicting
     sources (different link_status per source, or a conflict-type reason),
     or are CORROBORATED only (reconciled but not independently verified)."""
+
+    # Scope: Scopus authors already tied to an ICTU lecturer, either an approved identity or a
+    # candidate still awaiting / past review. Nothing here confirms any link.
+    ictu_author_ids: set[uuid.UUID] | None = None
+    if ictu_only:
+        ictu_author_ids = set(
+            db.scalars(
+                select(LecturerScopusCandidate.scopus_author_id).where(
+                    LecturerScopusCandidate.status.in_(("PENDING", "ACCEPTED"))
+                )
+            ).all()
+        ) | set(
+            db.scalars(
+                select(LecturerScopusIdentity.scopus_author_id).where(
+                    LecturerScopusIdentity.status == "APPROVED"
+                )
+            ).all()
+        )
 
     rows = db.execute(
         select(
             PublicationAuthor.id,
             Publication.eid,
             Publication.title,
+            Publication.doi,
             PublicationAuthor.author_order,
             ScopusAuthor.scopus_id,
             ScopusAuthor.preferred_name,
+            ScopusAuthor.id,
         )
         .join(Publication, Publication.id == PublicationAuthor.publication_id)
         .join(ScopusAuthor, ScopusAuthor.id == PublicationAuthor.scopus_author_id)
@@ -347,6 +454,20 @@ def list_needs_review(
     for res in db.scalars(select(PublicationAuthorAffiliationResolution)).all():
         res_by_author.setdefault(res.publication_author_id, []).append(res)
 
+    # Verbatim affiliation text each source reported, so a reviewer can see WHERE a unit comes from.
+    raw_by_resolution: dict[uuid.UUID, list[str]] = {}
+    for rid, raw_text in db.execute(
+        select(
+            PublicationAuthorAffiliation.resolution_id,
+            PublicationAuthorAffiliation.raw_affiliation_text,
+        )
+        .where(PublicationAuthorAffiliation.raw_affiliation_text.is_not(None))
+        .order_by(PublicationAuthorAffiliation.resolution_id, PublicationAuthorAffiliation.ord)
+    ).all():
+        texts = raw_by_resolution.setdefault(rid, [])
+        if raw_text and raw_text not in texts:
+            texts.append(raw_text)
+
     overrides_by_author: dict[uuid.UUID, list[PublicationAuthorAffiliationOverride]] = {}
     for o in db.scalars(
         select(PublicationAuthorAffiliationOverride).order_by(PublicationAuthorAffiliationOverride.created_at.desc())
@@ -354,7 +475,9 @@ def list_needs_review(
         overrides_by_author.setdefault(o.publication_author_id, []).append(o)
 
     items: list[NeedsReviewItem] = []
-    for author_id, eid, title, author_order, scopus_id, preferred_name in rows:
+    for author_id, eid, title, doi, author_order, scopus_id, preferred_name, scopus_author_pk in rows:
+        if ictu_author_ids is not None and scopus_author_pk not in ictu_author_ids:
+            continue
         resolutions = res_by_author.get(author_id, [])
         if not resolutions:
             continue  # NOT_RECONCILED — nothing was ever attempted, out of scope here
@@ -385,10 +508,12 @@ def list_needs_review(
                         "source_system": r.source_system,
                         "link_status": r.link_status,
                         "unresolved_reason": r.unresolved_reason,
+                        "raw_affiliations": raw_by_resolution.get(r.id, []),
                     }
                     for r in sorted(resolutions, key=lambda r: r.source_system)
                 ],
                 has_override=any(o.status == "ACTIVE" for o in overrides),
+                doi=doi,
                 overrides=overrides,
             )
         )

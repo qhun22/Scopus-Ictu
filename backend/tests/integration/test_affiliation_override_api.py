@@ -27,7 +27,9 @@ from app.core.database import get_session
 from app.main import app
 from app.models.affiliation_override import PublicationAuthorAffiliationOverride
 from app.models.base import Base
+from app.models.candidate import LecturerScopusCandidate
 from app.models.governance import AuditEvent, User
+from app.models.master_lecturer import Lecturer
 from app.models.publication import Publication, PublicationAuthor, ScopusAuthor
 from app.services import affiliation_override_service as override_service
 from app.services.affiliation_import import AffiliationImportService, ResolutionInput
@@ -158,6 +160,22 @@ def test_anonymous_is_unauthenticated(client) -> None:
     assert client.get("/api/v1/affiliations/needs-review").status_code == 401
 
 
+def test_needs_review_can_be_limited_to_authors_tied_to_an_ictu_lecturer(client, as_role, db, world) -> None:
+    as_role("ADMIN")
+    lecturer = Lecturer(full_name="TS. Test Lecturer", full_name_normalized="ts. test lecturer")
+    db.add(lecturer)
+    db.flush()
+    author_222 = db.scalars(select(ScopusAuthor).where(ScopusAuthor.scopus_id == "222")).one()
+    db.add(LecturerScopusCandidate(lecturer_id=lecturer.id, scopus_author_id=author_222.id, status="PENDING"))
+    db.commit()
+
+    everyone = client.get("/api/v1/affiliations/needs-review").json()
+    scoped = client.get("/api/v1/affiliations/needs-review", params={"ictu_only": "true"}).json()
+    assert everyone["total"] == 2
+    assert {(i["eid"], i["author_order"]) for i in scoped["items"]} == {("E1", 2)}
+    assert scoped["total"] == 1
+
+
 # --------------------------------------------------------------------------- needs-review listing
 def test_needs_review_lists_unresolved_and_corroborated_not_not_reconciled(client, as_role, world) -> None:
     as_role("ADMIN")
@@ -201,6 +219,77 @@ def test_admin_adds_override_with_evidence_and_reason(client, as_role, db, world
     assert len(audits) == 1
     assert audits[0].actor_user_id == admin.id
     assert audits[0].before_state is None
+
+
+def _second_position_of_222(db: Session, world: dict) -> PublicationAuthor:
+    pub = _pub("E3")
+    db.add(pub)
+    db.flush()
+    author_222 = db.get(PublicationAuthor, world["pa2"].id).scopus_author_id
+    extra = PublicationAuthor(publication_id=pub.id, scopus_author_id=author_222, author_order=1)
+    db.add(extra)
+    db.commit()
+    return extra
+
+
+def _bulk(client, items, **overrides) -> object:
+    body = {
+        "items": items,
+        "affiliation_text": "University of Information and Communication Technology (ICTU)",
+        "confidence": "CORROBORATED",
+        "reason": "Checked each paper",
+    }
+    body.update(overrides)
+    return client.post("/api/v1/affiliations/overrides/bulk", json=body)
+
+
+def test_bulk_adds_one_row_and_one_audit_event_per_position_of_the_same_author(
+    client, as_role, db, world
+) -> None:
+    as_role("ADMIN")
+    extra = _second_position_of_222(db, world)
+    resp = _bulk(client, [
+        {"publication_author_id": str(world["pa2"].id), "evidence_url": "https://doi.org/10.1/e1"},
+        {"publication_author_id": str(extra.id), "evidence_url": "https://doi.org/10.1/e3"},
+    ])
+    assert resp.status_code == 201, resp.text
+    rows = resp.json()
+    assert {r["evidence_url"] for r in rows} == {"https://doi.org/10.1/e1", "https://doi.org/10.1/e3"}
+    assert db.scalar(select(text("count(*)")).select_from(PublicationAuthorAffiliationOverride)) == 2
+    events = db.scalars(select(AuditEvent).where(AuditEvent.entity_type == override_service.ENTITY_TYPE)).all()
+    assert len(events) == 2 and all(e.event_metadata.get("bulk") is True for e in events)
+
+
+def test_bulk_refuses_positions_of_different_authors_and_writes_nothing(client, as_role, db, world) -> None:
+    as_role("ADMIN")
+    resp = _bulk(client, [
+        {"publication_author_id": str(world["pa1"].id), "evidence_url": "https://doi.org/10.1/e1"},
+        {"publication_author_id": str(world["pa2"].id), "evidence_url": "https://doi.org/10.1/e1"},
+    ])
+    assert resp.status_code == 422
+    assert resp.json()["code"] == "BULK_MIXED_AUTHORS"
+    assert db.scalar(select(text("count(*)")).select_from(PublicationAuthorAffiliationOverride)) == 0
+
+
+def test_bulk_is_all_or_nothing_when_one_position_already_has_that_unit(client, as_role, db, world) -> None:
+    as_role("ADMIN")
+    extra = _second_position_of_222(db, world)
+    existing = _add(
+        client, str(extra.id), affiliation_text="University of Information and Communication Technology (ICTU)"
+    )
+    assert existing.status_code == 201
+    resp = _bulk(client, [
+        {"publication_author_id": str(world["pa2"].id), "evidence_url": "https://doi.org/10.1/e1"},
+        {"publication_author_id": str(extra.id), "evidence_url": "https://doi.org/10.1/e3"},
+    ])
+    assert resp.status_code == 409
+    assert db.scalar(select(text("count(*)")).select_from(PublicationAuthorAffiliationOverride)) == 1
+
+
+def test_only_admin_can_bulk_add(client, as_role, world) -> None:
+    as_role("REVIEWER")
+    resp = _bulk(client, [{"publication_author_id": str(world["pa2"].id), "evidence_url": "https://x"}])
+    assert resp.status_code == 403
 
 
 def test_missing_reason_or_evidence_is_rejected(client, as_role, world) -> None:

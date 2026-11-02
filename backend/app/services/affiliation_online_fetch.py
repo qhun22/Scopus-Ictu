@@ -52,6 +52,11 @@ _OPENALEX_BATCH_SIZE = 40
 _OPENALEX_RATE_DELAY = 0.25  # <=4 req/s, well under OpenAlex's documented polite-pool limits
 _CROSSREF_RATE_DELAY = 0.35
 _ORCID_RATE_DELAY = 0.30
+# Crossref and ORCID answer one DOI / one ORCID per request. Run a few at a time instead of
+# strictly one after another; each worker still waits its polite delay after every request,
+# so the combined rate stays within the public limits (about 3-4 requests/s per service).
+_CROSSREF_CONCURRENCY = 3
+_ORCID_CONCURRENCY = 4
 
 OPENALEX_BASE = "https://api.openalex.org"
 CROSSREF_BASE = "https://api.crossref.org"
@@ -178,12 +183,12 @@ async def fetch_crossref_works(
     cache = cache if cache is not None else {}
     found = 0
     keep_fields = ("DOI", "title", "author", "publisher", "type", "issued")
-    for doi in dois:
-        if should_continue is not None and not should_continue():
-            raise AffiliationFetchCancelled
+    slots = asyncio.Semaphore(_CROSSREF_CONCURRENCY)
+
+    async def fetch_one(doi: str) -> dict:
         if doi in cache:
-            record = cache[doi]
-        else:
+            return cache[doi]
+        async with slots:
             url = f"{CROSSREF_BASE}/works/{urllib.parse.quote(doi, safe='/()')}"
             status, data = await _get_json(client, url)
             record: dict[str, Any] = {
@@ -197,10 +202,19 @@ async def fetch_crossref_works(
                 record["work"] = {k: message.get(k) for k in keep_fields}
             cache[doi] = record
             await asyncio.sleep(_CROSSREF_RATE_DELAY)
-        if record.get("work"):
-            found += 1
-        if on_record is not None:
-            await on_record(record)
+            return record
+
+    # Chunks keep cancellation prompt and records in the caller's DOI order.
+    step = _CROSSREF_CONCURRENCY * 4
+    for i in range(0, len(dois), step):
+        if should_continue is not None and not should_continue():
+            raise AffiliationFetchCancelled
+        chunk = list(dois[i : i + step])
+        for record in await asyncio.gather(*(fetch_one(d) for d in chunk)):
+            if record.get("work"):
+                found += 1
+            if on_record is not None:
+                await on_record(record)
     return found
 
 
@@ -235,33 +249,44 @@ async def fetch_orcid_records(
 ) -> dict[str, dict]:
     cache = cache if cache is not None else {}
     out: dict[str, dict] = {}
-    for orcid in orcids:
+    slots = asyncio.Semaphore(_ORCID_CONCURRENCY)
+
+    async def fetch_one(orcid: str) -> dict:
+        if orcid in cache:
+            return cache[orcid]
+        async with slots:
+            url = f"{ORCID_BASE}/{orcid}/external-identifiers"
+            status, data = await _get_json(client, url)
+            if data is not None:
+                record = {
+                    "retrieved_at": _now(),
+                    "http": status,
+                    "external_identifiers": [
+                        {
+                            "type": x.get("external-id-type"),
+                            "value": x.get("external-id-value"),
+                            "url": (x.get("external-id-url") or {}).get("value"),
+                            "source": (
+                                (x.get("source") or {}).get("source-name") or {}
+                            ).get("value"),
+                        }
+                        for x in (data.get("external-identifier") or [])
+                    ],
+                }
+            else:
+                record = {"retrieved_at": _now(), "http": status, "external_identifiers": None}
+            cache[orcid] = record
+            await asyncio.sleep(_ORCID_RATE_DELAY)
+            return record
+
+    step = _ORCID_CONCURRENCY * 4
+    for i in range(0, len(orcids), step):
         if should_continue is not None and not should_continue():
             raise AffiliationFetchCancelled
-        if orcid in cache:
-            out[orcid] = cache[orcid]
-            continue
-        url = f"{ORCID_BASE}/{orcid}/external-identifiers"
-        status, data = await _get_json(client, url)
-        if data is not None:
-            record = {
-                "retrieved_at": _now(),
-                "http": status,
-                "external_identifiers": [
-                    {
-                        "type": x.get("external-id-type"),
-                        "value": x.get("external-id-value"),
-                        "url": (x.get("external-id-url") or {}).get("value"),
-                        "source": ((x.get("source") or {}).get("source-name") or {}).get("value"),
-                    }
-                    for x in (data.get("external-identifier") or [])
-                ],
-            }
-        else:
-            record = {"retrieved_at": _now(), "http": status, "external_identifiers": None}
-        cache[orcid] = record
-        out[orcid] = record
-        await asyncio.sleep(_ORCID_RATE_DELAY)
+        chunk = list(orcids[i : i + step])
+        records = await asyncio.gather(*(fetch_one(o) for o in chunk))
+        for orcid, record in zip(chunk, records, strict=True):
+            out[orcid] = record
     return out
 
 

@@ -93,9 +93,26 @@ async function readJsonBody(response: Response): Promise<unknown> {
   }
 }
 
+/** FastAPI 422 bodies carry `detail` as a list of { loc, msg }: turn it into one readable sentence. */
+function describeValidationDetail(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const detail = (body as { detail?: unknown }).detail;
+  if (!Array.isArray(detail) || detail.length === 0) return undefined;
+  const fields = detail
+    .map((item) => {
+      const loc = (item as { loc?: unknown })?.loc;
+      return Array.isArray(loc) ? String(loc[loc.length - 1]) : null;
+    })
+    .filter((name): name is string => Boolean(name));
+  const unique = [...new Set(fields)];
+  return unique.length > 0
+    ? `Dữ liệu chưa hợp lệ ở: ${unique.join(", ")}. Hãy kiểm tra lại các trường này.`
+    : "Dữ liệu gửi lên chưa hợp lệ. Hãy kiểm tra lại các trường đã nhập.";
+}
+
 async function createApiError(method: string, response: Response): Promise<ApiError> {
   const body = await readJsonBody(response);
-  const detail = getStringField(body, "detail");
+  const detail = getStringField(body, "detail") ?? describeValidationDetail(body);
   const code = getStringField(body, "code");
   const fallback = `Yêu cầu ${method} không thành công (${response.status}).`;
 

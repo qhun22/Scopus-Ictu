@@ -169,8 +169,14 @@ export interface NeedsReviewItem {
   scopus_id: string;
   preferred_name: string;
   reason_kind: "UNRESOLVED" | "CONFLICTING_SOURCES" | "LOW_CONFIDENCE";
-  resolution_summaries: Array<{ source_system: string; link_status: string; unresolved_reason: string | null }>;
+  resolution_summaries: Array<{
+    source_system: string;
+    link_status: string;
+    unresolved_reason: string | null;
+    raw_affiliations?: string[];
+  }>;
   has_override: boolean;
+  doi?: string | null;
   /** ALL overrides for this position — active and revoked, newest first. */
   overrides: OverrideFull[];
 }
@@ -219,7 +225,7 @@ export interface RevokeOverrideBody {
 }
 
 export function getNeedsReview(
-  params: { limit?: number; offset?: number; query?: string; reason_kind?: string } = {},
+  params: { limit?: number; offset?: number; query?: string; reason_kind?: string; ictu_only?: boolean } = {},
   options: ApiRequestOptions = {},
 ): Promise<NeedsReviewListResponse> {
   const query = new URLSearchParams();
@@ -230,8 +236,21 @@ export function getNeedsReview(
     query.set("q", params.query);
   }
   if (params.reason_kind) query.set("reason_kind", params.reason_kind);
+  if (params.ictu_only) query.set("ictu_only", "true");
   const qs = query.toString();
   return apiGet<NeedsReviewListResponse>(`/api/v1/affiliations/needs-review${qs ? `?${qs}` : ""}`, options);
+}
+
+export interface BulkAddOverridesBody {
+  items: Array<{ publication_author_id: string; evidence_url: string }>;
+  affiliation_text: string;
+  confidence: "CORROBORATED" | "UNRESOLVED";
+  reason: string;
+}
+
+/** Add the same unit to several positions of ONE Scopus author, all or none. */
+export function addOverridesBulk(body: BulkAddOverridesBody, options: ApiRequestOptions = {}): Promise<OverrideFull[]> {
+  return apiPost<OverrideFull[], BulkAddOverridesBody>("/api/v1/affiliations/overrides/bulk", body, options);
 }
 
 /** Add a new active unit statement for a position. Does not touch any other override already on it. */

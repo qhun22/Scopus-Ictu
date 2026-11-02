@@ -12,6 +12,7 @@ import Button, { buttonClass } from "../../components/ui/Button";
 import ModalPortal from "../../components/common/ModalPortal";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
+import ApplyToOtherPositions from "./ApplyToOtherPositions";
 
 type Locale = "vi" | "en";
 
@@ -21,11 +22,49 @@ const REASON_KIND_LABEL: Record<string, Record<Locale, string>> = {
   LOW_CONFIDENCE: { vi: "Chỉ đối chiếu, chưa xác minh", en: "Corroborated only, not verified" },
 };
 
-const REASON_KIND_STYLE: Record<string, string> = {
-  UNRESOLVED: "bg-slate-100 text-slate-600 border-slate-200",
-  CONFLICTING_SOURCES: "bg-rose-50 text-rose-700 border-rose-200",
-  LOW_CONFIDENCE: "bg-amber-50 text-amber-700 border-amber-200",
+// A status that carries two facts is shown as two stacked labels, like the source labels beside it.
+const REASON_KIND_PARTS: Record<string, Record<Locale, string[]>> = {
+  LOW_CONFIDENCE: {
+    vi: ["Chỉ đối chiếu", "Chưa xác minh"],
+    en: ["Corroborated only", "Not verified"],
+  },
 };
+
+// Once an ADMIN has set an active unit the position is handled: the badge says so, while the
+// source-derived status stays visible in the detail view and as a tooltip.
+const ADJUSTED_LABEL: Record<Locale, string> = { vi: "Đã hiệu chỉnh", en: "Adjusted" };
+const ADJUSTED_STYLE = "border-emerald-400 bg-white text-emerald-700 hover:bg-emerald-50";
+
+const reasonParts = (kind: string, locale: Locale): string[] =>
+  REASON_KIND_PARTS[kind]?.[locale] ?? [REASON_KIND_LABEL[kind]?.[locale] ?? kind];
+
+const REASON_KIND_STYLE: Record<string, string> = {
+  UNRESOLVED: "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
+  CONFLICTING_SOURCES: "border-red-300 bg-white text-red-700 hover:bg-red-50",
+  LOW_CONFIDENCE: "border-amber-300 bg-white text-amber-700 hover:bg-amber-50",
+};
+
+// Same fixed width for the "Trạng thái rà soát" and "Nguồn đối soát" labels, so the column reads evenly.
+const STATUS_BADGE_BASE =
+  "inline-flex h-badge w-40 shrink-0 items-center justify-center truncate whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
+const UNIT_BADGE_BASE =
+  "inline-flex h-badge w-40 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
+const UNIT_BADGE_ICTU = "border-[#3A5FC3] bg-white text-[#3A5FC3] hover:bg-blue-50";
+const UNIT_BADGE_OTHER = "border-slate-400 bg-white text-slate-700 hover:bg-slate-50";
+
+// The university itself (name or acronym), ignoring case and Vietnamese diacritics.
+const isIctuUnit = (text: string): boolean => {
+  const plain = text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/gi, "d")
+    .toLowerCase();
+  return (plain.includes("cong nghe thong tin") && plain.includes("truyen thong")) ||
+    (plain.includes("information and communication technology") && plain.includes("thai nguyen")) ||
+    /ictu/.test(plain);
+};
+const SOURCE_BADGE_BASE =
+  "inline-flex h-badge w-40 shrink-0 items-center justify-center truncate whitespace-nowrap rounded border border-slate-200 px-2 text-center text-[10px] leading-none";
 
 const ERROR_LABEL: Record<string, Record<Locale, string>> = {
   STALE_OVERRIDE_VERSION: {
@@ -86,6 +125,15 @@ function OverrideForm({
   const [error, setError] = useState<string | null>(null);
 
   const submit = useSingleFlight(async () => {
+    const missing = [
+      !form.affiliation_text.trim() && (vi ? "Tên đơn vị" : "Unit name"),
+      !form.evidence_url.trim() && (vi ? "Nguồn chứng cứ (URL)" : "Evidence source (URL)"),
+      !form.reason.trim() && (vi ? "Lý do" : "Reason"),
+    ].filter(Boolean);
+    if (missing.length > 0) {
+      setError(vi ? `Cần nhập: ${missing.join(", ")}.` : `Required: ${missing.join(", ")}.`);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -98,8 +146,8 @@ function OverrideForm({
   });
 
   return (
-    <div className="mt-2 space-y-2.5 rounded-[5px] border border-violet-200 bg-violet-50/40 p-3">
-      <p className="text-xs font-bold text-violet-800">{title}</p>
+    <div className="mt-2 space-y-2.5 rounded-[5px] border border-slate-200 bg-white p-3">
+      <p className="text-xs font-bold text-slate-800">{title}</p>
       <div>
         <label className="text-[11px] font-semibold text-slate-600">{vi ? "Tên đơn vị *" : "Unit name *"}</label>
         <input
@@ -185,7 +233,12 @@ function OverrideRow({
     setRevokeError(null);
     try {
       await revokeOverride(o.id, { reason: revokeReason, expected_version: o.version });
-      toast.success(vi ? "Đã thu hồi đơn vị" : "Unit revoked", "");
+      toast.success(
+        vi ? "Đã thu hồi đơn vị" : "Unit revoked",
+        vi
+          ? `Đơn vị "${o.affiliation_text}" không còn hoạt động. Lịch sử vẫn được giữ lại.`
+          : `"${o.affiliation_text}" is no longer active. The history is kept.`,
+      );
       setRevoking(false);
       onChanged();
     } catch (err) {
@@ -199,7 +252,7 @@ function OverrideRow({
 
   return (
     <li
-      className={`rounded-[5px] border p-3 ${isRevoked ? "border-slate-200 bg-slate-50" : "border-violet-200 bg-violet-50/30"}`}
+      className={`rounded-[5px] border p-3 ${isRevoked ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white"}`}
       data-testid="override-row"
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -207,14 +260,10 @@ function OverrideRow({
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-800">{o.affiliation_text}</span>
             {isRevoked ? (
-              <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+              <span className="inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50">
                 {vi ? "Đã thu hồi" : "Revoked"}
               </span>
-            ) : (
-              <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">
-                {vi ? "Đang hoạt động" : "Active"}
-              </span>
-            )}
+            ) : null}
           </div>
           <p className="text-[11px] text-slate-600">
             <span className="text-slate-400">{vi ? "Mức tin cậy: " : "Confidence: "}</span>
@@ -281,7 +330,12 @@ function OverrideRow({
           onCancel={() => setEditing(false)}
           onSubmit={async (form) => {
             await updateOverride(o.id, { ...form, expected_version: o.version });
-            toast.success(vi ? "Đã cập nhật đơn vị" : "Unit updated", "");
+            toast.success(
+              vi ? "Đã cập nhật đơn vị" : "Unit updated",
+              vi
+                ? `Đã lưu thay đổi cho "${form.affiliation_text}" kèm nguồn chứng cứ và lý do.`
+                : `Changes to "${form.affiliation_text}" were saved with its evidence and reason.`,
+            );
             setEditing(false);
             onChanged();
           }}
@@ -349,6 +403,9 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   const [appliedSearch, setAppliedSearch] = useState("");
   const [reasonFilter, setReasonFilter] = useState("ALL");
   const [appliedReasonFilter, setAppliedReasonFilter] = useState("ALL");
+  // Scope of the list: only Scopus authors tied to an ICTU lecturer (default), or every author.
+  const [scopeFilter, setScopeFilter] = useState<"ICTU" | "ALL">("ICTU");
+  const [appliedScope, setAppliedScope] = useState<"ICTU" | "ALL">("ICTU");
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -357,9 +414,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   // Selected item for modal details
   const [selectedItem, setSelectedItem] = useState<NeedsReviewItem | null>(null);
   const [modalAdding, setModalAdding] = useState(false);
+  // Revoked units stay in the history; the list shows them only when asked.
+  const [showRevoked, setShowRevoked] = useState(false);
 
   const loadItems = useCallback(
-    async (q: string, filter: string, targetPage: number, targetPageSize: number) => {
+    async (q: string, filter: string, scope: "ICTU" | "ALL", targetPage: number, targetPageSize: number) => {
       setLoading(true);
       setLoadError(null);
       try {
@@ -368,6 +427,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
           offset: (targetPage - 1) * targetPageSize,
           query: q.trim() || undefined,
           reason_kind: filter !== "ALL" ? filter : undefined,
+          ictu_only: scope === "ICTU",
         });
         setItems(res.items);
         setTotal(res.total);
@@ -385,18 +445,19 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   );
 
   useEffect(() => {
-    void loadItems(appliedSearch, appliedReasonFilter, page, pageSize);
-  }, [loadItems, appliedSearch, appliedReasonFilter, page, pageSize]);
+    void loadItems(appliedSearch, appliedReasonFilter, appliedScope, page, pageSize);
+  }, [loadItems, appliedSearch, appliedReasonFilter, appliedScope, page, pageSize]);
 
   const refresh = useCallback(async () => {
-    await loadItems(appliedSearch, appliedReasonFilter, page, pageSize);
-  }, [loadItems, appliedSearch, appliedReasonFilter, page, pageSize]);
+    await loadItems(appliedSearch, appliedReasonFilter, appliedScope, page, pageSize);
+  }, [loadItems, appliedSearch, appliedReasonFilter, appliedScope, page, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const handleApplySearch = () => {
     setAppliedSearch(searchInput.trim());
     setAppliedReasonFilter(reasonFilter);
+    setAppliedScope(scopeFilter);
     setPage(1);
   };
 
@@ -405,20 +466,29 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
     setAppliedSearch("");
     setReasonFilter("ALL");
     setAppliedReasonFilter("ALL");
+    setScopeFilter("ICTU");
+    setAppliedScope("ICTU");
     setPage(1);
   };
 
   const isApplyDisabled =
-    searchInput.trim() === appliedSearch.trim() && reasonFilter === appliedReasonFilter;
+    searchInput.trim() === appliedSearch.trim() &&
+    reasonFilter === appliedReasonFilter &&
+    scopeFilter === appliedScope;
   const isResetDisabled =
-    !searchInput.trim() && !appliedSearch && reasonFilter === "ALL" && appliedReasonFilter === "ALL";
+    !searchInput.trim() &&
+    !appliedSearch &&
+    reasonFilter === "ALL" &&
+    appliedReasonFilter === "ALL" &&
+    scopeFilter === "ICTU" &&
+    appliedScope === "ICTU";
 
   return (
     <section className="space-y-4" data-testid="aff-manual-review-card">
       {/* Title & Description */}
       <div>
         <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">
-          {vi ? "4. Rà soát và hiệu chỉnh thủ công" : "4. Manual Review and Override"}
+          {vi ? "5. Rà soát và hiệu chỉnh thủ công" : "5. Manual review and override"}
         </h2>
         <p className="mt-1 text-xs leading-relaxed text-slate-600 max-w-5xl">
           {vi
@@ -455,6 +525,17 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Phạm vi tác giả */}
+          <select
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as "ICTU" | "ALL")}
+            aria-label={vi ? "Phạm vi tác giả" : "Author scope"}
+            className="h-control rounded-control border border-line bg-slate-50 px-3 text-[13px] text-ink focus:border-brand focus:bg-white focus:outline-none cursor-pointer"
+          >
+            <option value="ICTU">{vi ? "Tác giả liên quan ICTU" : "ICTU-related authors"}</option>
+            <option value="ALL">{vi ? "Tất cả tác giả" : "All authors"}</option>
+          </select>
+
           {/* Lọc theo lý do */}
           <select
             value={reasonFilter}
@@ -514,13 +595,13 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                   {vi ? "Bài báo / EID" : "Publication / EID"}
                 </th>
                 <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
+                  {vi ? "Nguồn đối soát" : "Reconciliation Sources"}
+                </th>
+                <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
                   {vi ? "Trạng thái rà soát" : "Review Status"}
                 </th>
                 <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
                   {vi ? "Đơn vị đang hoạt động" : "Active Units"}
-                </th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">
-                  {vi ? "Nguồn đối soát" : "Reconciliation Sources"}
                 </th>
                 <th className="w-44 whitespace-nowrap border-l border-slate-200/80 px-4 py-3 text-center font-semibold text-slate-600">
                   {vi ? "Thao tác" : "Actions"}
@@ -567,8 +648,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                         <p className="font-semibold text-slate-800 text-xs line-clamp-1" title={item.preferred_name}>
                           {item.preferred_name}
                         </p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {vi ? "Vị trí" : "Order"} <span className="font-semibold text-slate-700">{item.author_order}</span> · Scopus ID: <span className="font-mono text-slate-600">{item.scopus_id}</span>
+                        <p className="text-[11px] text-slate-500 mt-0.5 whitespace-nowrap">
+                          {vi ? "Vị trí" : "Order"} <span className="font-semibold text-slate-700">{item.author_order}</span>
+                        </p>
+                        <p className="text-[11px] text-slate-500 whitespace-nowrap">
+                          Scopus ID: <span className="font-mono text-slate-600">{item.scopus_id}</span>
                         </p>
                       </td>
 
@@ -582,47 +666,48 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                         </p>
                       </td>
 
+                      {/* Nguồn đối soát */}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col items-center gap-1 text-[10px]">
+                          {item.resolution_summaries.map((r, idx) => (
+                            <span
+                              key={idx}
+                              className={`${SOURCE_BADGE_BASE} bg-white text-slate-600`}
+                              title={`${r.source_system}: ${r.link_status}${r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}`}
+                            >
+                              {r.source_system}: <strong className="text-slate-700">{r.link_status}</strong>
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+
                       {/* Trạng thái rà soát */}
                       <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-bold ${REASON_KIND_STYLE[item.reason_kind]}`}
-                        >
-                          {REASON_KIND_LABEL[item.reason_kind]?.[locale] ?? item.reason_kind}
-                        </span>
+                        <div className="flex flex-col items-center gap-1">
+                          {(activeOverrides.length > 0 ? [ADJUSTED_LABEL[locale]] : reasonParts(item.reason_kind, locale)).map((part) => (
+                            <span
+                              key={part}
+                              className={`${STATUS_BADGE_BASE} ${activeOverrides.length > 0 ? ADJUSTED_STYLE : REASON_KIND_STYLE[item.reason_kind]}`}
+                              title={`${vi ? "Trạng thái từ nguồn" : "Source status"}: ${REASON_KIND_LABEL[item.reason_kind]?.[locale] ?? item.reason_kind}`}
+                            >
+                              {part}
+                            </span>
+                          ))}
+                        </div>
                       </td>
 
                       {/* Đơn vị đang hoạt động */}
                       <td className="px-4 py-3 text-center">
                         {activeOverrides.length > 0 ? (
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
-                              {activeOverrides.length} {vi ? "đơn vị" : "unit(s)"}
-                            </span>
-                            <span
-                              className="text-[11px] text-slate-600 max-w-[150px] truncate"
-                              title={activeOverrides[0].affiliation_text}
-                            >
-                              {activeOverrides[0].affiliation_text}
-                            </span>
-                          </div>
+                          <span
+                            className={`${UNIT_BADGE_BASE} ${activeOverrides.some((o) => isIctuUnit(o.affiliation_text)) ? UNIT_BADGE_ICTU : UNIT_BADGE_OTHER}`}
+                            title={activeOverrides.map((o) => o.affiliation_text).join("; ")}
+                          >
+                            {activeOverrides.length} {vi ? "đơn vị" : "unit(s)"}
+                          </span>
                         ) : (
                           <span className="text-slate-300">—</span>
                         )}
-                      </td>
-
-                      {/* Nguồn đối soát */}
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col items-start gap-1 text-[10px]">
-                          {item.resolution_summaries.map((r, idx) => (
-                            <span
-                              key={idx}
-                              className="rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-slate-600 whitespace-nowrap"
-                            >
-                              {r.source_system}: <strong className="text-slate-700">{r.link_status}</strong>
-                              {r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}
-                            </span>
-                          ))}
-                        </div>
                       </td>
 
                       {/* Thao tác */}
@@ -715,7 +800,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
       {selectedItem && (
         <ModalPortal>
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-card border border-slate-200 bg-white shadow-2xl overflow-hidden">
+            <div className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-card border border-slate-200 bg-white shadow-2xl overflow-hidden">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
                 <div>
@@ -744,28 +829,59 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
               <div className="overflow-y-auto p-5 space-y-4 flex-1">
                 {/* Paper Context Card */}
                 <div className="rounded-[5px] border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-slate-700">
-                      EID: <span className="font-mono text-slate-900">{selectedItem.eid}</span>
-                    </span>
-                    <span
-                      className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-bold ${REASON_KIND_STYLE[selectedItem.reason_kind]}`}
-                    >
-                      {REASON_KIND_LABEL[selectedItem.reason_kind]?.[locale] ?? selectedItem.reason_kind}
-                    </span>
-                  </div>
+                  <span className="block text-xs font-semibold text-slate-700">
+                    EID: <span className="font-mono text-slate-900">{selectedItem.eid}</span>
+                  </span>
                   <p className="text-xs font-medium text-slate-800 leading-snug">{selectedItem.title}</p>
                   <div className="flex flex-col items-start gap-1 text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
-                    <span className="font-semibold">{vi ? "Nguồn đối soát:" : "Reconciled sources:"}</span>
-                    <div className="flex flex-col items-start gap-1">
-                      {selectedItem.resolution_summaries.map((r, idx) => (
-                        <span
-                          key={idx}
-                          className="rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600"
-                        >
-                          {r.source_system}: <strong className="text-slate-800">{r.link_status}</strong>
-                          {r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}
+                    <span className="font-semibold">{vi ? "Trạng thái rà soát:" : "Review status:"}</span>
+                    <div className="flex flex-col items-start gap-2">
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-[11px] text-slate-500">
+                          {selectedItem.overrides.some((o) => o.status === "ACTIVE")
+                            ? vi ? "Trạng thái cũ" : "Previous status"
+                            : vi ? "Trạng thái hiện tại" : "Current status"}
                         </span>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {reasonParts(selectedItem.reason_kind, locale).map((part) => (
+                            <span key={part} className={`${STATUS_BADGE_BASE} ${REASON_KIND_STYLE[selectedItem.reason_kind]}`}>
+                              {part}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {selectedItem.overrides.some((o) => o.status === "ACTIVE") && (
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="text-[11px] text-slate-500">{vi ? "Trạng thái mới" : "New status"}</span>
+                          <span className={`${STATUS_BADGE_BASE} ${ADJUSTED_STYLE}`}>{ADJUSTED_LABEL[locale]}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-start gap-1 text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
+                    <span className="font-semibold">{vi ? "Nguồn đối soát:" : "Reconciled sources:"}</span>
+                    <div className="flex flex-col items-start gap-2">
+                      {selectedItem.resolution_summaries.map((r, idx) => (
+                        <div key={idx} className="flex flex-col items-start gap-1">
+                          <span
+                            className={`${SOURCE_BADGE_BASE} bg-white text-slate-600`}
+                            title={`${r.source_system}: ${r.link_status}${r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}`}
+                          >
+                            {r.source_system}: <strong className="text-slate-800">{r.link_status}</strong>
+                            {r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}
+                          </span>
+                          {(r.raw_affiliations ?? []).length > 0 ? (
+                            <ul className="ml-1 list-disc space-y-0.5 pl-4 text-[11px] text-slate-700">
+                              {(r.raw_affiliations ?? []).map((text) => (
+                                <li key={text}>{text}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="ml-1 text-[11px] text-slate-400">
+                              {vi ? "Nguồn này không ghi đơn vị." : "This source reports no affiliation."}
+                            </span>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -776,9 +892,9 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">
                       {vi ? "Danh sách đơn vị đã ghi nhận" : "Recorded units list"}
-                      {selectedItem.overrides.length > 0 && (
+                      {selectedItem.overrides.some((o) => o.status === "ACTIVE") && (
                         <span className="ml-1.5 font-normal text-slate-400">
-                          ({selectedItem.overrides.length})
+                          ({selectedItem.overrides.filter((o) => o.status === "ACTIVE").length})
                         </span>
                       )}
                     </h3>
@@ -786,18 +902,15 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       <button
                         type="button"
                         onClick={() => setModalAdding(true)}
-                        className={buttonClass("primary", "sm")}
+                        className="inline-flex h-badge w-40 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50"
                         data-testid="review-add-btn"
                       >
-                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
-                        </svg>
                         <span>{vi ? "Thêm đơn vị" : "Add unit"}</span>
                       </button>
                     )}
                   </div>
 
-                  {selectedItem.overrides.length === 0 && !modalAdding ? (
+                  {selectedItem.overrides.filter((o) => showRevoked || o.status === "ACTIVE").length === 0 && !modalAdding ? (
                     <div className="rounded-[5px] border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
                       {vi
                         ? "Chưa có đơn vị nào được ghi nhận thủ công cho vị trí tác giả này."
@@ -805,7 +918,9 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                     </div>
                   ) : (
                     <ul className="space-y-2" data-testid="override-list">
-                      {selectedItem.overrides.map((o) => (
+                      {selectedItem.overrides
+                        .filter((o) => showRevoked || o.status === "ACTIVE")
+                        .map((o) => (
                         <OverrideRow
                           key={o.id}
                           override={o}
@@ -817,7 +932,25 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       ))}
                     </ul>
                   )}
+                  {selectedItem.overrides.some((o) => o.status === "REVOKED") && (
+                    <button
+                      type="button"
+                      onClick={() => setShowRevoked((v) => !v)}
+                      className="mt-2 text-[11px] font-semibold text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                      data-testid="toggle-revoked-units"
+                    >
+                      {showRevoked
+                        ? vi ? "Ẩn các đơn vị đã thu hồi" : "Hide revoked units"
+                        : vi
+                          ? `Hiện ${selectedItem.overrides.filter((o) => o.status === "REVOKED").length} đơn vị đã thu hồi`
+                          : `Show ${selectedItem.overrides.filter((o) => o.status === "REVOKED").length} revoked unit(s)`}
+                    </button>
+                  )}
                 </div>
+
+                {selectedItem.overrides.some((o) => o.status === "ACTIVE") && (
+                  <ApplyToOtherPositions item={selectedItem} locale={locale} onDone={refresh} />
+                )}
 
                 {/* Form thêm đơn vị mới */}
                 {modalAdding && (

@@ -14,6 +14,7 @@ import {
 } from "../../api/affiliations";
 import { ApiError } from "../../api/client";
 import Button from "../../components/ui/Button";
+import ConfirmModal from "../../components/common/ConfirmModal";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 import ManualReviewCard from "./ManualReviewCard";
@@ -44,7 +45,7 @@ const BLOCKED_LABEL: Record<string, Record<Locale, string>> = {
     en: "No publications yet. Import and normalize a Scopus CSV first.",
   },
   NOTHING_TO_APPLY: {
-    vi: "Không có gì mới để ghi: kết quả này đã được áp dụng trước đó.",
+    vi: "Không có gì mới để ghi: kết quả này đã được bạn áp dụng trước đó.",
     en: "Nothing new to write: this result has already been applied.",
   },
   SOURCE_MISMATCH: {
@@ -127,6 +128,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
   const [job, setJob] = useState<EnrichmentJob | null>(null);
   const [starting, setStarting] = useState(false);
   const [resuming, setResuming] = useState(false);
+  const [confirmRerun, setConfirmRerun] = useState(false);
   const [sourceMode, setSourceMode] = useState<"offline" | "online">("offline");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -312,20 +314,20 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
             <div className="space-y-1 text-xs" data-testid="aff-source-missing">
               <p className="font-medium text-slate-700">
                 {vi
-                  ? "Chưa gắn bộ nguồn offline với máy chủ, nên chưa thể Xem trước / Áp dụng một lần đối chiếu mới từ nguồn offline."
-                  : "No offline source bundle is attached to the server, so a new offline preview / apply cannot be run."}
+                  ? "Chưa có dữ liệu đơn vị nào được nạp. Hãy chạy thu thập trực tuyến ở mục 3."
+                  : "No affiliation data has been loaded yet. Run online collection in section 3."}
               </p>
               {db && Object.keys(db.resolutions_by_source_and_status).length > 0 && (
                 <p className="text-emerald-700" data-testid="aff-source-missing-data-kept">
                   {vi
-                    ? "Dữ liệu đơn vị đã áp dụng trước đó vẫn được giữ nguyên trong hệ thống (xem mục 2)."
-                    : "Affiliation data applied earlier is kept in the system (see section 2)."}
+                    ? "Dữ liệu đã áp dụng trước đó vẫn được giữ nguyên (xem mục 2)."
+                    : "Data applied earlier is unchanged (see section 2)."}
                 </p>
               )}
               <p className="text-slate-400">
                 {vi
-                  ? "Dành cho người vận hành: cấu hình AFFILIATION_SOURCE_DIR trỏ tới bộ metadata đã kiểm tra."
-                  : "For operators: set AFFILIATION_SOURCE_DIR to the verified metadata bundle."}
+                  ? "Quản trị: có thể nạp sẵn dữ liệu bằng cấu hình AFFILIATION_SOURCE_DIR."
+                  : "Admin: data can be preloaded via the AFFILIATION_SOURCE_DIR setting."}
               </p>
             </div>
           ) : (
@@ -413,18 +415,50 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
         </Card>
       </div>
 
-      <Card title={vi ? "2. Thu thập đơn vị trực tuyến (tùy chọn)" : "2. Online affiliation collection (optional)"} testId="aff-online-card">
+      <Card title={vi ? "3. Thu thập đơn vị trực tuyến" : "3. Online affiliation collection (optional)"} testId="aff-online-card">
         <p className="mb-3 text-xs leading-relaxed text-slate-600">
           {vi
-            ? "ADMIN có thể chủ động tra cứu OpenAlex, Crossref và ORCID công khai cho DOI của các công bố hiện có, thay vì cần chuẩn bị bộ nguồn offline thủ công. Chạy nền; có thể tạm dừng và tiếp tục bất cứ lúc nào."
+            ? "Tại đây có thể chủ động tra cứu OpenAlex, Crossref và ORCID công khai cho DOI của các công bố hiện có, thay vì cần chuẩn bị bộ nguồn offline thủ công. Chạy nền; có thể tạm dừng và tiếp tục bất cứ lúc nào."
             : "ADMIN may actively query public OpenAlex, Crossref and ORCID for the DOIs of existing publications, instead of preparing an offline bundle by hand. Runs in the background; can be paused and resumed at any time."}
         </p>
+        <ConfirmModal
+          open={confirmRerun}
+          variant="warning"
+          title={vi ? "Đã thu thập trực tuyến trước đó" : "Online collection already done"}
+          description={
+            job ? (
+              <>
+                <p>
+                  {vi
+                    ? `Lượt gần nhất đã hoàn tất lúc ${new Date(job.updated_at).toLocaleString("vi-VN")}: ${fmt(job.processed_dois)}/${fmt(job.total_dois)} DOI (OpenAlex tìm thấy ${fmt(job.openalex_found)}, Crossref ${fmt(job.crossref_found)}, ORCID ${fmt(job.orcid_fetched)}).`
+                    : `The latest run finished at ${new Date(job.updated_at).toLocaleString("en-GB")}: ${fmt(job.processed_dois)}/${fmt(job.total_dois)} DOIs (OpenAlex found ${fmt(job.openalex_found)}, Crossref ${fmt(job.crossref_found)}, ORCID ${fmt(job.orcid_fetched)}).`}
+                </p>
+                <p>
+                  {vi
+                    ? "Chạy lại sẽ gọi lại các dịch vụ bên ngoài và mất nhiều thời gian. Bạn có muốn chạy lại không?"
+                    : "Running again will call the external services again and takes a long time. Do you want to run it again?"}
+                </p>
+              </>
+            ) : null
+          }
+          confirmLabel={vi ? "Chạy lại" : "Run again"}
+          cancelLabel={vi ? "Không, giữ kết quả" : "No, keep results"}
+          onCancel={() => setConfirmRerun(false)}
+          onConfirm={() => {
+            setConfirmRerun(false);
+            void runStartEnrichment();
+          }}
+        />
         {!job || !ENRICHMENT_ACTIVE.includes(job.status) ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="secondary"
-              onClick={runStartEnrichment}
+              onClick={() => {
+                // A finished run already holds results: ask before repeating the slow external lookups.
+                if (job?.status === "COMPLETED") setConfirmRerun(true);
+                else void runStartEnrichment();
+              }}
               disabled={starting || resuming}
               data-testid="aff-online-start-btn"
             >
@@ -504,7 +538,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
             {job.status === "COMPLETED" && (
               <p className="mt-1 text-slate-500">
                 {vi
-                  ? 'Kết quả đã sẵn sàng. Nhấn "Xem trước" bên dưới để dùng kết quả này thay cho bộ nguồn offline.'
+                  ? 'Kết quả đã hoàn thành. Nhấn "Xem trước" bên dưới để dùng kết quả này nhé!'
                   : 'Result is ready. Click "Preview" below to use this result instead of the offline bundle.'}
               </p>
             )}
@@ -512,7 +546,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
         )}
       </Card>
 
-      <Card title={vi ? "3. Xem trước và áp dụng" : "3. Preview and apply"} testId="aff-preview-card">
+      <Card title={vi ? "4. Xem trước và áp dụng" : "4. Preview and apply"} testId="aff-preview-card">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Button type="button" variant="secondary" onClick={runPreview} disabled={previewing || applying} data-testid="aff-preview-btn">
             {previewing ? (vi ? "Đang tính…" : "Computing…") : vi ? "Xem trước" : "Preview"}
@@ -526,7 +560,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                 ? "Xem trước chỉ đọc, không ghi dữ liệu."
                 : "Preview is read-only and writes nothing."}
           </span>
-          {job?.status === "COMPLETED" && (
+          {job?.status === "COMPLETED" && source?.ready && (
             <button
               type="button"
               className="text-xs font-medium text-sky-700 underline"

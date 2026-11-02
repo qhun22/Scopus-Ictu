@@ -1,6 +1,6 @@
 import { adminLabel, isCorruptedName } from "../../utils/displayName";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   ScopusImport,
   getConfirmedImportIds,
@@ -392,23 +392,6 @@ export default function NormalizationPage() {
       {activeTab === "matching" && (
         <div className="tab-fade-in space-y-4">
           <MatchingTab locale={locale} />
-          {/* Workflow next-step hint */}
-          <div className="flex items-center gap-3 rounded-[5px] border border-emerald-200 bg-[#ECFDF5] px-4 py-3 text-sm">
-            <svg className="h-4 w-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-emerald-700 font-medium">
-              {locale === "vi"
-                ? "Ứng viên nhận dạng cần REVIEWER kiểm tra — "
-                : "Identity candidates need REVIEWER verification — "}
-            </span>
-            <Link
-              to="/reviews"
-              className="underline underline-offset-2 text-emerald-700 font-semibold hover:text-emerald-800 transition-colors"
-            >
-              {locale === "vi" ? "Tới trang Kiểm duyệt →" : "Go to Reviews page →"}
-            </Link>
-          </div>
         </div>
       )}
 

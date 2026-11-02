@@ -287,3 +287,73 @@ def test_run_enrichment_writes_bundle_files_in_the_shape_affiliation_sources_rea
     assert status.openalex_works == 1
     assert status.crossref_works == 1
     assert status.orcid_with_scopus_id == 1  # ORCID bridge found via extracted orcid
+
+
+def test_crossref_is_parallel_but_bounded_and_keeps_input_order() -> None:
+    """Speed-up: bounded concurrency, records still delivered in the caller's DOI order."""
+    from app.services import affiliation_online_fetch as module
+
+    in_flight = 0
+    peak = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.05)
+        in_flight -= 1
+        return httpx.Response(200, json={"message": {"DOI": "x"}})
+
+    dois = [f"10.1000/d{i:03d}" for i in range(24)]
+
+    async def run() -> list[str]:
+        order: list[str] = []
+
+        async def on_record(rec: dict) -> None:
+            order.append(rec["query_doi"])
+
+        async with _client(handler) as client:
+            await fetch_crossref_works(client, dois, on_record=on_record)
+        return order
+
+    original = module._CROSSREF_RATE_DELAY
+    module._CROSSREF_RATE_DELAY = 0.0
+    try:
+        order = asyncio.run(run())
+    finally:
+        module._CROSSREF_RATE_DELAY = original
+    assert order == dois                                   # same order as the input
+    assert 2 <= peak <= module._CROSSREF_CONCURRENCY       # parallel, but bounded
+
+
+def test_orcid_runs_in_parallel_and_cancellation_still_stops_between_chunks() -> None:
+    from app.services import affiliation_online_fetch as module
+
+    orcids = [f"0000-0000-0000-{i:04d}" for i in range(40)]
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, json={"external-identifier": []})
+
+    async def run() -> dict[str, dict]:
+        async with _client(handler) as client:
+            return await fetch_orcid_records(client, orcids)
+
+    original = module._ORCID_RATE_DELAY
+    module._ORCID_RATE_DELAY = 0.0
+    try:
+        result = asyncio.run(run())
+        assert list(result) == orcids and calls == 40
+
+        checks = iter([True, False])
+
+        async def cancelled() -> None:
+            async with _client(handler) as client:
+                await fetch_orcid_records(client, orcids, should_continue=lambda: next(checks))
+
+        with pytest.raises(AffiliationFetchCancelled):
+            asyncio.run(cancelled())
+    finally:
+        module._ORCID_RATE_DELAY = original

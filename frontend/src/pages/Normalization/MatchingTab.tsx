@@ -44,6 +44,24 @@ const ERROR_LABEL: Record<string, Record<Locale, string>> = {
 
 const fmt = (n: number | null | undefined) => (n ?? 0).toLocaleString("vi-VN");
 
+// The server reports blocking problems as English sentences; show them in the UI language.
+const BLOCKING_PATTERNS: Array<[RegExp, (n: string) => string]> = [
+  [/^(\d+) Craw links do not resolve to a lecturer\/publication record$/, (n) => `${n} liên kết trong kho lưu trữ không khớp được với giảng viên/công bố nào`],
+  [/^(\d+) lecturers are unmapped$/, (n) => `${n} giảng viên trong kho lưu trữ chưa có hồ sơ tương ứng trong hệ thống`],
+  [/^(\d+) lecturers are ambiguous$/, (n) => `${n} giảng viên khớp với nhiều hồ sơ (không rõ ràng)`],
+  [/^(\d+) invalid records$/, (n) => `${n} bản ghi không hợp lệ (thường do chưa có hồ sơ giảng viên tương ứng)`],
+  [/^(\d+) conflicts$/, (n) => `${n} xung đột dữ liệu`],
+];
+
+function translateBlocking(message: string, locale: Locale): string {
+  if (locale !== "vi") return message;
+  for (const [pattern, render] of BLOCKING_PATTERNS) {
+    const match = pattern.exec(message);
+    if (match) return render(match[1]);
+  }
+  return message;
+}
+
 function Card({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
   return (
     <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
@@ -168,13 +186,13 @@ export default function MatchingTab({ locale }: { locale: Locale }) {
           <div className="space-y-3 text-xs text-slate-700" data-testid="craw-preview">
             {preview.blocked_reason && (
               <p className="rounded-[5px] border border-amber-200 bg-amber-50 p-2 font-medium text-amber-800" data-testid="craw-blocked">
-                {BLOCKED_LABEL[preview.blocked_reason]?.[locale] ?? preview.blocked_reason}
+                {BLOCKED_LABEL[preview.blocked_reason]?.[locale] ?? translateBlocking(preview.blocked_reason, locale)}
               </p>
             )}
             {preview.blocking.length > 0 && (
               <ul className="space-y-0.5 text-amber-700">
                 {preview.blocking.map((b, i) => (
-                  <li key={i}>• {b}</li>
+                  <li key={i}>• {translateBlocking(b, locale)}</li>
                 ))}
               </ul>
             )}

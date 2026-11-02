@@ -319,6 +319,7 @@ class NeedsReviewItemRead(BaseModel):
     reason_kind: str
     resolution_summaries: list[dict[str, Any]]
     has_override: bool
+    doi: str | None = None
     # ALL overrides for this position — active and revoked, newest first.
     overrides: list["OverrideRead"] = Field(default_factory=list)
 
@@ -352,6 +353,22 @@ class AddOverrideRequest(BaseModel):
     affiliation_text: str = Field(min_length=1, max_length=2000)
     confidence: str
     evidence_url: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class BulkOverrideItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    publication_author_id: uuid.UUID
+    evidence_url: str = Field(min_length=1, max_length=2000)
+
+
+class BulkAddOverridesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[BulkOverrideItem] = Field(min_length=1, max_length=100)
+    affiliation_text: str = Field(min_length=1, max_length=2000)
+    confidence: str
     reason: str = Field(min_length=1, max_length=2000)
 
 
@@ -404,11 +421,17 @@ def needs_review(
     query: Annotated[str | None, Query()] = None,
     q: Annotated[str | None, Query()] = None,
     reason_kind: Annotated[str | None, Query()] = None,
+    ictu_only: Annotated[bool, Query()] = False,
 ) -> NeedsReviewListResponse:
     try:
         search_query = query if query is not None else q
         items, total = override_service.list_needs_review(
-            db, limit=limit, offset=offset, query=search_query, reason_kind=reason_kind
+            db,
+            limit=limit,
+            offset=offset,
+            query=search_query,
+            reason_kind=reason_kind,
+            ictu_only=ictu_only,
         )
     except SQLAlchemyError as exc:
         raise _db_error(exc) from exc
@@ -424,6 +447,7 @@ def needs_review(
                 reason_kind=i.reason_kind,
                 resolution_summaries=i.resolution_summaries,
                 has_override=i.has_override,
+                doi=i.doi,
                 overrides=[_override_read(o) for o in i.overrides],
             )
             for i in items
@@ -457,6 +481,36 @@ def add_override(body: AddOverrideRequest, admin: AdminUser, db: DatabaseSession
         db.rollback()
         raise _db_error(exc) from exc
     return _override_read(row)
+
+
+@router.post(
+    "/overrides/bulk",
+    response_model=list[OverrideRead],
+    status_code=status.HTTP_201_CREATED,
+    summary="Add the same unit to several positions of ONE Scopus author, all or none",
+)
+def add_overrides_bulk(body: BulkAddOverridesRequest, admin: AdminUser, db: DatabaseSession) -> list[OverrideRead]:
+    try:
+        rows = override_service.add_overrides_bulk(
+            db,
+            [
+                override_service.AddOverrideCommand(
+                    publication_author_id=item.publication_author_id,
+                    affiliation_text=body.affiliation_text,
+                    confidence=body.confidence,
+                    evidence_url=item.evidence_url,
+                    reason=body.reason,
+                    actor_user_id=admin.id,
+                )
+                for item in body.items
+            ],
+        )
+    except override_service.AffiliationOverrideError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    return [_override_read(r) for r in rows]
 
 
 @router.put(
