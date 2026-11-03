@@ -52,6 +52,7 @@ from app.services.candidate_review_service import (
     StaleCandidateObservationError,
     StaleCandidateVersionError,
 )
+from tests.conftest import disable_append_only_triggers
 from tests.db_safety_guard import assert_safe_for_destructive_test
 
 
@@ -100,30 +101,14 @@ _TRUNCATE_MODELS = (
 
 
 def _wipe_tables(session) -> None:
-    """Truncate all review-test tables.
-
-    lecturer_primary_scopus_events has ENABLE ALWAYS triggers that block
-    TRUNCATE and DELETE.  Disable them for the duration of the wipe so that
-    TRUNCATE Lecturer CASCADE can cascade into that table without error, then
-    restore ENABLE ALWAYS so the guard is active for real test code.
-    """
+    """Truncate all review-test tables, bypassing ENABLE ALWAYS guard triggers."""
     from sqlalchemy import text as _text
-    session.execute(_text(
-        "ALTER TABLE lecturer_primary_scopus_events DISABLE TRIGGER ALL"
-    ))
-    for model in _TRUNCATE_MODELS:
-        if isinstance(model, str):
-            session.execute(_text(f"TRUNCATE {model} CASCADE"))
-        else:
-            session.execute(_text(f"TRUNCATE {model.__table__.name} CASCADE"))
-    session.execute(_text(
-        "ALTER TABLE lecturer_primary_scopus_events"
-        " ENABLE ALWAYS TRIGGER lpse_forbid_update_delete"
-    ))
-    session.execute(_text(
-        "ALTER TABLE lecturer_primary_scopus_events"
-        " ENABLE ALWAYS TRIGGER lpse_forbid_truncate"
-    ))
+    with disable_append_only_triggers(session):
+        for model in _TRUNCATE_MODELS:
+            if isinstance(model, str):
+                session.execute(_text(f"TRUNCATE {model} CASCADE"))
+            else:
+                session.execute(_text(f"TRUNCATE {model.__table__.name} CASCADE"))
 
 
 @pytest.fixture

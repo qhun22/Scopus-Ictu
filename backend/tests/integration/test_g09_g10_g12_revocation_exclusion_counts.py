@@ -45,6 +45,7 @@ from app.services.publication_exclusions import (
     PublicationExclusionService,
 )
 from app.services.publication_export import _batch_lecturer_links
+from tests.conftest import disable_append_only_triggers
 from tests.db_safety_guard import assert_safe_for_destructive_test
 from tests.integration.test_candidate_review_service import (  # noqa: F401  (fixtures)
     _make_user,
@@ -65,8 +66,9 @@ def _clean_publication_tables(review_engine):
     def wipe():
         assert_safe_for_destructive_test(review_engine)
         with review_engine.begin() as conn:
-            conn.execute(text("TRUNCATE publications, lecturer_publication_exclusion_events "
-                              "CASCADE"))
+            with disable_append_only_triggers(conn):
+                conn.execute(text("TRUNCATE publications, lecturer_publication_exclusion_events "
+                                  "CASCADE"))
 
     wipe()
     yield

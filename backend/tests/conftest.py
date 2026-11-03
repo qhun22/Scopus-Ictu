@@ -24,10 +24,41 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import Settings
 from app.core.database import get_session_factory
 from app.main import app
+from sqlalchemy import text as _sa_text
+
 from tests.db_safety_guard import (
     DatabaseSafetyRefused,
     assert_safe_for_destructive_test,
 )
+
+
+@contextmanager
+def disable_append_only_triggers(conn_or_session):
+    """Context manager: disable all ENABLE ALWAYS triggers in the current schema,
+    yield, then restore each one as ENABLE ALWAYS.
+
+    Required when test cleanup runs TRUNCATE ... CASCADE on tables that have FK
+    references into append-only audit tables (lecturer_primary_scopus_events,
+    sc_hybrid_*, etc.).  Those tables carry ENABLE ALWAYS triggers that block
+    TRUNCATE even when session_replication_role is 'replica'.
+    """
+    rows = conn_or_session.execute(_sa_text("""
+        SELECT t.relname, tr.tgname
+        FROM pg_trigger tr
+        JOIN pg_class t ON t.oid = tr.tgrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE tr.tgenabled = 'A' AND n.nspname = current_schema()
+        ORDER BY t.relname, tr.tgname
+    """)).fetchall()
+    for tbl, _ in rows:
+        conn_or_session.execute(_sa_text(f'ALTER TABLE "{tbl}" DISABLE TRIGGER ALL'))
+    try:
+        yield
+    finally:
+        for tbl, trig in rows:
+            conn_or_session.execute(_sa_text(
+                f'ALTER TABLE "{tbl}" ENABLE ALWAYS TRIGGER "{trig}"'
+            ))
 
 
 # ── Isolation guard ────────────────────────────────────────────────────────────

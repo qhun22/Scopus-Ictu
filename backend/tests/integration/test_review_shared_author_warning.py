@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from tests.conftest import disable_append_only_triggers
+
 from app.api.dependencies import get_current_user
 from app.core.database import get_session
 from app.main import app
@@ -58,12 +60,13 @@ def seeded(isolated_db_engine):
         pytest.skip("No isolated PostgreSQL database available.")
     Base.metadata.create_all(bind=isolated_db_engine)
     with Session(isolated_db_engine) as s:
-        for table in (
-            "lecturer_scopus_candidate_reviews", "identity_evidence", "lecturer_scopus_identities",
-            "lecturer_scopus_candidate_evidence", "lecturer_scopus_candidate_observations",
-            "lecturer_scopus_candidates", "candidate_generation_runs", "scopus_authors", "lecturers",
-        ):
-            s.execute(text(f"TRUNCATE {table} CASCADE"))
+        with disable_append_only_triggers(s):
+            for table in (
+                "lecturer_scopus_candidate_reviews", "identity_evidence", "lecturer_scopus_identities",
+                "lecturer_scopus_candidate_evidence", "lecturer_scopus_candidate_observations",
+                "lecturer_scopus_candidates", "candidate_generation_runs", "scopus_authors", "lecturers",
+            ):
+                s.execute(text(f"TRUNCATE {table} CASCADE"))
         a = Lecturer(full_name="Nguyen Van A", full_name_normalized="nguyen van a")
         b = Lecturer(full_name="Nguyen Van B", full_name_normalized="nguyen van b")
         c = Lecturer(full_name="Tran Thi C", full_name_normalized="tran thi c")
