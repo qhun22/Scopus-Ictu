@@ -38,7 +38,8 @@ def target(tmp_path, monkeypatch):
     if not base:
         pytest.skip("TEST_DATABASE_URL is required")
     url = make_url(base).set(database=TEST_DB)
-    assert url.host == "127.0.0.1" and url.port == dl.PG_PORT
+    if url.host != "127.0.0.1" or url.port != dl.PG_PORT:
+        pytest.skip(f"requires local demo cluster at 127.0.0.1:{dl.PG_PORT}")
     engine = create_engine(url, pool_pre_ping=True, future=True)
     assert_safe_for_destructive_test(engine)  # allowlisted disposable DB on the expected cluster
     with engine.begin() as c:

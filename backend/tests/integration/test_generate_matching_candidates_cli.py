@@ -32,6 +32,7 @@ from app.services.matching.candidate_persistence import (
     GenerationRunSpec,
 )
 from scripts import generate_matching_candidates as cli
+from tests.conftest import disable_append_only_triggers
 
 
 @pytest.fixture
@@ -40,18 +41,19 @@ def env(isolated_db_engine: Engine, tmp_path: Path):
         pytest.skip("No isolated PostgreSQL database available.")
     Base.metadata.create_all(bind=isolated_db_engine)
     with Session(isolated_db_engine) as s:
-        for table in (
-            "lecturer_scopus_candidate_reviews",
-            "identity_evidence",
-            "lecturer_scopus_identities",
-            "lecturer_scopus_candidate_evidence",
-            "lecturer_scopus_candidate_observations",
-            "lecturer_scopus_candidates",
-            "candidate_generation_runs",
-            "scopus_authors",
-            "lecturers",
-        ):
-            s.execute(text(f"TRUNCATE {table} CASCADE"))
+        with disable_append_only_triggers(s):
+            for table in (
+                "lecturer_scopus_candidate_reviews",
+                "identity_evidence",
+                "lecturer_scopus_identities",
+                "lecturer_scopus_candidate_evidence",
+                "lecturer_scopus_candidate_observations",
+                "lecturer_scopus_candidates",
+                "candidate_generation_runs",
+                "scopus_authors",
+                "lecturers",
+            ):
+                s.execute(text(f"TRUNCATE {table} CASCADE"))
         lecturer_a = Lecturer(full_name="Nguyen Van A", full_name_normalized="nguyen van a")
         lecturer_b = Lecturer(full_name="Tran Thi B", full_name_normalized="tran thi b")
         match = ScopusAuthor(scopus_id="11111111111", preferred_name="Nguyen Van A")
