@@ -546,6 +546,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
             <option value="UNRESOLVED">{vi ? "Chưa có đơn vị" : "No unit"}</option>
             <option value="CONFLICTING_SOURCES">{vi ? "Nguồn mâu thuẫn" : "Conflicting sources"}</option>
             <option value="LOW_CONFIDENCE">{vi ? "Chỉ đối chiếu, chưa xác minh" : "Corroborated only"}</option>
+            <option value="ADJUSTED">{vi ? "Đã hiệu chỉnh" : "Adjusted"}</option>
           </select>
 
           {/* Nút Áp dụng */}

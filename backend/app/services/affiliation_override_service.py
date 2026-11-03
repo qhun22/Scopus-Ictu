@@ -517,7 +517,9 @@ def list_needs_review(
                 overrides=overrides,
             )
         )
-    if reason_kind:
+    if reason_kind == "ADJUSTED":
+        items = [i for i in items if i.has_override]
+    elif reason_kind:
         items = [i for i in items if i.reason_kind == reason_kind]
     if query:
         raw_q = query.strip()
