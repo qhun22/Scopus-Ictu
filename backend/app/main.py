@@ -6,10 +6,13 @@ Wires FastAPI application with CORS middleware, settings, and v1 API routers.
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import router as v1_router
 from app.core.config import settings
@@ -71,6 +74,16 @@ def create_app() -> FastAPI:
         return {"status": "ok", "app": "Scopus-Ictu API", "version": "0.1.0"}
 
     app.include_router(v1_router, prefix="/api/v1")
+
+    # Serve built React frontend when FRONTEND_DIST_DIR is set.
+    # Must be mounted LAST so API routes take priority.
+    frontend_dist = os.environ.get(
+        "FRONTEND_DIST_DIR",
+        str(Path(__file__).resolve().parents[2] / "frontend" / "dist"),
+    )
+    if Path(frontend_dist).is_dir():
+        app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+
     return app
 
 
