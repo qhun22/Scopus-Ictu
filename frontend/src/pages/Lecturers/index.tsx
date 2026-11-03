@@ -594,6 +594,10 @@ export default function LecturersPage() {
   ).slice().sort((a, b) => {
     const positionDifference = positionRank(a.position) - positionRank(b.position);
     if (positionDifference !== 0) return positionDifference;
+    // Ngay sau chức vụ: trong cùng bậc chức vụ (kể cả bậc "không có chức vụ"),
+    // ai đã có tài khoản thì xếp trước.
+    const accountDifference = (a.account ? 0 : 1) - (b.account ? 0 : 1);
+    if (accountDifference !== 0) return accountDifference;
     return a.full_name.localeCompare(b.full_name, "vi");
   });
 

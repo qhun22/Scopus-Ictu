@@ -228,8 +228,14 @@ def _get_lecturer_stats(db: Session) -> LecturerStats:
     )
 
 
-def _lecturer_sort_key(lec: Lecturer, dup_ids: set[uuid.UUID], locked_ids: set[uuid.UUID]):
+def _lecturer_sort_key(
+    lec: Lecturer,
+    dup_ids: set[uuid.UUID],
+    locked_ids: set[uuid.UUID],
+    linked_ids: set[uuid.UUID] = frozenset(),
+):
     is_warn = 0 if lec.id in dup_ids else (1 if lec.id in locked_ids else 2)
+    has_account = 0 if lec.id in linked_ids else 1
     position = (lec.position or "").strip().lower()
     if position == "hiệu trưởng":
         position_rank = 0
@@ -262,7 +268,7 @@ def _lecturer_sort_key(lec: Lecturer, dup_ids: set[uuid.UUID], locked_ids: set[u
         dk = 3
     else:
         dk = 4
-    return (is_warn, position_rank, rk, dk, (lec.full_name or "").lower(), str(lec.id))
+    return (is_warn, position_rank, has_account, rk, dk, (lec.full_name or "").lower(), str(lec.id))
 
 
 @router.get(
@@ -314,8 +320,9 @@ def list_lecturers(
             all_users = db.query(User).filter(User.lecturer_id.is_not(None)).all()
             locked_ids = {u.lecturer_id for u in all_users if u.lecturer_id and not u.is_active}
             user_map = {u.lecturer_id: u for u in all_users if u.lecturer_id}
+            linked_ids = set(user_map.keys())
 
-            sorted_rows = sorted(all_rows, key=lambda l: _lecturer_sort_key(l, dup_ids, locked_ids))
+            sorted_rows = sorted(all_rows, key=lambda l: _lecturer_sort_key(l, dup_ids, locked_ids, linked_ids))
             rows = sorted_rows[(page - 1) * page_size : page * page_size]
         else:
             total = db.execute(
@@ -329,6 +336,9 @@ def list_lecturers(
                         User.is_active.is_(False),
                     )
                 ).all()
+            )
+            linked_ids = set(
+                db.scalars(select(User.lecturer_id).where(User.lecturer_id.is_not(None))).all()
             )
 
             abnormal_expr = case(
@@ -375,10 +385,19 @@ def list_lecturers(
                 else_=99,
             ).asc()
 
+            # Right after position: among lecturers with the same chức vụ tier
+            # (including the "no special position" tier), ones who already
+            # have an account come first.
+            has_account_expr = case(
+                (Lecturer.id.in_(linked_ids), 0),
+                else_=1,
+            ).asc()
+
             rows = db.execute(
                 stmt.order_by(
                     abnormal_expr,
                     position_expr,
+                    has_account_expr,
                     rank_expr,
                     degree_expr,
                     Lecturer.full_name.asc(),

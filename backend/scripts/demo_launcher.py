@@ -46,6 +46,12 @@ FORBIDDEN_PORTS = {5432}
 # Frozen defence-demo snapshot: its schema must never be upgraded by this launcher.
 MIGRATION_PROTECTED_DBS = frozenset({"scopus_ictu_demo_teacher_20261014"})
 WEB_URL = f"http://127.0.0.1:{FRONTEND_PORT}"
+# Cloudflare Tunnel: named tunnel configured once via `cloudflared tunnel login` /
+# `cloudflared tunnel create`; its routing lives in %USERPROFILE%\.cloudflared\config.yml
+# (hostname -> http://localhost:<BACKEND_PORT>), not in this repo. Best-effort step:
+# a missing/failed tunnel never blocks local dev (backend/frontend already work).
+CLOUDFLARE_TUNNEL_NAME = "scopus-ictu"
+PUBLIC_URL = "https://scopus-ictu.xyz"
 
 _DETACHED = 0x00000008 | 0x00000200 | 0x08000000  # DETACHED_PROCESS | NEW_PROCESS_GROUP | NO_WINDOW
 
@@ -402,6 +408,53 @@ def ensure_frontend() -> None:
     say("OK", f"Frontend san sang: {WEB_URL} (nguon: {REPO / 'frontend'}).")
 
 
+def cloudflared_running() -> int:
+    """PID of a running ``cloudflared.exe`` (any instance), or 0 if none."""
+    out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq cloudflared.exe", "/NH", "/FO", "CSV"],
+                         capture_output=True, text=True, errors="replace").stdout
+    m = re.search(r'"cloudflared\.exe","(\d+)"', out)
+    return int(m.group(1)) if m else 0
+
+
+def ensure_cloudflared() -> None:
+    """Best-effort: start the named Cloudflare Tunnel so PUBLIC_URL reaches the backend.
+
+    Never raises - a missing ``cloudflared`` binary or an unreachable tunnel only
+    prints a notice. Local dev (backend/frontend) is already confirmed working by
+    the time this runs, and the public domain is a bonus, not a requirement.
+    """
+    if not shutil.which("cloudflared"):
+        say("CHU Y", "Khong tim thay 'cloudflared' trong PATH - bo qua, chi chay local.")
+        return
+    tracked = read_pid("cloudflared")
+    stopped = None  # set only when this run starts the process
+    if tracked and pid_alive(tracked):
+        say("OK", f"Cloudflare Tunnel dang chay (PID {tracked}).")
+    else:
+        foreign = cloudflared_running()
+        if foreign:
+            # Not tracked via our pidfile on purpose: `cmd_stop` must never kill a
+            # cloudflared instance this launcher did not start.
+            say("OK", f"Cloudflare Tunnel da dang chay (PID {foreign}, khong phai do lan nay khoi dong) - dung lai.")
+            return
+        say("..", f"Khoi dong Cloudflare Tunnel '{CLOUDFLARE_TUNNEL_NAME}' ...")
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with (LOG_DIR / "cloudflared.log").open("ab") as out:
+            try:
+                proc = subprocess.Popen(["cloudflared", "tunnel", "run", CLOUDFLARE_TUNNEL_NAME],
+                                        stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, creationflags=_DETACHED)
+            except OSError as exc:
+                say("CHU Y", f"Khong chay duoc cloudflared ({type(exc).__name__}) - bo qua, chi chay local.")
+                return
+        pidfile("cloudflared").write_text(str(proc.pid))
+        stopped = lambda: proc.poll() is not None  # noqa: E731
+    if not wait_for(f"{PUBLIC_URL}/api/v1/auth/me", {200, 401}, 30, stopped):
+        say("CHU Y", f"Chua xac nhan duoc {PUBLIC_URL} (co the DNS/tunnel can them thoi gian). "
+                      f"Van tiep tuc - web van dung duoc o {WEB_URL}. Xem {LOG_DIR / 'cloudflared.log'}")
+        return
+    say("OK", f"Domain cong khai san sang: {PUBLIC_URL}")
+
+
 # ----------------------------------------------------------------------------- lệnh
 def cmd_start(args: argparse.Namespace) -> int:
     started: list[str] = []
@@ -422,16 +475,26 @@ def cmd_start(args: argparse.Namespace) -> int:
             if pid:
                 kill_tree(pid)
         return 1
+    ensure_cloudflared()  # best-effort: khong lam that bai buoc start neu loi
     if not args.no_browser:
         if webbrowser.open(WEB_URL):
             say("OK", f"Da mo trinh duyet: {WEB_URL}")
         else:
             say("CHU Y", f"Khong tu mo duoc trinh duyet. Hay mo thu cong: {WEB_URL}")
-    print(f"\nPHAN MEM SAN SANG: {WEB_URL}\nSwagger: http://127.0.0.1:{BACKEND_PORT}/docs\nNhat ky: {LOG_DIR}", flush=True)
+    print(f"\nPHAN MEM SAN SANG: {WEB_URL}\nCong khai: {PUBLIC_URL}\nSwagger: http://127.0.0.1:{BACKEND_PORT}/docs\nNhat ky: {LOG_DIR}", flush=True)
     return 0
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
+    tracked = read_pid("cloudflared")
+    if tracked and pid_alive(tracked):
+        kill_tree(tracked)
+        pidfile("cloudflared").unlink(missing_ok=True)
+        say("OK", f"Da dung Cloudflare Tunnel (PID {tracked}).")
+    elif cloudflared_running():
+        say("BO QUA", "Cloudflare Tunnel dang chay nhung khong phai do launcher nay khoi dong - khong dung.")
+    else:
+        say("OK", "Cloudflare Tunnel: khong chay.")
     process_table = process_parents()
     for name, port in (("frontend", FRONTEND_PORT), ("backend", BACKEND_PORT)):
         pid = listeners().get(port)
@@ -466,7 +529,10 @@ def cmd_status(_args: argparse.Namespace) -> int:
         print(f"{name:9} cong {port}: " + ("trong" if pid is None else f"PID {pid} ({port_owner(pid, [read_pid(name)], table)})"))
     owner = listeners().get(PG_PORT)
     print(f"postgres  cong {PG_PORT}: " + ("trong" if owner is None else f"PID {owner} ({'cluster demo' if owner == postmaster_pid() else 'KHONG phai cluster demo'})"))
-    print(f"health    : backend={http_status(f'http://127.0.0.1:{BACKEND_PORT}/health')} frontend={http_status(WEB_URL + '/')}")
+    cf_tracked = read_pid("cloudflared")
+    cf_pid = cf_tracked if cf_tracked and pid_alive(cf_tracked) else cloudflared_running()
+    print("cloudflared        : " + ("khong chay" if not cf_pid else f"PID {cf_pid} ({'ours' if cf_pid == cf_tracked else 'foreign'})"))
+    print(f"health    : backend={http_status(f'http://127.0.0.1:{BACKEND_PORT}/health')} frontend={http_status(WEB_URL + '/')} public={http_status(PUBLIC_URL + '/api/v1/auth/me')}")
     return 0
 
 
