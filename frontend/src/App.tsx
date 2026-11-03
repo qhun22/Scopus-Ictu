@@ -1,6 +1,6 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { PageVisitProvider } from "./contexts/PageVisitContext";
@@ -41,16 +41,19 @@ function TasksPlaceholderPage() {
   );
 }
 
-function RootRedirect() {
-  const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#3A5FC3]" />
-      </div>
-    );
-  }
-  return <Navigate to={isAuthenticated ? "/home" : "/"} replace />;
+function NotFoundPage() {
+  const { locale } = useI18n();
+  return (
+    <PlaceholderPage
+      title={locale === "vi" ? "404 - Không tìm thấy trang" : "404 - Page not found"}
+      description={
+        locale === "vi"
+          ? "Đường dẫn này không tồn tại hoặc đã được thay đổi. Hãy kiểm tra lại địa chỉ, hoặc quay về trang chủ."
+          : "This page doesn't exist or has moved. Check the address, or head back to the home page."
+      }
+      icon="default"
+    />
+  );
 }
 
 export default function App() {
@@ -114,8 +117,11 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Catch-all route */}
-          <Route path="*" element={<RootRedirect />} />
+          {/* Catch-all route: any unmatched path (logged in or not) gets a
+              proper 404 page instead of a silent redirect. */}
+          <Route element={<AppLayout />}>
+            <Route path="*" element={<NotFoundPage />} />
+          </Route>
             </Routes>
             <button
               type="button"

@@ -11,6 +11,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Public domain is reached through a Cloudflare Tunnel pointed at this
+    // dev server; Vite otherwise rejects requests with an unrecognized Host
+    // header (DNS-rebinding protection).
+    allowedHosts: ["scopus-ictu.xyz"],
     proxy: {
       "/api": {
         // Override with VITE_API_PROXY_TARGET (e.g. the demo backend on 8001); default unchanged.
