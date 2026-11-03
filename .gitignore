@@ -88,3 +88,8 @@ data/diagram-skills-package/
 # --- Nhat ky phoi hop Hun1/Hun2 (local only) ---
 /Hun1/
 /Hun2/
+
+# Moved out of repo
+docs/
+scripts/
+*.bat
