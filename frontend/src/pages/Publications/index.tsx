@@ -9,6 +9,7 @@ import {
   PublicationFilterOptions,
 } from "../../api/publications";
 import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
 import { PublicationListItem } from "../../types/publication";
 import { useI18n } from "../../i18n";
 import Button from "../../components/ui/Button";
@@ -36,6 +37,7 @@ export default function PublicationsPage() {
   const scopusIdFilter = /^\d{1,32}$/.test(rawScopusId) ? rawScopusId : undefined;
   const { locale } = useI18n();
   const { user: currentUser } = useAuth();
+  const toast = useToast();
   const isAdmin = currentUser?.role === "ADMIN";
 
   // ── Data state ────────────────────────────────────────────────────────────
@@ -73,7 +75,7 @@ export default function PublicationsPage() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // ── Error state ──────────────────────────────────────────────────────────
-  const [error, setError] = useState<string | null>(null);
+  const [hasError, setHasError] = useState(false);
 
   // ── Filter options (distinct values, counted within the OTHER filters
   //     currently applied — re-fetched alongside the list so counts stay
@@ -124,7 +126,7 @@ export default function PublicationsPage() {
         setLoading(false);
         setLoadingMore(true);
       }
-      setError(null);
+      setHasError(false);
 
       // Abort any previous in-flight request and create a new controller
       // for THIS request.
@@ -156,7 +158,9 @@ export default function PublicationsPage() {
         // requests (defensive even though we already aborted the previous).
         if (currentGen !== genRef.current) return;
 
-        setError(
+        setHasError(true);
+        toast.error(
+          "Lỗi tải dữ liệu",
           err instanceof ApiError
             ? getApiErrorMessage(err)
             : "Không thể tải danh sách công bố. Vui lòng thử lại.",
@@ -169,7 +173,7 @@ export default function PublicationsPage() {
         setLoadingMore(false);
       }
     },
-    [qForApi, effectiveScopusId, appliedFilters],
+    [qForApi, effectiveScopusId, appliedFilters, toast],
   );
 
   // Restore scroll once, after the first successful data load on mount.
@@ -502,26 +506,6 @@ export default function PublicationsPage() {
         </div>
       </div>
 
-      {/* ── Error state ─────────────────────────────────────────────────── */}
-      {error && (
-        <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-4 text-xs text-rose-800 flex items-start gap-2.5">
-          <svg className="h-5 w-5 shrink-0 text-rose-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div className="flex flex-col gap-1.5">
-            <span className="font-semibold">{error}</span>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="self-start"
-              onClick={() => { genRef.current += 1; fetchPublications(page, pageSize, genRef.current); }}
-            >
-              {locale === "vi" ? "Thử lại" : "Retry"}
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
@@ -562,7 +546,7 @@ export default function PublicationsPage() {
                   </td>
                 </tr>
               ) : /* ── Empty state ── */
-              !loading && items.length === 0 && !error ? (
+              !loading && items.length === 0 && !hasError ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-1">
