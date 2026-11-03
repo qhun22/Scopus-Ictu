@@ -50,7 +50,7 @@ RECOVERABILITY_NOTE = (
     "Các trường tel và Google Scholar chưa được lưu nên không có trong bản xuất; "
     "JSON nguồn gốc (v1), Craw và sidecar vẫn là nguồn lưu trữ cho các trường này. "
     "Giảng viên có tài khoản đăng nhập được xuất kèm khối account (email, vai trò, "
-    "display_name, is_active, mã băm Argon2id); token và cookie không có trong tệp xuất."
+    "display_name, is_active, mã băm Argon2id); bí mật xác thực và phiên đăng nhập không có trong tệp xuất."
 )
 
 
