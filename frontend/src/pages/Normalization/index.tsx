@@ -6,6 +6,7 @@ import {
   getConfirmedImportIds,
   getImportHistory,
   isImportConfirmed,
+  isSupersededByNewerConfirmedDuplicate,
   normalizeImport,
 } from "../../api/imports";
 import { ApiError } from "../../api/client";
@@ -21,10 +22,20 @@ import MatchingTab from "./MatchingTab";
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
 const badgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+// "Basic" neutral style — same as the "Chi tiết" action button, not the blue brand badge.
+const basicBadgeClassName =
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900";
 const ingestionSuccessBadgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
 const completedStatusBadgeClassName = ingestionSuccessBadgeClassName;
+
+// Same convention as the Imports page: the full id is a 36-char UUID, too
+// long for a table cell. Show only the first 8 characters; the full value
+// stays available via the `title` tooltip.
+function shortId(id: string): string {
+  return id.length > 8 ? id.slice(0, 8) : id;
+}
 
 function formatDate(isoString?: string | null): string {
   if (!isoString) return "—";
@@ -75,23 +86,19 @@ export default function NormalizationPage() {
   const [history, setHistory] = useState<ScopusImport[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "pending" | "processing" | "completed" | "failed">("all");
-
-  const handleApplySearch = () => {
-    setAppliedSearch(searchInput.trim());
-    setHistoryPage(1);
-  };
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "processing" | "completed" | "failed">("all");
+  const [pendingSearchInput, setPendingSearchInput] = useState("");
+  const [pendingStatusFilter, setPendingStatusFilter] = useState<"ALL" | "PENDING" | "SUPERSEDED">("ALL");
+  const [pendingPage, setPendingPage] = useState(1);
+  const [pendingPageSize, setPendingPageSize] = useState(10);
 
   const handleResetSearch = () => {
     setSearchInput("");
-    setAppliedSearch("");
     setHistoryStatusFilter("all");
     setHistoryPage(1);
   };
 
-  const isApplyDisabled = searchInput.trim() === appliedSearch.trim();
-  const isResetDisabled = !searchInput && !appliedSearch && historyStatusFilter === "all";
+  const isResetDisabled = !searchInput && historyStatusFilter === "all";
 
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageSize, setHistoryPageSize] = useState(10);
@@ -156,6 +163,11 @@ export default function NormalizationPage() {
     );
   };
 
+  // A newer, already-confirmed duplicate exists: normalizing this one would
+  // process stale data. Same rule as the "Thay thế" badge on the Imports page.
+  const isSuperseded = (item: ScopusImport): boolean =>
+    isSupersededByNewerConfirmedDuplicate(item, history, confirmedIds);
+
   const isProcessing = (item: ScopusImport): boolean => {
     return (
       item.normalization?.status === "NORMALIZING" ||
@@ -186,43 +198,81 @@ export default function NormalizationPage() {
     );
   };
 
-  // 4 Summary KPI counters
-  const countPending = scopusImports.filter(isPending).length;
-  const countProcessing = scopusImports.filter(isProcessing).length;
-  const countCompleted = scopusImports.filter(isCompleted).length;
-  const countFailed = scopusImports.filter(isFailed).length;
-
   // Actionable queue items
   const pendingImports = useMemo(() => {
     return scopusImports.filter(isPending);
   }, [scopusImports]);
 
-  // Processed history items
-  const historyImports = useMemo(() => {
-    return scopusImports.filter((item) => !isPending(item));
-  }, [scopusImports]);
+  const pendingCountAll = pendingImports.length;
+  const pendingCountAwaiting = pendingImports.filter((item) => !isSuperseded(item)).length;
+  const pendingCountSuperseded = pendingImports.filter(isSuperseded).length;
 
-  // Filtered history list
-  const filteredHistory = useMemo(() => {
-    let list = historyImports;
-    if (historyStatusFilter === "pending") {
-      list = list.filter(isPending);
-    } else if (historyStatusFilter === "processing") {
-      list = list.filter(isProcessing);
-    } else if (historyStatusFilter === "completed") {
-      list = list.filter(isCompleted);
-    } else if (historyStatusFilter === "failed") {
-      list = list.filter(isFailed);
+  const filteredPendingImports = useMemo(() => {
+    let list = pendingImports;
+    if (pendingStatusFilter === "PENDING") {
+      list = list.filter((item) => !isSuperseded(item));
+    } else if (pendingStatusFilter === "SUPERSEDED") {
+      list = list.filter(isSuperseded);
     }
-    if (!appliedSearch.trim()) return list;
-    const q = appliedSearch.toLowerCase().trim();
+    const q = pendingSearchInput.trim().toLowerCase();
+    if (!q) return list;
     return list.filter(
       (item) =>
         item.file_name.toLowerCase().includes(q) ||
         item.id.toLowerCase().includes(q) ||
         (item.performed_by && item.performed_by.toLowerCase().includes(q)),
     );
-  }, [historyImports, historyStatusFilter, appliedSearch]);
+  }, [pendingImports, pendingSearchInput, pendingStatusFilter]);
+
+  const pendingTotalPages = Math.max(1, Math.ceil(filteredPendingImports.length / pendingPageSize));
+  const currentPendingPage = Math.min(pendingPage, pendingTotalPages);
+  const paginatedPendingImports = useMemo(() => {
+    return filteredPendingImports.slice(
+      (currentPendingPage - 1) * pendingPageSize,
+      currentPendingPage * pendingPageSize,
+    );
+  }, [filteredPendingImports, currentPendingPage, pendingPageSize]);
+
+  const handlePendingPageChange = (newPage: number) => {
+    if (newPage === pendingPage || newPage < 1 || newPage > pendingTotalPages) return;
+    setPendingPage(newPage);
+  };
+
+  const handlePendingPageSizeChange = (newSize: number) => {
+    if (newSize === pendingPageSize) return;
+    setPendingPageSize(newSize);
+    setPendingPage(1);
+  };
+
+  // Processed history items
+  const historyImports = useMemo(() => {
+    return scopusImports.filter((item) => !isPending(item));
+  }, [scopusImports]);
+
+  const historyCountAll = historyImports.length;
+  const historyCountProcessing = historyImports.filter(isProcessing).length;
+  const historyCountCompleted = historyImports.filter(isCompleted).length;
+  const historyCountFailed = historyImports.filter(isFailed).length;
+
+  // Filtered history list
+  const filteredHistory = useMemo(() => {
+    let list = historyImports;
+    if (historyStatusFilter === "processing") {
+      list = list.filter(isProcessing);
+    } else if (historyStatusFilter === "completed") {
+      list = list.filter(isCompleted);
+    } else if (historyStatusFilter === "failed") {
+      list = list.filter(isFailed);
+    }
+    const q = searchInput.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(
+      (item) =>
+        item.file_name.toLowerCase().includes(q) ||
+        item.id.toLowerCase().includes(q) ||
+        (item.performed_by && item.performed_by.toLowerCase().includes(q)),
+    );
+  }, [historyImports, historyStatusFilter, searchInput]);
 
   const historyTotalPages = Math.max(1, Math.ceil(filteredHistory.length / historyPageSize));
   const currentHistoryPage = Math.min(historyPage, historyTotalPages);
@@ -410,74 +460,6 @@ export default function NormalizationPage() {
       {/* Tab Content: Publications Normalization (M2.6A Functional) */}
       {activeTab === "publications" && (
         <div className="tab-fade-in space-y-5">
-          {/* Summary KPI Cards — Matching /imports & /lecturers visual rhythm */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-            <button
-              type="button"
-              onClick={() => { setHistoryStatusFilter("all"); setHistoryPage(1); }}
-              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "all" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
-            >
-              <span className="text-xs font-medium text-slate-500">
-                {locale === "vi" ? "Tổng đợt nhập" : "Total imports"}
-              </span>
-              <p className="mt-1 text-2xl font-black text-slate-800">
-                {scopusImports.length}
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "pending" ? "all" : "pending"); setHistoryPage(1); }}
-              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "pending" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
-            >
-              <span className="text-xs font-medium text-slate-500">
-                {t.normalization.summary.pending}
-              </span>
-              <p className="mt-1 text-2xl font-black text-slate-800">
-                {countPending}
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "processing" ? "all" : "processing"); setHistoryPage(1); }}
-              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "processing" ? "border-blue-300 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200/80 bg-white hover:border-blue-200 hover:bg-blue-50/40"}`}
-            >
-              <span className="text-xs font-medium text-[#3A5FC3]">
-                {t.normalization.summary.processing}
-              </span>
-              <p className="mt-1 text-2xl font-black text-[#3A5FC3]">
-                {countProcessing}
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "completed" ? "all" : "completed"); setHistoryPage(1); }}
-              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "completed" ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200/80 bg-white hover:border-emerald-200 hover:bg-emerald-50/40"}`}
-            >
-              <span className="text-xs font-medium text-emerald-600">
-                {t.normalization.summary.completed}
-              </span>
-              <p className="mt-1 text-2xl font-black text-emerald-600">
-                {countCompleted}
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setHistoryStatusFilter(historyStatusFilter === "failed" ? "all" : "failed"); setHistoryPage(1); }}
-              className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 cursor-pointer ${historyStatusFilter === "failed" ? "border-rose-300 bg-rose-50 ring-2 ring-rose-200" : "border-slate-200/80 bg-white hover:border-rose-200 hover:bg-rose-50/40"}`}
-            >
-              <span className="text-xs font-medium text-rose-600">
-                {t.normalization.summary.failed}
-              </span>
-              <p className="mt-1 text-2xl font-black text-rose-600">
-                {countFailed}
-              </p>
-            </button>
-          </div>
-
           {/* SECTION 1: CẦN XỬ LÝ (Actionable Queue Table) */}
           <section className="space-y-3">
             <div>
@@ -487,6 +469,60 @@ export default function NormalizationPage() {
               <p className="text-xs text-slate-500">
                 {t.normalization.pendingSubtitle}
               </p>
+            </div>
+
+            {/* Toolbar: Search + status filter (both apply live) */}
+            <div className="flex flex-col gap-3 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  aria-label={t.common.search}
+                  value={pendingSearchInput}
+                  onChange={(e) => { setPendingSearchInput(e.target.value); setPendingPage(1); }}
+                  placeholder={locale === "vi" ? "Tìm theo tên tệp, người thực hiện hoặc mã phiên..." : t.normalization.searchPlaceholder}
+                  className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <select
+                  aria-label={locale === "vi" ? "Trạng thái" : "Status"}
+                  value={pendingStatusFilter}
+                  onChange={(e) => { setPendingStatusFilter(e.target.value as "ALL" | "PENDING" | "SUPERSEDED"); setPendingPage(1); }}
+                  className="h-control shrink-0 rounded-control border border-line bg-slate-50 px-3 text-[13px] font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 cursor-pointer"
+                >
+                  <option value="ALL">
+                    {locale === "vi" ? "Tất cả" : "All"} ({numberFormatter.format(pendingCountAll)})
+                  </option>
+                  <option value="PENDING">
+                    {locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization"} ({numberFormatter.format(pendingCountAwaiting)})
+                  </option>
+                  <option value="SUPERSEDED">
+                    {locale === "vi" ? "Lỗi / Đã hủy" : "Failed / Rolled back"} ({numberFormatter.format(pendingCountSuperseded)})
+                  </option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingSearchInput("");
+                    setPendingStatusFilter("ALL");
+                    setPendingPage(1);
+                  }}
+                  disabled={!pendingSearchInput && pendingStatusFilter === "ALL"}
+                  className={buttonClass("secondary")}
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <span className="truncate">{locale === "vi" ? "Đặt lại" : "Reset"}</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
@@ -513,7 +549,7 @@ export default function NormalizationPage() {
                           </div>
                         </td>
                       </tr>
-                    ) : pendingImports.length === 0 ? (
+                    ) : filteredPendingImports.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-1.5">
@@ -523,17 +559,22 @@ export default function NormalizationPage() {
                               </svg>
                             </div>
                             <span className="text-sm font-bold text-slate-700">
-                              {locale === "vi" ? "Không có đợt nhập nào chờ xử lý" : "No pending imports awaiting normalization"}
+                              {pendingImports.length === 0
+                                ? (locale === "vi" ? "Không có đợt nhập nào chờ xử lý" : "No pending imports awaiting normalization")
+                                : (locale === "vi" ? "Không tìm thấy đợt nào khớp" : "No matching imports found")}
                             </span>
                             <span className="text-xs text-slate-400">
-                              {locale === "vi" ? "Tất cả các đợt nhập Scopus đã được chuẩn hóa hoặc xử lý hoàn tất." : "All Scopus imports have been normalized or processed."}
+                              {pendingImports.length === 0
+                                ? (locale === "vi" ? "Tất cả các đợt nhập Scopus đã được chuẩn hóa hoặc xử lý hoàn tất." : "All Scopus imports have been normalized or processed.")
+                                : (locale === "vi" ? "Thử từ khóa khác." : "Try a different search term.")}
                             </span>
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      pendingImports.map((item) => {
+                      paginatedPendingImports.map((item) => {
                         const isHighlighted = requestedImportId === item.id;
+                        const superseded = isSuperseded(item);
                         return (
                           <tr
                             key={item.id}
@@ -555,8 +596,8 @@ export default function NormalizationPage() {
                                   <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
                                     {item.file_name}
                                   </span>
-                                  <span className="block text-[10px] font-mono text-slate-400 truncate">
-                                    ID: {item.id}
+                                  <span className="block text-[10px] text-slate-400 truncate" title={item.id}>
+                                    ID: {shortId(item.id)}
                                   </span>
                                 </div>
                               </div>
@@ -564,7 +605,7 @@ export default function NormalizationPage() {
 
                             {/* Data type */}
                             <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium">
-                              <span className={badgeClassName}>Scopus</span>
+                              <span className={basicBadgeClassName}>Scopus</span>
                             </td>
 
                             {/* Time */}
@@ -579,14 +620,20 @@ export default function NormalizationPage() {
 
                             {/* Performed by */}
                             <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
-                              <span className={badgeClassName}>{formatPerformedBy(item.performed_by)}</span>
+                              <span className={basicBadgeClassName}>{formatPerformedBy(item.performed_by)}</span>
                             </td>
 
                             {/* Status */}
                             <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
-                              <span className={badgeClassName}>
-                                {locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization"}
-                              </span>
+                              {superseded ? (
+                                <span className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50">
+                                  {locale === "vi" ? "Thay thế" : "Superseded"}
+                                </span>
+                              ) : (
+                                <span className={badgeClassName}>
+                                  {locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization"}
+                                </span>
+                              )}
                             </td>
 
                             {/* Actions */}
@@ -595,8 +642,15 @@ export default function NormalizationPage() {
                                 <button
                                   type="button"
                                   onClick={() => void handleNormalize(item)}
-                                  disabled={Boolean(normalizingId)}
-                                  className="inline-flex h-badge w-28 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-300/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 group"
+                                  disabled={Boolean(normalizingId) || superseded}
+                                  title={
+                                    superseded
+                                      ? (locale === "vi"
+                                          ? "Đợt này đã được thay thế bởi một đợt nhập trùng mới hơn đã xác nhận."
+                                          : "This import was superseded by a newer, confirmed duplicate.")
+                                      : undefined
+                                  }
+                                  className="inline-flex h-badge w-32 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-300/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 group"
                                 >
                                   {normalizingId === item.id ? (
                                     <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
@@ -617,6 +671,62 @@ export default function NormalizationPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Footer info & Pagination Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
+                <div className="flex items-center gap-3">
+                  <span>
+                    {t.imports.showing} <strong>{paginatedPendingImports.length}</strong> {locale === "vi" ? "trong" : "of"} {filteredPendingImports.length} {locale === "vi" ? "đợt nhập" : "imports"}
+                  </span>
+
+                  <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                    <span className="text-slate-500">{locale === "vi" ? "Hiển thị:" : "Show:"}</span>
+                    <select
+                      value={pendingPageSize}
+                      onChange={(e) => handlePendingPageSizeChange(Number(e.target.value))}
+                      className="h-7 rounded-[5px] border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                    >
+                      <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
+                      <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
+                      <option value={50}>50 / {locale === "vi" ? "trang" : "page"}</option>
+                      <option value={100}>100 / {locale === "vi" ? "trang" : "page"}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <nav aria-label="Pagination" className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handlePendingPageChange(currentPendingPage - 1)}
+                    disabled={currentPendingPage <= 1}
+                    className={buttonClass("secondary", "sm")}
+                  >
+                    {t.imports.previousPage}
+                  </button>
+                  <span className="text-slate-400 px-0.5">{t.imports.page}</span>
+                  <input
+                    type="number"
+                    aria-label={locale === "vi" ? "Đến trang" : "Go to page"}
+                    min={1}
+                    max={pendingTotalPages}
+                    value={currentPendingPage}
+                    onChange={(e) => {
+                      const val = Math.max(1, Math.min(pendingTotalPages, parseInt(e.target.value, 10) || 1));
+                      handlePendingPageChange(val);
+                    }}
+                    className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                  <span className="text-slate-400">/ <strong className="text-slate-600">{pendingTotalPages}</strong></span>
+                  <button
+                    type="button"
+                    onClick={() => handlePendingPageChange(currentPendingPage + 1)}
+                    disabled={currentPendingPage >= pendingTotalPages}
+                    className={buttonClass("secondary", "sm")}
+                  >
+                    {t.imports.nextPage}
+                  </button>
+                </nav>
+              </div>
             </div>
           </section>
 
@@ -628,8 +738,8 @@ export default function NormalizationPage() {
               </h2>
             </div>
 
-            {/* Toolbar: Search input with Apply & Reset buttons */}
-            <div className="flex flex-col gap-3 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center">
+            {/* Toolbar: Search + status filter (both apply live) */}
+            <div className="flex flex-col gap-3 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -640,30 +750,32 @@ export default function NormalizationPage() {
                   type="text"
                   aria-label={t.common.search}
                   value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      handleApplySearch();
-                    }
-                  }}
+                  onChange={(e) => { setSearchInput(e.target.value); setHistoryPage(1); }}
                   placeholder={locale === "vi" ? "Tìm theo tên tệp, người thực hiện hoặc mã phiên..." : t.normalization.searchPlaceholder}
                   className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
                 />
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {/* Nút Áp dụng */}
-                <button
-                  type="button"
-                  disabled={isApplyDisabled}
-                  onClick={handleApplySearch}
-                  className={buttonClass("primary")}
+                <select
+                  aria-label={locale === "vi" ? "Trạng thái" : "Status"}
+                  value={historyStatusFilter}
+                  onChange={(e) => { setHistoryStatusFilter(e.target.value as "all" | "processing" | "completed" | "failed"); setHistoryPage(1); }}
+                  className="h-control shrink-0 rounded-control border border-line bg-slate-50 px-3 text-[13px] font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 cursor-pointer"
                 >
-                  <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <span className="truncate">{locale === "vi" ? "Áp dụng" : "Apply"}</span>
-                </button>
+                  <option value="all">
+                    {locale === "vi" ? "Tất cả" : "All"} ({numberFormatter.format(historyCountAll)})
+                  </option>
+                  <option value="processing">
+                    {t.normalization.summary.processing} ({numberFormatter.format(historyCountProcessing)})
+                  </option>
+                  <option value="completed">
+                    {t.normalization.summary.completed} ({numberFormatter.format(historyCountCompleted)})
+                  </option>
+                  <option value="failed">
+                    {t.normalization.summary.failed} ({numberFormatter.format(historyCountFailed)})
+                  </option>
+                </select>
 
                 {/* Nút Đặt lại */}
                 <button
@@ -738,8 +850,8 @@ export default function NormalizationPage() {
                                   <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
                                     {item.file_name}
                                   </span>
-                                  <span className="block text-[10px] font-mono text-slate-400 truncate">
-                                    ID: {item.id}
+                                  <span className="block text-[10px] text-slate-400 truncate" title={item.id}>
+                                    ID: {shortId(item.id)}
                                   </span>
                                 </div>
                               </div>
@@ -747,7 +859,7 @@ export default function NormalizationPage() {
 
                             {/* Data type */}
                             <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium">
-                              <span className={badgeClassName}>Scopus</span>
+                              <span className={basicBadgeClassName}>Scopus</span>
                             </td>
 
                             {/* Time */}
@@ -762,7 +874,7 @@ export default function NormalizationPage() {
 
                             {/* Performed by */}
                             <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
-                              <span className={badgeClassName}>{formatPerformedBy(item.performed_by)}</span>
+                              <span className={basicBadgeClassName}>{formatPerformedBy(item.performed_by)}</span>
                             </td>
 
                             {/* Result */}
@@ -793,7 +905,7 @@ export default function NormalizationPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetailModal(item)}
-                                className="inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors cursor-pointer"
+                                className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                               >
                                 <span>{t.normalization.actions.viewDetail}</span>
                               </button>
@@ -874,13 +986,13 @@ export default function NormalizationPage() {
       {/* NORMALIZATION DETAIL MODAL */}
       {detailModalItem && (
         <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto transition-[left] duration-200 ease-out">
             <div
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+              className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] bg-slate-900/60 backdrop-blur-xs modal-backdrop-in transition-[left,opacity] duration-200 ease-out"
               onClick={() => setDetailModalItem(null)}
             />
 
-            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-card bg-white shadow-2xl overflow-hidden z-10 animate-in zoom-in-95 duration-150">
+            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-card bg-white shadow-2xl overflow-hidden z-10 modal-panel-in">
               {/* Modal Header */}
               <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/50">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1073,7 +1185,7 @@ export default function NormalizationPage() {
                     <div className="mt-3 pt-3 border-t border-slate-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                       <div>
                         <span className="text-slate-400 block">{locale === "vi" ? "Mã đợt nhập (ID):" : "Import ID:"}</span>
-                        <span className="font-mono text-slate-700 font-semibold">{detailModalItem.id}</span>
+                        <span className="font-bold text-slate-700" title={detailModalItem.id}>{shortId(detailModalItem.id)}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block">{locale === "vi" ? "Thời lượng xử lý:" : "Duration:"}</span>
@@ -1105,7 +1217,14 @@ export default function NormalizationPage() {
                 {isPending(detailModalItem) ? (
                   <button
                     type="button"
-                    disabled={Boolean(normalizingId)}
+                    disabled={Boolean(normalizingId) || isSuperseded(detailModalItem)}
+                    title={
+                      isSuperseded(detailModalItem)
+                        ? (locale === "vi"
+                            ? "Đợt này đã được thay thế bởi một đợt nhập trùng mới hơn đã xác nhận."
+                            : "This import was superseded by a newer, confirmed duplicate.")
+                        : undefined
+                    }
                     onClick={() => void handleNormalize(detailModalItem)}
                     className={buttonClass("primary")}
                   >

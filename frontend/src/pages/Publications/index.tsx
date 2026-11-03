@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
-import { exportPublicationsJson, getPublications } from "../../api/publications";
+import {
+  exportPublicationsJson,
+  getPublicationFilterOptions,
+  getPublications,
+  PublicationFilterOptions,
+} from "../../api/publications";
 import { useAuth } from "../../contexts/AuthContext";
 import { PublicationListItem } from "../../types/publication";
 import { useI18n } from "../../i18n";
 import Button from "../../components/ui/Button";
+import PublicationDetailModal from "./PublicationDetailModal";
 
 const DEFAULT_PAGE_SIZE = 20;
 const FILTER_DELAY_MS = 350;
@@ -20,46 +26,12 @@ interface AppliedFilters {
   document_type: string | undefined;
   publication_stage: string | undefined;
   open_access_status: string | undefined;
-}
-
-/**
- * Compare two normalized AppliedFilters structurally. Treats undefined as
- * equal to undefined. Used to derive the "draft differs from applied" dirty
- * state for the Apply button.
- */
-function filtersEqual(a: AppliedFilters, b: AppliedFilters): boolean {
-  const aYear = a.year ?? null;
-  const bYear = b.year ?? null;
-  return (
-    aYear === bYear &&
-    (a.document_type ?? null) === (b.document_type ?? null) &&
-    (a.publication_stage ?? null) === (b.publication_stage ?? null) &&
-    (a.open_access_status ?? null) === (b.open_access_status ?? null)
-  );
-}
-
-/**
- * Build the AppliedFilters object from current draft input values. Trims
- * string filters so that " Article " and "Article" yield identical
- * normalized state.
- */
-function buildFiltersFromDraft(
-  draftYear: string,
-  draftDocType: string,
-  draftStage: string,
-  draftOa: string,
-): AppliedFilters {
-  return {
-    year: draftYear.trim() ? Number(draftYear.trim()) : undefined,
-    document_type: draftDocType.trim() ? draftDocType.trim() : undefined,
-    publication_stage: draftStage.trim() ? draftStage.trim() : undefined,
-    open_access_status: draftOa.trim() ? draftOa.trim() : undefined,
-  };
+  missing_doi: boolean;
 }
 
 export default function PublicationsPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedEid, setSelectedEid] = useState<string | null>(null);
   const rawScopusId = searchParams.get("scopus_id") ?? "";
   const scopusIdFilter = /^\d{1,32}$/.test(rawScopusId) ? rawScopusId : undefined;
   const { locale } = useI18n();
@@ -72,24 +44,28 @@ export default function PublicationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // ── Search state ───────────────────────────────────────────────────────
+  // ── Search state (one box: title, EID, DOI, journal, author name, Scopus ID) ───
   const [q, setQ] = useState("");
   const [qDebounced, setQDebounced] = useState("");
-  const [authorName, setAuthorName] = useState("");
-  const [authorNameDebounced, setAuthorNameDebounced] = useState("");
 
-  // ── Draft filter state (controlled inputs) ──────────────────────────────
-  const [draftYear, setDraftYear] = useState("");
-  const [draftDocType, setDraftDocType] = useState("");
-  const [draftStage, setDraftStage] = useState("");
-  const [draftOa, setDraftOa] = useState("");
+  // When the search box contains only digits (>=8), treat it as a Scopus Author ID
+  // and route to the dedicated scopus_id param (exact match) instead of q (substring).
+  const qIsScopusId = /^\d{8,}$/.test(qDebounced.trim());
+  const qForApi = qIsScopusId ? undefined : (qDebounced || undefined);
+  const effectiveScopusId = scopusIdFilter ?? (qIsScopusId ? qDebounced.trim() : undefined);
 
-  // ── Applied filter state (triggers requests) ────────────────────────────
+  // ── Year: free-text, debounced live filter (same pattern as the search box) ──
+  const [yearInput, setYearInput] = useState("");
+
+  // ── Applied filter state (each control writes here directly — filtering is
+  //     live, no separate "Apply" step) ──────────────────────────────────
+
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({
     year: undefined,
     document_type: undefined,
     publication_stage: undefined,
     open_access_status: undefined,
+    missing_doi: false,
   });
 
   // ── Pagination state ─────────────────────────────────────────────────────
@@ -99,6 +75,29 @@ export default function PublicationsPage() {
   // ── Error state ──────────────────────────────────────────────────────────
   const [error, setError] = useState<string | null>(null);
 
+  // ── Filter options (distinct values, counted within the OTHER filters
+  //     currently applied — re-fetched alongside the list so counts stay
+  //     truthful instead of always showing the dataset-wide totals) ───────
+  const [filterOptions, setFilterOptions] = useState<PublicationFilterOptions | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublicationFilterOptions({
+      q: qForApi,
+      scopus_id: effectiveScopusId,
+      ...appliedFilters,
+    })
+      .then((opts) => {
+        if (!cancelled) setFilterOptions(opts);
+      })
+      .catch(() => {
+        // Non-critical: dropdowns just keep their last-known counts if this fails.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [qForApi, effectiveScopusId, appliedFilters]);
+
   // ── Export state (ADMIN only) ─────────────────────────────────────────────
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -106,6 +105,11 @@ export default function PublicationsPage() {
   // ── Stale-request defenses: AbortController + monotonic generation ─────
   const abortRef = useRef<AbortController | null>(null);
   const genRef = useRef(0);
+
+  // ── Scroll restoration: save position before navigating to detail page,
+  //     restore it after the first data load completes on return. ─────────
+  const SCROLL_KEY = "pub-list-scroll-y";
+  const scrollRestoredRef = useRef(false);
 
   const fetchPublications = useCallback(
     async (currentPage: number, currentPageSize: number, currentGen: number) => {
@@ -133,9 +137,8 @@ export default function PublicationsPage() {
           {
             page: currentPage,
             page_size: currentPageSize,
-            q: qDebounced || undefined,
-            scopus_id: scopusIdFilter,
-            author_name: authorNameDebounced || undefined,
+            q: qForApi,
+            scopus_id: effectiveScopusId,
             ...appliedFilters,
           },
           { signal: controller.signal },
@@ -166,8 +169,25 @@ export default function PublicationsPage() {
         setLoadingMore(false);
       }
     },
-    [qDebounced, authorNameDebounced, appliedFilters, scopusIdFilter],
+    [qForApi, effectiveScopusId, appliedFilters],
   );
+
+  // Restore scroll once, after the first successful data load on mount.
+  useEffect(() => {
+    if (loading || scrollRestoredRef.current) return;
+    scrollRestoredRef.current = true;
+    try {
+      const saved = sessionStorage.getItem(SCROLL_KEY);
+      if (saved !== null) {
+        sessionStorage.removeItem(SCROLL_KEY);
+        const y = Number(saved);
+        if (Number.isFinite(y) && y > 0) {
+          requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "instant" }));
+        }
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   // ── Single trigger: appliedFilters + page + pageSize + qDebounced ────────
   useEffect(() => {
@@ -182,7 +202,7 @@ export default function PublicationsPage() {
     // closure); we list page + pageSize + appliedFilters + qDebounced to drive
     // the trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, appliedFilters, qDebounced, authorNameDebounced, scopusIdFilter]);
+  }, [page, pageSize, appliedFilters, qDebounced, scopusIdFilter]);
 
   // ── Debounce free-text search + reset to page 1 when it changes ─────────
   useEffect(() => {
@@ -194,21 +214,21 @@ export default function PublicationsPage() {
     return () => window.clearTimeout(timer);
   }, [q, qDebounced]);
 
-  // ── Debounce author-name search + reset to page 1 when it changes ───────
+  // ── Debounce the year box — only filters once it's a complete 4-digit
+  //     year (or empty); a partial typed year like "20" filters nothing yet.
   useEffect(() => {
-    if (authorName === authorNameDebounced) return;
+    const trimmed = yearInput.trim();
     const timer = window.setTimeout(() => {
-      setAuthorNameDebounced(authorName);
+      const parsed = /^\d{4}$/.test(trimmed) ? Number(trimmed) : undefined;
+      setAppliedFilters((prev) => (prev.year === parsed ? prev : { ...prev, year: parsed }));
       setPage(1);
     }, FILTER_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [authorName, authorNameDebounced]);
+  }, [yearInput]);
 
-  // ── Filter actions ────────────────────────────────────────────────────
-  const handleApply = () => {
-    setAppliedFilters(
-      buildFiltersFromDraft(draftYear, draftDocType, draftStage, draftOa),
-    );
+  // ── Filter actions: each control sets appliedFilters directly (live) ────
+  const setFilter = <K extends keyof AppliedFilters>(key: K, value: AppliedFilters[K]) => {
+    setAppliedFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
   };
 
@@ -216,17 +236,13 @@ export default function PublicationsPage() {
     if (scopusIdFilter) setSearchParams({}, { replace: true });
     setQ("");
     setQDebounced("");
-    setAuthorName("");
-    setAuthorNameDebounced("");
-    setDraftYear("");
-    setDraftDocType("");
-    setDraftStage("");
-    setDraftOa("");
+    setYearInput("");
     setAppliedFilters({
       year: undefined,
       document_type: undefined,
       publication_stage: undefined,
       open_access_status: undefined,
+      missing_doi: false,
     });
     setPage(1);
   };
@@ -237,28 +253,16 @@ export default function PublicationsPage() {
   };
 
   // ── Derived ───────────────────────────────────────────────────────────
-  const draftFiltersNormalized = buildFiltersFromDraft(
-    draftYear,
-    draftDocType,
-    draftStage,
-    draftOa,
-  );
-  const isApplyDirty = !filtersEqual(draftFiltersNormalized, appliedFilters);
-
   const hasAnyInput =
     !!scopusIdFilter ||
     !!q ||
     !!qDebounced ||
-    !!authorName ||
-    !!authorNameDebounced ||
-    !!draftYear ||
-    !!draftDocType ||
-    !!draftStage ||
-    !!draftOa ||
+    !!yearInput ||
     !!appliedFilters.year ||
     !!appliedFilters.document_type ||
     !!appliedFilters.publication_stage ||
-    !!appliedFilters.open_access_status;
+    !!appliedFilters.open_access_status ||
+    appliedFilters.missing_doi;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const isFiltering = loading || loadingMore;
@@ -283,7 +287,7 @@ export default function PublicationsPage() {
   const colSource = locale === "vi" ? "Nguồn xuất bản" : "Source title";
   const colDocType = locale === "vi" ? "Loại tài liệu" : "Document Type";
   const colCitations = locale === "vi" ? "Trích dẫn" : "Citations";
-  const colStage = locale === "vi" ? "Giai đoạn xuất bản" : "Publication Stage";
+  const colStage = locale === "vi" ? "Giai đoạn" : "Stage";
   const colOa = locale === "vi" ? "Truy cập mở" : "Open Access";
   const colAction = locale === "vi" ? "Thao tác" : "Actions";
   const pageLabel = locale === "vi" ? "Trang" : "Page";
@@ -296,7 +300,6 @@ export default function PublicationsPage() {
     ? "Hãy thử từ khóa hoặc bộ lọc khác."
     : "Try a different keyword or filter.";
   const resetLabel = locale === "vi" ? "Đặt lại" : "Reset";
-  const applyLabel = locale === "vi" ? "Áp dụng" : "Apply";
   const viewDetailLabel = locale === "vi" ? "Chi tiết" : "Details";
   const subtitleText = locale === "vi"
     ? "Danh mục công bố khoa học chuẩn hóa toàn trường ICTU."
@@ -389,138 +392,113 @@ export default function PublicationsPage() {
         </div>
       )}
 
-      {/* ── Filter Bar ──────────────────────────────────────────────────── */}
+      {/* ── Filter Bar: row 1 = search + reset, row 2 = filters + apply ───── */}
       <div className="rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs space-y-3">
-        {/* Free-text search */}
-        <div className="relative">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-          <input
-            type="text"
-            aria-label={locale === "vi" ? "Tìm kiếm công bố" : "Search publications"}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={
-              locale === "vi"
-                ? "Tìm theo tiêu đề, EID, DOI, nguồn tạp chí..."
-                : "Search by title, EID, DOI, journal..."
-            }
-            className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
-          />
-        </div>
-
-        {/* Author-name search */}
-        <div className="relative">
-          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-          <input
-            type="text"
-            aria-label={locale === "vi" ? "Tìm theo tên tác giả" : "Search by author name"}
-            value={authorName}
-            onChange={(e) => setAuthorName(e.target.value)}
-            placeholder={
-              locale === "vi" ? "Tìm theo tên tác giả (Scopus)..." : "Search by author name (Scopus)..."
-            }
-            className="h-9 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
-          />
-        </div>
-
-        {/* Filter row */}
-        <div className="flex flex-wrap items-end gap-2">
-          {/* Year */}
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="pub-filter-year" className="whitespace-nowrap text-xs font-semibold text-slate-600">
-              {locale === "vi" ? "Năm:" : "Year:"}
-            </label>
+        {/* Row 1: search + reset */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
             <input
-              id="pub-filter-year"
-              type="number"
-              min="1900"
-              max="2100"
-              value={draftYear}
-              onChange={(e) => setDraftYear(e.target.value)}
-              placeholder="VD: 2023"
-              className="h-8 w-24 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+              type="text"
+              aria-label={locale === "vi" ? "Tìm kiếm công bố" : "Search publications"}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={
+                locale === "vi"
+                  ? "Tìm theo tiêu đề, EID, DOI, nguồn, tác giả, Scopus ID tác giả..."
+                  : "Search by title, EID, DOI, journal, author, author's Scopus ID..."
+              }
+              className="h-control w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
             />
           </div>
+
+          <Button
+            variant="secondary"
+            onClick={handleClear}
+            disabled={!hasAnyInput}
+          >
+            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="truncate">{resetLabel}</span>
+          </Button>
+        </div>
+
+        {/* Row 2: filters — equal-width columns, apply live on change */}
+        <div className={`grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3 ${isAdmin ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+          {/* Year — free-text, filters live once a full 4-digit year is typed */}
+          <input
+            type="text"
+            inputMode="numeric"
+            list="pub-year-options"
+            aria-label={locale === "vi" ? "Năm" : "Year"}
+            value={yearInput}
+            onChange={(e) => setYearInput(e.target.value.replace(/[^\d]/g, "").slice(0, 4))}
+            placeholder={locale === "vi" ? "Năm (vd 2024)" : "Year (e.g. 2024)"}
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+          />
+          <datalist id="pub-year-options">
+            {filterOptions?.years.map((y) => (
+              <option key={y} value={y} />
+            ))}
+          </datalist>
 
           {/* Document type */}
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="pub-filter-doc-type" className="whitespace-nowrap text-xs font-semibold text-slate-600">
-              {locale === "vi" ? "Loại tài liệu:" : "Doc. type:"}
-            </label>
-            <input
-              id="pub-filter-doc-type"
-              type="text"
-              value={draftDocType}
-              onChange={(e) => setDraftDocType(e.target.value)}
-              placeholder={locale === "vi" ? "VD: Article" : "e.g. Article"}
-              className="h-8 w-28 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-            />
-          </div>
+          <select
+            aria-label={locale === "vi" ? "Loại tài liệu" : "Document type"}
+            value={appliedFilters.document_type ?? ""}
+            onChange={(e) => setFilter("document_type", e.target.value || undefined)}
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          >
+            <option value="">{locale === "vi" ? "Loại tài liệu: Tất cả" : "Doc. type: All"}</option>
+            {filterOptions?.document_types.map((o) => (
+              <option key={o.value} value={o.value}>{o.value} ({o.count})</option>
+            ))}
+          </select>
 
           {/* Publication stage */}
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="pub-filter-stage" className="whitespace-nowrap text-xs font-semibold text-slate-600">
-              {locale === "vi" ? "Giai đoạn:" : "Stage:"}
-            </label>
-            <input
-              id="pub-filter-stage"
-              type="text"
-              value={draftStage}
-              onChange={(e) => setDraftStage(e.target.value)}
-              placeholder={locale === "vi" ? "VD: Published" : "e.g. Published"}
-              className="h-8 w-28 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-            />
-          </div>
+          <select
+            aria-label={locale === "vi" ? "Giai đoạn" : "Stage"}
+            value={appliedFilters.publication_stage ?? ""}
+            onChange={(e) => setFilter("publication_stage", e.target.value || undefined)}
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          >
+            <option value="">{locale === "vi" ? "Giai đoạn: Tất cả" : "Stage: All"}</option>
+            {filterOptions?.publication_stages.map((o) => (
+              <option key={o.value} value={o.value}>{o.value} ({o.count})</option>
+            ))}
+          </select>
 
           {/* Open access status */}
-          <div className="flex items-center gap-1.5">
-            <label htmlFor="pub-filter-oa" className="whitespace-nowrap text-xs font-semibold text-slate-600">
-              {locale === "vi" ? "Truy cập mở:" : "Open Access:"}
+          <select
+            aria-label={locale === "vi" ? "Truy cập mở" : "Open Access"}
+            value={appliedFilters.open_access_status ?? ""}
+            onChange={(e) => setFilter("open_access_status", e.target.value || undefined)}
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          >
+            <option value="">{locale === "vi" ? "Truy cập mở: Tất cả" : "Open Access: All"}</option>
+            {filterOptions?.open_access_statuses.map((o) => (
+              <option key={o.value} value={o.value}>{o.value} ({o.count})</option>
+            ))}
+          </select>
+
+          {/* Missing DOI — admin only */}
+          {isAdmin && (
+            <label className="flex h-control w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600">
+              <input
+                type="checkbox"
+                checked={appliedFilters.missing_doi}
+                onChange={(e) => setFilter("missing_doi", e.target.checked)}
+                className="cursor-pointer"
+              />
+              {locale === "vi" ? "Thiếu DOI" : "Missing DOI"}
+              {filterOptions && <span className="text-slate-400">({filterOptions.missing_doi_count})</span>}
             </label>
-            <input
-              id="pub-filter-oa"
-              type="text"
-              value={draftOa}
-              onChange={(e) => setDraftOa(e.target.value)}
-              placeholder={locale === "vi" ? "VD: Open Access" : "e.g. Open Access"}
-              className="h-8 w-28 rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
-            />
-          </div>
-
-          {/* Apply / Clear buttons */}
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleApply}
-              disabled={!isApplyDirty}
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-              <span>{applyLabel}</span>
-            </Button>
-
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleClear}
-              disabled={!hasAnyInput}
-            >
-              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span>{resetLabel}</span>
-            </Button>
-          </div>
+          )}
         </div>
       </div>
 
@@ -547,18 +525,29 @@ export default function PublicationsPage() {
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
-          <table className="w-full text-left text-xs" aria-busy={isFiltering}>
+          <table className="w-full table-fixed text-left text-xs" aria-busy={isFiltering}>
+            <colgroup>
+              <col style={{ width: 200 }} />
+              <col style={{ width: 165 }} />
+              <col style={{ width: 66 }} />
+              <col style={{ width: 180 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 88 }} />
+              <col style={{ width: 88 }} />
+              <col style={{ width: 105 }} />
+              <col style={{ width: 164 }} />
+            </colgroup>
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{colTitle}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{colEid}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{colYear}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{colSource}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{colDocType}</th>
-                <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">{colCitations}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{colStage}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{colOa}</th>
-                <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">{colAction}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colTitle}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colEid}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colYear}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colSource}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colDocType}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 text-center font-semibold whitespace-nowrap">{colCitations}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colStage}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colOa}</th>
+                <th className="sticky right-0 z-[1] border-l border-slate-200/80 bg-slate-50 px-4 py-3 text-center font-semibold whitespace-nowrap">{colAction}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -581,52 +570,64 @@ export default function PublicationsPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       <span className="font-semibold text-slate-600">{noDataLabel}</span>
-                      <span className="text-[11px]">{noDataSubLabel}</span>
+                      <span className="text-xs">{noDataSubLabel}</span>
                     </div>
                   </td>
                 </tr>
               ) : /* ── Data rows ── */
                 items.map((pub) => (
                   <tr key={pub.eid} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3 min-w-[200px]">
+                    <td className="border-r border-slate-100 px-4 py-3">
                       <span
-                        className="block max-w-[200px] line-clamp-2 break-words font-semibold text-slate-800"
+                        className="block line-clamp-2 break-words font-semibold text-slate-800"
                         title={pub.title}
                       >
                         {pub.title}
                       </span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap font-mono text-[11px] text-slate-500">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-500">
                       {pub.eid}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 whitespace-nowrap font-bold text-slate-800">
                       {fmtYear(pub.year)}
                     </td>
-                    <td className="px-4 py-3 min-w-[180px] max-w-[260px]">
+                    <td className="border-r border-slate-100 px-4 py-3">
                       <span className="block line-clamp-2 break-words text-slate-700" title={pub.source_title ?? ""}>
                         {fmtField(pub.source_title)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
                       {fmtField(pub.document_type)}
                     </td>
-                    <td className="px-4 py-3 text-center text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 text-center font-bold text-slate-800">
                       {fmtCitations(pub.cited_by_count)}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
                       {fmtField(pub.publication_stage)}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
                       {fmtField(pub.open_access_status)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <Button
-                        variant="tonal"
-                        size="sm"
-                        onClick={() => navigate(`/publications/${encodeURIComponent(pub.eid)}`)}
-                      >
-                        {viewDetailLabel}
-                      </Button>
+                    <td className="sticky right-0 z-[1] border-l border-slate-100 bg-white px-4 py-3 text-center">
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedEid(pub.eid)}
+                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
+                        >
+                          {viewDetailLabel}
+                        </button>
+                      ) : (
+                        <Link
+                          to={`/publications/${encodeURIComponent(pub.eid)}`}
+                          onClick={() => {
+                            try { sessionStorage.setItem(SCROLL_KEY, String(window.scrollY)); } catch {}
+                          }}
+                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors"
+                        >
+                          {viewDetailLabel}
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -645,7 +646,7 @@ export default function PublicationsPage() {
         </div>
 
         {/* ── Footer: count + pagination ──────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-xs text-slate-500">
           {/* Record count */}
           <div className="flex items-center gap-3">
             <span>
@@ -661,7 +662,7 @@ export default function PublicationsPage() {
               <select
                 value={pageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
@@ -695,6 +696,8 @@ export default function PublicationsPage() {
           </nav>
         </div>
       </div>
+
+      <PublicationDetailModal eid={selectedEid} onClose={() => setSelectedEid(null)} />
     </div>
   );
 }

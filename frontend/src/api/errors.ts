@@ -11,6 +11,7 @@ const CODE_MESSAGES: Readonly<Record<string, string>> = {
   CANNOT_LOCK_CURRENT_USER: "Không thể khóa tài khoản đang sử dụng.",
   CANNOT_RESET_CURRENT_USER:
     "Không thể đặt lại mật khẩu quản trị viên đang sử dụng từ màn hình này.",
+  SYSTEM_RESET_DISABLED: "Chức năng reset đã bị tắt tạm thời.",
 };
 
 export function getApiErrorCode(error: unknown): string | undefined {

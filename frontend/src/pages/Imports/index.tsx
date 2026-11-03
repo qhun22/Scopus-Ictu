@@ -16,6 +16,7 @@ import {
   uploadScopusCsv,
   CONFIRMED_IMPORTS_KEY,
   getConfirmedImportIds,
+  isSupersededByNewerConfirmedDuplicate,
 } from "../../api/imports";
 import { ApiError } from "../../api/client";
 import { cancelLecturerDatasetImport, importLecturerDataset } from "../../api/lecturerImport";
@@ -29,76 +30,57 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
 import { buttonClass } from "../../components/ui/Button";
+import {
+  PENDING_SCOPUS_IMPORT_KEY,
+  PENDING_LECTURER_PREVIEW_KEY,
+  savePendingLecturerFile,
+  loadPendingLecturerFile,
+  clearPendingLecturerFile,
+} from "../../utils/pendingImportCache";
 
 const LECTURER_PREVIEW_ID = "__lecturer_preview__";
-const PENDING_SCOPUS_IMPORT_KEY = "scopus-ictu.pending-scopus-import-id";
-const PENDING_LECTURER_PREVIEW_KEY = "scopus-ictu.pending-lecturer-preview";
-const PENDING_LECTURER_FILE_STORE = "scopus-ictu.pending-lecturer-file";
-
-function openPendingLecturerFileStore(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(PENDING_LECTURER_FILE_STORE, 1);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore("files");
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function savePendingLecturerFile(file: File): Promise<void> {
-  const database = await openPendingLecturerFileStore();
-  await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction("files", "readwrite");
-    transaction.objectStore("files").put(file, "pending");
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-  database.close();
-}
-
-async function loadPendingLecturerFile(): Promise<File | null> {
-  const database = await openPendingLecturerFileStore();
-  const file = await new Promise<File | null>((resolve, reject) => {
-    const transaction = database.transaction("files", "readonly");
-    const request = transaction.objectStore("files").get("pending");
-    request.onsuccess = () => resolve((request.result as File | undefined) ?? null);
-    request.onerror = () => reject(request.error);
-  });
-  database.close();
-  return file;
-}
-
-async function clearPendingLecturerFile(): Promise<void> {
-  const database = await openPendingLecturerFileStore();
-  await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction("files", "readwrite");
-    transaction.objectStore("files").delete("pending");
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-  });
-  database.close();
-}
 
 function replaceToken(template: string, token: string, value: string): string {
   return template.replace(`{${token}}`, value);
 }
 
+// A real UUID shown in place of the internal LECTURER_PREVIEW_ID placeholder
+// while the file is still only a preview (no backend record yet). Sent back
+// to the server on confirm (see handleConfirmLecturerImport) so the backend
+// uses this exact id for the new import instead of generating its own —
+// the id the admin saw while previewing never changes once confirmed. Only
+// the first 8 characters are ever shown (see shortId below), so continuity
+// holds visually too, not just internally.
+function generateDisplayId(): string {
+  return crypto.randomUUID();
+}
+
+// The full id is a 36-char UUID — too long for a compact badge/cell and
+// prone to overflowing the layout. Show only its first 8 characters (still
+// unique enough to tell rows apart at a glance); the full value is always
+// available via the `title` tooltip for copy/paste.
+function shortId(id: string): string {
+  return id.length > 8 ? id.slice(0, 8) : id;
+}
+
 const badgeClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
 const statusBadgeClassName = badgeClassName;
 const cancelledStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
 const activeStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
 const supersededStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
 const abnormalStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700 hover:bg-amber-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700 hover:bg-amber-50";
 const needsProcessingBadgeClassName =
   "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
-const typeBadgeClassName = badgeClassName;
-const userBadgeClassName = badgeClassName;
+// "Basic" neutral style — same as the "Chi tiết" action button, not the blue brand badge.
+const basicBadgeClassName =
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900";
+const typeBadgeClassName = basicBadgeClassName;
+const userBadgeClassName = basicBadgeClassName;
 const ACTIVE_STATUSES: ImportStatus[] = ["RECEIVED", "PARSING", "VALIDATED"];
 
 function errorField(error: ApiError, field: string): string | undefined {
@@ -137,6 +119,13 @@ export default function ImportsPage() {
     preview: PreviewResponse;
     file: File;
     at: string;
+    // A random 8-digit stand-in shown in the UI instead of the internal
+    // LECTURER_PREVIEW_ID placeholder constant — generated once per preview
+    // and kept stable across reloads via sessionStorage. The real
+    // LECTURER_PREVIEW_ID stays the row's `id` everywhere else (the client
+    // never calls the backend to confirm/cancel, so all that logic matches
+    // on this fixed constant) — this field is for display only.
+    displayId: string;
     duplicate?: { importId: string; filename: string; importedAt: string } | null;
   } | null>(null);
   // Scopus CSV needs the school's lecturer data first.
@@ -153,7 +142,6 @@ export default function ImportsPage() {
 
   // Search & Filter & Pagination states
   const [searchInput, setSearchInput] = useState<string>("");
-  const [appliedSearch, setAppliedSearch] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [archiveFilter, setArchiveFilter] = useState<"active" | "archived" | "all">(
     "active",
@@ -228,6 +216,7 @@ export default function ImportsPage() {
       const stored = JSON.parse(serialized) as {
         preview: PreviewResponse;
         at: string;
+        displayId?: string;
         duplicate?: { importId: string; filename: string; importedAt: string } | null;
       };
       if (!stored.preview?.filename || !stored.at) {
@@ -238,7 +227,15 @@ export default function ImportsPage() {
         sessionStorage.removeItem(PENDING_LECTURER_PREVIEW_KEY);
         return;
       }
-      setLecturerPreview({ preview: stored.preview, file, at: stored.at, duplicate: stored.duplicate ?? null });
+      setLecturerPreview({
+        preview: stored.preview,
+        file,
+        at: stored.at,
+        // Older sessionStorage entries predate this field — fall back to a
+        // freshly generated one rather than breaking restoration.
+        displayId: stored.displayId ?? generateDisplayId(),
+        duplicate: stored.duplicate ?? null,
+      });
     } catch (error) {
       sessionStorage.removeItem(PENDING_LECTURER_PREVIEW_KEY);
       await clearPendingLecturerFile().catch(() => undefined);
@@ -307,7 +304,11 @@ export default function ImportsPage() {
   const formatDate = (value: string): string =>
     new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
       dateStyle: "short",
-      timeStyle: "short",
+      // "medium" (adds seconds) instead of "short": several rows can share
+      // the same displayed minute while the sort (exact created_at, see
+      // tableHistory below) correctly tells them apart — without seconds
+      // shown, a technically-correct order can look random to the eye.
+      timeStyle: "medium",
     }).format(new Date(value));
 
   const formatDuration = (seconds: number): string => {
@@ -324,15 +325,27 @@ export default function ImportsPage() {
     return item.duplicate_candidates || 0;
   };
 
+  const isAwaitingConfirmation = (item: ScopusImport): boolean =>
+    item.id === LECTURER_PREVIEW_ID;
+
   const isWarningStatus = (item: ScopusImport): boolean => {
+    // A pending lecturer preview flagged as a duplicate shows "Bất thường" —
+    // count it as a warning instead of plain processing.
+    if (isAwaitingConfirmation(item)) {
+      return Boolean(item.duplicate_of);
+    }
+    // A Scopus CSV staged as a whole-file duplicate, not yet confirmed, also
+    // shows "Bất thường" — same rule, it just has a real id instead of the
+    // lecturer-preview placeholder one.
+    if (item.type !== "LECTURERS" && item.status === "STAGED" && item.duplicate_of) {
+      const confirmed = confirmedImportIds.includes(item.id) || Boolean(item.normalization_summary);
+      if (!confirmed) return true;
+    }
     if (item.status !== "STAGED" && item.status !== "APPLIED" && item.status !== "IMPORTED") {
       return false;
     }
     return getItemWarningCount(item) > 0;
   };
-
-  const isAwaitingConfirmation = (item: ScopusImport): boolean =>
-    item.id === LECTURER_PREVIEW_ID;
 
   const warnPendingAction = () => {
     toast.warning(
@@ -363,7 +376,7 @@ export default function ImportsPage() {
     if (item.status === "FAILED") return t.imports.failed;
     if (item.status === "CANCELLED") return cancelledLabel(item);
     // A newer import of the same file now holds the data: nothing was rolled back.
-    if (item.status === "SUPERSEDED") return locale === "vi" ? "Đã thay thế" : "Superseded";
+    if (item.status === "SUPERSEDED") return locale === "vi" ? "Thay thế" : "Superseded";
     if (item.type === "LECTURERS") {
       if (isAwaitingConfirmation(item)) {
         if (item.duplicate_of) return locale === "vi" ? "Bất thường" : "Abnormal";
@@ -372,11 +385,14 @@ export default function ImportsPage() {
       if (isWarningStatus(item)) {
         return locale === "vi" ? "Cảnh báo" : "Warning";
       }
-      return item.failed_records > 0 ? t.imports.completedWithErrors : (locale === "vi" ? "Đang hoạt động" : "Active");
+      return item.failed_records > 0 ? t.imports.completedWithErrors : (locale === "vi" ? "Hoạt động" : "Active");
     }
     // Scopus imports
+    if (isSupersededByNewerConfirmedDuplicate(item, history, confirmedImportIds)) {
+      return locale === "vi" ? "Thay thế" : "Superseded";
+    }
     if (item.status === "APPLIED" || isInUse(item)) {
-      return locale === "vi" ? "Đang hoạt động" : "Active";
+      return locale === "vi" ? "Hoạt động" : "Active";
     }
     if (item.status === "STAGED") {
       const confirmed = confirmedImportIds.includes(item.id) || Boolean(item.normalization_summary);
@@ -391,16 +407,18 @@ export default function ImportsPage() {
       }
       return locale === "vi" ? "Chờ xử lý" : "Awaiting processing";
     }
-    return locale === "vi" ? "Đang hoạt động" : "Active";
+    return locale === "vi" ? "Hoạt động" : "Active";
   };
 
   const renderStatusBadge = (item: ScopusImport) => {
     const isBusy = confirmingImportId === item.id || cancellingImportId === item.id;
     const label = statusLabel(item);
-    const isActive = label === (locale === "vi" ? "Đang hoạt động" : "Active");
-    const isNeedsProcessing = label === (locale === "vi" ? "Chờ xử lý" : "Awaiting processing");
+    const isActive = label === (locale === "vi" ? "Hoạt động" : "Active");
+    const isNeedsProcessing =
+      label === (locale === "vi" ? "Chờ xử lý" : "Awaiting processing") ||
+      label === (locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization");
     const isAbnormal = label === (locale === "vi" ? "Bất thường" : "Abnormal");
-    const isSuperseded = item.status === "SUPERSEDED";
+    const isSuperseded = label === (locale === "vi" ? "Thay thế" : "Superseded");
     const isProcessing = ACTIVE_STATUSES.includes(item.status) || isBusy;
     return (
       <span
@@ -564,7 +582,7 @@ export default function ImportsPage() {
   const selectFile = (file: File | undefined) => {
     if (!file || uploading) return;
     if (lecturerDataMissing) {
-      setSelectionError(lecturerDataMessage);
+      notifyLecturerDataRequired();
       return;
     }
     const extension = file.name.includes(".")
@@ -630,6 +648,9 @@ export default function ImportsPage() {
     locale === "vi"
       ? "Cần nhập danh sách giảng viên của trường (tệp JSON) trước khi nhập tệp Scopus."
       : "Import the school's lecturer list (JSON) before importing a Scopus file.";
+  const notifyLecturerDataRequired = () => {
+    toast.warning(locale === "vi" ? "Cần dữ liệu giảng viên" : "Lecturer data required", lecturerDataMessage);
+  };
 
   const startImport = async () => {
     if (!selectedFile || uploading) return;
@@ -676,7 +697,7 @@ export default function ImportsPage() {
     } catch (error: unknown) {
       if (error instanceof ApiError && error.code === "LECTURER_DATA_REQUIRED") {
         setLecturerCount(0);
-        setSelectionError(lecturerDataMessage);
+        notifyLecturerDataRequired();
         return;
       }
       if (error instanceof ApiError && error.code === "IMPORT_ALREADY_PROCESSING") {
@@ -748,7 +769,7 @@ export default function ImportsPage() {
     setLecturerImporting(true);
     try {
       const [result] = await Promise.all([
-        importLecturerDataset(lecturerPreview.file),
+        importLecturerDataset(lecturerPreview.file, lecturerPreview.displayId),
         new Promise((resolve) => setTimeout(resolve, 2000)),
       ]);
       sessionStorage.removeItem(PENDING_LECTURER_PREVIEW_KEY);
@@ -765,7 +786,22 @@ export default function ImportsPage() {
           String(result.summary.total),
         ),
       );
+      if (result.summary.accounts_skipped !== undefined && result.summary.accounts_skipped > 0) {
+        toast.warning(
+          t.lecturerImport.accountsSkipped,
+          t.lecturerImport.accountsSkippedWarning.replace("{count}", String(result.summary.accounts_skipped)),
+        );
+      }
       await fetchData();
+      // fetchData() only refreshes config + history; lecturerCount (used to
+      // gate the Scopus upload box) is a separate piece of state and goes
+      // stale here otherwise — re-fetch it so the "Cần dữ liệu giảng viên"
+      // warning doesn't keep firing right after a successful import.
+      try {
+        setLecturerCount((await getImportPrerequisites()).lecturer_count);
+      } catch {
+        // non-critical: the server still enforces the rule
+      }
     } catch (error) {
       const code = error instanceof ApiError ? error.code : "IMPORT_FAILED";
       const detail =
@@ -1119,18 +1155,11 @@ export default function ImportsPage() {
   const handleHeaderAddClick = () => {
     if (uploading) return;
     if (lecturerDataMissing) {
-      toast.warning(locale === "vi" ? "Cần dữ liệu giảng viên" : "Lecturer data required", lecturerDataMessage);
+      notifyLecturerDataRequired();
       return;
     }
     inputRef.current?.click();
   };
-
-  const handleApplySearch = () => {
-    setAppliedSearch(searchInput);
-    setPage(1);
-  };
-
-  const isApplyDisabled = !searchInput.trim() || searchInput.trim() === appliedSearch.trim();
 
   // Filter & Pagination calculations
   const lecturerPreviewRow: ScopusImport | null = lecturerPreview
@@ -1172,7 +1201,11 @@ export default function ImportsPage() {
         },
       }
     : null;
-  const tableHistory = lecturerPreviewRow ? [lecturerPreviewRow, ...history] : history;
+  const tableHistory = lecturerPreviewRow
+    ? [lecturerPreviewRow, ...history].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+    : history;
 
   // KPI Calculations — must include the in-progress lecturer preview row
   // (tableHistory), not just confirmed server-side history, otherwise the
@@ -1180,24 +1213,34 @@ export default function ImportsPage() {
   // A row awaiting user confirmation (isAwaitingConfirmation) must count as
   // "Processing", not "Success" — it has STAGED status but the user hasn't
   // clicked "Confirm import" yet, so nothing has actually been imported.
+  const isFailedOrCancelledOrSuperseded = (item: ScopusImport): boolean =>
+    item.status === "FAILED" ||
+    item.status === "CANCELLED" ||
+    statusLabel(item) === (locale === "vi" ? "Thay thế" : "Superseded");
+  // "Chờ chuẩn hóa" is still in progress — the Scopus rows haven't gone
+  // through normalization yet — so it belongs in "Đang xử lý", not "Thành công".
+  const isAwaitingNormalization = (item: ScopusImport): boolean =>
+    statusLabel(item) === (locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization");
   const countTotal = tableHistory.length;
   const countWarning = tableHistory.filter((item) => isWarningStatus(item)).length;
   const countSuccess = tableHistory.filter(
     (item) =>
       (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
       !isAwaitingConfirmation(item) &&
-      !isWarningStatus(item),
+      !isWarningStatus(item) &&
+      !isFailedOrCancelledOrSuperseded(item) &&
+      !isAwaitingNormalization(item),
   ).length;
   const countProcessing = tableHistory.filter(
     (item) =>
-      ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item),
+      ((["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item)) &&
+        !isWarningStatus(item)) ||
+      isAwaitingNormalization(item),
   ).length;
-  const countFailed = tableHistory.filter(
-    (item) => item.status === "FAILED" || item.status === "CANCELLED",
-  ).length;
+  const countFailed = tableHistory.filter(isFailedOrCancelledOrSuperseded).length;
 
   const filteredHistory = tableHistory.filter((item) => {
-    const q = appliedSearch.trim().toLowerCase();
+    const q = searchInput.trim().toLowerCase();
     const matchesSearch =
       !q ||
       item.file_name.toLowerCase().includes(q) ||
@@ -1210,14 +1253,18 @@ export default function ImportsPage() {
       matchesStatus =
         (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
         !isAwaitingConfirmation(item) &&
-        !isWarningStatus(item);
+        !isWarningStatus(item) &&
+        !isFailedOrCancelledOrSuperseded(item) &&
+        !isAwaitingNormalization(item);
     } else if (statusFilter === "WARNING") {
       matchesStatus = isWarningStatus(item);
     } else if (statusFilter === "PROCESSING") {
       matchesStatus =
-        ["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item);
+        ((["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item)) &&
+          !isWarningStatus(item)) ||
+        isAwaitingNormalization(item);
     } else if (statusFilter === "FAILED") {
-      matchesStatus = item.status === "FAILED" || item.status === "CANCELLED";
+      matchesStatus = isFailedOrCancelledOrSuperseded(item);
     }
 
     return matchesSearch && matchesStatus;
@@ -1276,9 +1323,6 @@ export default function ImportsPage() {
             onClick={handleHeaderAddClick}
             className={buttonClass("primary", "md", true)}
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
-            </svg>
             <span className="truncate">{t.imports.addImport}</span>
           </button>
 
@@ -1288,80 +1332,9 @@ export default function ImportsPage() {
             onClick={() => lecturerCardRef.current?.openFilePicker()}
             className={buttonClass("primary", "md", true)}
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
-            </svg>
             <span className="truncate">{t.imports.addLecturers}</span>
           </button>
         </div>
-      </div>
-
-      {/* KPI Stats Grid — clickable để lọc nhanh */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
-        <button
-          type="button"
-          onClick={() => { setStatusFilter("ALL"); setPage(1); }}
-          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "ALL" ? "border-slate-400 bg-slate-100 ring-2 ring-slate-300" : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"}`}
-        >
-          <span className="text-xs font-medium text-slate-500">
-            {locale === "vi" ? "Tổng đợt nhập" : "Total Imports"}
-          </span>
-          <p className="mt-1 text-2xl font-black text-slate-800">
-            {numberFormatter.format(countTotal)}
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setStatusFilter("COMPLETED"); setPage(1); }}
-          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "COMPLETED" ? "border-emerald-400 bg-emerald-50 ring-2 ring-emerald-200" : "border-slate-200/80 bg-white hover:border-emerald-200 hover:bg-emerald-50/50"}`}
-        >
-          <span className="text-xs font-medium text-emerald-600">
-            {locale === "vi" ? "Thành công" : "Completed"}
-          </span>
-          <p className="mt-1 text-2xl font-black text-emerald-600">
-            {numberFormatter.format(countSuccess)}
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setStatusFilter("WARNING"); setPage(1); }}
-          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "WARNING" ? "border-amber-400 bg-amber-50 ring-2 ring-amber-200" : "border-slate-200/80 bg-white hover:border-amber-200 hover:bg-amber-50/50"}`}
-        >
-          <span className="text-xs font-medium text-amber-600">
-            {locale === "vi" ? "Cảnh báo" : "Warnings"}
-          </span>
-          <p className="mt-1 text-2xl font-black text-amber-600">
-            {numberFormatter.format(countWarning)}
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setStatusFilter("PROCESSING"); setPage(1); }}
-          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${statusFilter === "PROCESSING" ? "border-blue-400 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200/80 bg-white hover:border-blue-200 hover:bg-blue-50/50"}`}
-        >
-          <span className="text-xs font-medium text-blue-600">
-            {locale === "vi" ? "Đang xử lý" : "Processing"}
-          </span>
-          <p className="mt-1 text-2xl font-black text-[#3A5FC3]">
-            {numberFormatter.format(countProcessing)}
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { setStatusFilter("FAILED"); setPage(1); }}
-          className={`rounded-[5px] border p-4 shadow-xs text-left transition-all duration-150 active:scale-[0.98] cursor-pointer col-span-2 sm:col-span-1 ${statusFilter === "FAILED" ? "border-rose-400 bg-rose-50 ring-2 ring-rose-200" : "border-slate-200/80 bg-white hover:border-rose-200 hover:bg-rose-50/50"}`}
-        >
-          <span className="text-xs font-medium text-rose-600">
-            {locale === "vi" ? "Lỗi / Đã hủy" : "Failed / Rolled back"}
-          </span>
-          <p className="mt-1 text-2xl font-black text-rose-600">
-            {numberFormatter.format(countFailed)}
-          </p>
-        </button>
       </div>
 
       {/* Import Boxes Grid: 1 row, 2 boxes (1:1 ratio) - Left: Scopus CSV, Right: Lecturer JSON */}
@@ -1384,21 +1357,11 @@ export default function ImportsPage() {
             </div>
           </div>
 
-          {lecturerDataMissing && (
-            <div
-              className="mt-4 rounded-[5px] border border-amber-300 bg-white p-3 text-xs font-semibold text-amber-700"
-              role="alert"
-              data-testid="lecturer-data-required"
-            >
-              {lecturerDataMessage}
-            </div>
-          )}
-
           {!selectedFile ? (
             <div
               onClick={() => {
                 if (uploading) return;
-                if (lecturerDataMissing) setSelectionError(lecturerDataMessage);
+                if (lecturerDataMissing) notifyLecturerDataRequired();
                 else inputRef.current?.click();
               }}
               onDragEnter={(event) => {
@@ -1511,11 +1474,12 @@ export default function ImportsPage() {
           isImporting={lecturerImporting}
           onPreviewGenerated={(preview, file, duplicateOf) => {
             const at = new Date().toISOString();
-            setLecturerPreview({ preview, file, at, duplicate: duplicateOf ?? null });
+            const displayId = generateDisplayId();
+            setLecturerPreview({ preview, file, at, displayId, duplicate: duplicateOf ?? null });
             setActiveResultPanel("lecturer_preview");
             sessionStorage.setItem(
               PENDING_LECTURER_PREVIEW_KEY,
-              JSON.stringify({ preview, at, duplicate: duplicateOf ?? null }),
+              JSON.stringify({ preview, at, displayId, duplicate: duplicateOf ?? null }),
             );
             void savePendingLecturerFile(file).catch((error: unknown) => {
               sessionStorage.removeItem(PENDING_LECTURER_PREVIEW_KEY);
@@ -1563,42 +1527,46 @@ export default function ImportsPage() {
             type="text"
             aria-label={t.common.search}
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                handleApplySearch();
-              }
-            }}
+            onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
             placeholder={t.imports.searchPlaceholder}
             className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Nút Áp dụng */}
-          <button
-            type="button"
-            disabled={isApplyDisabled}
-            onClick={handleApplySearch}
-            className={buttonClass("primary")}
+          <select
+            aria-label={locale === "vi" ? "Trạng thái" : "Status"}
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+            className="h-control shrink-0 rounded-control border border-line bg-slate-50 px-3 text-[13px] font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 cursor-pointer"
           >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="truncate">{locale === "vi" ? "Áp dụng" : "Apply"}</span>
-          </button>
+            <option value="ALL">
+              {locale === "vi" ? "Tất cả" : "All"} ({numberFormatter.format(countTotal)})
+            </option>
+            <option value="COMPLETED">
+              {locale === "vi" ? "Thành công" : "Completed"} ({numberFormatter.format(countSuccess)})
+            </option>
+            <option value="WARNING">
+              {locale === "vi" ? "Cảnh báo" : "Warnings"} ({numberFormatter.format(countWarning)})
+            </option>
+            <option value="PROCESSING">
+              {locale === "vi" ? "Cần xử lý" : "Processing"} ({numberFormatter.format(countProcessing)})
+            </option>
+            <option value="FAILED">
+              {locale === "vi" ? "Lỗi / Đã hủy" : "Failed / Rolled back"} ({numberFormatter.format(countFailed)})
+            </option>
+          </select>
 
           {/* Nút Đặt lại */}
           <button
             type="button"
             onClick={() => {
               setSearchInput("");
-              setAppliedSearch("");
               setStatusFilter("ALL");
               setArchiveFilter("active");
               setPage(1);
             }}
-            disabled={!searchInput && !appliedSearch && statusFilter === "ALL"}
+            disabled={!searchInput && statusFilter === "ALL"}
             className={buttonClass("secondary")}
           >
             <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1665,9 +1633,7 @@ export default function ImportsPage() {
                   >
                     <td className="px-3 py-3.5 align-middle whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-[5px] border shrink-0 shadow-2xs ${
-                          "bg-blue-50 text-[#3A5FC3] border-blue-100/80"
-                        }`}>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0 shadow-2xs">
                           {item.type === "LECTURERS" ? (
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1678,12 +1644,15 @@ export default function ImportsPage() {
                             </svg>
                           )}
                         </div>
-                        <div className="min-w-0 max-w-[180px]">
+                        <div className="min-w-0 max-w-xs sm:max-w-sm">
                           <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
                             {item.file_name}
                           </span>
-                          <span className="block text-[10px] font-mono text-slate-400 truncate">
-                            ID: {item.id}
+                          <span
+                            className="block text-[10px] font-mono text-slate-400 truncate"
+                            title={item.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? item.id) : item.id}
+                          >
+                            ID: {shortId(item.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? item.id) : item.id)}
                           </span>
                         </div>
                       </div>
@@ -1700,7 +1669,9 @@ export default function ImportsPage() {
                     <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
                       <span>
                         {`${numberFormatter.format(
-                          item.status === "CANCELLED" || item.status === "FAILED"
+                          item.status === "CANCELLED" ||
+                            item.status === "FAILED" ||
+                            statusLabel(item) === (locale === "vi" ? "Thay thế" : "Superseded")
                             ? 0
                             : item.type === "LECTURERS"
                               ? item.imported_records
@@ -1726,7 +1697,7 @@ export default function ImportsPage() {
                       <button
                         type="button"
                         onClick={() => openDetail(item)}
-                        className="inline-flex w-28 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors cursor-pointer"
+                        className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                       >
                         {t.imports.detail}
                       </button>
@@ -1803,42 +1774,32 @@ export default function ImportsPage() {
       {/* ====================================================================== */}
       {detailOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
             <section
               role="dialog"
               aria-modal="true"
               aria-labelledby="import-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-card bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-card bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
             >
-              <header className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-4 border-b border-slate-100 px-5 py-4">
+              <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-slate-100 px-5 py-4">
                 <div className="min-w-0">
-                  <div className="min-w-0">
-                    <h2 id="import-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
-                      {t.imports.detail}
-                    </h2>
-                    {detail && (
-                      <p className="mt-0.5 break-all text-[11px] font-mono text-slate-400">
-                        ID: {detail.id === LECTURER_PREVIEW_ID ? detail.file_name : detail.id}
-                      </p>
-                    )}
-                  </div>
+                  <h2 id="import-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
+                    {detail?.type === "LECTURERS"
+                      ? (locale === "vi" ? "Chi tiết tệp giảng viên" : "Lecturer file detail")
+                      : t.imports.detail}
+                  </h2>
                 </div>
                 {detail && (
                   <div className="flex shrink-0 items-center gap-2 pt-1">
+                    <span
+                      className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center font-mono text-xs font-bold leading-none text-slate-700"
+                      title={detail.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? detail.id) : detail.id}
+                    >
+                      ID: {shortId(detail.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? detail.id) : detail.id)}
+                    </span>
                     {renderTypeBadge(detail.type)}
                     {renderStatusBadge(detail)}
                   </div>
-                )}
-                {detail && (
-                  <button
-                    type="button"
-                    onClick={() => setDetailOpen(false)}
-                    className="rounded-[5px] p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 )}
               </header>
 
@@ -1856,8 +1817,8 @@ export default function ImportsPage() {
                       </h3>
                       <p className="mt-1 text-xs text-slate-600">
                         {locale === "vi"
-                          ? "Hệ thống phát hiện tệp có nội dung trùng với một đợt nhập trước. Đợt này được đánh dấu \"Bất thường\"; bạn vẫn có thể xác nhận nhập hoặc hủy tiến trình."
-                          : "The file content matches an earlier import. This one is marked \"Abnormal\"; you can still confirm the import or cancel."}
+                          ? "Tệp có nội dung trùng với một đợt nhập trước. Đợt này được đánh dấu \"Bất thường\"; bạn có thể \"Xem đợt trước\" để đối chiếu, hoặc xác nhận nhập/hủy tiến trình bên dưới."
+                          : "The file content matches an earlier import. This one is marked \"Abnormal\"; you can view the earlier import to compare, or confirm/cancel below."}
                       </p>
                       <dl className="mt-2 space-y-0.5 text-xs text-slate-700">
                         <div>
@@ -1871,13 +1832,6 @@ export default function ImportsPage() {
                           </dd>
                         </div>
                       </dl>
-                      <button
-                        type="button"
-                        className="mt-3 inline-flex h-badge w-40 cursor-pointer items-center justify-center rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50"
-                        onClick={() => void viewPreviousImport(detail.duplicate_of?.import_id)}
-                      >
-                        {locale === "vi" ? "Xem đợt trước" : "View earlier import"}
-                      </button>
                     </div>
                   )}
                 {detailLoading || !detail ? (
@@ -1888,79 +1842,96 @@ export default function ImportsPage() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
                       <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                        <div className="mb-3 flex items-center gap-2 border-b border-slate-200/70 pb-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-200/70 text-slate-600">
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2m6-6a4 4 0 100-8 4 4 0 000 8zm8-3a4 4 0 100-8 4 4 0 000 8zm0 3h2a4 4 0 014 4v2" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                                {locale === "vi" ? "Tiếp nhận dữ liệu" : "Data ingestion"}
-                              </h3>
-                              <span className="text-[11px] font-medium text-slate-500">
-                                {locale === "vi" ? "Dữ liệu giảng viên" : "Lecturer dataset"}
-                              </span>
-                            </div>
-                          </div>
+                        <div className="mb-3 border-b border-slate-200/70 pb-3">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                            {locale === "vi" ? "Tiếp nhận dữ liệu" : "Data ingestion"}
+                          </h3>
+                          <span className="text-[11px] font-medium text-slate-500">
+                            {locale === "vi" ? "Dữ liệu giảng viên" : "Lecturer dataset"}
+                          </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-center">
-                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.totalRecords}</span>
                             <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.created}</span>
                             <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.lecturer_summary?.created ?? detail.imported_records)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.updated}</span>
                             <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.lecturer_summary?.updated ?? 0)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.unchanged}</span>
                             <p className="mt-0.5 text-base font-black text-slate-700">{numberFormatter.format(detail.lecturer_summary?.unchanged ?? 0)}</p>
                           </div>
+                          {detail.id !== LECTURER_PREVIEW_ID && (
+                            <>
+                              <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                                <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.accountsCreated}</span>
+                                <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.lecturer_summary?.accounts_created ?? 0)}</p>
+                              </div>
+                              <div className={`flex h-16 flex-col items-center justify-center rounded-[5px] border p-2.5 shadow-2xs ${(detail.lecturer_summary?.accounts_skipped ?? 0) > 0 ? "border-amber-200 bg-amber-50/80" : "border-slate-200/80 bg-white"}`}>
+                                <span className={`text-[10px] font-medium uppercase ${(detail.lecturer_summary?.accounts_skipped ?? 0) > 0 ? "text-amber-700" : "text-slate-500"}`}>{t.lecturerImport.accountsSkipped}</span>
+                                <p className={`mt-0.5 text-base font-black ${(detail.lecturer_summary?.accounts_skipped ?? 0) > 0 ? "text-amber-800" : "text-slate-700"}`}>{numberFormatter.format(detail.lecturer_summary?.accounts_skipped ?? 0)}</p>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
                       <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                        <div className="mb-3 flex items-center gap-2 border-b border-slate-200/70 pb-3">
-                          <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-200/70 text-slate-600">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                              {locale === "vi" ? "Thông tin tệp" : "File information"}
-                            </h3>
-                            <span className="text-[11px] font-medium text-slate-500">
-                              {locale === "vi" ? "Thông tin đợt nhập" : "Import details"}
-                            </span>
-                          </div>
+                        <div className="mb-3 border-b border-slate-200/70 pb-3">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                            {locale === "vi" ? "Thông tin tệp" : "File information"}
+                          </h3>
+                          <span className="text-[11px] font-medium text-slate-500">
+                            {locale === "vi" ? "Thông tin đợt nhập" : "Import details"}
+                          </span>
                         </div>
-                        <dl className="mt-auto space-y-2.5 text-xs">
-                          <div className="rounded-[5px] border border-slate-100 bg-white/75 p-3">
-                            <dt className="font-semibold text-slate-500">{t.imports.fileName}</dt>
-                            <dd className="mt-1 break-all font-bold text-slate-800">{detail.file_name}</dd>
+                        <dl className="grid grid-cols-2 gap-2 text-center">
+                          <div className="col-span-2 flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <dt className="text-[10px] font-medium uppercase text-slate-500">{t.imports.fileName}</dt>
+                            <dd className="mt-0.5 truncate text-sm font-black text-slate-800" title={detail.file_name}>{detail.file_name}</dd>
                           </div>
-                          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                            <div className="rounded-[5px] border border-slate-100 bg-white/75 p-3">
-                              <dt className="font-semibold text-slate-500">{locale === "vi" ? "Thời gian nhập" : "Imported at"}</dt>
-                              <dd className="mt-1 font-semibold text-slate-700">{formatDate(detail.created_at)}</dd>
-                            </div>
-                            <div className="rounded-[5px] border border-slate-100 bg-white/75 p-3">
-                              <dt className="font-semibold text-slate-500">{t.imports.performedBy}</dt>
-                              <dd className="mt-1 font-semibold text-slate-700">{formatPerformedBy(detail.performed_by)}</dd>
-                            </div>
+                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <dt className="text-[10px] font-medium uppercase text-slate-500">{locale === "vi" ? "Thời gian nhập" : "Imported at"}</dt>
+                            <dd className="mt-0.5 text-sm font-black text-slate-800">{formatDate(detail.created_at)}</dd>
+                          </div>
+                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <dt className="text-[10px] font-medium uppercase text-slate-500">{t.imports.performedBy}</dt>
+                            <dd className="mt-0.5 text-sm font-black text-slate-800">{formatPerformedBy(detail.performed_by)}</dd>
                           </div>
                         </dl>
                       </div>
                     </div>
 
+                    {detail.id !== LECTURER_PREVIEW_ID && (detail.lecturer_summary?.accounts_skipped ?? 0) > 0 && (
+                      <div className="rounded-[5px] border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800" role="alert">
+                        <div className="flex items-start gap-2">
+                          <svg className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <span>
+                            <strong>{t.lecturerImport.accountsSkipped}:</strong>{" "}
+                            {t.lecturerImport.accountsSkippedWarning.replace("{count}", String(detail.lecturer_summary?.accounts_skipped ?? 0))}
+                          </span>
+                        </div>
+                        {(detail.lecturer_summary?.account_warnings ?? []).length > 0 && (
+                          <ul className="mt-2 ml-6 space-y-1 text-amber-700">
+                            {(detail.lecturer_summary?.account_warnings ?? []).map((w, i) => (
+                              <li key={i} className="leading-relaxed">
+                                <span className="font-medium">{w.record_full_name ?? "—"}</span>
+                                {w.reason ? <span className="text-amber-600"> — {w.reason}</span> : null}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
                     {lecturerPreview && detail.id === LECTURER_PREVIEW_ID && lecturerPreview.preview.conflicts.length > 0 ? (
                       <div className="rounded-[5px] border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-2xs">
                         <div className="flex items-center gap-2 font-bold text-amber-900">
@@ -2021,7 +1992,7 @@ export default function ImportsPage() {
                           </div>
                           <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-slate-500 uppercase">{t.imports.importedRecords}</span>
-                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.status === "CANCELLED" || detail.status === "FAILED" ? 0 : detail.imported_records)}</p>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.status === "CANCELLED" || detail.status === "FAILED" || statusLabel(detail) === (locale === "vi" ? "Thay thế" : "Superseded") ? 0 : detail.imported_records)}</p>
                           </div>
                           <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-slate-500 uppercase">{t.imports.failedRecords}</span>
@@ -2201,6 +2172,16 @@ export default function ImportsPage() {
                         ) : null}
                         <span>{locale === "vi" ? "Hủy tiến trình" : "Cancel process"}</span>
                       </button>
+                      {detail?.duplicate_of && (
+                        <button
+                          type="button"
+                          disabled={detailLoading || lecturerImporting || lecturerCancelling}
+                          onClick={() => void viewPreviousImport(detail.duplicate_of?.import_id)}
+                          className={buttonClass("secondary")}
+                        >
+                          {locale === "vi" ? "Xem đợt trước" : "View earlier import"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={
@@ -2237,6 +2218,16 @@ export default function ImportsPage() {
                       >
                         <span>{locale === "vi" ? "Hủy tiến trình" : "Cancel process"}</span>
                       </button>
+                      {detail.duplicate_of && (
+                        <button
+                          type="button"
+                          disabled={detailLoading || isCancelling || confirmingImportId === detail.id}
+                          onClick={() => void viewPreviousImport(detail.duplicate_of?.import_id)}
+                          className={buttonClass("secondary")}
+                        >
+                          {locale === "vi" ? "Xem đợt trước" : "View earlier import"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={detailLoading || isCancelling || confirmingImportId === detail.id}

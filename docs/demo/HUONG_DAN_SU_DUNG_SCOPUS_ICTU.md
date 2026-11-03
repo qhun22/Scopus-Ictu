@@ -71,7 +71,7 @@ Ma trận quyền chi tiết (đã kiểm chứng, Task 17) xem mục **4.16**. 
 
 - **Không có** màn hình "Tác vụ hệ thống" (`/tasks` chỉ là trang giữ chỗ — `NOT_IMPLEMENTED`).
 - **Không có** màn hình riêng "Người dùng": quản lý tài khoản nằm trong cửa sổ **Chi tiết** của giảng viên (`/users` tự chuyển sang `/lecturers`).
-- **Không có** nút trên giao diện để: sinh ứng viên đối sánh, nạp OpenAlex/Crossref, nạp công bố đã biết (đều là script dòng lệnh).
+- Nạp OpenAlex/Crossref, nạp công bố đã biết: **không có** nút trên giao diện (script dòng lệnh). Sinh ứng viên đối sánh: có nút **Sinh ứng viên** trong trang **Duyệt đối sánh** dành riêng cho ADMIN *(bổ sung 02/11/2026)*.
 - Các khung biểu đồ ở **Trang chủ** là giữ chỗ (luôn "Chưa có dữ liệu để hiển thị biểu đồ"), nhãn đã đổi thành "Đang phát triển".
 - Trường **điện thoại (`tel`)** và **Google Scholar** có trong JSON nguồn nhưng **không có cột trong database**, nên **Xuất JSON không khôi phục được** hai trường này.
 - Khoa / Bộ môn của giảng viên ICTU phần lớn **chưa có dữ liệu** (cột hiển thị "—").
@@ -130,7 +130,7 @@ Thanh menu bên trái (ADMIN). Trạng thái: ✔ = đã có chức năng thật
 | Menu (tiếng Việt) | Địa chỉ | Chức năng | Quyền | Đọc / Ghi | Tình trạng |
 |---|---|---|---|---|---|
 | Trang chủ | `/home` | Lời chào, ô Tra cứu nhanh, lối tắt. Khung biểu đồ/hoạt động là giữ chỗ | Mọi vai trò | Chỉ đọc | ✔ (một phần giữ chỗ) |
-| Tổng quan | `/dashboard` | Thẻ thống kê, trạng thái định danh, đợt nhập gần nhất, hoạt động gần đây | ADMIN | Chỉ đọc | ✔ |
+| Tổng quan | `/dashboard` | Thẻ thống kê, trạng thái định danh, đợt nhập gần nhất, hoạt động gần đây; **Đặt lại hệ thống** (local only) | ADMIN | Chỉ đọc + **Ghi** (nút reset, chỉ local) | ✔ |
 | Nhập dữ liệu | `/imports` | Nhập CSV Scopus; nhập JSON giảng viên; lịch sử các đợt nhập; hoàn tác/xóa đợt nhập | ADMIN | **Ghi** | ✔ |
 | Chuẩn hóa dữ liệu | `/normalization` | Chuẩn hóa công bố; bóc tách tác giả; danh sách tác giả Scopus | ADMIN | **Ghi** (nút chuẩn hóa) / Đọc (danh sách) | ✔ |
 | Giảng viên | `/lecturers` | Danh sách, tìm kiếm, thêm, sửa, xóa hồ sơ; cấp/khóa/mở khóa tài khoản; đặt lại mật khẩu; Xuất JSON | ADMIN | **Ghi** | ✔ |
@@ -175,6 +175,7 @@ Mỗi chức năng theo cùng khung: Mục đích · Khi nào dùng · Điều k
 - Số liệu là **thống kê tại thời điểm tải trang**, không phải thời gian thực. Nút **Làm mới** tải lại.
 - **Trang chủ:** ô **Tra cứu nhanh** → gõ ≥ 2 ký tự → **Tìm kiếm** → chuyển tới `/search?q=...`.
 - **Đã kiểm thử:** `BROWSER_PASS` (hiển thị, điều hướng, tải lại trang); `API_PASS` (đối chiếu số liệu với database). Dashboard không có biểu đồ — chỉ có thẻ và bảng.
+- **Nút "Đặt lại hệ thống" (chỉ ADMIN):** xuất hiện trên Dashboard khi chạy ở môi trường local. Bấm → nhập **ICTU** để xác nhận → toàn bộ dữ liệu bị xóa sạch (giảng viên, lịch sử nhập, chuẩn hóa, danh tính Scopus, bài báo, nhật ký kiểm toán…), **chỉ giữ lại tài khoản ADMIN**. Thao tác **không thể hoàn tác** — dùng đúng mục đích: làm mới môi trường kiểm thử. Sau khi reset thành công, phiên đăng nhập hiện tại bị thu hồi và chuyển về trang đăng nhập. **Khi triển khai thật (deploy), nút này bị tắt** — backend trả `410 SYSTEM_RESET_DISABLED` và giao diện thông báo "Chức năng reset đã bị tắt tạm thời." *(bổ sung 02/11/2026)*
 
 ## 4.2. Quản lý giảng viên — **[CÓ GHI DỮ LIỆU khi thêm/sửa/xóa — chỉ test DB]**
 
@@ -262,7 +263,7 @@ Khi hồ sơ **đã** có tài khoản: cửa sổ hiện *Email đăng nhập*,
   2. `ictu_lecturers_merged.json` — bản gộp: thêm **ORCID (352)** và điện thoại (327); dùng cho teacher DB.
   3. Bản **xuất từ chính hệ thống** (Xuất JSON): có `full_name_normalized`, ORCID, **không có `tel`** (database không lưu).
   Nhập bản (1) lên DB đang có ORCID sẽ cho Preview "Cập nhật 352" (xóa ORCID) — **cẩn thận khi nhập tệp cũ**.
-- **`Xuất JSON`** (nút ở trang **Giảng viên**): tải về 410 hồ sơ giảng viên ICTU (không gồm hồ sơ demo), **không chứa mật khẩu/băm/token/secret** (đã quét: 0 từ khóa nhạy cảm). Xuất xong nhập lại → Preview "Không thay đổi 410". **Mỗi lần Xuất ghi `LECTURER_DATASET_EXPORTED` vào nhật ký** → *không bấm trên teacher DB*.
+- **`Xuất JSON`** (nút ở trang **Giảng viên**): tải về 410 hồ sơ giảng viên ICTU (không gồm hồ sơ demo), **không chứa mật khẩu/băm/token/secret** (đã quét: 0 từ khóa nhạy cảm). Xuất xong nhập lại → Preview "Không thay đổi 410"; tuy nhiên **tài khoản đăng nhập sẽ không được tạo lại tự động** — tệp xuất không lưu mật khẩu, cần tạo thủ công *(hành vi kể từ 02/11/2026)*. **Mỗi lần Xuất ghi `LECTURER_DATASET_EXPORTED` vào nhật ký** → *không bấm trên teacher DB*.
 - **Đã kiểm thử:** `BROWSER_PASS` (chọn tệp, Preview, nhập, cập nhật, khôi phục, hoàn tác, các lỗi trên); nút Xuất JSON `BROWSER_PASS` (gọi server, ghi nhật ký) + nội dung tệp `API_PASS` (trình duyệt tích hợp không cho kiểm tra tệp tải về).
 
 ## 4.4. Nhập CSV Scopus — **[CÓ GHI DỮ LIỆU — chỉ test DB]**
@@ -401,7 +402,7 @@ Affiliation trên bài là **đơn vị người đó khai tại thời điểm 
 ## 4.10. Hàng đợi đối sánh (Matching) — **[CHỈ XEM]**
 
 ### Matching Engine làm gì?
-Một **script dòng lệnh** (`generate_matching_candidates.py`, **không** có nút trên giao diện, **không** chạy trong web) đọc 410 giảng viên và 1.207 tác giả Scopus rồi **sinh ứng viên (candidate)** — mỗi ứng viên là *một đề xuất* "giảng viên A có thể là Scopus Author ID Y". Cách sinh **xác định (deterministic)**: so tên sau khi bỏ tiền tố chức danh (`DH.`, `GS.TS.`, `PGS.TS.`, `ThS.`, `TS.`), chuẩn hóa chữ thường/bỏ dấu, tương đương dấu phẩy (4 quy tắc `RULE_EXACT_N0`, `RULE_TITLE_STRIPPED_N0`, `RULE_TITLE_STRIPPED_N2`, `RULE_TITLE_STRIPPED_N2_FORMAT`). Sau đó bổ sung **bằng chứng công bố**: so DOI/tiêu đề trong *công bố đã biết của giảng viên* (nguồn Craw ICTU) với công bố Scopus của tác giả đó (`DOI_EXACT`, `TITLE_EXACT`). **Không chấm điểm, không xếp hạng, không tự duyệt.**
+Cơ chế sinh ứng viên (`generate_matching_candidates.py`) nay có thể kích hoạt qua nút **Sinh ứng viên** trong trang Duyệt đối sánh (chỉ ADMIN, **bổ sung 02/11/2026**) ngoài script dòng lệnh. Tiến trình đọc 410 giảng viên và 1.207 tác giả Scopus rồi **sinh ứng viên (candidate)** — mỗi ứng viên là *một đề xuất* "giảng viên A có thể là Scopus Author ID Y". Cách sinh **xác định (deterministic)**: so tên sau khi bỏ tiền tố chức danh (`DH.`, `GS.TS.`, `PGS.TS.`, `ThS.`, `TS.`), chuẩn hóa chữ thường/bỏ dấu, tương đương dấu phẩy (4 quy tắc `RULE_EXACT_N0`, `RULE_TITLE_STRIPPED_N0`, `RULE_TITLE_STRIPPED_N2`, `RULE_TITLE_STRIPPED_N2_FORMAT`). Sau đó bổ sung **bằng chứng công bố**: so DOI/tiêu đề trong *công bố đã biết của giảng viên* (nguồn Craw ICTU) với công bố Scopus của tác giả đó (`DOI_EXACT`, `TITLE_EXACT`). **Không chấm điểm, không xếp hạng, không tự duyệt.**
 
 ### Trên giao diện
 1. **Duyệt đối sánh**. Bộ lọc: **Trạng thái** (mặc định *Chờ duyệt*), **Loại bằng chứng**, **Mức độ mơ hồ**; **Làm mới**; "Tổng số: 40". 20 dòng/trang.

@@ -5,9 +5,9 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -463,7 +463,8 @@ def export_lecturers(
     Only lecturers whose import snapshots recorded a source identity
     (``source_id``) for ``source_system`` are exported; synthetic/manual
     records are excluded. A lecturer that has a login account is exported with
-    it (email, role and Argon2 password hash), so the file is confidential.
+    business identity fields only (email, role, display_name, is_active);
+    ``password_hash`` and other authentication secrets are **not** included.
     ``tel`` and Google Scholar are not stored in PostgreSQL and are therefore
     not exported (see ``dataset.export.not_preserved_fields``).
     """
@@ -1033,6 +1034,15 @@ def _validate_upload_filename(filename: str | None) -> str:
     return cleaned
 
 
+def _audit_event_id_exists(db: Session, candidate: uuid.UUID) -> bool:
+    from app.models.governance import AuditEvent
+
+    return (
+        db.query(AuditEvent.id).filter(AuditEvent.id == candidate).first()
+        is not None
+    )
+
+
 @router.post(
     "/import/preview",
     response_model=LecturerPreviewResponse,
@@ -1112,6 +1122,12 @@ async def import_lecturer_dataset(
     admin: Annotated[User, Depends(require_role("ADMIN"))],
     db: Annotated[Session, Depends(get_session)],
     file: Annotated[UploadFile | None, File()] = None,
+    # Optional: the id the frontend already showed during preview, so it
+    # stays the SAME id once the import is confirmed instead of a new one
+    # appearing. Best-effort only — an invalid or already-used value is
+    # silently ignored and a fresh id is generated instead, same as if this
+    # field were absent.
+    client_import_id: Annotated[str | None, Form()] = None,
 ) -> LecturerImportResponse:
     """M2.5A §29–§35: ADMIN-only, atomic, idempotent import."""
     if file is None:
@@ -1125,12 +1141,21 @@ async def import_lecturer_dataset(
         content = await _read_upload_bounded(file, LECTURER_IMPORT_MAX_BYTES)
     finally:
         await file.close()
+    requested_import_id: uuid.UUID | None = None
+    if client_import_id:
+        try:
+            candidate = uuid.UUID(client_import_id)
+        except (ValueError, AttributeError):
+            candidate = None
+        if candidate is not None and not _audit_event_id_exists(db, candidate):
+            requested_import_id = candidate
     try:
         result = LecturerImportService().import_dataset(
             db,
             filename=filename,
             content=content,
             actor=admin,
+            import_id=requested_import_id,
         )
     except DatasetValidationError as exc:
         raise APIError(
@@ -1159,6 +1184,9 @@ async def import_lecturer_dataset(
             "blocking_conflicts": result.blocking_conflicts,
             "absent_from_file": result.absent_from_file,
             "deleted": 0,
+            "accounts_created": result.accounts_created,
+            "accounts_skipped": result.accounts_skipped,
+            "account_warnings": result.account_warnings,
         },
         conflicts=[LecturerDatasetConflict(**c) for c in result.conflict_samples],
         snapshot_ids=result.snapshot_ids,

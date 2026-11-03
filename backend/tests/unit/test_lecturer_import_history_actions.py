@@ -112,8 +112,9 @@ def test_deleted_history_marker_hides_import_from_history() -> None:
         action="LECTURER_DATASET_HISTORY_DELETED",
         event_metadata={"import_id": str(import_id)},
     )
-    # Fifth (empty) result: list_imports now also queries cancelled lecturer-import audits.
-    session = _Session([], [audit], [], [marker], [])
+    # Fifth (empty) result: list_imports queries cancelled lecturer-import audits.
+    # Sixth (empty) result: list_imports queries superseded lecturer-import audits.
+    session = _Session([], [audit], [], [marker], [], [])
 
     assert list_imports(session) == []
 

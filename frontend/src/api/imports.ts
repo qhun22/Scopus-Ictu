@@ -32,6 +32,17 @@ export interface LecturerImportSummaryData {
   dataset_name?: string;
   schema_version?: string;
   cancelled_before_import?: boolean;
+  accounts_created?: number;
+  accounts_skipped?: number;
+  account_warnings?: Array<{
+    record_full_name: string | null;
+    matched_by?: string;
+    existing_id?: string | null;
+    existing_full_name?: string | null;
+    existing_email?: string | null;
+    blocking?: boolean;
+    reason: string;
+  }>;
 }
 
 export interface AuthorNormalizationSummary {
@@ -196,4 +207,29 @@ export function isImportConfirmed(item: ScopusImport, confirmedIds?: string[]): 
   }
   // Any other status without normalization (RECEIVED, PARSING, VALIDATED, CANCELLED, FAILED) is not confirmed/ready
   return false;
+}
+
+/**
+ * True once a NEWER, confirmed, still-valid (not cancelled) Scopus import
+ * with identical file content exists for `item`. Scopus "confirm" is a
+ * browser-only action (see handleConfirmImport in Imports/index.tsx — it
+ * never calls the API), so the backend has no way to know this; it can only
+ * be computed client-side from the full item list plus the confirmed-id
+ * cache. Never true for an import whose data is still actually in use
+ * (in_use): that data is real, not a stale duplicate, regardless of a newer
+ * re-upload.
+ */
+export function isSupersededByNewerConfirmedDuplicate(
+  item: ScopusImport,
+  allItems: ScopusImport[],
+  confirmedIds?: string[],
+): boolean {
+  if (item.type === "LECTURERS" || item.in_use) return false;
+  const ids = confirmedIds ?? getConfirmedImportIds();
+  return allItems.some((other) => {
+    if (other.id === item.id || other.type === "LECTURERS") return false;
+    if (other.duplicate_of?.import_id !== item.id) return false;
+    if (other.status === "CANCELLED") return false;
+    return isImportConfirmed(other, ids);
+  });
 }

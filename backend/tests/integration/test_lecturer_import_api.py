@@ -239,6 +239,55 @@ def test_import_creates_records_then_idempotent(client: TestClient, mock_db: Mag
     assert mock_db.commit.called
 
 
+def test_import_uses_the_client_supplied_id_so_the_preview_id_does_not_change(
+    client: TestClient, mock_db: MagicMock,
+) -> None:
+    """The frontend shows a random id while the file is only a preview (no
+    backend record exists yet). On confirm it sends that same id back as
+    ``client_import_id`` so the row keeps the exact id the admin already saw
+    — it must not be swapped for a different, server-generated one."""
+    from app.models.governance import AuditEvent
+
+    _configure_db_with(mock_db)
+    _install_role_override(role="ADMIN")
+    requested_id = uuid.uuid4()
+    response = client.post(
+        "/api/v1/lecturers/import",
+        files={"file": ("fixture.json", _fixture_bytes(), "application/json")},
+        data={"client_import_id": str(requested_id)},
+    )
+    assert response.status_code == 201, response.text
+    audit_events = [
+        call.args[0] for call in mock_db.add.call_args_list
+        if call.args and isinstance(call.args[0], AuditEvent)
+    ]
+    assert len(audit_events) == 1
+    assert audit_events[0].id == requested_id
+
+
+def test_import_ignores_a_client_id_that_is_not_a_valid_uuid(
+    client: TestClient, mock_db: MagicMock,
+) -> None:
+    """A malformed id must never fail the import — it's just ignored and a
+    fresh id is generated instead, same as when the field is absent."""
+    from app.models.governance import AuditEvent
+
+    _configure_db_with(mock_db)
+    _install_role_override(role="ADMIN")
+    response = client.post(
+        "/api/v1/lecturers/import",
+        files={"file": ("fixture.json", _fixture_bytes(), "application/json")},
+        data={"client_import_id": "not-a-uuid"},
+    )
+    assert response.status_code == 201, response.text
+    audit_events = [
+        call.args[0] for call in mock_db.add.call_args_list
+        if call.args and isinstance(call.args[0], AuditEvent)
+    ]
+    assert len(audit_events) == 1
+    assert isinstance(audit_events[0].id, uuid.UUID)
+
+
 def test_import_rejects_invalid_json(client: TestClient, mock_db: MagicMock) -> None:
     _configure_db_with(mock_db)
     _install_role_override(role="ADMIN")

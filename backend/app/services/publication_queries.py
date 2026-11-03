@@ -36,6 +36,8 @@ from app.schemas.publication_api import (
     AuthorAffiliationRead,
     PublicationAuthorRead,
     PublicationDetailResponse,
+    PublicationFilterOption,
+    PublicationFilterOptions,
     PublicationListItem,
     PublicationListResponse,
     LinkEvidenceBasisRead,
@@ -63,6 +65,39 @@ def _escaped_substring(value: str) -> str:
     return f"%{escaped}%"
 
 
+def _author_name_match_exists(pattern: str):
+    # Publications with a matching author name (diacritic/case-insensitive
+    # substring over the Scopus preferred name — not a lecturer lookup).
+    return (
+        select(PublicationAuthor.id)
+        .join(ScopusAuthor, ScopusAuthor.id == PublicationAuthor.scopus_author_id)
+        .where(
+            PublicationAuthor.publication_id == Publication.id,
+            folded(ScopusAuthor.preferred_name).like(fold_text(pattern), escape="\\"),
+        )
+        .exists()
+    )
+
+
+def _author_scopus_id_match_exists(pattern: str):
+    # Same free-text box also matches a pasted Scopus Author ID — the search
+    # placeholder already promises "tác giả" matching, and a Scopus ID is the
+    # most exact way to search for one.
+    return (
+        select(PublicationAuthor.id)
+        .join(ScopusAuthor, ScopusAuthor.id == PublicationAuthor.scopus_author_id)
+        .where(
+            PublicationAuthor.publication_id == Publication.id,
+            ScopusAuthor.scopus_id.ilike(pattern, escape="\\"),
+        )
+        .exists()
+    )
+
+
+def _missing_doi_condition():
+    return or_(Publication.doi.is_(None), func.btrim(Publication.doi) == "")
+
+
 def publication_filters(
     *,
     q: str | None,
@@ -72,6 +107,7 @@ def publication_filters(
     open_access_status: str | None,
     scopus_id: str | None = None,
     author_name: str | None = None,
+    missing_doi: bool | None = None,
 ) -> list[object]:
     conditions: list[object] = []
     trimmed_q = _trim_optional(q)
@@ -83,6 +119,8 @@ def publication_filters(
                 Publication.eid.ilike(pattern, escape="\\"),
                 Publication.doi.ilike(pattern, escape="\\"),
                 folded(Publication.source_title).like(fold_text(pattern), escape="\\"),
+                _author_name_match_exists(pattern),
+                _author_scopus_id_match_exists(pattern),
             )
         )
 
@@ -101,18 +139,7 @@ def publication_filters(
 
     trimmed_author_name = _trim_optional(author_name)
     if trimmed_author_name is not None:
-        # Publications with a matching author name (diacritic/case-insensitive
-        # substring over the Scopus preferred name — not a lecturer lookup).
-        pattern = _escaped_substring(trimmed_author_name)
-        conditions.append(
-            select(PublicationAuthor.id)
-            .join(ScopusAuthor, ScopusAuthor.id == PublicationAuthor.scopus_author_id)
-            .where(
-                PublicationAuthor.publication_id == Publication.id,
-                folded(ScopusAuthor.preferred_name).like(fold_text(pattern), escape="\\"),
-            )
-            .exists()
-        )
+        conditions.append(_author_name_match_exists(_escaped_substring(trimmed_author_name)))
 
     if year is not None:
         conditions.append(Publication.year == year)
@@ -126,6 +153,9 @@ def publication_filters(
         if trimmed is not None:
             conditions.append(column == trimmed)
 
+    if missing_doi:
+        conditions.append(_missing_doi_condition())
+
     return conditions
 
 
@@ -138,6 +168,7 @@ def _list_statement(
     open_access_status: str | None,
     scopus_id: str | None = None,
     author_name: str | None = None,
+    missing_doi: bool | None = None,
 ):
     return select(Publication).where(
         *publication_filters(
@@ -148,6 +179,7 @@ def _list_statement(
             open_access_status=open_access_status,
             scopus_id=scopus_id,
             author_name=author_name,
+            missing_doi=missing_doi,
         )
     )
 
@@ -164,6 +196,7 @@ def list_publications(
     open_access_status: str | None = None,
     scopus_id: str | None = None,
     author_name: str | None = None,
+    missing_doi: bool | None = None,
 ) -> PublicationListResponse:
     """Return a deterministic page of canonical publications without writes."""
 
@@ -175,6 +208,7 @@ def list_publications(
         open_access_status=open_access_status,
         scopus_id=scopus_id,
         author_name=author_name,
+        missing_doi=missing_doi,
     )
     total = session.scalar(
         select(func.count()).select_from(statement.order_by(None).subquery())
@@ -208,6 +242,77 @@ def list_publications(
         total=int(total),
         page=page,
         page_size=page_size,
+    )
+
+
+def _distinct_value_counts(
+    session: Session, column, extra_conditions: Sequence[object] = ()
+) -> list[PublicationFilterOption]:
+    rows = session.execute(
+        select(column, func.count())
+        .where(column.isnot(None), func.btrim(column) != "", *extra_conditions)
+        .group_by(column)
+        .order_by(func.count().desc(), column.asc())
+    ).all()
+    return [PublicationFilterOption(value=value, count=int(count)) for value, count in rows]
+
+
+def get_publication_filter_options(
+    session: Session,
+    *,
+    q: str | None = None,
+    year: int | None = None,
+    document_type: str | None = None,
+    publication_stage: str | None = None,
+    open_access_status: str | None = None,
+    scopus_id: str | None = None,
+    author_name: str | None = None,
+    missing_doi: bool | None = None,
+) -> PublicationFilterOptions:
+    """Values for the publication list's filter dropdowns, each counted within
+    the scope of whatever OTHER filters are already applied (standard faceted
+    search) — not that dropdown's own filter, so every option stays pickable.
+    With no filters applied yet, this is the same as the dataset-wide counts."""
+
+    base = dict(
+        q=q,
+        year=year,
+        document_type=document_type,
+        publication_stage=publication_stage,
+        open_access_status=open_access_status,
+        scopus_id=scopus_id,
+        author_name=author_name,
+        missing_doi=missing_doi,
+    )
+
+    def conditions_excluding(**override: object) -> list[object]:
+        return publication_filters(**{**base, **override})
+
+    years = session.scalars(
+        select(Publication.year)
+        .where(Publication.year.isnot(None), *conditions_excluding(year=None))
+        .distinct()
+        .order_by(Publication.year.desc())
+    ).all()
+
+    missing_doi_count = session.scalar(
+        select(func.count())
+        .select_from(Publication)
+        .where(_missing_doi_condition(), *conditions_excluding(missing_doi=None))
+    ) or 0
+
+    return PublicationFilterOptions(
+        years=list(years),
+        document_types=_distinct_value_counts(
+            session, Publication.document_type, conditions_excluding(document_type=None)
+        ),
+        publication_stages=_distinct_value_counts(
+            session, Publication.publication_stage, conditions_excluding(publication_stage=None)
+        ),
+        open_access_statuses=_distinct_value_counts(
+            session, Publication.open_access_status, conditions_excluding(open_access_status=None)
+        ),
+        missing_doi_count=int(missing_doi_count),
     )
 
 

@@ -46,9 +46,9 @@ const REASON_KIND_STYLE: Record<string, string> = {
 
 // Same fixed width for the "Trạng thái rà soát" and "Nguồn đối soát" labels, so the column reads evenly.
 const STATUS_BADGE_BASE =
-  "inline-flex h-badge w-40 shrink-0 items-center justify-center truncate whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center truncate whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
 const UNIT_BADGE_BASE =
-  "inline-flex h-badge w-40 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
 const UNIT_BADGE_ICTU = "border-[#3A5FC3] bg-white text-[#3A5FC3] hover:bg-blue-50";
 const UNIT_BADGE_OTHER = "border-slate-400 bg-white text-slate-700 hover:bg-slate-50";
 
@@ -64,7 +64,7 @@ const isIctuUnit = (text: string): boolean => {
     /ictu/.test(plain);
 };
 const SOURCE_BADGE_BASE =
-  "inline-flex h-badge w-40 shrink-0 items-center justify-center truncate whitespace-nowrap rounded border border-slate-200 px-2 text-center text-[10px] leading-none";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center truncate whitespace-nowrap rounded border border-slate-200 px-2 text-center text-[10px] leading-none";
 
 const ERROR_LABEL: Record<string, Record<Locale, string>> = {
   STALE_OVERRIDE_VERSION: {
@@ -84,7 +84,7 @@ const ERROR_LABEL: Record<string, Record<Locale, string>> = {
 };
 
 const neutralDetailButtonClassName =
-  "inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 cursor-pointer";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 cursor-pointer";
 
 function explain(error: unknown, locale: Locale): string {
   if (error instanceof ApiError) {
@@ -260,7 +260,7 @@ function OverrideRow({
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-800">{o.affiliation_text}</span>
             {isRevoked ? (
-              <span className="inline-flex h-badge w-28 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50">
+              <span className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50">
                 {vi ? "Đã thu hồi" : "Revoked"}
               </span>
             ) : null}
@@ -652,7 +652,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                           {vi ? "Vị trí" : "Order"} <span className="font-semibold text-slate-700">{item.author_order}</span>
                         </p>
                         <p className="text-[11px] text-slate-500 whitespace-nowrap">
-                          Scopus ID: <span className="font-mono text-slate-600">{item.scopus_id}</span>
+                          Scopus ID: <span className="font-semibold text-slate-600">{item.scopus_id}</span>
                         </p>
                       </td>
 
@@ -661,7 +661,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                         <p className="font-medium text-slate-700 text-xs line-clamp-2 leading-relaxed" title={item.title}>
                           {item.title}
                         </p>
-                        <p className="font-mono text-[10px] text-slate-400 mt-0.5">
+                        <p className="text-[10px] text-slate-400 mt-0.5">
                           EID: {item.eid}
                         </p>
                       </td>
@@ -799,8 +799,8 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
       {/* Modal chi tiết & hiệu chỉnh đơn vị tác giả */}
       {selectedItem && (
         <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-card border border-slate-200 bg-white shadow-2xl overflow-hidden">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center bg-black/40 p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
+            <div className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-card border border-slate-200 bg-white shadow-2xl overflow-hidden modal-panel-in">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
                 <div>
@@ -830,7 +830,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                 {/* Paper Context Card */}
                 <div className="rounded-[5px] border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2">
                   <span className="block text-xs font-semibold text-slate-700">
-                    EID: <span className="font-mono text-slate-900">{selectedItem.eid}</span>
+                    EID: <span className="font-bold text-slate-900">{selectedItem.eid}</span>
                   </span>
                   <p className="text-xs font-medium text-slate-800 leading-snug">{selectedItem.title}</p>
                   <div className="flex flex-col items-start gap-1 text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
@@ -902,7 +902,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       <button
                         type="button"
                         onClick={() => setModalAdding(true)}
-                        className="inline-flex h-badge w-40 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50"
+                        className="inline-flex h-badge w-32 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50"
                         data-testid="review-add-btn"
                       >
                         <span>{vi ? "Thêm đơn vị" : "Add unit"}</span>

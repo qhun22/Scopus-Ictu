@@ -60,6 +60,7 @@ export default function App() {
         <AuthProvider>
           <NotificationProvider>
             <PageVisitProvider>
+            <>
             <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -116,6 +117,14 @@ export default function App() {
           {/* Catch-all route */}
           <Route path="*" element={<RootRedirect />} />
             </Routes>
+            <button
+              type="button"
+              className="fixed bottom-6 right-6 z-50 h-10 w-10 overflow-hidden rounded-full focus:outline-none"
+              aria-label="Chat bot"
+            >
+              <img src="/assets/gatchan.png" alt="Gatchan chat bot" className="h-full w-full object-cover" />
+            </button>
+            </>
             </PageVisitProvider>
           </NotificationProvider>
         </AuthProvider>

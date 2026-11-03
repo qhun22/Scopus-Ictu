@@ -6,7 +6,7 @@ import { useToast } from "../../contexts/ToastContext";
 type Locale = "vi" | "en";
 
 const BUTTON =
-  "inline-flex h-badge w-40 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-badge w-32 shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50";
 
 const errorText = (error: unknown, vi: boolean): string => {
   if (error instanceof ApiError) return error.detail || error.message;
@@ -173,7 +173,7 @@ export default function ApplyToOtherPositions({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold text-slate-800">{c.title}</span>
-                        <span className="block font-mono text-slate-500">{c.eid}</span>
+                        <span className="block text-slate-500">{c.eid}</span>
                         <span className="mt-1 block text-slate-500">
                           {vi ? "Nguồn ghi: " : "Sources report: "}
                           {texts.length > 0 ? (

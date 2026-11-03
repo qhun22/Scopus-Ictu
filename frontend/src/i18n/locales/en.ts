@@ -315,6 +315,9 @@ export const en: TranslationSchema = {
     updated: "Updated",
     unchanged: "Unchanged",
     conflicts: "Conflicts",
+    accountsCreated: "Accounts created",
+    accountsSkipped: "Accounts skipped",
+    accountsSkippedWarning: "{count} account(s) were not created because the file does not contain credentials (password_hash). Create accounts manually after import.",
   },
   normalization: {
     title: "Data Normalization",
@@ -388,7 +391,7 @@ export const en: TranslationSchema = {
       emptyPending: "No imports pending author extraction",
       emptyPendingSub: "All imports have been processed or are not yet ready.",
       historyTitle: "Author History",
-      scopusAuthorsTitle: "Scopus Authors",
+      scopusAuthorsTitle: "Processed Author Data",
       searchPlaceholder: "Search by name or Scopus ID...",
       table: {
         authorName: "Author Name",

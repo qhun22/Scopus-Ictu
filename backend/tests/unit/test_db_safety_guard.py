@@ -11,21 +11,28 @@ reachable target before any destructive statement runs.
 
 from __future__ import annotations
 
+import json
 import os
+import tempfile
 
 import pytest
 from sqlalchemy import create_engine
 
 from tests.db_safety_guard import (
     ALLOWED_TEST_DATABASE_NAMES,
+    ClusterManifest,
     FORBIDDEN_DATABASE_NAMES,
     FORBIDDEN_PORTS,
     EXPECTED_LOCAL_CLUSTER_SYSTEM_IDENTIFIERS,
     DatabaseSafetyRefused,
+    _check_cluster_identity,
     _check_host_address,
     _check_connection_claims,
     _check_name,
     _ci_container_network_allowed,
+    _load_manifest,
+    _path_has_prefix,
+    _path_under_testroot,
 )
 
 
@@ -84,9 +91,9 @@ def test_forbidden_database_is_refused_before_opening_a_connection() -> None:
 @pytest.mark.parametrize(
     ("url", "server_port", "server_user"),
     [
-        ("postgresql://test_user@localhost:55432/test_db", 5432, "test_user"),
-        ("postgresql://other_user@localhost:55432/test_db", 55432, "test_user"),
-        ("postgresql://test_user@example.com:55432/test_db", 55432, "test_user"),
+        ("postgresql+psycopg2://test_user@localhost:55432/test_db", 5432, "test_user"),
+        ("postgresql+psycopg2://other_user@localhost:55432/test_db", 55432, "test_user"),
+        ("postgresql+psycopg2://test_user@example.com:55432/test_db", 55432, "test_user"),
     ],
 )
 def test_connection_claim_mismatch_is_refused(url: str, server_port: int, server_user: str) -> None:
@@ -101,8 +108,6 @@ def test_production_port_is_in_forbidden_set() -> None:
 
 
 def test_local_database_requires_its_verified_cluster_identifier() -> None:
-    from tests.db_safety_guard import _check_cluster_identity
-
     for database, system_identifier in EXPECTED_LOCAL_CLUSTER_SYSTEM_IDENTIFIERS.items():
         _check_cluster_identity(database, system_identifier)
         with pytest.raises(DatabaseSafetyRefused):
@@ -175,3 +180,207 @@ def test_live_guard_refuses_a_reachable_but_forbidden_database() -> None:
     with pytest.raises(DatabaseSafetyRefused):
         assert_safe_for_destructive_test(engine)
     engine.dispose()
+
+
+# --------------------------------------------------------------------------- manifest / path helpers
+_TESTROOT_STR = "D:/DataFolder/ProjectIctu/DoAn/_ScopusIctu_Test"
+_VALID_DATA_DIR_PREFIX = f"{_TESTROOT_STR}/Hun1/0211/021126-203934-postgres-regression/pgdata"
+_VALID_DB = "scopus_ictu_test_pytest_20261011"
+_VALID_SYSID = 7703568449941442872
+
+
+def test_path_under_testroot_accepts_subpath() -> None:
+    assert _path_under_testroot(f"{_TESTROOT_STR}/some/subdir") is True
+
+
+def test_path_under_testroot_rejects_sibling() -> None:
+    assert _path_under_testroot("D:/DataFolder/ProjectIctu/DoAn/Scopus-Ictu") is False
+
+
+def test_path_under_testroot_rejects_parent() -> None:
+    assert _path_under_testroot("D:/DataFolder/ProjectIctu/DoAn") is False
+
+
+def test_path_under_testroot_accepts_backslash_variant() -> None:
+    # Windows paths with backslashes must be treated identically.
+    assert _path_under_testroot(_TESTROOT_STR.replace("/", "\\") + "\\subdir") is True
+
+
+def test_path_has_prefix_exact_match() -> None:
+    assert _path_has_prefix(_VALID_DATA_DIR_PREFIX + "/pg_wal", _VALID_DATA_DIR_PREFIX) is True
+
+
+def test_path_has_prefix_rejects_shorter_data_dir() -> None:
+    assert _path_has_prefix(_TESTROOT_STR, _VALID_DATA_DIR_PREFIX) is False
+
+
+def test_path_has_prefix_case_insensitive() -> None:
+    assert _path_has_prefix(_VALID_DATA_DIR_PREFIX.upper(), _VALID_DATA_DIR_PREFIX.lower()) is True
+
+
+# --------------------------------------------------------------------------- _load_manifest() env-var tests
+# NOTE: tests that manipulate TEST_CLUSTER_MANIFEST via monkeypatch are kept in
+# a standalone script (TestRoot/Hun1/0211/021126-235000-reset-integration-test/
+# scripts/run_manifest_env_tests.py) because conftest's pytest_runtest_teardown
+# hook runs BEFORE monkeypatch restores env vars, causing the guard to re-read
+# the modified value and refuse. Those env-var tests are not DB tests and use
+# no real connections; the script runs them with --noconftest legitimately.
+# The tests below exercise ClusterManifest / _check_cluster_identity logic
+# directly (no env-var manipulation) and run fine through conftest.
+
+
+# --------------------------------------------------------------------------- _check_cluster_identity with manifest
+def test_manifest_cluster_identity_accepted_when_all_match() -> None:
+    m = ClusterManifest(
+        database=_VALID_DB,
+        port=5490,
+        system_identifier=_VALID_SYSID,
+        data_dir_prefix=_VALID_DATA_DIR_PREFIX,
+    )
+    _check_cluster_identity(_VALID_DB, _VALID_SYSID, manifest=m, data_dir=_VALID_DATA_DIR_PREFIX + "/PG_VERSION")
+
+
+def test_manifest_cluster_identity_refused_wrong_database() -> None:
+    m = ClusterManifest(
+        database=_VALID_DB,
+        port=5490,
+        system_identifier=_VALID_SYSID,
+        data_dir_prefix=_VALID_DATA_DIR_PREFIX,
+    )
+    with pytest.raises(DatabaseSafetyRefused, match="manifest is for database"):
+        _check_cluster_identity("scopus_ictu_test_pytest_20261013", _VALID_SYSID, manifest=m, data_dir=_VALID_DATA_DIR_PREFIX)
+
+
+def test_manifest_cluster_identity_refused_wrong_system_identifier() -> None:
+    m = ClusterManifest(
+        database=_VALID_DB,
+        port=5490,
+        system_identifier=_VALID_SYSID,
+        data_dir_prefix=_VALID_DATA_DIR_PREFIX,
+    )
+    with pytest.raises(DatabaseSafetyRefused, match="system_identifier does not match"):
+        _check_cluster_identity(_VALID_DB, _VALID_SYSID + 1, manifest=m, data_dir=_VALID_DATA_DIR_PREFIX)
+
+
+def test_manifest_cluster_identity_refused_data_dir_outside_prefix() -> None:
+    m = ClusterManifest(
+        database=_VALID_DB,
+        port=5490,
+        system_identifier=_VALID_SYSID,
+        data_dir_prefix=_VALID_DATA_DIR_PREFIX,
+    )
+    other_dir = f"{_TESTROOT_STR}/Hun1/0211/021126-999999-other-cluster/pgdata"
+    with pytest.raises(DatabaseSafetyRefused, match="data_dir_prefix"):
+        _check_cluster_identity(_VALID_DB, _VALID_SYSID, manifest=m, data_dir=other_dir)
+
+
+def test_manifest_cluster_identity_refused_missing_data_dir() -> None:
+    m = ClusterManifest(
+        database=_VALID_DB,
+        port=5490,
+        system_identifier=_VALID_SYSID,
+        data_dir_prefix=_VALID_DATA_DIR_PREFIX,
+    )
+    with pytest.raises(DatabaseSafetyRefused, match="data_directory could not be retrieved"):
+        _check_cluster_identity(_VALID_DB, _VALID_SYSID, manifest=m, data_dir=None)
+
+
+# --------------------------------------------------------------------------- _load_manifest() env-var tests via monkeypatch.context()
+# Each test manipulates TEST_CLUSTER_MANIFEST inside a monkeypatch.context()
+# block.  The env var is restored when the with-block exits — INSIDE the test
+# body, BEFORE conftest's pytest_runtest_teardown hook calls
+# verify_destructive_test_target().  This is safe: the hook sees the original
+# TEST_CLUSTER_MANIFEST value and the guard accepts the registered cluster.
+# (The standalone script run_manifest_env_tests.py remains as a reference and
+# can be run without conftest; the canonical pytest path is here.)
+
+
+def test_load_manifest_returns_none_when_env_var_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.delenv("TEST_CLUSTER_MANIFEST", raising=False)
+        assert _load_manifest() is None
+
+
+def test_load_manifest_raises_when_file_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    with monkeypatch.context() as m:
+        m.setenv("TEST_CLUSTER_MANIFEST", "/nonexistent/path/manifest.json")
+        with pytest.raises(DatabaseSafetyRefused, match="not a readable file"):
+            _load_manifest()
+
+
+def test_load_manifest_raises_on_invalid_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        f.write("not-json-at-all")
+        fname = f.name
+    try:
+        with monkeypatch.context() as m:
+            m.setenv("TEST_CLUSTER_MANIFEST", fname)
+            with pytest.raises(DatabaseSafetyRefused, match="could not read or parse"):
+                _load_manifest()
+    finally:
+        os.unlink(fname)
+
+
+def test_load_manifest_raises_when_required_field_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump({"database": _VALID_DB, "port": 5490}, f)
+        fname = f.name
+    try:
+        with monkeypatch.context() as m:
+            m.setenv("TEST_CLUSTER_MANIFEST", fname)
+            with pytest.raises(DatabaseSafetyRefused, match="missing required field"):
+                _load_manifest()
+    finally:
+        os.unlink(fname)
+
+
+def test_load_manifest_raises_when_data_dir_prefix_outside_testroot(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "database": _VALID_DB,
+        "port": 5490,
+        "system_identifier": _VALID_SYSID,
+        "data_dir_prefix": "C:/SomeOtherPath/pgdata",
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(payload, f)
+        fname = f.name
+    try:
+        with monkeypatch.context() as m:
+            m.setenv("TEST_CLUSTER_MANIFEST", fname)
+            with pytest.raises(DatabaseSafetyRefused, match="not under TestRoot"):
+                _load_manifest()
+    finally:
+        os.unlink(fname)
+
+
+def test_load_manifest_returns_correct_dataclass_for_valid_manifest(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "database": _VALID_DB,
+        "port": 5490,
+        "system_identifier": _VALID_SYSID,
+        "data_dir_prefix": _VALID_DATA_DIR_PREFIX,
+    }
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+        json.dump(payload, f)
+        fname = f.name
+    try:
+        with monkeypatch.context() as m:
+            m.setenv("TEST_CLUSTER_MANIFEST", fname)
+            m_obj = _load_manifest()
+            assert m_obj is not None
+            assert m_obj.database == _VALID_DB
+            assert m_obj.port == 5490
+            assert m_obj.system_identifier == _VALID_SYSID
+            assert m_obj.data_dir_prefix == _VALID_DATA_DIR_PREFIX
+    finally:
+        os.unlink(fname)
+
+
+def test_check_cluster_identity_no_manifest_wrong_sysid_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without manifest, uses hardcoded table; _VALID_SYSID doesn't match hardcoded entry."""
+    with monkeypatch.context() as m:
+        m.delenv("TEST_CLUSTER_MANIFEST", raising=False)
+        m.delenv("DB_SAFETY_GUARD_CI_CONTAINER_NETWORK", raising=False)
+        m.delenv("GITHUB_ACTIONS", raising=False)
+        with pytest.raises(DatabaseSafetyRefused):
+            _check_cluster_identity(_VALID_DB, _VALID_SYSID)

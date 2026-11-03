@@ -41,12 +41,29 @@ import { getApiErrorMessage } from "../../api/errors";
 import { useToast } from "../../contexts/ToastContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n/I18nContext";
-import Badge from "../../components/ui/Badge";
+import Badge, { type BadgeTone } from "../../components/ui/Badge";
 import UiButton from "../../components/ui/Button";
 import FitBadge, { fitLevelLabel, fitReasonText } from "./FitBadge";
 import GroupReviewPanel from "./GroupReviewPanel";
 import PrimaryIdPanel from "./PrimaryIdPanel";
 import { CANDIDATE_STATUS_TONE } from "../../components/ui/reviewTones";
+
+// "Nhãn chuẩn" style used across Imports/Normalization/Lecturers/Công bố:
+// h-badge, w-32, rounded-[5px], white bg, bold xs text — not the rounded-full Badge component.
+const NHAN_TONE_STYLE: Record<BadgeTone, string> = {
+  success: "border-emerald-400 text-emerald-700 hover:bg-emerald-50",
+  warning: "border-amber-400 text-amber-700 hover:bg-amber-50",
+  danger: "border-red-400 text-red-700 hover:bg-red-50",
+  info: "border-sky-400 text-sky-700 hover:bg-sky-50",
+  indigo: "border-indigo-400 text-indigo-700 hover:bg-indigo-50",
+  neutral: "border-slate-300 text-slate-500 hover:bg-slate-50",
+  violet: "border-violet-400 text-violet-700 hover:bg-violet-50",
+  brand: "border-[#3A5FC3] text-[#3A5FC3] hover:bg-blue-50",
+};
+
+function nhanBadgeClass(tone: BadgeTone): string {
+  return `inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border bg-white px-2.5 text-center text-xs font-bold leading-none ${NHAN_TONE_STYLE[tone]}`;
+}
 import { reconciliationLabel, ruleLabel, surfaceLabel } from "./ruleLabels";
 import type { TranslationSchema } from "../../i18n/types";
 import type {
@@ -515,19 +532,21 @@ export default function ApprovalQueuePage() {
           <div className="text-xs text-slate-500">
             {t.totalLabel}: <span className="font-semibold text-slate-800">{total}</span>
           </div>
-          <UiButton
-            variant="primary"
-            size="md"
-            loading={generating}
-            onClick={() => setGenerateConfirmOpen(true)}
-            icon={
-              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            <span className="truncate">{t.generateBtn}</span>
-          </UiButton>
+          {user?.role === "ADMIN" && (
+            <UiButton
+              variant="primary"
+              size="md"
+              loading={generating}
+              onClick={() => setGenerateConfirmOpen(true)}
+              icon={
+                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
+                </svg>
+              }
+            >
+              <span className="truncate">{t.generateBtn}</span>
+            </UiButton>
+          )}
         </div>
       </div>
 
@@ -714,32 +733,32 @@ export default function ApprovalQueuePage() {
                         <div className="mt-0.5 font-mono text-[10px] text-slate-400">{item.scopus_author.scopus_id}</div>
                       </td>
                       <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
-                        <Badge tone={CANDIDATE_STATUS_TONE[item.candidate_status]} className="min-w-[84px] justify-center !rounded-[5px]">
+                        <span className={nhanBadgeClass(CANDIDATE_STATUS_TONE[item.candidate_status])}>
                           {statusLabels(t)[item.candidate_status]}
-                        </Badge>
+                        </span>
                       </td>
                       <td className="px-4 py-3.5 align-middle">
                         {item.publication_support_count > 0 && item.name_evidence_count === 0 ? (
                           <div>
-                            <Badge tone="violet" appearance="outline" className="min-w-[130px] justify-center !rounded-[5px]" title={t.craweOnlyBadgeTooltip}>
+                            <span className={nhanBadgeClass("violet")} title={t.craweOnlyBadgeTooltip}>
                               {t.craweOnlyBadge}
-                            </Badge>
+                            </span>
                             <div className="mt-1 text-[10px] text-slate-400">{format(t.craweOnlyCount, { count: item.publication_support_count })}</div>
                           </div>
                         ) : item.publication_support_count > 0 ? (
                           <div>
-                            <Badge tone="info" appearance="outline" className="min-w-[130px] justify-center !rounded-[5px]">
+                            <span className={nhanBadgeClass("info")}>
                               {t.publicationSupportedBadge}
-                            </Badge>
+                            </span>
                             <div className="mt-1 text-[10px] text-slate-400">
                               {format(t.publicationSupportedCount, { publications: item.publication_support_count, names: item.name_evidence_count })}
                             </div>
                           </div>
                         ) : (
                           <div>
-                            <Badge tone="neutral" appearance="outline" className="min-w-[130px] justify-center !rounded-[5px]">
+                            <span className={nhanBadgeClass("neutral")}>
                               {t.nameOnlyBadge}
-                            </Badge>
+                            </span>
                             <div className="mt-1 text-[10px] text-slate-400">{format(t.nameOnlyCount, { count: item.name_evidence_count })}</div>
                           </div>
                         )}
@@ -749,19 +768,17 @@ export default function ApprovalQueuePage() {
                       </td>
                       <td className="px-4 py-3.5 align-middle">
                         <div className="flex flex-col items-start gap-1">
-                          <Badge tone={item.is_ambiguous ? "warning" : "neutral"} appearance="outline" className="!rounded-[5px]">
+                          <span className={nhanBadgeClass(item.is_ambiguous ? "warning" : "neutral")}>
                             {ambiguityText(t, item.candidate_count_for_lecturer)}
-                          </Badge>
+                          </span>
                           {item.is_shared_scopus_author && (
-                            <Badge
-                              tone="danger"
-                              appearance="outline"
-                              className="!rounded-[5px]"
+                            <span
+                              className={nhanBadgeClass("danger")}
                               data-testid="shared-author-tag"
                               title={sharedAuthorText(t, item.candidate_count_for_scopus_author)}
                             >
                               {format(t.sharedBadge, { count: item.candidate_count_for_scopus_author ?? "?" })}
-                            </Badge>
+                            </span>
                           )}
                         </div>
                       </td>
@@ -769,7 +786,7 @@ export default function ApprovalQueuePage() {
                         <button
                           type="button"
                           onClick={() => openDetail(item.candidate_id)}
-                          className="inline-flex h-7 items-center justify-center gap-1 rounded-[5px] border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-2xs transition-all duration-150 active:scale-[0.97] hover:border-[#3A5FC3] hover:text-[#3A5FC3] cursor-pointer whitespace-nowrap"
+                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 transition-colors hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 cursor-pointer"
                         >
                           <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -842,6 +859,7 @@ export default function ApprovalQueuePage() {
         closable={!decisionSubmitting}
         onCancel={closeDetail}
         styles={{ body: { padding: 0 } }}
+        zIndex={1000}
       >
         {detailLoading ? (
           <div className="flex min-h-72 flex-col items-center justify-center gap-3">
@@ -1022,6 +1040,7 @@ export default function ApprovalQueuePage() {
       <Modal
         open={revocationOpen && detail !== null}
         title={t.revokeModalTitle}
+        zIndex={1050}
         okText={t.confirmRevokeOk}
         okButtonProps={{ danger: true, disabled: revocationReason.trim().length === 0 }}
         cancelText={t.cancel}
@@ -1064,6 +1083,7 @@ export default function ApprovalQueuePage() {
       <Modal
         open={decisionAction === "ACCEPT" && detail !== null}
         title={t.confirmAcceptTitle}
+        zIndex={1050}
         okText={t.confirmAcceptOk}
         okButtonProps={{ disabled: acceptReasonRequired && decisionReason.trim().length === 0 }}
         cancelText={t.cancel}
@@ -1133,6 +1153,7 @@ export default function ApprovalQueuePage() {
       <Modal
         open={decisionAction === "REJECT" && detail !== null}
         title={t.rejectModalTitle}
+        zIndex={1050}
         okText={t.confirmRejectOk}
         okButtonProps={{ danger: true, disabled: decisionReason.trim().length === 0 }}
         cancelText={t.cancel}

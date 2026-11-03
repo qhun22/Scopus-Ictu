@@ -28,7 +28,7 @@ from app.schemas.scopus_import import (
     ScopusImportResponse,
 )
 from app.services.parser.scopus_csv_parser import ParsedScopusFile, ScopusCsvError, ScopusCsvParser
-from app.services.normalization.scopus_normalizer import normalize_import
+from app.services.normalization.scopus_normalizer import NormalizationCounters, normalize_import
 
 ACTIVE_STATUSES = frozenset({"RECEIVED", "PARSING", "VALIDATED"})
 COMPLETED_STATUSES = frozenset({"STAGED", "APPLIED"})
@@ -570,7 +570,7 @@ def list_imports(
     superseded_ids: set[uuid.UUID] = set()
     for a in db.query(AuditEvent).filter(
         AuditEvent.entity_type == "lecturer_dataset", AuditEvent.action == SUPERSEDED_ACTION
-    ):
+    ).all():
         if a.entity_id is not None:
             superseded_ids.add(a.entity_id)
         raw_id = _safe_dict(a.event_metadata).get("import_id")
@@ -627,7 +627,9 @@ def list_imports(
                     "CANCELLED" if is_rolled_back else "SUPERSEDED" if is_superseded else "IMPORTED"
                 ),
                 total_records=total,
-                imported_records=0 if is_rolled_back else min(total, created + updated + unchanged),
+                imported_records=(
+                    0 if is_rolled_back or is_superseded else min(total, created + updated + unchanged)
+                ),
                 failed_records=0,
                 processed_records=total,
                 progress_percent=100,
@@ -651,6 +653,9 @@ def list_imports(
                     "warnings": warnings,
                     "dataset_name": meta.get("dataset_name"),
                     "schema_version": meta.get("dataset_schema_version", "1.0"),
+                    "accounts_created": int(meta.get("accounts_created") or 0),
+                    "accounts_skipped": int(meta.get("accounts_skipped") or 0),
+                    "account_warnings": meta.get("account_warnings") or [],
                 },
             )
         )
@@ -785,7 +790,9 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
             file_name=meta.get("filename", "ictu_lecturers.json"),
             status="CANCELLED" if is_rolled_back else "SUPERSEDED" if is_superseded else "IMPORTED",
             total_records=total,
-            imported_records=0 if is_rolled_back else min(total, created + updated + unchanged),
+            imported_records=(
+                0 if is_rolled_back or is_superseded else min(total, created + updated + unchanged)
+            ),
             failed_records=0,
             processed_records=total,
             progress_percent=100,
@@ -809,6 +816,9 @@ def get_import(db: Session, import_id: uuid.UUID) -> ScopusImportResponse | None
                 "warnings": warnings,
                 "dataset_name": meta.get("dataset_name"),
                 "schema_version": meta.get("dataset_schema_version", "1.0"),
+                "accounts_created": int(meta.get("accounts_created") or 0),
+                "accounts_skipped": int(meta.get("accounts_skipped") or 0),
+                "account_warnings": meta.get("account_warnings") or [],
             },
             normalization_summary=None,
         )
@@ -1132,6 +1142,8 @@ def to_import_response(
     duplicate_of: dict | None = None,
 ) -> ScopusImportResponse:
     is_cancelled = item.status == "CANCELLED"
+    usage_info = usage or ImportUsageInfo(publication_source_links=0, author_variant_links=0)
+    in_use = usage_info.in_use
     processed = 0 if is_cancelled else (item.valid_records + item.invalid_records)
     imported = 0 if is_cancelled else item.valid_records
     progress = (
@@ -1142,8 +1154,6 @@ def to_import_response(
     terminal = item.status in TERMINAL_STATUSES
     summary = item.error_summary or {}
     normalization = _build_normalization_data(item)
-    usage_info = usage or ImportUsageInfo(publication_source_links=0, author_variant_links=0)
-    in_use = usage_info.in_use
     # can_delete rules:
     #   ACTIVE     -> False
     #   TERMINAL   -> False when in_use else True

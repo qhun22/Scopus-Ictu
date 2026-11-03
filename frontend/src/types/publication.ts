@@ -172,4 +172,6 @@ export interface PublicationListQuery {
   scopus_id?: string;
   /** Only publications with an author whose Scopus preferred name matches (substring, diacritic-insensitive). */
   author_name?: string;
+  /** true = only publications with no DOI recorded. */
+  missing_doi?: boolean;
 }

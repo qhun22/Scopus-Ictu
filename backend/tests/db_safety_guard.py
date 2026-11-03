@@ -53,11 +53,126 @@ this file, edited (and reviewed) like any other code change.
 from __future__ import annotations
 
 import ipaddress
+import json
 import os
 from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 
 from sqlalchemy import Engine, text
 from sqlalchemy.engine import make_url
+
+# ── Manifest-based cluster registration ─────────────────────────────────────
+# The env var TEST_CLUSTER_MANIFEST points to a JSON file that registers a
+# specific, disposable test cluster *for this test process only*. The manifest
+# approach avoids editing the EXPECTED_LOCAL_CLUSTER_SYSTEM_IDENTIFIERS table
+# for every new cluster while keeping the guard's fail-closed guarantee.
+#
+# The manifest must be placed under TestRoot (verified), which anchors it to a
+# local disposable cluster directory. The manifest's system_identifier is
+# checked against the live server's pg_control_system().system_identifier;
+# the live data_directory is checked against the manifest's data_dir_prefix.
+#
+# When TEST_CLUSTER_MANIFEST is absent: the existing EXPECTED_LOCAL_CLUSTER_SYSTEM_IDENTIFIERS
+# table is used (unchanged behaviour for CI and the original registered cluster).
+# When present and valid: manifest values override the system_identifier check.
+# When present but invalid (missing/bad JSON/wrong paths): fail closed.
+
+_TEST_CLUSTER_MANIFEST_ENV = "TEST_CLUSTER_MANIFEST"
+
+# Root under which all disposable test clusters must live. The manifest's
+# data_dir_prefix must be under this directory (case-insensitive on Windows).
+# NEVER change this to a path that contains the application or teacher database.
+_TESTROOT = Path("D:/DataFolder/ProjectIctu/DoAn/_ScopusIctu_Test")
+
+
+@dataclass(frozen=True, slots=True)
+class ClusterManifest:
+    """Identity of a disposable test cluster registered for a specific test run."""
+
+    database: str
+    port: int
+    system_identifier: int
+    data_dir_prefix: str  # path under _TESTROOT; live data_dir must start with this
+
+
+def _path_under_testroot(p: str) -> bool:
+    """True when p (or any prefix-equal path) is under _TESTROOT (case-insensitive)."""
+    def _parts(s: str):
+        return [x.lower() for x in PurePosixPath(s.replace("\\", "/")).parts]
+
+    root_parts = _parts(str(_TESTROOT))
+    candidate_parts = _parts(p)
+    return (
+        len(candidate_parts) >= len(root_parts)
+        and candidate_parts[: len(root_parts)] == root_parts
+    )
+
+
+def _path_has_prefix(data_dir: str, prefix: str) -> bool:
+    """True when data_dir starts with prefix (case-insensitive, cross-OS)."""
+    def _parts(s: str):
+        return [x.lower() for x in PurePosixPath(s.replace("\\", "/")).parts]
+
+    p = _parts(prefix)
+    d = _parts(data_dir)
+    return len(d) >= len(p) and d[: len(p)] == p
+
+
+def _load_manifest() -> ClusterManifest | None:
+    """Read and validate the cluster manifest from TEST_CLUSTER_MANIFEST, if set.
+
+    Returns None when the env var is absent.
+    Raises DatabaseSafetyRefused on any validation failure (fail closed).
+    """
+    path_str = os.environ.get(_TEST_CLUSTER_MANIFEST_ENV)
+    if not path_str:
+        return None
+
+    try:
+        manifest_path = Path(path_str)
+        if not manifest_path.is_file():
+            raise DatabaseSafetyRefused(
+                f"Refusing destructive test fixture: TEST_CLUSTER_MANIFEST "
+                f"'{path_str}' is not a readable file."
+            )
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except DatabaseSafetyRefused:
+        raise
+    except Exception as exc:
+        raise DatabaseSafetyRefused(
+            f"Refusing destructive test fixture: could not read or parse "
+            f"TEST_CLUSTER_MANIFEST '{path_str}': {exc}"
+        ) from exc
+
+    # Validate required fields
+    required = ("database", "port", "system_identifier", "data_dir_prefix")
+    missing = [k for k in required if k not in raw]
+    if missing:
+        raise DatabaseSafetyRefused(
+            f"Refusing destructive test fixture: TEST_CLUSTER_MANIFEST missing "
+            f"required field(s): {missing}"
+        )
+
+    data_dir_prefix = str(raw["data_dir_prefix"])
+    if not _path_under_testroot(data_dir_prefix):
+        raise DatabaseSafetyRefused(
+            f"Refusing destructive test fixture: manifest data_dir_prefix "
+            f"'{data_dir_prefix}' is not under TestRoot ({_TESTROOT}). "
+            "Only clusters with data directories under TestRoot may be registered."
+        )
+
+    try:
+        return ClusterManifest(
+            database=str(raw["database"]),
+            port=int(raw["port"]),
+            system_identifier=int(raw["system_identifier"]),
+            data_dir_prefix=data_dir_prefix,
+        )
+    except (ValueError, TypeError) as exc:
+        raise DatabaseSafetyRefused(
+            f"Refusing destructive test fixture: TEST_CLUSTER_MANIFEST has "
+            f"invalid field values: {exc}"
+        ) from exc
 
 # ── Layer 1: explicit allowlist ──────────────────────────────────────────
 # Every name here must be a disposable database created specifically to be
@@ -202,7 +317,42 @@ def _check_connection_claims(engine: Engine, *, port: int, user: str) -> None:
         )
 
 
-def _check_cluster_identity(database: str, system_identifier: int) -> None:
+def _check_cluster_identity(
+    database: str,
+    system_identifier: int,
+    *,
+    manifest: "ClusterManifest | None" = None,
+    data_dir: str | None = None,
+) -> None:
+    # Manifest path: explicit cluster registration for this test run.
+    if manifest is not None:
+        if manifest.database != database:
+            raise DatabaseSafetyRefused(
+                f"Refusing destructive test fixture: manifest is for database "
+                f"'{manifest.database}' but connected database is '{database}'."
+            )
+        if manifest.system_identifier != system_identifier:
+            raise DatabaseSafetyRefused(
+                "Refusing destructive test fixture: PostgreSQL cluster "
+                "system_identifier does not match the manifest. "
+                f"Manifest expects {manifest.system_identifier}; "
+                f"server reports {system_identifier}."
+            )
+        if data_dir is None:
+            raise DatabaseSafetyRefused(
+                "Refusing destructive test fixture: manifest requires data_dir "
+                "verification but data_directory could not be retrieved."
+            )
+        if not _path_has_prefix(data_dir, manifest.data_dir_prefix):
+            raise DatabaseSafetyRefused(
+                f"Refusing destructive test fixture: server data_directory "
+                f"'{data_dir}' does not start with manifest data_dir_prefix "
+                f"'{manifest.data_dir_prefix}'. "
+                "This cluster is not the one registered in the manifest."
+            )
+        return
+
+    # Default path: hardcoded expected system_identifiers per database name.
     expected = EXPECTED_LOCAL_CLUSTER_SYSTEM_IDENTIFIERS.get(database)
     if expected is not None:
         if system_identifier != expected:
@@ -215,7 +365,8 @@ def _check_cluster_identity(database: str, system_identifier: int) -> None:
         return
     raise DatabaseSafetyRefused(
         "Refusing destructive test fixture: no approved PostgreSQL cluster "
-        "identity is configured for this target."
+        "identity is configured for this target. "
+        "Use TEST_CLUSTER_MANIFEST to register a new disposable test cluster."
     )
 
 
@@ -231,7 +382,16 @@ def verify_destructive_test_target(engine: Engine) -> VerifiedTestTarget:
     connection: a forbidden name (App DB, teacher DB, ...) is refused
     without ever establishing a session against that server, not merely
     before any destructive statement on it.
+
+    When TEST_CLUSTER_MANIFEST is set, the manifest's system_identifier and
+    data_dir_prefix are used for cluster identity verification instead of the
+    hardcoded EXPECTED_LOCAL_CLUSTER_SYSTEM_IDENTIFIERS table. A manifest
+    that fails validation causes an immediate DatabaseSafetyRefused.
     """
+
+    # Load manifest early (before connecting) so a bad manifest file fails
+    # closed without ever touching the server.
+    manifest = _load_manifest()
 
     _check_name(engine.url.database)
 
@@ -241,7 +401,8 @@ def verify_destructive_test_target(engine: Engine) -> VerifiedTestTarget:
                 text(
                     "select current_database(), inet_server_port(), "
                     "coalesce(host(inet_server_addr()), '127.0.0.1'), current_user, "
-                    "(select system_identifier from pg_control_system())"
+                    "(select system_identifier from pg_control_system()), "
+                    "current_setting('data_directory')"
                 )
             ).one()
             conn.rollback()
@@ -253,7 +414,7 @@ def verify_destructive_test_target(engine: Engine) -> VerifiedTestTarget:
             f"({type(exc).__name__}). Fail closed — no cleanup was attempted."
         ) from exc
 
-    database, port, addr, user, system_identifier = row
+    database, port, addr, user, system_identifier, data_dir = row
 
     _check_name(database)
 
@@ -270,7 +431,12 @@ def verify_destructive_test_target(engine: Engine) -> VerifiedTestTarget:
             "Refusing destructive test fixture: PostgreSQL cluster identity "
             "could not be verified."
         )
-    _check_cluster_identity(database, system_identifier)
+    _check_cluster_identity(
+        database,
+        system_identifier,
+        manifest=manifest,
+        data_dir=str(data_dir) if data_dir else None,
+    )
 
     return VerifiedTestTarget(
         database=database,
@@ -296,8 +462,12 @@ __all__ = [
     "FORBIDDEN_DATABASE_NAMES",
     "FORBIDDEN_PORTS",
     "EXPECTED_LOCAL_CLUSTER_SYSTEM_IDENTIFIERS",
+    "ClusterManifest",
     "DatabaseSafetyRefused",
     "VerifiedTestTarget",
+    "_load_manifest",
+    "_path_has_prefix",
+    "_path_under_testroot",
     "assert_safe_for_destructive_test",
     "verify_destructive_test_target",
 ]

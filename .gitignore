@@ -84,3 +84,7 @@ data/diagram-skills-package/
 *.dump.sha256
 .env.*
 !.env.example
+
+# --- Nhat ky phoi hop Hun1/Hun2 (local only) ---
+/Hun1/
+/Hun2/

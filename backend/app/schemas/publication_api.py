@@ -35,6 +35,25 @@ class PublicationListResponse(BaseModel):
     page_size: int
 
 
+class PublicationFilterOption(BaseModel):
+    """One selectable value for a publication list filter, with its row count."""
+
+    value: str
+    count: int
+
+
+class PublicationFilterOptions(BaseModel):
+    """Distinct values currently present in the canonical publication table,
+    used to populate the publication list filter dropdowns (so a filter only
+    ever offers a value that can actually match something)."""
+
+    years: list[int]
+    document_types: list[PublicationFilterOption]
+    publication_stages: list[PublicationFilterOption]
+    open_access_statuses: list[PublicationFilterOption]
+    missing_doi_count: int
+
+
 class AffiliationOrganizationRead(BaseModel):
     """Organization as normalized by the EXTERNAL source (never merged across sources)."""
 

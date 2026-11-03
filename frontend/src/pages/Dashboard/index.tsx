@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 import { getDashboardCharts, getDashboardSummary } from "../../api/dashboard";
 import { getApiErrorMessage } from "../../api/errors";
 import { resetSystem } from "../../api/system";
-import { useAuth } from "../../contexts/AuthContext";
-import { useToast } from "../../contexts/ToastContext";
-import TextConfirmModal from "../../components/common/TextConfirmModal";
 import Badge, { type BadgeTone } from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import TextConfirmModal from "../../components/common/TextConfirmModal";
+import { useAuth } from "../../contexts/AuthContext";
+import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
 import {
   DashboardCharts,
@@ -16,6 +16,7 @@ import {
 } from "../../types/dashboard";
 import { AuditListItem } from "../../types/audit";
 import { formatTimestamp } from "../../utils/dateTime";
+import { clearAllPendingImportCaches } from "../../utils/pendingImportCache";
 import PublicationsByYearChart from "./charts/PublicationsByYearChart";
 import DocumentTypeDonutChart from "./charts/DocumentTypeDonutChart";
 import AffiliationCoverageChart from "./charts/AffiliationCoverageChart";
@@ -62,8 +63,28 @@ const IDENTITY_LABEL_KEYS: Record<DashboardIdentityStatus, "identityCandidate" |
 export default function DashboardPage() {
   const { t, locale } = useI18n();
   const copy = t.dashboard;
+  const { user, forceLogout } = useAuth();
   const toast = useToast();
-  const { user: currentUser } = useAuth();
+
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleReset = async () => {
+    setIsResetting(true);
+    try {
+      await resetSystem("ICTU");
+      // Reset wipes server data but not the browser's own caches (pending
+      // import previews, confirmed-import ids) — clear those too so a stale
+      // "Bất thường" preview from before the reset doesn't reappear.
+      clearAllPendingImportCaches();
+      toast.success(copy.resetSuccessTitle, copy.resetSuccessMessage);
+      forceLogout();
+    } catch (err) {
+      toast.error(copy.resetErrorTitle, getApiErrorMessage(err, copy.resetErrorMessage));
+      setIsResetting(false);
+      setShowResetModal(false);
+    }
+  };
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,24 +95,6 @@ export default function DashboardPage() {
   const [chartsLoading, setChartsLoading] = useState(true);
   const [chartsError, setChartsError] = useState<string | null>(null);
   const chartsControllerRef = useRef<AbortController | null>(null);
-
-  // Reset modal state
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-
-  const handleReset = async () => {
-    setIsResetting(true);
-    try {
-      await resetSystem("ICTU");
-      toast.success(copy.resetSuccessTitle, copy.resetSuccessMessage);
-      setShowResetModal(false);
-      fetchSummary();
-    } catch (err) {
-      toast.error(copy.resetErrorTitle, getApiErrorMessage(err, copy.resetErrorMessage));
-    } finally {
-      setIsResetting(false);
-    }
-  };
 
   const fetchSummary = useCallback(() => {
     if (controllerRef.current) {
@@ -153,20 +156,6 @@ export default function DashboardPage() {
 
   return (
     <div className="app-page-container space-y-6">
-      {/* Reset Confirmation Modal */}
-      <TextConfirmModal
-        open={showResetModal}
-        title={copy.resetModalTitle}
-        subtitle={copy.resetModalSubtitle}
-        description={copy.resetModalDescription}
-        confirmWord="ICTU"
-        confirmLabel={copy.resetModalConfirmLabel}
-        cancelLabel={copy.resetModalCancelLabel}
-        loading={isResetting}
-        onConfirm={handleReset}
-        onCancel={() => setShowResetModal(false)}
-      />
-
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -187,21 +176,15 @@ export default function DashboardPage() {
           >
             {copy.refresh}
           </Button>
-          {currentUser?.role === "ADMIN" ? (
+          {user?.role === "ADMIN" && (
             <Button
               variant="danger"
               fullWidth
               onClick={() => setShowResetModal(true)}
-              icon={
-                <svg className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              }
+              disabled={isResetting}
             >
               {copy.resetSystem}
             </Button>
-          ) : (
-            <div />
           )}
         </div>
       </div>
@@ -502,6 +485,19 @@ export default function DashboardPage() {
           </section>
         </>
       )}
+
+      <TextConfirmModal
+        open={showResetModal}
+        title={copy.resetModalTitle}
+        subtitle={copy.resetModalSubtitle}
+        description={copy.resetModalDescription}
+        confirmWord="ICTU"
+        confirmLabel={copy.resetModalConfirmLabel}
+        cancelLabel={copy.resetModalCancelLabel}
+        loading={isResetting}
+        onConfirm={handleReset}
+        onCancel={() => { if (!isResetting) setShowResetModal(false); }}
+      />
     </div>
   );
 }

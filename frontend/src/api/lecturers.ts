@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from "./client";
+import { apiDelete, apiDownload, apiGet, apiPost, apiPut, type ApiRequestOptions } from "./client";
 
 export interface LecturerAccount {
   user_id: string;
@@ -149,44 +149,22 @@ export async function deleteLecturer(id: string): Promise<{ message: string }> {
   return apiDelete(`/api/v1/lecturers/${id}`);
 }
 
-export async function exportLecturersJson(): Promise<{ blob: Blob; filename: string; recordCount: number }> {
-  const token = localStorage.getItem("token");
-  const response = await fetch("/api/v1/lecturers/export", {
-    method: "GET",
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+export async function exportLecturersJson(
+  options: ApiRequestOptions = {},
+): Promise<{ blob: Blob; filename: string; recordCount: number }> {
+  const { blob, filename } = await apiDownload("/api/v1/lecturers/export", options);
 
-  if (!response.ok) {
-    let errorDetail = "Không thể xuất dữ liệu giảng viên.";
-    try {
-      const errJson = await response.json();
-      errorDetail = errJson.detail || errorDetail;
-    } catch {
-      // ignore
-    }
-    throw new Error(errorDetail);
-  }
-
-  const contentDisposition = response.headers.get("Content-Disposition");
-  let filename = "ictu_lecturers.json";
-  if (contentDisposition) {
-    const match = contentDisposition.match(/filename="?([^";]+)"?/);
-    if (match && match[1]) {
-      filename = match[1];
-    }
-  }
-
-  const text = await response.text();
   let recordCount = 0;
   try {
-    const parsed = JSON.parse(text);
+    const text = await blob.text();
+    const parsed = JSON.parse(text) as {
+      dataset?: { record_count?: number };
+      lecturers?: unknown[];
+    };
     recordCount = parsed?.dataset?.record_count ?? parsed?.lecturers?.length ?? 0;
   } catch {
     // ignore
   }
 
-  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
   return { blob, filename, recordCount };
 }

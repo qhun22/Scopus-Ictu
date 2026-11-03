@@ -35,6 +35,16 @@ export interface LecturerPreviewResponse {
   parser_version: string;
 }
 
+export interface AccountWarningItem {
+  record_full_name: string | null;
+  matched_by?: string;
+  existing_id?: string | null;
+  existing_full_name?: string | null;
+  existing_email?: string | null;
+  blocking?: boolean;
+  reason: string;
+}
+
 export interface LecturerImportResponse {
   dataset: LecturerDatasetMeta;
   summary: {
@@ -43,6 +53,12 @@ export interface LecturerImportResponse {
     updated: number;
     unchanged: number;
     conflicts: number;
+    blocking_conflicts?: number;
+    absent_from_file?: number;
+    deleted?: number;
+    accounts_created?: number;
+    accounts_skipped?: number;
+    account_warnings?: AccountWarningItem[];
   };
   conflicts: LecturerDatasetConflict[];
   snapshot_ids: string[];
@@ -65,9 +81,15 @@ export class LecturerDatasetError extends Error {
 async function postForm<T>(
   path: string,
   file: File,
+  extraFields?: Record<string, string>,
 ): Promise<T> {
   const form = new FormData();
   form.append("file", file, file.name);
+  if (extraFields) {
+    for (const [key, value] of Object.entries(extraFields)) {
+      form.append(key, value);
+    }
+  }
   return apiPostForm<T>(path, form);
 }
 
@@ -84,10 +106,16 @@ export function previewLecturerDataset(
 
 export function importLecturerDataset(
   file: File,
+  // When given, the backend uses this exact UUID as the new import's id
+  // instead of generating its own — so the id shown during preview doesn't
+  // change once the import is confirmed. Best-effort: an invalid or already
+  // taken id is silently ignored server-side (a fresh one gets generated).
+  clientImportId?: string,
 ): Promise<LecturerImportResponse> {
   return postForm<LecturerImportResponse>(
     "/api/v1/lecturers/import",
     file,
+    clientImportId ? { client_import_id: clientImportId } : undefined,
   );
 }
 

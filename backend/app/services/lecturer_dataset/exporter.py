@@ -16,10 +16,10 @@ The output is accepted by :func:`parse_and_validate` and by the import
 service (round trip).
 
 A lecturer that has a login account is exported together with it (``account``:
-email, role, display name, active flag and the Argon2id ``password_hash``).
-Passwords are never stored in plaintext, so the hash is the only credential
-that can travel; importing it restores a login that works with the same
-password. The file therefore must be handled as confidential.
+email, role, display name, and active flag). ``password_hash`` and other
+authentication secrets are **not** included; the export whitelist only carries
+business identity fields. Re-importing a file without ``password_hash`` will
+skip account creation for those records (the importer will log a warning).
 """
 
 from __future__ import annotations
@@ -49,8 +49,8 @@ RECOVERABILITY_NOTE = (
     "bao gồm specialization, gender, date_of_birth và phone (thêm từ migration e1a2b3c4d5f6). "
     "Các trường tel và Google Scholar chưa được lưu nên không có trong bản xuất; "
     "JSON nguồn gốc (v1), Craw và sidecar vẫn là nguồn lưu trữ cho các trường này. "
-    "Giảng viên có tài khoản đăng nhập được xuất kèm khối account (email, vai trò, chuỗi băm "
-    "mật khẩu Argon2); hệ thống không lưu mật khẩu gốc nên chỉ chuỗi băm được xuất."
+    "Giảng viên có tài khoản đăng nhập được xuất kèm khối account (email, vai trò, "
+    "display_name, is_active); password_hash và các bí mật xác thực không xuất."
 )
 
 
@@ -195,12 +195,13 @@ def build_lecturer_export(
             "full_name_normalized": row.full_name_normalized,
         }
         if account is not None:
+            # Whitelist: business identity fields only. password_hash and other
+            # authentication secrets are intentionally excluded from the export.
             record["account"] = {
                 "email": account.email,
                 "display_name": account.display_name,
                 "role": account.role,
                 "is_active": account.is_active,
-                "password_hash": account.password_hash,
             }
         records.append(record)
     records.sort(key=lambda r: r["source_id"])
@@ -226,7 +227,8 @@ def build_lecturer_export(
             "excluded_without_source_id": excluded,
             "includes_accounts": True,
             "accounts_note": (
-                "Tệp chứa chuỗi băm mật khẩu và vai trò tài khoản; chỉ lưu và chia sẻ cho người có thẩm quyền."
+                "Tệp chứa thông tin tài khoản (email, vai trò, display_name, is_active). "
+                "password_hash và bí mật xác thực không có trong tệp xuất."
             ),
         },
     }

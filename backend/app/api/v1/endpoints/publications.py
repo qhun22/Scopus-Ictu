@@ -16,11 +16,19 @@ from app.api.dependencies import get_optional_current_user, require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import AuditEvent, User
-from app.schemas.publication_api import PublicationDetailResponse, PublicationListResponse
+from app.schemas.publication_api import (
+    PublicationDetailResponse,
+    PublicationFilterOptions,
+    PublicationListResponse,
+)
 from app.schemas.publication_export import PublicationExportDataset, PublicationExportResponse
 from app.services import normalization_compare
 from app.services.publication_export import export_publications
-from app.services.publication_queries import get_publication_detail, list_publications
+from app.services.publication_queries import (
+    get_publication_detail,
+    get_publication_filter_options,
+    list_publications,
+)
 
 router = APIRouter()
 # Guests and authenticated users may read the public list/detail. Export stays
@@ -65,6 +73,7 @@ def list_publication_endpoint(
     open_access_status: Annotated[str | None, Query(max_length=50)] = None,
     scopus_id: Annotated[str | None, Query(max_length=32, pattern=r"^\d*$")] = None,
     author_name: Annotated[str | None, Query(max_length=255)] = None,
+    missing_doi: bool | None = None,
 ) -> PublicationListResponse:
     """List canonical publications using server-side filtering and pagination."""
 
@@ -80,6 +89,41 @@ def list_publication_endpoint(
             open_access_status=open_access_status,
             scopus_id=scopus_id,
             author_name=author_name,
+            missing_doi=missing_doi,
+        )
+    except SQLAlchemyError as exc:
+        raise _database_unavailable(exc) from exc
+
+
+# /filters MUST be declared before /{eid} so FastAPI matches it as a static path.
+@router.get("/filters", response_model=PublicationFilterOptions)
+def list_publication_filter_options_endpoint(
+    _reader: PublicationReader,
+    db: DatabaseSession,
+    q: Annotated[str | None, Query(max_length=255)] = None,
+    year: int | None = None,
+    document_type: Annotated[str | None, Query(max_length=50)] = None,
+    publication_stage: Annotated[str | None, Query(max_length=50)] = None,
+    open_access_status: Annotated[str | None, Query(max_length=50)] = None,
+    scopus_id: Annotated[str | None, Query(max_length=32, pattern=r"^\d*$")] = None,
+    author_name: Annotated[str | None, Query(max_length=255)] = None,
+    missing_doi: bool | None = None,
+) -> PublicationFilterOptions:
+    """Year/document-type/stage/open-access values for the list page's filter
+    dropdowns, each counted within whatever OTHER filters are already applied
+    (same parameters as the list endpoint) — not that dropdown's own filter."""
+
+    try:
+        return get_publication_filter_options(
+            db,
+            q=q,
+            year=year,
+            document_type=document_type,
+            publication_stage=publication_stage,
+            open_access_status=open_access_status,
+            scopus_id=scopus_id,
+            author_name=author_name,
+            missing_doi=missing_doi,
         )
     except SQLAlchemyError as exc:
         raise _database_unavailable(exc) from exc

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "../components/common/Header";
 import Sidebar from "../components/common/Sidebar";
@@ -18,6 +18,15 @@ export default function AppLayout() {
   useLayoutEffect(() => {
     mainRef.current?.scrollTo(0, 0);
   }, [location.pathname]);
+
+  // Exposes the current (desktop) sidebar width as a CSS var on <body> so
+  // content-area overlays (modal backdrops, loading overlays) rendered via
+  // a portal to document.body can size themselves to the content region
+  // only — below the header, right of the sidebar — instead of the full
+  // viewport, without prop-drilling this state through every page.
+  useEffect(() => {
+    document.body.style.setProperty("--app-sidebar-w", isSidebarCollapsed ? "5rem" : "16rem");
+  }, [isSidebarCollapsed]);
 
   return (
     <div className="min-h-screen bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">

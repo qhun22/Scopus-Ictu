@@ -89,7 +89,7 @@ export default function ConfirmDialogFrame({
   return (
     <ModalPortal>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4"
+        className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
         onClick={onBackdropClick}
       >
         <div
@@ -98,7 +98,7 @@ export default function ConfirmDialogFrame({
           aria-modal="true"
           aria-labelledby={titleId}
           aria-describedby={descId}
-          className={`max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-card border bg-white shadow-2xl ${styles.panel}`}
+          className={`max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-card border bg-white shadow-2xl modal-panel-in ${styles.panel}`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className={`rounded-t-card border-b px-5 py-4 ${styles.header}`}>

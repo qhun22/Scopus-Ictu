@@ -47,8 +47,59 @@ export async function getPublications(
     params.set("author_name", query.author_name.trim());
   }
 
+  if (query.missing_doi) params.set("missing_doi", "true");
+
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiGet<PublicationListResponse>(`/api/v1/publications${suffix}`, options);
+}
+
+export interface PublicationFilterOption {
+  value: string;
+  count: number;
+}
+
+export interface PublicationFilterOptions {
+  years: number[];
+  document_types: PublicationFilterOption[];
+  publication_stages: PublicationFilterOption[];
+  open_access_statuses: PublicationFilterOption[];
+  missing_doi_count: number;
+}
+
+/**
+ * Year/document-type/stage/open-access values for the list filter dropdowns,
+ * each counted within the scope of whatever OTHER filters are passed here
+ * (same shape as `getPublications`'s query) — not that dropdown's own filter.
+ * Re-fetch this whenever the applied filters change so the counts stay
+ * truthful instead of always showing the dataset-wide totals.
+ */
+export async function getPublicationFilterOptions(
+  query: PublicationListQuery = {},
+  options: ApiRequestOptions = {},
+): Promise<PublicationFilterOptions> {
+  const params = new URLSearchParams();
+
+  if (query.q !== undefined && query.q.trim()) params.set("q", query.q.trim());
+  if (query.year !== undefined) params.set("year", String(query.year));
+  if (query.document_type !== undefined && query.document_type.trim()) {
+    params.set("document_type", query.document_type.trim());
+  }
+  if (query.publication_stage !== undefined && query.publication_stage.trim()) {
+    params.set("publication_stage", query.publication_stage.trim());
+  }
+  if (query.open_access_status !== undefined && query.open_access_status.trim()) {
+    params.set("open_access_status", query.open_access_status.trim());
+  }
+  if (query.scopus_id !== undefined && /^\d+$/.test(query.scopus_id.trim())) {
+    params.set("scopus_id", query.scopus_id.trim());
+  }
+  if (query.author_name !== undefined && query.author_name.trim()) {
+    params.set("author_name", query.author_name.trim());
+  }
+  if (query.missing_doi) params.set("missing_doi", "true");
+
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiGet<PublicationFilterOptions>(`/api/v1/publications/filters${suffix}`, options);
 }
 
 /**

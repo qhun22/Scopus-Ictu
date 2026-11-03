@@ -1,18 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ApiError } from "../../api/client";
-import { getApiErrorMessage } from "../../api/errors";
-import { getPublicationByEid } from "../../api/publications";
-import { PublicationDetailResponse } from "../../types/publication";
-import { useAuth } from "../../contexts/AuthContext";
-import NormalizationCompareCard from "./NormalizationCompareCard";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useI18n } from "../../i18n";
-import { AffiliationSummaryBar, AuthorAffiliationCell } from "./AuthorAffiliations";
-import { EvidenceBasisCell, LinkStatusBadge, ReviewDecisionCell } from "./LinkEvidence";
-
-const NULL_YEAR = "Chưa rõ";
-const NULL_CITATION = "Chưa có dữ liệu";
-const NULL_STRING = "Chưa cập nhật";
+import PublicationDetailBody from "./PublicationDetailBody";
 
 export default function PublicationDetailPage() {
   const navigate = useNavigate();
@@ -21,418 +9,45 @@ export default function PublicationDetailPage() {
   // Opened from "Công bố của tôi" (W-02): go back there instead of the full catalogue.
   const fromMyPublications = (location.state as { from?: string } | null)?.from === "/my-publications";
   const backTarget = fromMyPublications ? "/my-publications" : "/publications";
+  // Prefer a real history "back" (POP) over push-navigating to a fixed path,
+  // so the list page is however the user actually left it; `navigate(backTarget)`
+  // is only a fallback for a direct load/refresh with no in-app history to pop
+  // (location.key is React Router's "default" for that case).
+  const handleBack = () => {
+    if (location.key !== "default") {
+      navigate(-1);
+    } else {
+      navigate(backTarget);
+    }
+  };
   const { locale } = useI18n();
-  const { user } = useAuth();
-  // LECTURER gets a read-only academic view: no import trace, no other lecturers' data.
-  const isLecturer = user?.role === "LECTURER";
+  const backLabel = locale === "vi" ? "Quay lại" : "Back";
 
-  const [publication, setPublication] = useState<PublicationDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showAllProvenance, setShowAllProvenance] = useState(false);
-
-  // ── Stale-request defenses: AbortController + monotonic generation ─────
-  const abortRef = useRef<AbortController | null>(null);
-  const genRef = useRef(0);
-
-  const fetchDetail = useCallback(async () => {
-    if (!eid) return;
-
-    const currentGen = ++genRef.current;
-
-    // Establish the complete loading state for THIS request BEFORE awaiting.
-    setLoading(true);
-    setError(null);
-
-    // Abort any previous in-flight request and create a new controller.
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      const data = await getPublicationByEid(eid, { signal: controller.signal });
-      // Generation guard: only commit if THIS request is still current.
-      if (currentGen !== genRef.current) return;
-      setPublication(data);
-    } catch (err) {
-      // AbortError is silent — neither error nor state is updated.
-      if ((err as Error).name === "AbortError") return;
-      if (currentGen !== genRef.current) return;
-
-      if (err instanceof ApiError && err.status === 404) {
-        setError(
-          locale === "vi"
-            ? "Không tìm thấy công bố này."
-            : "Publication not found.",
-        );
-      } else {
-        setError(
-          err instanceof ApiError
-            ? getApiErrorMessage(err)
-            : (locale === "vi"
-              ? "Không thể tải thông tin công bố. Vui lòng thử lại."
-              : "Unable to load publication details. Please try again."),
-        );
-      }
-    } finally {
-      // Only the CURRENT request clears its own loading flag. A stale
-      // request's finally is a no-op, so loading can never stick.
-      if (currentGen !== genRef.current) return;
-      setLoading(false);
-    }
-  }, [eid, locale]);
-
-  useEffect(() => {
-    fetchDetail();
-    // Cleanup on unmount or before the next effect run: abort in-flight.
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, [fetchDetail]);
-
-  // ── Display helpers ──────────────────────────────────────────────────────
-  const fmtField = (v: string | null | undefined): string =>
-    (v === null || v === undefined || v === "") ? NULL_STRING : v;
-
-  const fmtYear = (y: number | null | undefined): string =>
-    (y === null || y === undefined) ? NULL_YEAR : String(y);
-
-  const fmtCitations = (c: number | null | undefined): string => {
-    if (c === null || c === undefined) return NULL_CITATION;
-    return String(c);
-  };
-
-  const fmtProvenanceDate = (iso: string): string => {
-    try {
-      return new Date(iso).toLocaleString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return iso;
-    }
-  };
-
-  // ── Labels ────────────────────────────────────────────────────────────────
-  const backLabel = fromMyPublications
-    ? (locale === "vi" ? " Quay lại công bố của tôi" : " Back to my publications")
-    : (locale === "vi" ? " Quay lại danh sách công bố" : " Back to publications list");
-  const sectionMeta = locale === "vi" ? "Thông tin công bố" : "Publication Metadata";
-  const sectionAuthors = locale === "vi" ? "Danh sách tác giả (Scopus)" : "Scopus Authors";
-  const sectionLinks = locale === "vi" ? "Liên kết giảng viên ICTU" : "ICTU Lecturer Links";
-  const sectionProvenance = locale === "vi" ? "Nguồn dữ liệu & truy vết" : "Data Provenance";
-  const loadingLabel = locale === "vi" ? "Đang tải thông tin công bố..." : "Loading publication details...";
-  const retryLabel = locale === "vi" ? "Thử lại" : "Retry";
-  const colAuthorOrder = locale === "vi" ? "STT" : "#";
-  const colScopusId = "Scopus ID";
-  const colAffiliation = locale === "vi" ? "Đơn vị theo tác giả (nguồn ngoài) & độ tin cậy" : "Author affiliation (external source) & confidence";
-  const colName = locale === "vi" ? "Tên ưu tiên" : "Preferred Name";
-  const colStaffCode = locale === "vi" ? "Mã cán bộ" : "Staff Code";
-  const colDepartment = locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept";
-  const colFaculty = locale === "vi" ? "Khoa" : "Faculty";
-  const colOrcid = "ORCID";
-  const colFileName = locale === "vi" ? "Tên tệp" : "File Name";
-  const colRowNum = locale === "vi" ? "Dòng" : "Row";
-  const colImportedAt = locale === "vi" ? "Thời gian nhập" : "Imported At";
-  const colSha256 = "SHA-256";
-
-  const emptyAuthorsLabel = locale === "vi"
-    ? "Không có dữ liệu tác giả."
-    : "No author data available.";
-  const emptyLinksLabel = locale === "vi"
-    ? "Chưa có liên kết giảng viên được phê duyệt."
-    : "No approved lecturer links yet.";
-  const emptyProvenanceLabel = locale === "vi"
-    ? "Không có dữ liệu truy vết."
-    : "No provenance data available.";
-
-  if (loading) {
-    return (
-      <div className="flex min-h-64 items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-slate-400">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#3A5FC3]" />
-          <span className="text-sm">{loadingLabel}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-        <div className="rounded-full bg-rose-50 p-4">
-          <svg className="h-10 w-10 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-700">{error}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(backTarget)}
-            className="rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            {backLabel}
-          </button>
-          <button
-            type="button"
-            onClick={fetchDetail}
-            className="rounded-[5px] bg-[#3A5FC3] px-4 py-2 text-sm font-bold text-white hover:bg-[#2f4ea6] transition-colors cursor-pointer"
-          >
-            {retryLabel}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!publication) return null;
-
-  const {
-    title, eid: pubEid, doi, year, source_title,
-    volume, issue, art_no, page_start, page_end,
-    cited_by_count, document_type, publication_stage, open_access_status,
-    authors, approved_lecturer_links, provenance,
-  } = publication;
-
-  const provenanceToShow = showAllProvenance ? provenance : provenance.slice(0, 3);
-  const hasMoreProvenance = provenance.length > 3;
+  if (!eid) return null;
 
   return (
     <div className="app-page-container space-y-5">
       {/* ── Back navigation ────────────────────────────────────────────── */}
       <button
         type="button"
-        onClick={() => navigate(backTarget)}
-        className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer"
+        onClick={handleBack}
+        className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer"
       >
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-        </svg>
         <span>{backLabel}</span>
       </button>
 
-      {/* ── Section A: Canonical Metadata ─────────────────────────────── */}
-      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
-        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-          {sectionMeta}
-        </h2>
-
-        <h3 className="mb-3 text-sm font-bold text-[#3A5FC3]">{fmtField(title)}</h3>
-
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
-          <MetaItem label="EID" value={pubEid} mono />
-          <MetaItem label="DOI" value={fmtField(doi)} mono={false} />
-          <MetaItem label={locale === "vi" ? "Năm xuất bản" : "Year"} value={fmtYear(year)} />
-          <MetaItem label={locale === "vi" ? "Nguồn xuất bản" : "Source title"} value={fmtField(source_title)} />
-          <MetaItem label={locale === "vi" ? "Tập" : "Volume"} value={fmtField(volume)} />
-          <MetaItem label={locale === "vi" ? "Số tạp chí" : "Issue"} value={fmtField(issue)} />
-          <MetaItem label={locale === "vi" ? "Số bài (Art. No.)" : "Article No."} value={fmtField(art_no)} />
-          <MetaItem label={locale === "vi" ? "Trang đầu" : "Page Start"} value={fmtField(page_start)} />
-          <MetaItem label={locale === "vi" ? "Trang cuối" : "Page End"} value={fmtField(page_end)} />
-          <MetaItem
-            label={locale === "vi" ? "Số lượt trích dẫn" : "Citation Count"}
-            value={fmtCitations(cited_by_count)}
-            highlight={cited_by_count !== null && cited_by_count !== undefined}
-          />
-          <MetaItem label={locale === "vi" ? "Loại tài liệu" : "Document Type"} value={fmtField(document_type)} />
-          <MetaItem label={locale === "vi" ? "Giai đoạn xuất bản" : "Publication Stage"} value={fmtField(publication_stage)} />
-          <MetaItem label={locale === "vi" ? "Tình trạng truy cập mở" : "Open Access Status"} value={fmtField(open_access_status)} />
-        </div>
-      </section>
-
-      {/* ── Section B: Ordered Scopus Authors (always visible) ─────────── */}
-      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
-        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-          {sectionAuthors}
-        </h2>
-
-        {authors.length === 0 ? (
-          <p className="py-6 text-center text-xs text-slate-400">{emptyAuthorsLabel}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-slate-500" data-testid="author-count">
-              {locale === "vi" ? `${authors.length} tác giả, theo thứ tự trên bài báo.` : `${authors.length} authors, in publication order.`}
-            </p>
-            <AffiliationSummaryBar authors={authors} locale={locale} />
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
-                <tr>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colAuthorOrder}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colName}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colScopusId}</th>
-                  <th className="px-3 py-2.5 font-semibold">{colAffiliation}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {authors.map((a) => (
-                  <tr key={`${a.scopus_id}-${a.author_order}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-3 py-2.5 text-center text-slate-500">{a.author_order}</td>
-                    <td className="px-3 py-2.5 font-medium text-slate-800">
-                      <Link
-                        to={`/publications?scopus_id=${encodeURIComponent(a.scopus_id)}`}
-                        className="text-[#3A5FC3] hover:underline"
-                        title={locale === "vi" ? "Xem các công bố của tác giả này" : "List this author's publications"}
-                        data-testid="author-link"
-                      >
-                        {a.preferred_name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2.5 font-mono text-slate-500">{a.scopus_id}</td>
-                    <td className="px-3 py-2.5 align-top">
-                      <AuthorAffiliationCell author={a} locale={locale} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {!isLecturer && (
-        <>
-      {/* ── Section C: Approved Lecturer Links (always visible) ─────────── */}
-      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
-        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-          {sectionLinks}
-        </h2>
-        <p className="-mt-2 mb-3 text-xs leading-relaxed text-slate-500" data-testid="link-evidence-note">
-          {locale === "vi"
-            ? "Liên kết đã duyệt là quyết định của người duyệt. Liên kết chỉ được coi là định danh đã xác minh khi có chứng cứ định danh độc lập (ví dụ ORCID trùng khớp); mức chứng cứ bên dưới lấy từ dữ liệu chứng cứ đã lưu, không từ việc chấp nhận."
-            : "An approved link is a reviewer's decision. It counts as a verified identity only with independent identity evidence (for example a matching ORCID); the evidence level below comes from stored evidence, not from the acceptance."}
-        </p>
-
-        {approved_lecturer_links.length === 0 ? (
-          <p className="py-6 text-center text-xs text-slate-400">{emptyLinksLabel}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
-                <tr>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colAuthorOrder}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{locale === "vi" ? "Họ tên giảng viên" : "Lecturer Name"}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colStaffCode}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colDepartment}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colFaculty}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colOrcid}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colScopusId}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{locale === "vi" ? "Trạng thái liên kết" : "Link status"}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{locale === "vi" ? "Mức chứng cứ" : "Evidence level"}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{locale === "vi" ? "Quyết định duyệt" : "Review decision"}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {approved_lecturer_links.map((link, idx) => (
-                  <tr key={`link-${idx}-${link.author_order}-${link.scopus_id}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-3 py-2.5 text-center text-slate-500">{link.author_order}</td>
-                    <td className="px-3 py-2.5 font-medium text-slate-800">{link.full_name}</td>
-                    <td className="px-3 py-2.5 font-mono text-slate-600">{fmtField(link.staff_code)}</td>
-                    <td className="px-3 py-2.5 text-slate-700">{fmtField(link.department)}</td>
-                    <td className="px-3 py-2.5 text-slate-700">{fmtField(link.faculty)}</td>
-                    <td className="px-3 py-2.5 font-mono text-slate-500 text-[10px]">{fmtField(link.orcid)}</td>
-                    <td className="px-3 py-2.5 font-mono text-slate-500">{link.scopus_id}</td>
-                    <td className="px-3 py-2.5 align-top"><LinkStatusBadge locale={locale} /></td>
-                    <td className="px-3 py-2.5 align-top"><EvidenceBasisCell basis={link.evidence_basis} locale={locale} /></td>
-                    <td className="px-3 py-2.5 align-top">
-                      <ReviewDecisionCell decision={link.review_decision} locale={locale} formatDate={fmtProvenanceDate} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {!isLecturer && user && <NormalizationCompareCard eid={publication.eid} locale={locale === "en" ? "en" : "vi"} />}
-
-      {/* ── Section D: Safe Provenance (always visible) ────────────────── */}
-      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
-        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-          {sectionProvenance}
-        </h2>
-
-        {provenance.length === 0 ? (
-          <p className="py-6 text-center text-xs text-slate-400">{emptyProvenanceLabel}</p>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colFileName}</th>
-                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colRowNum}</th>
-                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colImportedAt}</th>
-                    <th className="px-3 py-2.5 font-semibold whitespace-nowrap hidden lg:table-cell">{colSha256}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {provenanceToShow.map((p, idx) => (
-                    <tr key={`${p.file_name}-${p.row_number}-${idx}`} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-3 py-2.5 font-medium text-slate-800 max-w-0">
-                        <span className="block max-w-[200px] truncate" title={p.file_name}>{p.file_name}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center text-slate-600">{p.row_number}</td>
-                      <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{fmtProvenanceDate(p.imported_at)}</td>
-                      <td className="px-3 py-2.5 font-mono text-[10px] text-slate-400 hidden lg:table-cell">
-                        <span className="block max-w-[120px] truncate" title={p.file_sha256}>{p.file_sha256}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {hasMoreProvenance && (
-              <div className="mt-3 text-center">
-                <button
-                  type="button"
-                  onClick={() => setShowAllProvenance((v) => !v)}
-                  className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
-                >
-                  {showAllProvenance
-                    ? (locale === "vi" ? "Thu gọn" : "Show less")
-                    : `${locale === "vi" ? "Xem thêm" : "Show all"} (${provenance.length})`}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </section>
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── Small helper component ──────────────────────────────────────────────────
-interface MetaItemProps {
-  label: string;
-  value: string;
-  mono?: boolean;
-  highlight?: boolean;
-}
-
-function MetaItem({ label, value, mono, highlight }: MetaItemProps) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
-      <span
-        className={[
-          "text-sm text-slate-800",
-          mono ? "font-mono" : "font-medium",
-          highlight ? "font-bold text-emerald-700" : "",
-        ].join(" ")}
-      >
-        {value}
-      </span>
+      <PublicationDetailBody
+        eid={eid}
+        errorActions={
+          <button
+            type="button"
+            onClick={handleBack}
+            className="rounded-[5px] border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            {backLabel}
+          </button>
+        }
+      />
     </div>
   );
 }

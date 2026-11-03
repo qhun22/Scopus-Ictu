@@ -55,11 +55,11 @@ export default function TextConfirmModal({
   return (
     <ModalPortal>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
         onClick={() => { if (!loading) onCancel(); }}
       >
         <div
-          className="w-full max-w-md rounded-card border border-red-200 bg-white shadow-2xl"
+          className="w-full max-w-md rounded-card border border-red-200 bg-white shadow-2xl modal-panel-in"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}

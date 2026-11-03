@@ -5,11 +5,16 @@
 @tailwind utilities;
 
 :root {
+  color-scheme: light;
   font-family: Saira, Arial, sans-serif;
   color: #172033;
   background: #f4f6fb;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  /* Default/fallback for the AppLayout sidebar-width var (see AppLayout.tsx) —
+     keeps content-area overlays correctly scoped even before the layout's
+     effect runs, or on routes rendered outside AppLayout. */
+  --app-sidebar-w: 16rem;
 }
 
 * {
@@ -133,6 +138,39 @@ body {
 .validation-message-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* Modal entrance animations. Hand-rolled because no animate.css /
+   tailwindcss-animate plugin is registered in tailwind.config.js — the
+   `animate-in`/`zoom-in-95`/`fade-in` utility class names used in a few
+   modals historically resolve to nothing (unrecognized by core Tailwind),
+   so those modals popped in instantly with no transition. */
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalPanelIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-backdrop-in {
+  animation: modalBackdropIn 160ms ease-out both;
+}
+
+.modal-panel-in {
+  animation: modalPanelIn 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

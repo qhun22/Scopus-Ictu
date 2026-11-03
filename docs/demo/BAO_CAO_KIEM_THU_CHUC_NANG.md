@@ -101,7 +101,7 @@ Nguồn danh sách: `frontend\src\App.tsx` (14 route + `*`), `Sidebar.tsx` (3 me
 | F28 | Trang Tác vụ | `/tasks` | ADMIN | **NOT_IMPLEMENTED** | Trang giữ chỗ — đã xem bằng trình duyệt |
 | F29 | Trang Người dùng riêng / nút tạo user độc lập | `/users` | ADMIN | **NOT_IMPLEMENTED** | `/users` chuyển sang `/lecturers`; không có `POST /users` |
 | F30 | Biểu đồ Trang chủ | `/home` | | **NOT_IMPLEMENTED** | Luôn "Chưa có dữ liệu" (đổi nhãn "Đang phát triển") |
-| F31 | Sinh ứng viên đối sánh; nạp OpenAlex/Crossref; nạp công bố đã biết | CLI `scripts/*.py` | quản trị viên chạy | **CODE_ONLY** (có thể đọc docstring + tests; **cố ý không chạy** trên teacher; không có nút UI) | |
+| F31 | Sinh ứng viên đối sánh; nạp OpenAlex/Crossref; nạp công bố đã biết | CLI `scripts/*.py` + nút UI ADMIN *(02/11/2026)* | quản trị viên chạy | **CODE_ONLY** (có thể đọc docstring + tests; **cố ý không chạy** trên teacher; **[Đính chính 02/11/2026]** nút **Sinh ứng viên** đã có trong trang Duyệt đối sánh, ADMIN-gated; nạp OpenAlex/Crossref và công bố đã biết vẫn là CLI) | |
 | F32 | `DELETE /lecturers/unlinked/cleanup` | API | ADMIN | **FAILED → đã sửa → API_PASS** | Trước: 500; nay 410 |
 | F33 | `PUT /lecturers/{id}`, `GET /users/{id}` | API | ADMIN | **CODE_ONLY** | UI dùng PATCH / danh sách |
 

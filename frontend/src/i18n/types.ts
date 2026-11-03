@@ -311,6 +311,9 @@ export interface TranslationSchema {
     updated: string;
     unchanged: string;
     conflicts: string;
+    accountsCreated: string;
+    accountsSkipped: string;
+    accountsSkippedWarning: string;
   };
   normalization: {
     title: string;

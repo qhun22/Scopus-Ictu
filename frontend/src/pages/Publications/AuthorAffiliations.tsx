@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AffiliationLinkStatus,
   AffiliationOverrideRead,
   AuthorAffiliationRead,
@@ -8,10 +8,10 @@ import type {
 type Locale = "vi" | "en";
 
 const STATUS_STYLE: Record<AffiliationLinkStatus, string> = {
-  VERIFIED: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  CORROBORATED: "bg-amber-50 text-amber-700 border-amber-200",
-  UNRESOLVED: "bg-slate-100 text-slate-600 border-slate-200",
-  NOT_RECONCILED: "bg-slate-50 text-slate-400 border-slate-200",
+  VERIFIED: "border-emerald-400 bg-white text-emerald-700 hover:bg-emerald-50",
+  CORROBORATED: "border-amber-400 bg-white text-amber-700 hover:bg-amber-50",
+  UNRESOLVED: "border-slate-400 bg-white text-slate-600 hover:bg-slate-50",
+  NOT_RECONCILED: "border-slate-300 bg-white text-slate-500 hover:bg-slate-50",
 };
 
 // Display labels only: the enum values in the API and database are unchanged.
@@ -93,13 +93,13 @@ function evidenceLine(a: AuthorAffiliationRead, locale: Locale): string {
 }
 const sourceLabel = (s: string) => SOURCE_LABEL[s] ?? s;
 
-// Status badge per Figma "Status Badges" (5:34): pill, 23px high, 10px horizontal padding, width fits content.
+// Status badge, same "nhãn chuẩn" style used across Imports/Normalization/Lecturers/Công bố.
 export function AffiliationBadge({ status, locale }: { status: AffiliationLinkStatus; locale: Locale }) {
   return (
     <span
       title={statusHint(status, locale)}
       data-testid={`aff-badge-${status}`}
-      className={`inline-flex h-[23px] shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 text-[11px] font-bold ${STATUS_STYLE[status]}`}
+      className={`inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border px-2.5 text-center text-xs font-bold leading-none ${STATUS_STYLE[status]}`}
     >
       {statusLabel(status, locale)}
     </span>
@@ -157,23 +157,23 @@ export function AffiliationSummaryBar({
   const items = all.filter((i) => counts[i.key] > 0);
   return (
     <div className="mb-3 space-y-2 rounded-[5px] border border-slate-100 bg-slate-50/60 p-3" data-testid="aff-summary">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-600">
+      <div className={'flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-slate-600'}>
         <span className="font-semibold">
           {vi ? `Đơn vị theo ${authors.length} tác giả:` : `Units across ${authors.length} authors:`}
         </span>
         {items.map((i) => (
-          <span key={i.key} className="inline-flex items-center gap-1">
-            <AffiliationBadge status={i.status} locale={locale} />
-            <span>
-              {counts[i.key]} {vi ? "tác giả" : counts[i.key] === 1 ? "author" : "authors"} {i.label}
-            </span>
+          <span key={i.key}>
+            {counts[i.key]} {vi ? "tác giả" : counts[i.key] === 1 ? "author" : "authors"} {i.label}
           </span>
         ))}
+        <span>
+          {vi ? `${authors.length} tác giả, theo thứ tự trên bài báo.` : `${authors.length} authors, in publication order.`}
+        </span>
       </div>
-      <p className="text-[11px] leading-snug text-slate-500">
+      <p className="text-xs leading-snug text-slate-500">
         {vi
-          ? "Đơn vị lấy từ nguồn metadata ngoài (OpenAlex, Crossref), không phải xác nhận trực tiếp của Scopus. “Đã xác minh định danh” nghĩa là có chuỗi ORCID → Scopus Author ID; “Đã đối chiếu · Chưa xác minh” chỉ khớp theo số tác giả, vị trí và tên."
-          : "Units come from external metadata sources (OpenAlex, Crossref), not asserted by Scopus. “Identity verified” means an ORCID → Scopus Author ID chain exists; “Cross-checked · Not verified” is matched only by author count, position and name."}
+          ? "Đơn vị được tra cứu từ nguồn bên ngoài (OpenAlex, Crossref), chưa được Scopus xác nhận trực tiếp."
+          : "Units are looked up from external sources (OpenAlex, Crossref) and have not been directly confirmed by Scopus."}
       </p>
     </div>
   );
@@ -183,27 +183,18 @@ function OverrideNote({ override, locale }: { override: AffiliationOverrideRead;
   const vi = locale === "vi";
   return (
     <div
-      className="mt-1.5 rounded-[5px] border border-violet-200 bg-violet-50/60 p-2 text-[11px] leading-snug"
+      className="mt-1.5 rounded-[5px] border border-emerald-200 bg-emerald-50/60 p-2 text-[11px] leading-snug"
       data-testid="aff-override"
     >
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-bold text-violet-700">
-          {vi ? "ADMIN rà soát thủ công" : "ADMIN manual review"}
-        </span>
-        <AffiliationBadge status={override.confidence} locale={locale} />
-      </div>
-      <p className="mt-1 font-medium text-slate-700">{override.affiliation_text}</p>
-      <p className="mt-0.5 text-slate-500">
-        {vi ? "Nguồn: " : "Source: "}
-        <a href={override.evidence_url} target="_blank" rel="noreferrer" className="text-sky-700 underline">
-          {override.evidence_url}
-        </a>
-      </p>
-      <p className="mt-0.5 text-slate-500">
-        {vi ? "Lý do: " : "Reason: "}
-        {override.reason}
-      </p>
-      <p className="mt-1 text-[10px] text-violet-600">{override.note}</p>
+      <p className="font-medium text-slate-700">{override.affiliation_text}</p>
+      {override.evidence_url && (
+        <p className="mt-0.5 text-slate-500">
+          {vi ? "Nguồn: " : "Source: "}
+          <a href={override.evidence_url} target="_blank" rel="noreferrer" className="text-sky-700 underline">
+            {override.evidence_url}
+          </a>
+        </p>
+      )}
     </div>
   );
 }
@@ -211,9 +202,11 @@ function OverrideNote({ override, locale }: { override: AffiliationOverrideRead;
 export function AuthorAffiliationCell({
   author,
   locale,
+  isAdmin = false,
 }: {
   author: PublicationAuthorRead;
   locale: Locale;
+  isAdmin?: boolean;
 }) {
   const vi = locale === "vi";
   const status = author.affiliation_status ?? "NOT_RECONCILED";
@@ -221,7 +214,7 @@ export function AuthorAffiliationCell({
   const resolutions = author.affiliation_resolutions ?? [];
   const noUnit = vi ? "Chưa có thông tin đơn vị" : "No unit information yet";
 
-  const resolutionLine = resolutions.length > 0 && (
+  const resolutionLine = isAdmin && resolutions.length > 0 && (
     <div className="mt-1 text-[10px] text-slate-500" data-testid="aff-resolutions">
       {vi ? "Theo nguồn: " : "By source: "}
       {resolutions
@@ -250,10 +243,12 @@ export function AuthorAffiliationCell({
   if (status === "UNRESOLVED") {
     return (
       <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <AffiliationBadge status={status} locale={locale} />
-          <span className="text-slate-500">{vi ? "Chưa xác định được đơn vị" : "Unit could not be determined"}</span>
-        </div>
+        {overrides.length === 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <AffiliationBadge status={status} locale={locale} />
+            <span className="text-slate-500">{vi ? "Chưa xác định được đơn vị" : "Unit could not be determined"}</span>
+          </div>
+        )}
         {resolutionLine}
         {overrides.map((o, i) => (
           <OverrideNote key={i} override={o} locale={locale} />

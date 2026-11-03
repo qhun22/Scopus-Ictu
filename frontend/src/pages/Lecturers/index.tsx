@@ -32,7 +32,7 @@ export default function LecturersPage() {
 
   const getAccountRoleLabel = (role: string): string =>
     role.toUpperCase() === "LECTURER"
-      ? (locale === "vi" ? "Cán bộ" : "Staff")
+      ? (locale === "vi" ? "Giảng viên" : "Lecturer")
       : getRoleLabel(role);
 
   const [lecturers, setLecturers] = useState<LecturerMasterItem[]>([]);
@@ -619,8 +619,8 @@ export default function LecturersPage() {
       toast.success(
         locale === "vi" ? "Xuất dữ liệu thành công" : "Export successful",
         locale === "vi"
-          ? `Đã xuất ${recordCount} hồ sơ giảng viên, kèm tài khoản đăng nhập (nếu có). Tệp chứa chuỗi băm mật khẩu, hãy bảo quản cẩn thận.`
-          : `Exported ${recordCount} lecturer records, with their login accounts (if any). The file contains password hashes; keep it safe.`,
+          ? `Đã xuất ${recordCount} hồ sơ giảng viên, kèm thông tin tài khoản (nếu có). Tệp không chứa mật khẩu; tài khoản cần được tạo lại thủ công khi tái nhập.`
+          : `Exported ${recordCount} lecturer records, with account info (if any). The file does not contain passwords; accounts must be recreated manually on re-import.`,
       );
     } catch (err: any) {
       toast.error(
@@ -951,7 +951,7 @@ export default function LecturersPage() {
                           </span>
                         ) : (
                           <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 py-0.5 text-xs font-bold text-emerald-600">
-                            <span>{locale === "vi" ? "Đang hoạt động" : "Active"}</span>
+                            <span>{locale === "vi" ? "Hoạt động" : "Active"}</span>
                           </span>
                         )}
                       </td>
@@ -961,7 +961,7 @@ export default function LecturersPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenDetailModal(lec)}
-                          className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900 transition-colors cursor-pointer"
+                          className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                         >
                           {locale === "vi" ? "Chi tiết" : "Detail"}
                         </button>
@@ -1071,12 +1071,12 @@ export default function LecturersPage() {
       {/* ====================================================================== */}
       {isAddModalOpen && (
         <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
             <div
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-lecturer-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
@@ -1284,12 +1284,12 @@ export default function LecturersPage() {
       {/* ====================================================================== */}
       {isDetailModalOpen && selectedLecturer && (
         <ModalPortal>
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
             <div
               role="dialog"
               aria-modal="true"
               aria-labelledby="lecturer-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl animate-in zoom-in-95 duration-150 sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
             >
               <div className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
                 <h3 id="lecturer-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
@@ -1568,7 +1568,7 @@ export default function LecturersPage() {
                             }`}
                           >
                             {selectedLecturer.account.is_active
-                              ? (locale === "vi" ? "Đang hoạt động" : "Active")
+                              ? (locale === "vi" ? "Hoạt động" : "Active")
                               : (locale === "vi" ? "Đã khóa" : "Locked")}
                           </span>
                         </div>

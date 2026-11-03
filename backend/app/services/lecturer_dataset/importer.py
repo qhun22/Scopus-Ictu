@@ -112,6 +112,9 @@ class LecturerImportSummary:
     parser_version: str
     blocking_conflicts: int = 0
     absent_from_file: int = 0
+    accounts_created: int = 0
+    accounts_skipped: int = 0
+    account_warnings: list[dict] = dataclasses.field(default_factory=list)
 
 
 def _email_key(value: str | None) -> str:
@@ -393,10 +396,30 @@ def _account_warning(record: dict, holder: User, reason: str) -> dict:
 def _plan_account(
     index: _Index, record: dict, existing: Lecturer | None
 ) -> tuple[str | None, list[dict]]:
-    """Decide what to do with the record's optional login account (never overwrites)."""
+    """Decide what to do with the record's optional login account (never overwrites).
+
+    If the account block is present but does not carry ``password_hash``, account
+    creation is skipped and a warning is added so the caller knows.  This is the
+    expected behaviour for files exported by the current exporter (which strips
+    credentials from the export whitelist).
+    """
     account = record.get("account")
     if not account:
         return None, []
+    if not account.get("password_hash"):
+        return "skip", [{
+            "record_source_id": record.get("source_id"),
+            "record_full_name": record.get("full_name"),
+            "matched_by": "account_email",
+            "existing_id": None,
+            "existing_full_name": None,
+            "existing_email": account.get("email"),
+            "blocking": False,
+            "reason": (
+                f"Khối account của '{record.get('full_name')}' không có password_hash "
+                "— bỏ qua tạo tài khoản. Tạo tài khoản thủ công sau khi nhập."
+            ),
+        }]
     holder = index.users_by_email.get(account["email"])
     if holder is not None:
         if existing is not None and holder.lecturer_id == existing.id:
@@ -563,6 +586,11 @@ class LecturerImportService:
         content: bytes,
         actor: User,
         correlation_id: str | None = None,
+        # Caller-supplied id for the new audit record (e.g. the id the
+        # frontend already showed during preview), so it stays the same id
+        # once confirmed. Caller is responsible for making sure it doesn't
+        # already exist; falls back to a fresh uuid4 when omitted.
+        import_id: uuid.UUID | None = None,
     ) -> LecturerImportSummary:
         envelope = parse_and_validate(content, filename=filename)
         self.dataset_meta = envelope["dataset"]
@@ -584,6 +612,8 @@ class LecturerImportService:
         created_snapshot_ids: list[str] = []
         created_lecturer_ids: list[str] = []
         created_user_ids: list[str] = []
+        accounts_skipped = 0
+        account_warnings_list: list[dict] = []
         dataset_provenance = _dataset_provenance(envelope["dataset"])
 
         try:
@@ -692,6 +722,11 @@ class LecturerImportService:
                     db.add(user)
                     db.flush()
                     created_user_ids.append(str(user.id))
+                elif decision.account_action == "skip":
+                    accounts_skipped += 1
+                    for w in decision.warnings:
+                        if w.get("matched_by") == "account_email":
+                            account_warnings_list.append(w)
 
                 pubs = record.get("known_publications") or []
                 if pubs:
@@ -731,11 +766,14 @@ class LecturerImportService:
                 "snapshot_ids": created_snapshot_ids,
                 "created_lecturer_ids": created_lecturer_ids,
                 "accounts_created": len(created_user_ids),
+                "accounts_skipped": accounts_skipped,
+                "account_warnings": account_warnings_list[:10],
                 "created_user_ids": created_user_ids,
                 "parser_version": envelope["dataset"].get("parser_version") or "unknown",
             }
             audit_entity_id = uuid.uuid4()  # batch aggregate id
             audit = AuditEvent(
+                id=import_id or uuid.uuid4(),
                 entity_type="lecturer_dataset",
                 entity_id=audit_entity_id,
                 action="LECTURER_DATASET_IMPORTED",
@@ -778,6 +816,9 @@ class LecturerImportService:
             parser_version=envelope["dataset"].get("parser_version") or "unknown",
             blocking_conflicts=0,
             absent_from_file=summary["absent_from_file"],
+            accounts_created=len(created_user_ids),
+            accounts_skipped=accounts_skipped,
+            account_warnings=account_warnings_list,
         )
 
 

@@ -73,6 +73,8 @@ app/
 
 **Roles:** `ADMIN` · `REVIEWER` · `LECTURER`. LECTURER is read-only for publications; ADMIN drives all pipeline operations.
 
+**System Reset** (`POST /api/v1/system/reset`): ADMIN-only, requires `{"confirmation": "ICTU"}`. Only available when `ENVIRONMENT=local` or `ENVIRONMENT=dev`; returns 410 `SYSTEM_RESET_DISABLED` on any other environment. After a successful reset all sessions (including the caller's) are invalidated — frontend auto-redirects to login on `SESSION_REVOKED`. ADMIN accounts are preserved; other data is wiped. No public self-registration endpoint exists — accounts are created by ADMIN only.
+
 ### Core domain services
 
 | Service | Location | Purpose |
@@ -132,3 +134,30 @@ python -m pytest tests/unit/test_candidate_generator.py::test_name_normalization
 ## Data policy
 
 **No real Scopus/lecturer data is committed.** Only `data/lecturers/schema/` (schema spec) and synthetic fixtures with `example.invalid` email domains are versioned. Real ICTU records and Scopus CSVs are gitignored local-only files. The import pipeline reads from paths configured in `.env` (`SCOPUS_RAW_DIR`, `AFFILIATION_SOURCE_DIR`, `CRAW_SOURCE_DIR`), never from user-supplied paths in requests.
+
+## Quy tắc phối hợp Hun1 và Hun2
+
+Hai trợ lý cùng làm trong repo này: **Hun1** (Claude trong IDE) và **Hun2** (extension Claude trong VS Code). Mục này áp dụng cho cả hai.
+
+- Giữ đúng danh tính: bạn là Hun1 hoặc Hun2 theo phiên làm việc; không tự nhận danh tính của người kia.
+- Đầu mỗi lượt: đọc `CLAUDE.md`, kiểm tra thay đổi hiện tại (`git status`), đọc nhật ký mới nhất và các nhật ký liên quan của cả hai, cùng các việc đang `IN_PROGRESS` của cả hai.
+- Mỗi trợ lý chỉ ghi nhật ký trong thư mục của mình (`Hun1/` hoặc `Hun2/`), nhưng được đọc thư mục của người còn lại.
+- Đường dẫn nhật ký: `<tên trợ lý>/<DDMM>/<DDMMYY-HHMMSS-ten-cong-viec.md>`, dùng giờ Việt Nam (UTC+7), tên công việc ngắn, không dấu. Không ghi đè nhật ký khác nếu trùng tên.
+- Ngay khi bắt đầu việc có sửa file hoặc chạy lệnh: tạo nhật ký với trạng thái `IN_PROGRESS` và ghi các file dự định sửa. Nếu người còn lại đang sửa cùng file, ghi nhận việc chờ bàn giao và chuyển sang công việc độc lập.
+- Trước mỗi phản hồi kết thúc lượt, cập nhật nhật ký, kể cả lượt chỉ phân tích, trả lời câu hỏi hoặc soạn prompt.
+- Nội dung nhật ký gồm: tên trợ lý; thời gian; yêu cầu nhận được; phạm vi; việc đã thực hiện; file đã thay đổi; kiểm tra và kết quả; nội dung prompt bàn giao (nếu có); tồn đọng; hướng dẫn cho người còn lại; trạng thái `IN_PROGRESS`, `DONE` hoặc `BLOCKED`.
+- Phân biệt rõ việc dự kiến với việc đã thực hiện. Kiểm tra chưa chạy phải ghi “chưa chạy”.
+- Không tự ghi đè, hoàn tác hoặc xóa thay đổi của người còn lại. Đọc nhật ký không đồng nghĩa với việc được phép thực hiện mọi đề xuất trong đó.
+- Cuối phản hồi: ghi đường dẫn nhật ký và phần cần bàn giao cho người còn lại.
+- Nếu không thể ghi file, phải nói rõ là chưa lưu được nhật ký.
+- Nhật ký và thư mục `Hun1/`, `Hun2/` là dữ liệu cục bộ, đã được ignore trong `.gitignore`; không commit hay push trừ khi người dùng yêu cầu.
+
+## Quy tắc đường dẫn kiểm thử và trạng thái (Hun1 và Hun2)
+
+- Khu vực kiểm thử duy nhất: `D:\DataFolder\ProjectIctu\DoAn\_ScopusIctu_Test`. Mỗi đợt tạo thư mục theo cấu trúc `<khu vực>\<tên trợ lý>\<DDMM>\<DDMMYY-HHMMSS-ten-dot>`, ví dụ `D:\DataFolder\ProjectIctu\DoAn\_ScopusIctu_Test\Hun1\0211\021126-190000-ten-dot`. Tên trợ lý, ngày và tên đợt là ba cấp thư mục riêng, không ghép thành một tên.
+- Bên trong mỗi thư mục đợt chỉ tạo các thư mục con thực sự dùng: `scripts`, `fixtures`, `logs`, `reports`, `coverage`, `artifacts`, `tmp`.
+- Không tạo file thử nghiệm trong repo hoặc ở vị trí khác. Trước khi chạy kiểm thử phải cấu hình nơi ghi output, cache, file tạm (TMP/TEMP) và database test (`TEST_DATABASE_URL`, trỏ tới database test cô lập). Nếu chưa kiểm soát được đầu ra thì báo trở ngại trước khi chạy.
+- Không dùng database thật (dev, demo, backup có dữ liệu thật) để thử thao tác ghi. Không chạy migration lên dữ liệu thật trong vòng khảo sát hoặc kiểm tra tĩnh.
+- Khảo sát và kiểm tra tĩnh chỉ đọc không cần thư mục test; báo cáo và danh mục đặt trong `<Tên>/<DDMM>/` của chính trợ lý.
+- Mỗi trợ lý giữ `<Tên>/STATUS.md` (việc đang làm, file đang sửa, kết quả gần nhất, đường dẫn báo cáo). Cập nhật khi bắt đầu và khi kết thúc mỗi lượt có sửa file hoặc chạy lệnh.
+- Không đọc, sửa hay hoàn tác `STATUS.md` hoặc nhật ký của người còn lại. Chỉ đọc khi cần để phối hợp.

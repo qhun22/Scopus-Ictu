@@ -13,8 +13,9 @@ import {
   startOnlineEnrichment,
 } from "../../api/affiliations";
 import { ApiError } from "../../api/client";
-import Button from "../../components/ui/Button";
+import Button, { buttonClass } from "../../components/ui/Button";
 import ConfirmModal from "../../components/common/ConfirmModal";
+import ModalPortal from "../../components/common/ModalPortal";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 import ManualReviewCard from "./ManualReviewCard";
@@ -324,11 +325,16 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                     : "Data applied earlier is unchanged (see section 2)."}
                 </p>
               )}
-              <p className="text-slate-400">
-                {vi
-                  ? "Quản trị: có thể nạp sẵn dữ liệu bằng cấu hình AFFILIATION_SOURCE_DIR."
-                  : "Admin: data can be preloaded via the AFFILIATION_SOURCE_DIR setting."}
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-slate-500" data-testid="aff-source-hint">
+                <span>{vi ? "Làm theo thứ tự:" : "Follow this order:"}</span>
+                <span className="rounded-[5px] border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-semibold text-slate-700">
+                  {vi ? "3. Thu thập trực tuyến" : "3. Online collection"}
+                </span>
+                <span className="text-slate-400">→</span>
+                <span className="rounded-[5px] border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-semibold text-slate-700">
+                  {vi ? "4. Xem trước và áp dụng" : "4. Preview and apply"}
+                </span>
+              </div>
             </div>
           ) : (
             <div className="space-y-2 text-xs text-slate-700">
@@ -383,16 +389,31 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
           {!db ? (
             <p className="text-xs text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
           ) : (
-            <div className="space-y-1.5 text-xs text-slate-700">
-              <p>
-                {fmt(db.publications)} {vi ? "công bố" : "publications"} · {fmt(db.author_positions)} {vi ? "vị trí tác giả" : "author positions"} ·{" "}
-                {fmt(db.organizations)} {vi ? "tổ chức" : "organizations"} · {fmt(db.affiliation_entries)} {vi ? "dòng đơn vị" : "affiliation lines"}
+            <div className="space-y-3 text-xs text-slate-700">
+              <p className="text-slate-500">
+                {vi
+                  ? "Số liệu tổng quan về công bố và đơn vị công tác đang có trong hệ thống."
+                  : "Overview of publications and affiliation data currently in the system."}
               </p>
-              {Object.keys(db.resolutions_by_source_and_status).length === 0 ? (
-                <p className="font-medium text-slate-500" data-testid="aff-none-applied">
-                  {vi ? `Chưa áp dụng đối chiếu đơn vị nào. Mọi tác giả đang hiển thị "Chưa đối chiếu".` : `No affiliation reconciliation applied yet. Every author shows "Not reconciled".`}
-                </p>
-              ) : (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <p className="text-lg font-bold text-slate-800">{fmt(db.publications)}</p>
+                  <p className="text-slate-500">{vi ? "Công bố" : "Publications"}</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-slate-800">{fmt(db.author_positions)}</p>
+                  <p className="text-slate-500">{vi ? "Vị trí tác giả" : "Author positions"}</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-slate-800">{fmt(db.organizations)}</p>
+                  <p className="text-slate-500">{vi ? "Tổ chức" : "Organizations"}</p>
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-slate-800">{fmt(db.affiliation_entries)}</p>
+                  <p className="text-slate-500">{vi ? "Dòng đơn vị" : "Affiliation lines"}</p>
+                </div>
+              </div>
+              {Object.keys(db.resolutions_by_source_and_status).length === 0 ? null : (
                 <ul className="space-y-0.5" data-testid="aff-state-list">
                   {Object.entries(db.resolutions_by_source_and_status)
                     .sort()
@@ -415,6 +436,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
         </Card>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-2">
       <Card title={vi ? "3. Thu thập đơn vị trực tuyến" : "3. Online affiliation collection (optional)"} testId="aff-online-card">
         <p className="mb-3 text-xs leading-relaxed text-slate-600">
           {vi
@@ -538,7 +560,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
             {job.status === "COMPLETED" && (
               <p className="mt-1 text-slate-500">
                 {vi
-                  ? 'Kết quả đã hoàn thành. Nhấn "Xem trước" bên dưới để dùng kết quả này nhé!'
+                  ? 'Kết quả đã hoàn thành. Nhấn "Xem trước" để dùng kết quả này nhé!'
                   : 'Result is ready. Click "Preview" below to use this result instead of the offline bundle.'}
               </p>
             )}
@@ -547,45 +569,81 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
       </Card>
 
       <Card title={vi ? "4. Xem trước và áp dụng" : "4. Preview and apply"} testId="aff-preview-card">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" onClick={runPreview} disabled={previewing || applying} data-testid="aff-preview-btn">
+        <p className="mb-3 text-xs leading-relaxed text-slate-600">
+          {vi
+            ? "Bước cuối gồm 2 lượt bấm: \"Xem trước\" chỉ tính thử, không ghi gì vào hệ thống — cho biết đơn vị công tác nào sẽ được gán cho tác giả nào. Xem kỹ kết quả rồi mới nhấn \"Xác nhận áp dụng\" để lưu chính thức."
+            : "Two clicks: \"Preview\" only computes the result, writing nothing yet — it shows which affiliation would be assigned to which author. Review it, then click \"Confirm and apply\" to save for real."}
+        </p>
+        <div className="mb-3 space-y-1.5">
+          <Button type="button" variant="secondary" onClick={runPreview} disabled={previewing || applying} loading={previewing} data-testid="aff-preview-btn">
             {previewing ? (vi ? "Đang tính…" : "Computing…") : vi ? "Xem trước" : "Preview"}
           </Button>
-          <span className="text-xs text-slate-500" data-testid="aff-preview-source-mode">
-            {sourceMode === "online" && job?.status === "COMPLETED"
-              ? vi
-                ? "Dùng kết quả thu thập trực tuyến vừa chạy."
-                : "Using the result of the online run just completed."
-              : vi
-                ? "Xem trước chỉ đọc, không ghi dữ liệu."
-                : "Preview is read-only and writes nothing."}
-          </span>
-          {job?.status === "COMPLETED" && source?.ready && (
-            <button
-              type="button"
-              className="text-xs font-medium text-sky-700 underline"
-              onClick={() => setSourceMode((m) => (m === "online" ? "offline" : "online"))}
-              data-testid="aff-source-mode-toggle"
-            >
-              {sourceMode === "online"
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-xs text-slate-500" data-testid="aff-preview-source-mode">
+              {sourceMode === "online" && job?.status === "COMPLETED"
                 ? vi
-                  ? "Chuyển sang bộ nguồn offline"
-                  : "Switch to offline bundle"
+                  ? "Dùng kết quả thu thập trực tuyến vừa chạy."
+                  : "Using the result of the online run just completed."
                 : vi
-                  ? "Chuyển sang kết quả trực tuyến"
-                  : "Switch to online result"}
-            </button>
-          )}
+                  ? "Xem trước chỉ đọc, không ghi dữ liệu."
+                  : "Preview is read-only and writes nothing."}
+            </span>
+            {job?.status === "COMPLETED" && source?.ready && (
+              <button
+                type="button"
+                className="text-xs font-medium text-sky-700 underline"
+                onClick={() => setSourceMode((m) => (m === "online" ? "offline" : "online"))}
+                data-testid="aff-source-mode-toggle"
+              >
+                {sourceMode === "online"
+                  ? vi
+                    ? "Chuyển sang bộ nguồn offline"
+                    : "Switch to offline bundle"
+                  : vi
+                    ? "Chuyển sang kết quả trực tuyến"
+                    : "Switch to online result"}
+              </button>
+            )}
+          </div>
         </div>
 
-        {message && (
+        {message && !preview && (
           <p className={`mb-3 text-xs font-medium ${message.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="aff-message">
             {message.text}
           </p>
         )}
+      </Card>
+      </div>
 
-        {preview && (
+      {preview && (
+        <ModalPortal>
+          <div
+            className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
+            onClick={() => { setPreview(null); setConfirmed(false); }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="aff-preview-modal-title"
+              className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="rounded-t-card border-b border-blue-100 bg-blue-50 px-5 py-4">
+                <h2 id="aff-preview-modal-title" className="text-base font-semibold text-[#2f4ea6]">
+                  {vi ? "Xem trước & áp dụng đối chiếu đơn vị" : "Preview & apply affiliation reconciliation"}
+                </h2>
+                <p className="mt-0.5 text-xs text-[#3A5FC3]">
+                  {vi ? "Chỉ ghi vào hệ thống sau khi bạn xác nhận bên dưới." : "Nothing is written until you confirm below."}
+                </p>
+              </div>
+
+              <div className="px-5 py-4">
           <div className="space-y-3 text-xs text-slate-700" data-testid="aff-preview">
+            {message && (
+              <p className={`text-xs font-medium ${message.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="aff-message">
+                {message.text}
+              </p>
+            )}
             {preview.blocked_reason && (
               <p className="rounded-[5px] border border-amber-200 bg-amber-50 p-2 font-medium text-amber-800" data-testid="aff-blocked">
                 {BLOCKED_LABEL[preview.blocked_reason]?.[locale] ?? preview.blocked_reason}
@@ -615,7 +673,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                         {preview.source_mismatches > 0 && <b className="text-rose-600"> · {fmt(preview.source_mismatches)} {vi ? "lệch" : "mismatches"}</b>}
                       </>
                     ) : (
-                      <b>{vi ? "Không có tệp (tùy chọn)" : "No file (optional)"}</b>
+                      <b>{vi ? "Không có tệp" : "No file"}</b>
                     )}
                   </li>
                 </ul>
@@ -681,18 +739,32 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                   : `I reviewed the result above. Units come from external sources, "Cross-checked" is not "Verified", and authors without enough evidence stay "Unresolved".`}
               </span>
             </label>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={runApply}
-              disabled={!preview.can_apply || !confirmed || applying}
-              data-testid="aff-apply-btn"
-            >
-              {applying ? (vi ? "Đang áp dụng…" : "Applying…") : vi ? "Xác nhận áp dụng" : "Confirm and apply"}
-            </Button>
           </div>
-        )}
-      </Card>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => { setPreview(null); setConfirmed(false); }}
+                  className={buttonClass("secondary")}
+                >
+                  {vi ? "Đóng" : "Close"}
+                </button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={runApply}
+                  disabled={!preview.can_apply || !confirmed || applying}
+                  loading={applying}
+                  data-testid="aff-apply-btn"
+                >
+                  {applying ? (vi ? "Đang áp dụng…" : "Applying…") : vi ? "Xác nhận áp dụng" : "Confirm and apply"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
       <ManualReviewCard locale={locale} />
     </div>
