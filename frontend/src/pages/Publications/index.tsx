@@ -531,13 +531,13 @@ export default function PublicationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {/* ── Initial loading / error ── */}
+              {/* ── Initial loading / error — on error just keep spinning ── */}
               {(loading && items.length === 0) || error ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
-                      <span className={error ? "text-rose-500 font-medium" : ""}>{error ?? loadingLabel}</span>
+                      {!error && <span>{loadingLabel}</span>}
                     </div>
                   </td>
                 </tr>
