@@ -93,3 +93,4 @@ data/diagram-skills-package/
 docs/
 scripts/
 *.bat
+!scopus-ictu-qhun22.bat
