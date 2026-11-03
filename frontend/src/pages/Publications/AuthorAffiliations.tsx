@@ -244,10 +244,7 @@ export function AuthorAffiliationCell({
     return (
       <div>
         {overrides.length === 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <AffiliationBadge status={status} locale={locale} />
-            <span className="text-slate-500">{vi ? "Chưa xác định được đơn vị" : "Unit could not be determined"}</span>
-          </div>
+          <AffiliationBadge status={status} locale={locale} />
         )}
         {resolutionLine}
         {overrides.map((o, i) => (
