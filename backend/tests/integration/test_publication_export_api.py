@@ -229,7 +229,7 @@ def seeded(db_session: Session) -> dict:
     db_session.add_all([
         _link(p1, a1, 1),
         _link(p1, a2, 2),
-        _link(p2, a1, 1),
+        _link(p2, a2, 1),
         _identity(lec, a1, status="APPROVED"),
     ])
     db_session.commit()

@@ -261,11 +261,12 @@ def test_five_author_publication_with_one_ictu_match_does_not_mass_generate(
     assert apply_response.status_code == 200, apply_response.text
 
     generation = client.post("/api/v1/matching/candidates/generate").json()
-    # Name step finds nothing (no lecturer name matches any of the 5
-    # authors via the 4 strict rules); Craw-assisted discovery must
-    # anchor exactly the one name-overlapping author position.
-    assert generation["name_candidates"] == 0
-    assert generation["craw_assisted_candidates"] == 1
+    # RULE_N2_HYPHEN folds "Tran, Thi-Mai" → "tran thi mai" which matches
+    # the lecturer's normalized name, so the name step finds 1 candidate.
+    # Craw-assisted discovery skips that pair (already in existing_candidate_pairs)
+    # and the remaining 4 authors have no lecturer name overlap → unattributed.
+    assert generation["name_candidates"] == 1
+    assert generation["craw_assisted_candidates"] == 0
     assert generation["craw_unattributed"] == 4
     assert generation["candidate_roots"] == 1
 

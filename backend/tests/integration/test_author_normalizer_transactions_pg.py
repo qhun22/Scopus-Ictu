@@ -194,13 +194,16 @@ def test_p5_driver_reports_sqlstate_and_constraint_for_each_violation(pg):
         pub = db.query(Publication).one()
         a1, a2 = (db.query(ScopusAuthor).filter(ScopusAuthor.scopus_id == _sid(n)).one()
                   for n in (1, 2))
+        # Fetch an existing raw record id to satisfy the NOT NULL FK.
+        raw_record_id = db.query(RawScopusRecord).first().id
         # Each case violates exactly one constraint.
         cases = [
             (ScopusAuthor(scopus_id=_sid(1), preferred_name="dup"),
              ("23505", UQ_SCOPUS_AUTHOR_ID)),
             (ScopusAuthorNameVariant(
                 scopus_author_id=a1.id, variant_type="AUTHOR_DISPLAY",
-                variant_name=f"Synthetic {_sid(1)}", variant_name_normalized="x"),
+                variant_name=f"Synthetic {_sid(1)}", variant_name_normalized="x",
+                first_seen_raw_record_id=raw_record_id),
              ("23505", UQ_AUTHOR_NAME_VARIANT)),
             (PublicationAuthor(publication_id=pub.id, scopus_author_id=a1.id, author_order=9),
              ("23505", UQ_PUBLICATION_AUTHOR)),

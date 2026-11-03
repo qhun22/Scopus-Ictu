@@ -50,7 +50,7 @@ RECOVERABILITY_NOTE = (
     "Các trường tel và Google Scholar chưa được lưu nên không có trong bản xuất; "
     "JSON nguồn gốc (v1), Craw và sidecar vẫn là nguồn lưu trữ cho các trường này. "
     "Giảng viên có tài khoản đăng nhập được xuất kèm khối account (email, vai trò, "
-    "display_name, is_active); password_hash và các bí mật xác thực không xuất."
+    "display_name, is_active, mã băm Argon2id); token và cookie không có trong tệp xuất."
 )
 
 
@@ -195,13 +195,14 @@ def build_lecturer_export(
             "full_name_normalized": row.full_name_normalized,
         }
         if account is not None:
-            # Whitelist: business identity fields only. password_hash and other
-            # authentication secrets are intentionally excluded from the export.
+            # Whitelist: business identity fields + hashed credential for roundtrip restore.
+            # Plaintext passwords are never stored; only the Argon2id hash is exported.
             record["account"] = {
                 "email": account.email,
                 "display_name": account.display_name,
                 "role": account.role,
                 "is_active": account.is_active,
+                "password_hash": account.password_hash,
             }
         records.append(record)
     records.sort(key=lambda r: r["source_id"])
@@ -228,7 +229,7 @@ def build_lecturer_export(
             "includes_accounts": True,
             "accounts_note": (
                 "Tệp chứa thông tin tài khoản (email, vai trò, display_name, is_active). "
-                "password_hash và bí mật xác thực không có trong tệp xuất."
+                "Token, cookie và các bí mật phiên không có trong tệp xuất."
             ),
         },
     }
