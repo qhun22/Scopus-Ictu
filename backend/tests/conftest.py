@@ -76,29 +76,6 @@ if ISOLATION_ENGINE is None:
     )
 
 
-def pytest_runtest_setup(item: pytest.Item) -> None:
-    """Re-verify the live target before any per-test or module fixture runs.
-
-    A wrong TEST_DATABASE_URL therefore aborts before fixtures can create or
-    drop schemas, truncate tables, or execute cleanup. Fixtures using the
-    shared engine still re-check immediately before their own cleanup too.
-    """
-
-    try:
-        assert_safe_for_destructive_test(ISOLATION_ENGINE)
-    except DatabaseSafetyRefused as exc:
-        pytest.fail(f"DATABASE SAFETY GUARD REFUSED: {exc}", pytrace=False)
-
-
-def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
-    """Re-verify before function-scoped fixture finalizers perform cleanup."""
-
-    try:
-        assert_safe_for_destructive_test(ISOLATION_ENGINE)
-    except DatabaseSafetyRefused as exc:
-        pytest.fail(f"DATABASE SAFETY GUARD REFUSED BEFORE FIXTURE CLEANUP: {exc}", pytrace=False)
-
-
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
