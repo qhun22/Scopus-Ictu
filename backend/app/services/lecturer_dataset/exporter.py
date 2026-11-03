@@ -229,7 +229,7 @@ def build_lecturer_export(
             "includes_accounts": True,
             "accounts_note": (
                 "Tệp chứa thông tin tài khoản (email, vai trò, display_name, is_active). "
-                "Token, cookie và các bí mật phiên không có trong tệp xuất."
+                "Bí mật xác thực và phiên đăng nhập không có trong tệp xuất."
             ),
         },
     }

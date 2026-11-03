@@ -69,7 +69,7 @@ def test_forbidden_port_constant_is_the_windows_service_port() -> None:
 
 def test_the_bat_is_one_entry_point_without_secrets_or_absolute_paths() -> None:
     bat = (dl.REPO / "scopus-ictu-qhun22.bat").read_text(encoding="ascii")
-    assert "demo_launcher.py" in bat and '"%PYTHON%" "%LAUNCHER%" start' in bat and re.search(r"/i \"%~1\"==\"stop\"", bat)
+    assert "demo_launcher.py" in bat and '"%PYTHON%" "%TEE%"' in bat and '" start' in bat and re.search(r"/i \"%~1\"==\"stop\"", bat)
     assert not re.search(r"[A-Za-z]:\\", bat)  # no hard-coded drive paths: everything is derived from %~dp0
     assert not re.search(r"password\s*=|secret_key|postgresql://", bat, re.I)
     assert "--reload" not in bat and "5432" not in bat
