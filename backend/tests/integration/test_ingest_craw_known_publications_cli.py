@@ -13,6 +13,7 @@ from app.models.base import Base
 from app.models.master_lecturer import Lecturer
 from scripts import generate_matching_candidates as guards
 from scripts import ingest_craw_known_publications as cli
+from tests.conftest import disable_append_only_triggers
 
 BASE = "https://repository.ictu.edu.vn"
 
@@ -60,16 +61,17 @@ def env(isolated_db_engine, craw, tmp_path):
         pytest.skip("No isolated PostgreSQL database available.")
     Base.metadata.create_all(bind=isolated_db_engine)
     with Session(isolated_db_engine) as s:
-        for table in (
-            "lecturer_scopus_candidate_evidence",
-            "lecturer_scopus_candidate_observations",
-            "lecturer_scopus_candidates",
-            "candidate_generation_runs",
-            "lecturer_known_publications",
-            "lecturer_source_snapshots",
-            "lecturers",
-        ):
-            s.execute(text(f"TRUNCATE {table} CASCADE"))
+        with disable_append_only_triggers(s):
+            for table in (
+                "lecturer_scopus_candidate_evidence",
+                "lecturer_scopus_candidate_observations",
+                "lecturer_scopus_candidates",
+                "candidate_generation_runs",
+                "lecturer_known_publications",
+                "lecturer_source_snapshots",
+                "lecturers",
+            ):
+                s.execute(text(f"TRUNCATE {table} CASCADE"))
         s.add_all(
             Lecturer(full_name=n.title(), full_name_normalized=n, repository_profile_url=f"{BASE}/giang-vien/{n}/")
             for n in ("a", "b", "ghost")

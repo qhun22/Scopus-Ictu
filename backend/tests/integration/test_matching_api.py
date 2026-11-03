@@ -30,6 +30,7 @@ from app.models.base import Base
 from app.models.governance import User
 from app.models.master_lecturer import Lecturer
 from app.models.publication import Publication, PublicationAuthor, ScopusAuthor
+from tests.conftest import disable_append_only_triggers
 
 NOW = datetime(2026, 10, 13, 8, 0, tzinfo=UTC)
 BASE = "https://repository.ictu.edu.vn"
@@ -58,8 +59,9 @@ def db_session(isolated_db_engine: Engine | None) -> Generator[Session, None, No
         pytest.skip("No isolated PostgreSQL database available.")
     Base.metadata.create_all(bind=isolated_db_engine)
     with Session(isolated_db_engine) as cleanup:
-        for table in _TABLES_TO_TRUNCATE:
-            cleanup.execute(text(f'TRUNCATE "{table}" CASCADE'))
+        with disable_append_only_triggers(cleanup):
+            for table in _TABLES_TO_TRUNCATE:
+                cleanup.execute(text(f'TRUNCATE "{table}" CASCADE'))
         cleanup.commit()
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=isolated_db_engine)
     session = SessionLocal()
