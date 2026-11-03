@@ -858,10 +858,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       )}
                     </div>
                   </div>
+                  {selectedItem.resolution_summaries.some((r) => r.link_status !== "UNRESOLVED") && (
                   <div className="flex flex-col items-start gap-1 text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
                     <span className="font-semibold">{vi ? "Nguồn đối soát:" : "Reconciled sources:"}</span>
                     <div className="flex flex-col items-start gap-2">
-                      {selectedItem.resolution_summaries.map((r, idx) => (
+                      {selectedItem.resolution_summaries.filter((r) => r.link_status !== "UNRESOLVED").map((r, idx) => (
                         <div key={idx} className="flex flex-col items-start gap-1">
                           <span
                             className={`${SOURCE_BADGE_BASE} bg-white text-slate-600`}
@@ -885,6 +886,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       ))}
                     </div>
                   </div>
+                  )}
                 </div>
 
                 {/* Overrides List & Add Button */}
