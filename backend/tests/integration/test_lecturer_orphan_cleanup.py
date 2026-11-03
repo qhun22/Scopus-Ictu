@@ -20,11 +20,13 @@ from app.services.lecturer_dataset.rollback import (
     LecturerRollbackService,
     find_orphaned_imported_lecturers,
 )
+from tests.conftest import disable_append_only_triggers
 from tests.integration.test_affiliation_override_api import db  # noqa: F401  (fixture)
 
 
 def _reset(db):
-    db.execute(text("TRUNCATE lecturers CASCADE"))
+    with disable_append_only_triggers(db):
+        db.execute(text("TRUNCATE lecturers CASCADE"))
     db.execute(text("DELETE FROM audit_events WHERE entity_type = 'lecturer_dataset'"))
     db.execute(text("DELETE FROM users WHERE email = 'orphan-admin@example.invalid'"))
     db.commit()

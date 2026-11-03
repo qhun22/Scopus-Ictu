@@ -14,6 +14,7 @@ from sqlalchemy import text
 from app.models.publication import Publication, PublicationRawSource
 from app.models.scopus_raw import RawScopusRecord, ScopusImport
 from app.services.normalization_compare import build_compare
+from tests.conftest import disable_append_only_triggers
 from tests.db_safety_guard import assert_safe_for_destructive_test
 from tests.integration.test_candidate_review_service import (  # noqa: F401  (fixtures)
     review_engine,
@@ -27,7 +28,8 @@ def _clean(review_engine):
     def wipe():
         assert_safe_for_destructive_test(review_engine)
         with review_engine.begin() as conn:
-            conn.execute(text("TRUNCATE publications, scopus_imports CASCADE"))
+            with disable_append_only_triggers(conn):
+                conn.execute(text("TRUNCATE publications, scopus_imports CASCADE"))
 
     wipe()
     yield

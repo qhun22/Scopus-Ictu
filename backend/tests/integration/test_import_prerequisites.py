@@ -10,6 +10,7 @@ from sqlalchemy import text
 from app.models.master_lecturer import Lecturer
 from app.models.scopus_raw import ScopusImport
 from app.services.scopus_import_service import duplicate_map
+from tests.conftest import disable_append_only_triggers
 from tests.integration.test_affiliation_override_api import (  # noqa: F401  (fixtures)
     as_role,
     client,
@@ -24,7 +25,8 @@ def _upload(client):
 
 
 def _clear(db):
-    db.execute(text("TRUNCATE lecturers, scopus_imports CASCADE"))
+    with disable_append_only_triggers(db):
+        db.execute(text("TRUNCATE lecturers, scopus_imports CASCADE"))
     db.commit()
 
 
