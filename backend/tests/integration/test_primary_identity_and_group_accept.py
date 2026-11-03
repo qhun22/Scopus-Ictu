@@ -73,8 +73,23 @@ def _clean_tables(review_engine):
     def wipe():
         assert_safe_for_destructive_test(review_engine)
         with review_engine.begin() as conn:
-            conn.execute(text("TRUNCATE publications, lecturer_publication_exclusion_events, "
-                              "lecturer_primary_scopus_events CASCADE"))
+            # lecturer_primary_scopus_events has ENABLE ALWAYS triggers; disable
+            # them for the wipe then restore so the guard stays active for tests.
+            conn.execute(text(
+                "ALTER TABLE lecturer_primary_scopus_events DISABLE TRIGGER ALL"
+            ))
+            conn.execute(text(
+                "TRUNCATE publications, lecturer_publication_exclusion_events, "
+                "lecturer_primary_scopus_events CASCADE"
+            ))
+            conn.execute(text(
+                "ALTER TABLE lecturer_primary_scopus_events"
+                " ENABLE ALWAYS TRIGGER lpse_forbid_update_delete"
+            ))
+            conn.execute(text(
+                "ALTER TABLE lecturer_primary_scopus_events"
+                " ENABLE ALWAYS TRIGGER lpse_forbid_truncate"
+            ))
 
     wipe()
     yield

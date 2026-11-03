@@ -83,6 +83,49 @@ def session_factory(review_engine: Engine) -> sessionmaker:
     )
 
 
+_TRUNCATE_MODELS = (
+    LecturerScopusCandidateReview,
+    IdentityEvidence,
+    LecturerScopusIdentity,
+    LecturerScopusCandidateEvidence,
+    LecturerScopusCandidateObservation,
+    LecturerScopusCandidate,
+    AuditEvent,
+    CandidateGenerationRun,
+    "user_notifications",
+    User,
+    ScopusAuthor,
+    Lecturer,
+)
+
+
+def _wipe_tables(session) -> None:
+    """Truncate all review-test tables.
+
+    lecturer_primary_scopus_events has ENABLE ALWAYS triggers that block
+    TRUNCATE and DELETE.  Disable them for the duration of the wipe so that
+    TRUNCATE Lecturer CASCADE can cascade into that table without error, then
+    restore ENABLE ALWAYS so the guard is active for real test code.
+    """
+    from sqlalchemy import text as _text
+    session.execute(_text(
+        "ALTER TABLE lecturer_primary_scopus_events DISABLE TRIGGER ALL"
+    ))
+    for model in _TRUNCATE_MODELS:
+        if isinstance(model, str):
+            session.execute(_text(f"TRUNCATE {model} CASCADE"))
+        else:
+            session.execute(_text(f"TRUNCATE {model.__table__.name} CASCADE"))
+    session.execute(_text(
+        "ALTER TABLE lecturer_primary_scopus_events"
+        " ENABLE ALWAYS TRIGGER lpse_forbid_update_delete"
+    ))
+    session.execute(_text(
+        "ALTER TABLE lecturer_primary_scopus_events"
+        " ENABLE ALWAYS TRIGGER lpse_forbid_truncate"
+    ))
+
+
 @pytest.fixture
 def review_session(
     review_engine: Engine,
@@ -92,54 +135,13 @@ def review_session(
     session = session_factory()
     try:
         assert_safe_for_destructive_test(review_engine)
-        # Truncate in dependency order.  Use TRUNCATE ... CASCADE to safely
-        # handle cross-table FK references (user_notifications, etc).
-        from sqlalchemy import text as _text
-        for model in (
-            LecturerScopusCandidateReview,
-            IdentityEvidence,
-            LecturerScopusIdentity,
-            LecturerScopusCandidateEvidence,
-            LecturerScopusCandidateObservation,
-            LecturerScopusCandidate,
-            AuditEvent,
-            CandidateGenerationRun,
-            "user_notifications",
-            User,
-            ScopusAuthor,
-            Lecturer,
-        ):
-            if isinstance(model, str):
-                session.execute(_text(f"TRUNCATE {model} CASCADE"))
-            else:
-                session.execute(_text(
-                    f"TRUNCATE {model.__table__.name} CASCADE"
-                ))
+        _wipe_tables(session)
         session.commit()
         yield session
     finally:
         session.rollback()
         assert_safe_for_destructive_test(review_engine)
-        for model in (
-            LecturerScopusCandidateReview,
-            IdentityEvidence,
-            LecturerScopusIdentity,
-            LecturerScopusCandidateEvidence,
-            LecturerScopusCandidateObservation,
-            LecturerScopusCandidate,
-            AuditEvent,
-            CandidateGenerationRun,
-            "user_notifications",
-            User,
-            ScopusAuthor,
-            Lecturer,
-        ):
-            if isinstance(model, str):
-                session.execute(_text(f"TRUNCATE {model} CASCADE"))
-            else:
-                session.execute(_text(
-                    f"TRUNCATE {model.__table__.name} CASCADE"
-                ))
+        _wipe_tables(session)
         session.commit()
         session.close()
 
