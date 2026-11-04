@@ -210,7 +210,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
     <div className="space-y-5">
       {/* ── Section A: Canonical Metadata ─────────────────────────────── */}
       <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
-        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
+        <h2 className="mb-4 text-base font-medium text-slate-800 border-b border-slate-100 pb-3">
           {sectionMeta}
         </h2>
 
@@ -408,11 +408,11 @@ interface MetaItemProps {
 function MetaItem({ label, value, highlight }: MetaItemProps) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-sm font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-sm font-medium uppercase tracking-wide text-slate-400">{label}</span>
       <span
         className={[
-          "text-sm text-slate-800 font-medium",
-          highlight ? "font-bold text-emerald-700" : "",
+          "text-sm font-medium",
+          highlight ? "text-emerald-700" : "text-slate-800",
         ].join(" ")}
       >
         {value}

@@ -17,7 +17,7 @@ const STATUS_TEXT_COLOR: Record<AffiliationLinkStatus, string> = {
 // Display labels only: the enum values in the API and database are unchanged.
 const STATUS_LABEL: Record<AffiliationLinkStatus, Record<Locale, string>> = {
   VERIFIED: { vi: "Đã xác minh định danh", en: "Identity verified" },
-  CORROBORATED: { vi: "Đã đối chiếu · Chưa xác minh", en: "Cross-checked · Not verified" },
+  CORROBORATED: { vi: "Đã đối chiếu, chưa xác minh", en: "Cross-checked, not verified" },
   UNRESOLVED: { vi: "Chưa xác định", en: "Unresolved" },
   NOT_RECONCILED: { vi: "Chưa đối chiếu", en: "Not reconciled" },
 };
@@ -262,9 +262,9 @@ export function AuthorAffiliationCell({
                 <span className="rounded bg-slate-100 px-1.5 text-sm font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
                 <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
               </div>
-              <div className="ml-1 mt-0.5 text-sm text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
+              <div className="mt-0.5 text-sm text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
               {a.organizations.length > 0 && (
-                <div className="ml-1 mt-0.5 flex flex-wrap gap-1 text-sm text-slate-500">
+                <div className="mt-0.5 flex flex-wrap gap-1 text-sm text-slate-500">
                   <span>{vi ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
                   {a.organizations.map((o, k) => (
                     <span key={`${o.source_org_id ?? o.display_name}-${k}`} className="rounded bg-sky-50 px-1.5 text-sky-700">
