@@ -302,7 +302,7 @@ export default function PublicationsPage() {
   const resetLabel = locale === "vi" ? "Đặt lại" : "Reset";
   const viewDetailLabel = locale === "vi" ? "Chi tiết" : "Details";
   const subtitleText = locale === "vi"
-    ? "Danh mục công bố khoa học chuẩn hóa toàn trường ICTU."
+    ? "Danh mục công bố khoa học đã được chuẩn hóa toàn trường ICTU."
     : "Canonical normalized scientific publication catalog for ICTU.";
 
   const exportLabel = locale === "vi" ? "Xuất JSON" : "Export JSON";
