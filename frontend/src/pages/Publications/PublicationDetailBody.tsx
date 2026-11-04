@@ -277,7 +277,9 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                     <td className="px-3 py-2.5 text-slate-500">{a.scopus_id}</td>
                     <td className="px-3 py-2.5" data-testid="author-ictu-lecturer">
                       {a.ictu_lecturer_name ? (
-                        <span className="font-medium text-emerald-700">{a.ictu_lecturer_name} - ICTU</span>
+                        <span className="font-medium text-emerald-700">
+                          {a.ictu_lecturer_name} <span className="whitespace-nowrap">• ICTU</span>
+                        </span>
                       ) : (
                         <span className="text-slate-400">{locale === "vi" ? "Không xác định" : "Undetermined"}</span>
                       )}
