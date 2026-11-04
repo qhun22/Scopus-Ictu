@@ -275,7 +275,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                       </Link>
                     </td>
                     <td className="px-3 py-2.5 text-slate-500">{a.scopus_id}</td>
-                    <td className="px-3 py-2.5 align-top" data-testid="author-ictu-lecturer">
+                    <td className="px-3 py-2.5" data-testid="author-ictu-lecturer">
                       {a.ictu_lecturer_name ? (
                         <span className="font-medium text-emerald-700">{a.ictu_lecturer_name}</span>
                       ) : (
