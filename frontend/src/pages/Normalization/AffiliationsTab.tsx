@@ -637,16 +637,6 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                     {vi ? "Chỉ ghi vào hệ thống sau khi bạn xác nhận bên dưới." : "Nothing is written until you confirm below."}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { setPreview(null); setConfirmed(false); }}
-                  className="shrink-0 rounded-[5px] p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
-                  aria-label={vi ? "Đóng" : "Close"}
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
