@@ -408,7 +408,7 @@ interface MetaItemProps {
 function MetaItem({ label, value, highlight }: MetaItemProps) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-sm font-medium uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-sm font-bold text-slate-400">{label}</span>
       <span
         className={[
           "text-sm font-medium",
