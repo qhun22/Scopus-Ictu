@@ -339,7 +339,7 @@ export default function PublicationsPage() {
           <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">
             Công bố khoa học
           </h1>
-          <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">{subtitleText}</p>
+          <p className="mt-0.5 text-sm text-slate-500">{subtitleText}</p>
         </div>
         {isAdmin && (
           <div className="flex flex-col items-end gap-1">
@@ -356,7 +356,7 @@ export default function PublicationsPage() {
               {isExporting ? exportingLabel : exportLabel}
             </Button>
             {exportError && (
-              <p className="text-xs font-medium text-rose-500">{exportError}</p>
+              <p className="text-sm font-medium text-rose-500">{exportError}</p>
             )}
           </div>
         )}
@@ -364,7 +364,7 @@ export default function PublicationsPage() {
 
       {scopusIdFilter && (
         <div
-          className="flex flex-wrap items-center gap-2 rounded-[5px] border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900"
+          className="flex flex-wrap items-center gap-2 rounded-[5px] border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900"
           data-testid="scopus-id-chip"
         >
           <span>
@@ -404,7 +404,7 @@ export default function PublicationsPage() {
                   ? "Tìm theo tiêu đề, EID, DOI, nguồn, tác giả, Scopus ID tác giả..."
                   : "Search by title, EID, DOI, journal, author, author's Scopus ID..."
               }
-              className="h-control w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+              className="h-control w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
             />
           </div>
 
@@ -431,7 +431,7 @@ export default function PublicationsPage() {
             value={yearInput}
             onChange={(e) => setYearInput(e.target.value.replace(/[^\d]/g, "").slice(0, 4))}
             placeholder={locale === "vi" ? "Năm (vd 2024)" : "Year (e.g. 2024)"}
-            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
           />
           <datalist id="pub-year-options">
             {filterOptions?.years.map((y) => (
@@ -444,7 +444,7 @@ export default function PublicationsPage() {
             aria-label={locale === "vi" ? "Loại tài liệu" : "Document type"}
             value={appliedFilters.document_type ?? ""}
             onChange={(e) => setFilter("document_type", e.target.value || undefined)}
-            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
           >
             <option value="">{locale === "vi" ? "Loại tài liệu: Tất cả" : "Doc. type: All"}</option>
             {filterOptions?.document_types.map((o) => (
@@ -457,7 +457,7 @@ export default function PublicationsPage() {
             aria-label={locale === "vi" ? "Giai đoạn" : "Stage"}
             value={appliedFilters.publication_stage ?? ""}
             onChange={(e) => setFilter("publication_stage", e.target.value || undefined)}
-            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
           >
             <option value="">{locale === "vi" ? "Giai đoạn: Tất cả" : "Stage: All"}</option>
             {filterOptions?.publication_stages.map((o) => (
@@ -470,7 +470,7 @@ export default function PublicationsPage() {
             aria-label={locale === "vi" ? "Truy cập mở" : "Open Access"}
             value={appliedFilters.open_access_status ?? ""}
             onChange={(e) => setFilter("open_access_status", e.target.value || undefined)}
-            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+            className="h-control w-full rounded-[5px] border border-slate-200 bg-white px-2 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
           >
             <option value="">{locale === "vi" ? "Truy cập mở: Tất cả" : "Open Access: All"}</option>
             {filterOptions?.open_access_statuses.map((o) => (
@@ -480,7 +480,7 @@ export default function PublicationsPage() {
 
           {/* Missing DOI — admin only */}
           {isAdmin && (
-            <label className="flex h-control w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600">
+            <label className="flex h-control w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-600">
               <input
                 type="checkbox"
                 checked={appliedFilters.missing_doi}
@@ -497,7 +497,7 @@ export default function PublicationsPage() {
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
-          <table className="w-full table-fixed text-left text-xs" aria-busy={isFiltering}>
+          <table className="w-full table-fixed text-left text-sm" aria-busy={isFiltering}>
             <colgroup>
               <col style={{ width: 200 }} />
               <col style={{ width: 165 }} />
@@ -510,14 +510,14 @@ export default function PublicationsPage() {
             </colgroup>
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colTitle}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colEid}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colYear}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colSource}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colDocType}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colStage}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colOa}</th>
-                <th className="sticky right-0 z-[1] border-l border-slate-200/80 bg-slate-50 px-4 py-3 text-center font-semibold whitespace-nowrap">{colAction}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colTitle}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colEid}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colYear}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colSource}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colDocType}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colStage}</th>
+                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colOa}</th>
+                <th className="sticky right-0 z-[1] border-l border-slate-200/80 bg-slate-50 px-4 py-3 text-center font-bold whitespace-nowrap">{colAction}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -540,7 +540,7 @@ export default function PublicationsPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       <span className="font-semibold text-slate-600">{noDataLabel}</span>
-                      <span className="text-xs">{noDataSubLabel}</span>
+                      <span className="text-sm">{noDataSubLabel}</span>
                     </div>
                   </td>
                 </tr>
@@ -549,30 +549,30 @@ export default function PublicationsPage() {
                   <tr key={pub.eid} className="hover:bg-slate-50/50 transition-colors">
                     <td className="border-r border-slate-100 px-4 py-3">
                       <span
-                        className="block line-clamp-2 break-words font-semibold text-slate-800"
+                        className="block line-clamp-2 break-words font-bold text-slate-800"
                         title={pub.title}
                       >
                         {pub.title}
                       </span>
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-500">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-500">
                       {pub.eid}
                     </td>
                     <td className="border-r border-slate-100 px-4 py-3 whitespace-nowrap font-bold text-slate-800">
                       {fmtYear(pub.year)}
                     </td>
                     <td className="border-r border-slate-100 px-4 py-3">
-                      <span className="block line-clamp-2 break-words text-slate-700" title={pub.source_title ?? ""}>
+                      <span className="block line-clamp-2 break-words font-bold text-slate-700" title={pub.source_title ?? ""}>
                         {fmtField(pub.source_title)}
                       </span>
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-700">
                       {fmtField(pub.document_type)}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-700">
                       {fmtField(pub.publication_stage)}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-700">
                       {fmtField(pub.open_access_status)}
                     </td>
                     <td className="sticky right-0 z-[1] border-l border-slate-100 bg-white px-4 py-3 text-center">
@@ -580,7 +580,7 @@ export default function PublicationsPage() {
                         <button
                           type="button"
                           onClick={() => setSelectedEid(pub.eid)}
-                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
+                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                         >
                           {viewDetailLabel}
                         </button>
@@ -590,7 +590,7 @@ export default function PublicationsPage() {
                           onClick={() => {
                             try { sessionStorage.setItem(SCROLL_KEY, String(window.scrollY)); } catch {}
                           }}
-                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors"
+                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors"
                         >
                           {viewDetailLabel}
                         </Link>
@@ -604,7 +604,7 @@ export default function PublicationsPage() {
           {/* Loading overlay for filter/page transitions */}
           {loadingMore && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 backdrop-blur-[1px]">
-              <div role="status" className="flex items-center gap-2 rounded-[5px] border border-slate-100 bg-white px-4 py-2.5 text-xs font-medium text-slate-600 shadow-sm">
+              <div role="status" className="flex items-center gap-2 rounded-[5px] border border-slate-100 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
                 {loadingLabel}
               </div>
@@ -613,7 +613,7 @@ export default function PublicationsPage() {
         </div>
 
         {/* ── Footer: count + pagination ──────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-sm text-slate-500">
           {/* Record count */}
           <div className="flex items-center gap-3">
             <span>
@@ -629,7 +629,7 @@ export default function PublicationsPage() {
               <select
                 value={pageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-sm font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
               >
                 <option value={10}>10</option>
                 <option value={20}>20</option>
