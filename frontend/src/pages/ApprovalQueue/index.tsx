@@ -31,11 +31,14 @@ const ANTD_THEME = {
 
 import {
   decideReviewCandidate,
+  getLecturersWithoutCandidates,
   getReviewCandidate,
   getReviewCandidates,
   getReviewContext,
+  reopenRejectedCandidate,
   revokeReviewCandidate,
 } from "../../api/reviews";
+import type { LecturerWithoutCandidateItem } from "../../types/review";
 import { createManualCandidate, generateCandidates } from "../../api/matching";
 import { getLecturers } from "../../api/lecturers";
 import { ApiError } from "../../api/client";
@@ -285,6 +288,17 @@ export default function ApprovalQueuePage() {
   const [revocationSubmitting, setRevocationSubmitting] = useState(false);
   const [revocationError, setRevocationError] = useState<string | null>(null);
 
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState("");
+  const [reopenSubmitting, setReopenSubmitting] = useState(false);
+  const [reopenError, setReopenError] = useState<string | null>(null);
+
+  const [gapsOpen, setGapsOpen] = useState(false);
+  const [gapsSearch, setGapsSearch] = useState("");
+  const [gapsLoading, setGapsLoading] = useState(false);
+  const [gapsItems, setGapsItems] = useState<LecturerWithoutCandidateItem[]>([]);
+  const [gapsTotal, setGapsTotal] = useState(0);
+
   const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -429,6 +443,19 @@ export default function ApprovalQueuePage() {
     setManualError(null);
   };
 
+  const openManualFor = (lecturer: LecturerWithoutCandidateItem) => {
+    setGapsOpen(false);
+    setManualLecturerOptions([
+      { value: lecturer.id, label: `${lecturer.full_name}${lecturer.staff_code ? ` (${lecturer.staff_code})` : ""}` },
+    ]);
+    setManualLecturerId(lecturer.id);
+    setManualLecturerQuery(lecturer.full_name);
+    setManualScopusId("");
+    setManualNote("");
+    setManualError(null);
+    setManualOpen(true);
+  };
+
   const submitManualCandidate = async () => {
     if (manualSubmitting) return;
     if (!manualLecturerId) {
@@ -525,6 +552,66 @@ export default function ApprovalQueuePage() {
       setRevocationSubmitting(false);
     }
   };
+
+  const closeReopen = () => {
+    if (reopenSubmitting) return;
+    setReopenOpen(false);
+    setReopenReason("");
+    setReopenError(null);
+  };
+
+  const submitReopen = async () => {
+    if (!detail || reopenSubmitting) return;
+    const reason = reopenReason.trim();
+    if (!reason) {
+      setReopenError(locale === "en" ? "A reason is required." : "Cần nhập lý do.");
+      return;
+    }
+    setReopenSubmitting(true);
+    setReopenError(null);
+    try {
+      await reopenRejectedCandidate(detail.candidate_id, {
+        candidate_version: detail.candidate_version,
+        reason,
+      });
+      toast.success(
+        locale === "en" ? "Candidate reopened" : "Đã mở lại ứng viên",
+        locale === "en" ? "Back to PENDING for a fresh review." : "Đã quay về Chờ duyệt.",
+      );
+      setReopenOpen(false);
+      setReopenReason("");
+      await refreshQueueAndDetail();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setReopenError(getApiErrorMessage(error, t.conflictDefault));
+        if (selectedCandidateId) await loadDetail(selectedCandidateId);
+      } else {
+        setReopenError(getApiErrorMessage(error, locale === "en" ? "Could not reopen." : "Không mở lại được."));
+      }
+    } finally {
+      setReopenSubmitting(false);
+    }
+  };
+
+  const loadGaps = useCallback(async (search: string) => {
+    setGapsLoading(true);
+    try {
+      const res = await getLecturersWithoutCandidates({ search: search || undefined, page_size: 20 });
+      setGapsItems(res.items);
+      setGapsTotal(res.total);
+    } catch {
+      setGapsItems([]);
+      setGapsTotal(0);
+    } finally {
+      setGapsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!gapsOpen) return;
+    const timer = setTimeout(() => void loadGaps(gapsSearch), 300);
+    return () => clearTimeout(timer);
+  }, [gapsOpen, gapsSearch, loadGaps]);
 
   const refreshQueueAndDetail = useCallback(async () => {
     const requests: Promise<unknown>[] = [loadQueue()];
@@ -627,6 +714,20 @@ export default function ApprovalQueuePage() {
           <div className="text-xs text-slate-500">
             {t.totalLabel}: <span className="font-semibold text-slate-800">{total}</span>
           </div>
+          {(user?.role === "ADMIN" || user?.role === "REVIEWER") && (
+            <UiButton
+              variant="secondary"
+              size="md"
+              onClick={() => setGapsOpen(true)}
+              icon={
+                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              }
+            >
+              <span className="truncate">{locale === "en" ? "Lecturers without candidates" : "Giảng viên chưa có ứng viên"}</span>
+            </UiButton>
+          )}
           {user?.role === "ADMIN" && (
             <UiButton
               variant="secondary"
@@ -658,6 +759,57 @@ export default function ApprovalQueuePage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={gapsOpen}
+        title={locale === "en" ? "Lecturers without any matching candidate" : "Giảng viên chưa có ứng viên đối sánh nào"}
+        footer={null}
+        onCancel={() => setGapsOpen(false)}
+        width={640}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">
+            {locale === "en"
+              ? "These lecturers have zero candidate roots in any status — the automatic name rules never proposed anything for them at all (not even a rejected one). Use \"Add pair manually\" if you find a matching Scopus ID for one."
+              : "Các giảng viên này chưa có ứng viên đối sánh nào ở bất kỳ trạng thái nào — rule tự động chưa từng đề xuất gì cho họ (kể cả bị từ chối). Dùng \"Thêm cặp thủ công\" nếu cậu tìm được Scopus ID khớp."}
+          </p>
+          <Input
+            value={gapsSearch}
+            onChange={(e) => setGapsSearch(e.target.value)}
+            placeholder={locale === "en" ? "Search by name, email or staff code…" : "Tìm theo tên, email hoặc mã cán bộ…"}
+            allowClear
+          />
+          <div className="max-h-[50vh] overflow-y-auto rounded-[5px] border border-slate-200">
+            {gapsLoading ? (
+              <div className="flex justify-center py-8"><Spin /></div>
+            ) : gapsItems.length === 0 ? (
+              <Empty
+                description={locale === "en" ? "No gaps found" : "Không có giảng viên nào bị bỏ sót"}
+                className="py-8"
+              />
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {gapsItems.map((lec) => (
+                  <li key={lec.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-slate-800">{lec.full_name}</div>
+                      <div className="truncate text-xs text-slate-500">
+                        {[lec.staff_code, lec.department, lec.email].filter(Boolean).join(" · ") || "—"}
+                      </div>
+                    </div>
+                    <UiButton variant="secondary" size="sm" onClick={() => openManualFor(lec)}>
+                      {locale === "en" ? "Add pair" : "Thêm cặp"}
+                    </UiButton>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <p className="text-xs text-slate-400">
+            {locale === "en" ? "Total" : "Tổng"}: {gapsTotal}
+          </p>
+        </div>
+      </Modal>
 
       <Modal
         open={manualOpen}
@@ -1204,10 +1356,65 @@ export default function ApprovalQueuePage() {
                   {t.revokeAction}
                 </Button>
               )}
+              {detail.candidate_status === "REJECTED" && (
+                <Button
+                  onClick={() => {
+                    setReopenError(null);
+                    setReopenOpen(true);
+                  }}
+                >
+                  {locale === "en" ? "Reopen" : "Mở lại"}
+                </Button>
+              )}
             </div>
           </div>
           </div>
         ) : <Empty description={t.noDetailData} className="py-10" />}
+      </Modal>
+
+      <Modal
+        open={reopenOpen && detail !== null}
+        title={locale === "en" ? "Reopen rejected candidate" : "Mở lại ứng viên đã từ chối"}
+        zIndex={1050}
+        okText={locale === "en" ? "Reopen (Pending)" : "Mở lại (Chờ duyệt)"}
+        okButtonProps={{ disabled: reopenReason.trim().length === 0 }}
+        cancelText={t.cancel}
+        confirmLoading={reopenSubmitting}
+        closable={!reopenSubmitting}
+        maskClosable={!reopenSubmitting}
+        onOk={() => void submitReopen()}
+        onCancel={closeReopen}
+      >
+        {detail && (
+          <div className="space-y-4">
+            <Alert
+              showIcon
+              type="info"
+              message={
+                locale === "en"
+                  ? "The candidate goes back to PENDING for a fresh review. Nothing is accepted automatically."
+                  : "Ứng viên sẽ quay về trạng thái Chờ duyệt. Không có gì được tự động chấp nhận."
+              }
+            />
+            <Descriptions size="small" column={1} colon={false}>
+              <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
+              <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name} ({detail.scopus_author.scopus_id})</Descriptions.Item>
+            </Descriptions>
+            <div>
+              <label htmlFor="review-reopen-reason" className="mb-1.5 block font-semibold text-slate-700">
+                {locale === "en" ? "Reason" : "Lý do"} <span className="text-rose-600">*</span>
+              </label>
+              <Input.TextArea
+                id="review-reopen-reason"
+                value={reopenReason}
+                onChange={(e) => setReopenReason(e.target.value)}
+                rows={3}
+                placeholder={locale === "en" ? "e.g. rejected by mistake" : "VD: từ chối nhầm"}
+              />
+            </div>
+            {reopenError && <Alert type="error" showIcon message={reopenError} />}
+          </div>
+        )}
       </Modal>
 
       <Modal

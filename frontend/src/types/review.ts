@@ -223,6 +223,34 @@ export interface ReviewRevocationResponse {
   identity_status: "REVOKED";
 }
 
+export interface ReopenRejectedRequest {
+  candidate_version: number;
+  reason: string;
+}
+
+export interface ReopenRejectedResponse {
+  review_id: string;
+  candidate_id: string;
+  candidate_status: "PENDING";
+  candidate_version: number;
+}
+
+export interface LecturerWithoutCandidateItem {
+  id: string;
+  full_name: string;
+  staff_code: string | null;
+  email: string | null;
+  orcid: string | null;
+  department: string | null;
+}
+
+export interface LecturersWithoutCandidatesResponse {
+  items: LecturerWithoutCandidateItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 export interface ReviewGroupItem {
   candidate_id: string;
   observation_id: string;

@@ -73,6 +73,21 @@ class RevokeIdentityCommand:
     reason: str
 
 
+@dataclass(frozen=True, slots=True)
+class ReopenRejectedCommand:
+    """Compensation of an earlier REJECT: back to PENDING. Reason is mandatory.
+
+    No identity is ever involved here — REJECTED never had one — so, unlike
+    REVOKE, this needs no ADMIN-only restriction; ADMIN or REVIEWER may both
+    correct their own or each other's mistaken REJECT.
+    """
+
+    candidate_id: uuid.UUID
+    candidate_version: int
+    reviewer_user_id: uuid.UUID
+    reason: str
+
+
 # ---------------------------------------------------------------------------
 # Typed result objects
 # ---------------------------------------------------------------------------
@@ -114,6 +129,13 @@ class RevokeResult(ReviewResult):
 
     resulting_identity_id: uuid.UUID
     identity_status: str = "REVOKED"
+
+
+@dataclass(frozen=True, slots=True)
+class ReopenResult(ReviewResult):
+    """Result of reopening a REJECTED candidate: no identity involved."""
+
+    resulting_identity_id: None = field(default=None, compare=False)
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +244,12 @@ class CandidateNotAcceptedError(CandidateReviewError):
     code = "CANDIDATE_NOT_ACCEPTED"
 
 
+class CandidateNotRejectedError(CandidateReviewError):
+    """Only a REJECTED candidate (with a REJECT review to compensate) can be reopened."""
+
+    code = "CANDIDATE_NOT_REJECTED"
+
+
 class RevocationReasonRequiredError(InvalidReviewReasonError):
     """A revocation always needs a real, non-blank reason."""
 
@@ -256,6 +284,10 @@ class EvidencePromotionUnsupportedError(CandidateReviewError):
 CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE: dict[str, str] = {
     "NAME": "NAME_SIMILARITY",
     "PUBLICATION": "DOI_EXACT",  # overridden per evidence payload below
+    # An authoritative external source (e.g. the institution's own published
+    # Scopus-identity roster) already declares the pairing; it did not come
+    # from this system's own matching rules.
+    "SOURCE_CLAIM": "APPROVED_ID",
 }
 
 
@@ -276,6 +308,7 @@ AUDIT_ACTION_CANDIDATE_REJECTED = "CANDIDATE_REJECTED"
 AUDIT_ACTION_IDENTITY_CREATED = "IDENTITY_CREATED_FROM_CANDIDATE"
 AUDIT_ACTION_IDENTITY_REVOKED = "IDENTITY_REVOKED"
 AUDIT_ACTION_CANDIDATE_REOPENED = "CANDIDATE_REOPENED_BY_REVOCATION"
+AUDIT_ACTION_CANDIDATE_REOPENED_FROM_REJECT = "CANDIDATE_REOPENED_FROM_REJECT"
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +363,10 @@ class CandidateReviewService:
     def revoke_identity(self, cmd: RevokeIdentityCommand) -> RevokeResult:
         """ADMIN revokes an approved identity by appending a compensating review (G10)."""
         return self._revoke(cmd)
+
+    def reopen_rejected_candidate(self, cmd: ReopenRejectedCommand) -> ReopenResult:
+        """Compensate a mistaken REJECT: candidate goes back to PENDING for a fresh review."""
+        return self._reopen_rejected(cmd)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -537,6 +574,9 @@ class CandidateReviewService:
                     reconciliation or "TITLE_EXACT"
                 )
                 pub_count += 1
+            elif ev.evidence_kind == "SOURCE_CLAIM":
+                identity_evidence_type = "APPROVED_ID"
+                name_count += 1
             else:
                 raise EvidencePromotionUnsupportedError(
                     f"Candidate evidence kind {ev.evidence_kind!r} "
@@ -972,6 +1012,99 @@ class CandidateReviewService:
             candidate_version=candidate.version,
             idempotent=False,
             resulting_identity_id=identity.id,
+        )
+
+    # ------------------------------------------------------------------
+    # REOPEN-FROM-REJECT implementation: compensation, no identity involved
+    # ------------------------------------------------------------------
+
+    def _reopen_rejected(self, cmd: ReopenRejectedCommand) -> ReopenResult:
+        now = datetime.now(UTC)
+        reviewer = self._authorize_reviewer(cmd.reviewer_user_id)
+
+        reason = normalize_reason(cmd.reason)
+        if reason is None:
+            raise InvalidReviewReasonError(
+                "A non-blank reason is required to reopen a rejected candidate"
+            )
+
+        candidate = self._load_and_lock_candidate(cmd.candidate_id)
+        if candidate.status != "REJECTED":
+            raise CandidateNotRejectedError(
+                f"Candidate {cmd.candidate_id} has status {candidate.status!r}; "
+                f"only a REJECTED candidate can be reopened"
+            )
+        if candidate.version != cmd.candidate_version:
+            raise StaleCandidateVersionError(
+                f"Submitted version {cmd.candidate_version} does not match "
+                f"current version {candidate.version}"
+            )
+
+        rejected = self._session.scalar(
+            select(LecturerScopusCandidateReview)
+            .where(
+                LecturerScopusCandidateReview.candidate_id == candidate.id,
+                LecturerScopusCandidateReview.action == "REJECT",
+            )
+            .order_by(LecturerScopusCandidateReview.created_at.desc())
+            .limit(1)
+        )
+        if rejected is None:
+            raise CandidateNotRejectedError(
+                f"Candidate {cmd.candidate_id} has no REJECT review to compensate"
+            )
+
+        candidate_before = {
+            "id": str(candidate.id), "status": candidate.status, "version": candidate.version}
+        review = LecturerScopusCandidateReview(
+            id=uuid.uuid4(),
+            candidate_id=candidate.id,
+            observation_id=rejected.observation_id,
+            reviewer_user_id=reviewer.id,
+            action="REOPEN",
+            from_status="REJECTED",
+            to_status="PENDING",
+            candidate_version=candidate.version,
+            reason=reason,
+            evidence_snapshot={
+                "compensation": "REOPEN_REJECTED",
+                "compensates_review_id": str(rejected.id),
+            },
+            resulting_identity_id=None,
+            created_at=now,
+        )
+        self._session.add(review)
+        candidate.status = "PENDING"
+        candidate.version = candidate.version + 1
+        candidate.updated_at = now
+        self._session.flush()
+
+        meta = {
+            "candidate_id": str(candidate.id),
+            "review_id": str(review.id),
+            "compensates_review_id": str(rejected.id),
+        }
+        self._record_audit_events(
+            reviewer_user_id=reviewer.id,
+            action=AUDIT_ACTION_CANDIDATE_REOPENED_FROM_REJECT,
+            entity_type="lecturer_scopus_candidate",
+            entity_id=candidate.id,
+            event_metadata=meta,
+            before_state=candidate_before,
+            after_state={
+                "id": str(candidate.id), "status": candidate.status,
+                "version": candidate.version},
+            reason=reason,
+        )
+        self._finish()
+        return ReopenResult(
+            review_id=review.id,
+            candidate_id=candidate.id,
+            observation_id=review.observation_id,
+            action="REOPEN",
+            candidate_status="PENDING",
+            candidate_version=candidate.version,
+            idempotent=False,
         )
 
     # ------------------------------------------------------------------

@@ -127,6 +127,12 @@ def create_manual_candidate(
     source_state = build_source_state(session)
     run_id = uuid.uuid4()
     spec = GenerationRunSpec(run_id=run_id, source_state=source_state, started_at=datetime.now(UTC))
+    # The reads above (session.get/scalar, build_source_state) auto-begin a
+    # transaction on first use; persist_generation opens its own transaction
+    # via `with self._session.begin():` and raises InvalidRequestError if one
+    # is already open. End the read phase first, exactly as the bulk
+    # generator (generation_workflow.run_generation) already does.
+    session.commit()
     try:
         result = CandidatePersistenceService(session).persist_generation(spec, (candidate,))
     except (GenerationRunConflict, GenerationRunStateError) as exc:

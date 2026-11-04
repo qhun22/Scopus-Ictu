@@ -12,6 +12,9 @@ import {
   ReviewDecisionResponse,
   ReviewRevocationRequest,
   ReviewRevocationResponse,
+  ReopenRejectedRequest,
+  ReopenRejectedResponse,
+  LecturersWithoutCandidatesResponse,
   ReviewHistoryQueryParams,
   ReviewHistoryResponse,
   ReviewQueueResponse,
@@ -102,6 +105,31 @@ export function revokeReviewCandidate(
 
 export function getReviewContext(options: ApiRequestOptions = {}): Promise<ReviewContext> {
   return apiGet<ReviewContext>("/api/v1/reviews/context", options);
+}
+
+export function reopenRejectedCandidate(
+  candidateId: string,
+  request: ReopenRejectedRequest,
+): Promise<ReopenRejectedResponse> {
+  return apiPost<ReopenRejectedResponse, ReopenRejectedRequest>(
+    `/api/v1/reviews/candidates/${encodeURIComponent(candidateId)}/reopen`,
+    request,
+  );
+}
+
+export function getLecturersWithoutCandidates(
+  params: { search?: string; page?: number; page_size?: number } = {},
+  options: ApiRequestOptions = {},
+): Promise<LecturersWithoutCandidatesResponse> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.page) query.set("page", String(params.page));
+  if (params.page_size) query.set("page_size", String(params.page_size));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiGet<LecturersWithoutCandidatesResponse>(
+    `/api/v1/reviews/lecturers-without-candidates${suffix}`,
+    options,
+  );
 }
 
 /** Accept every proposed Scopus ID of one lecturer in one transaction (all or none). */

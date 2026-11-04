@@ -49,6 +49,10 @@ from app.schemas.review_api import (
     ReviewObservationResponse,
     ReviewRevocationRequest,
     ReviewRevocationResponse,
+    ReopenRejectedRequest,
+    ReopenRejectedResponse,
+    LecturerWithoutCandidateItem,
+    LecturersWithoutCandidatesResponse,
     ReviewOtherCandidateSummary,
     ReviewQueueItem,
     ReviewQueueResponse,
@@ -62,9 +66,11 @@ from app.services.candidate_review_service import (
     AcceptCandidateCommand,
     CandidateAlreadyDecidedError,
     CandidateNotAcceptedError,
+    CandidateNotRejectedError,
     IdentityRevokedError,
     RevocationReasonRequiredError,
     RevokeIdentityCommand,
+    ReopenRejectedCommand,
     CandidateNotFoundError,
     CandidateReviewError,
     CandidateReviewService,
@@ -259,6 +265,7 @@ def _domain_error_response(exc: CandidateReviewError) -> APIError:
         ReviewReasonRequiredForWeakEvidenceError: 422,
         EvidencePromotionUnsupportedError: 409,
         CandidateNotAcceptedError: 409,
+        CandidateNotRejectedError: 409,
         IdentityRevokedError: 409,
         RevocationReasonRequiredError: 422,
         GroupSizeError: 422,
@@ -351,6 +358,78 @@ def review_context(_reviewer: ReviewerUser, db: DatabaseSession) -> ReviewContex
         scopus_authors_total=authors,
         completed_generation_runs=runs,
         candidates_by_status=by_status,
+    )
+
+
+@router.get(
+    "/lecturers-without-candidates",
+    response_model=LecturersWithoutCandidatesResponse,
+    summary="Active lecturers with zero candidate roots in any status",
+)
+def list_lecturers_without_candidates(
+    _reviewer: ReviewerUser,
+    db: DatabaseSession,
+    search: str | None = Query(default=None, max_length=255),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+) -> LecturersWithoutCandidatesResponse:
+    """Name-rule coverage gap finder.
+
+    The automatic name rules in candidate_generator.py never propose a pair
+    for every real lecturer — word-order ambiguity is one known cause (a
+    given/middle name that folds to the same string as the surname makes
+    Vietnamese and Scopus/ORCID orderings disagree). A lecturer like that has
+    no candidate root at all, in no status, so nothing in the ordinary queue
+    (which lists candidates, not lecturers) ever surfaces them. This endpoint
+    is the one place that does, so ADMIN can use "Thêm cặp thủ công" on them.
+    """
+
+    try:
+        has_candidate = select(LecturerScopusCandidate.lecturer_id).distinct().subquery()
+        stmt = (
+            select(Lecturer)
+            .where(Lecturer.is_active.is_(True))
+            .where(Lecturer.id.not_in(select(has_candidate.c.lecturer_id)))
+        )
+        if search:
+            token = search.strip()
+            if token:
+                stmt = stmt.where(
+                    or_(
+                        contains_folded(Lecturer.full_name, token),
+                        contains_folded(func.coalesce(Lecturer.email, ""), token),
+                        contains_folded(func.coalesce(Lecturer.staff_code, ""), token),
+                    )
+                )
+        total = int(
+            db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+        )
+        rows = db.scalars(
+            stmt.order_by(Lecturer.full_name.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        ).all()
+    except SQLAlchemyError as exc:
+        raise APIError(
+            status_code=503,
+            detail="Không thể truy vấn danh sách giảng viên chưa có ứng viên.",
+            code="DATABASE_UNAVAILABLE",
+        ) from exc
+    return LecturersWithoutCandidatesResponse(
+        items=[
+            LecturerWithoutCandidateItem(
+                id=row.id,
+                full_name=row.full_name,
+                staff_code=row.staff_code,
+                email=row.email,
+                orcid=row.orcid,
+                department=row.department,
+            )
+            for row in rows
+        ],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
 
 
@@ -802,6 +881,46 @@ def revoke_review_candidate(
         candidate_version=result.candidate_version,
         revoked_identity_id=result.resulting_identity_id,
         identity_status="REVOKED",
+    )
+
+
+@router.post(
+    "/candidates/{candidate_id}/reopen",
+    response_model=ReopenRejectedResponse,
+    summary="Reopen a mistakenly REJECTED candidate back to PENDING (append-only compensation)",
+)
+def reopen_rejected_candidate_endpoint(
+    candidate_id: uuid.UUID,
+    request: ReopenRejectedRequest,
+    reviewer: ReviewerUser,
+    db: DatabaseSession,
+) -> ReopenRejectedResponse:
+    """No identity is ever involved here, so ADMIN or REVIEWER may both do this."""
+
+    try:
+        result = CandidateReviewService(db).reopen_rejected_candidate(
+            ReopenRejectedCommand(
+                candidate_id=candidate_id,
+                candidate_version=request.candidate_version,
+                reviewer_user_id=reviewer.id,
+                reason=request.reason,
+            )
+        )
+    except CandidateReviewError as exc:
+        db.rollback()
+        raise _domain_error_response(exc) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise APIError(
+            status_code=409,
+            detail="Reopening conflicted with current persisted state.",
+            code="REVIEW_PERSISTENCE_CONFLICT",
+        ) from exc
+    return ReopenRejectedResponse(
+        review_id=result.review_id,
+        candidate_id=result.candidate_id,
+        candidate_status="PENDING",
+        candidate_version=result.candidate_version,
     )
 
 

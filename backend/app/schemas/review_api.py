@@ -89,6 +89,43 @@ class ReviewRevocationResponse(BaseModel):
     identity_status: Literal["REVOKED"]
 
 
+class ReopenRejectedRequest(BaseModel):
+    """Compensation of an earlier REJECT. The reason is mandatory."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    candidate_version: int = Field(..., ge=1)
+    reason: str = Field(..., min_length=1, max_length=4000)
+
+
+class ReopenRejectedResponse(BaseModel):
+    review_id: uuid.UUID
+    candidate_id: uuid.UUID
+    candidate_status: Literal["PENDING"]
+    candidate_version: int
+
+
+class LecturerWithoutCandidateItem(BaseModel):
+    """An active lecturer with zero candidate roots in ANY status — PENDING,
+    ACCEPTED, REJECTED or SUPERSEDED. The automatic name rules never proposed
+    them at all, so unlike the review queue they never surface anywhere else;
+    this is the only place to find them before someone notices by accident."""
+
+    id: uuid.UUID
+    full_name: str
+    staff_code: str | None
+    email: str | None
+    orcid: str | None
+    department: str | None
+
+
+class LecturersWithoutCandidatesResponse(BaseModel):
+    items: list[LecturerWithoutCandidateItem]
+    total: int
+    page: int
+    page_size: int
+
+
 class ReviewLecturerSummary(BaseModel):
     id: uuid.UUID
     full_name: str
