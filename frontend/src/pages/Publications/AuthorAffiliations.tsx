@@ -280,9 +280,12 @@ export function AuthorAffiliationCell({
             ))}
           </ul>
         ) : (
-          <span className="font-medium text-emerald-700" data-testid="aff-has-unit">
-            {hasUnit}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <AffiliationBadge status={status} locale={locale} />
+            <span className="font-medium text-slate-500" data-testid="aff-has-unit">
+              {hasUnit}
+            </span>
+          </div>
         )
       )}
       {resolutionLine}
