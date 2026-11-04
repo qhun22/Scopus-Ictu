@@ -1289,13 +1289,26 @@ export default function LecturersPage() {
               aria-labelledby="lecturer-detail-title"
               className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
             >
-              <div className="shrink-0 bg-blue-50 border-b border-blue-100 px-4 py-4 sm:px-6">
-                <h3 id="lecturer-detail-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
-                  {locale === "vi" ? "Chi tiết Hồ sơ Giảng viên" : "Lecturer Profile Details"}
-                </h3>
-                <p className="mt-0.5 break-all text-[11px] font-mono text-slate-400">
-                  ID: {selectedLecturer.id}
-                </p>
+              <div className="flex shrink-0 items-start justify-between gap-4 bg-blue-50 border-b border-blue-100 px-4 py-4 sm:px-6">
+                <div className="min-w-0">
+                  <h3 id="lecturer-detail-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
+                    {locale === "vi" ? "Chi tiết Hồ sơ Giảng viên" : "Lecturer Profile Details"}
+                  </h3>
+                  <p className="mt-0.5 break-all text-[11px] font-mono text-slate-400">
+                    ID: {selectedLecturer.id}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={isDetailBusy}
+                  onClick={() => setIsDetailModalOpen(false)}
+                  className="shrink-0 rounded-[5px] p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer disabled:opacity-50"
+                  aria-label={t.common.cancel}
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
 
               <form onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col text-xs">
