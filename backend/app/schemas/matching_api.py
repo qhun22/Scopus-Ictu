@@ -39,3 +39,18 @@ class CrawApplyResponse(BaseModel):
     run_id: str
     fingerprint: str
     result: dict[str, Any]
+
+
+class ManualCandidateRequest(BaseModel):
+    lecturer_id: uuid.UUID
+    scopus_id: str
+    note: str
+
+
+class ManualCandidateResponse(BaseModel):
+    candidate_id: uuid.UUID
+    run_id: uuid.UUID
+    lecturer_full_name: str
+    scopus_id: str
+    scopus_preferred_name: str
+    idempotent_replay: bool

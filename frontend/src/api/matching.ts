@@ -19,6 +19,22 @@ export function generateCandidates(options: ApiRequestOptions = {}): Promise<Gen
   return apiPost<GenerationRunResult, Record<string, never>>("/api/v1/matching/candidates/generate", {}, options);
 }
 
+export interface ManualCandidateResult {
+  candidate_id: string;
+  run_id: string;
+  lecturer_full_name: string;
+  scopus_id: string;
+  scopus_preferred_name: string;
+  idempotent_replay: boolean;
+}
+
+export function createManualCandidate(
+  body: { lecturer_id: string; scopus_id: string; note: string },
+  options: ApiRequestOptions = {},
+): Promise<ManualCandidateResult> {
+  return apiPost<ManualCandidateResult, typeof body>("/api/v1/matching/candidates/manual", body, options);
+}
+
 export interface CrawIngestionPreview {
   fingerprint: string;
   can_apply: boolean;

@@ -45,6 +45,10 @@ const RULES: Record<string, Record<Locale, string>> = {
     vi: "Công bố Craw trùng ở đúng vị trí tác giả",
     en: "Crawled publication matching at the author position",
   },
+  RULE_MANUAL_ADMIN: {
+    vi: "ADMIN đề xuất thủ công (rule tên tự động không khớp được)",
+    en: "Manually proposed by ADMIN (automatic name rules could not match)",
+  },
 };
 
 const RECONCILIATION: Record<string, Record<Locale, string>> = {

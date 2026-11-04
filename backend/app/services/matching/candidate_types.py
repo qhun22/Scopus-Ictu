@@ -18,6 +18,14 @@ RuleId = Literal[
     "RULE_N2",
     "RULE_N2_FORMAT",
     "RULE_N2_HYPHEN",
+    # Not emitted by CandidateGenerator.generate_all(): an ADMIN proposed this
+    # pair by hand (see manual_candidate.py) because the name rules above
+    # missed it — e.g. a given/middle name that folds to the same string as
+    # the surname, so Vietnamese word order and Scopus "Last, First" order
+    # stop agreeing. Still NAME-kind evidence, so it flows through the
+    # ordinary PENDING -> review pipeline unchanged, and D-2's
+    # NAME_EVIDENCE_ONLY trigger still forces a reason on ACCEPT.
+    "RULE_MANUAL_ADMIN",
 ]
 
 PublicationEvidenceRuleId = Literal[

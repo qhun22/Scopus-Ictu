@@ -9,6 +9,7 @@ import {
   Empty,
   Input,
   Modal,
+  Select,
   Space,
   Spin,
   Typography,
@@ -35,7 +36,8 @@ import {
   getReviewContext,
   revokeReviewCandidate,
 } from "../../api/reviews";
-import { generateCandidates } from "../../api/matching";
+import { createManualCandidate, generateCandidates } from "../../api/matching";
+import { getLecturers } from "../../api/lecturers";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { useToast } from "../../contexts/ToastContext";
@@ -286,6 +288,18 @@ export default function ApprovalQueuePage() {
   const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
 
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualLecturerQuery, setManualLecturerQuery] = useState("");
+  const [manualLecturerOptions, setManualLecturerOptions] = useState<
+    { value: string; label: string }[]
+  >([]);
+  const [manualLecturerSearching, setManualLecturerSearching] = useState(false);
+  const [manualLecturerId, setManualLecturerId] = useState<string | null>(null);
+  const [manualScopusId, setManualScopusId] = useState("");
+  const [manualNote, setManualNote] = useState("");
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualError, setManualError] = useState<string | null>(null);
+
   const loadQueue = useCallback(async () => {
     setQueueLoading(true);
     setQueueError(null);
@@ -370,6 +384,87 @@ export default function ApprovalQueuePage() {
       setGenerating(false);
     }
   }, [loadQueue, t, toast]);
+
+  useEffect(() => {
+    if (!manualOpen) return;
+    const q = manualLecturerQuery.trim();
+    if (q.length < 2) {
+      setManualLecturerOptions([]);
+      return;
+    }
+    let cancelled = false;
+    setManualLecturerSearching(true);
+    const timer = setTimeout(() => {
+      getLecturers({ search: q, page_size: 20 })
+        .then((res) => {
+          if (cancelled) return;
+          setManualLecturerOptions(
+            res.items.map((it) => ({
+              value: it.id,
+              label: `${it.full_name}${it.staff_code ? ` (${it.staff_code})` : ""}`,
+            })),
+          );
+        })
+        .catch(() => {
+          if (!cancelled) setManualLecturerOptions([]);
+        })
+        .finally(() => {
+          if (!cancelled) setManualLecturerSearching(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [manualLecturerQuery, manualOpen]);
+
+  const closeManual = () => {
+    if (manualSubmitting) return;
+    setManualOpen(false);
+    setManualLecturerQuery("");
+    setManualLecturerOptions([]);
+    setManualLecturerId(null);
+    setManualScopusId("");
+    setManualNote("");
+    setManualError(null);
+  };
+
+  const submitManualCandidate = async () => {
+    if (manualSubmitting) return;
+    if (!manualLecturerId) {
+      setManualError(locale === "en" ? "Pick a lecturer first." : "Cần chọn giảng viên.");
+      return;
+    }
+    const scopusId = manualScopusId.trim();
+    if (!scopusId) {
+      setManualError(locale === "en" ? "Enter a Scopus ID." : "Cần nhập Scopus ID.");
+      return;
+    }
+    const note = manualNote.trim();
+    if (!note) {
+      setManualError(
+        locale === "en" ? "Enter a reason/evidence note." : "Cần ghi lý do/căn cứ.",
+      );
+      return;
+    }
+    setManualSubmitting(true);
+    setManualError(null);
+    try {
+      await createManualCandidate({ lecturer_id: manualLecturerId, scopus_id: scopusId, note });
+      toast.success(
+        locale === "en" ? "Candidate added" : "Đã thêm ứng viên",
+        locale === "en"
+          ? "A PENDING candidate was created. Review it like any other."
+          : "Đã tạo 1 ứng viên Chờ duyệt. Duyệt như bình thường.",
+      );
+      closeManual();
+      await loadQueue();
+    } catch (error) {
+      setManualError(getApiErrorMessage(error, locale === "en" ? "Could not add candidate." : "Không thêm được ứng viên."));
+    } finally {
+      setManualSubmitting(false);
+    }
+  };
 
   const openDetail = (candidateId: string) => {
     setConflictMessage(null);
@@ -534,6 +629,20 @@ export default function ApprovalQueuePage() {
           </div>
           {user?.role === "ADMIN" && (
             <UiButton
+              variant="secondary"
+              size="md"
+              onClick={() => setManualOpen(true)}
+              icon={
+                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              }
+            >
+              <span className="truncate">{locale === "en" ? "Add pair manually" : "Thêm cặp thủ công"}</span>
+            </UiButton>
+          )}
+          {user?.role === "ADMIN" && (
+            <UiButton
               variant="primary"
               size="md"
               loading={generating}
@@ -549,6 +658,70 @@ export default function ApprovalQueuePage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={manualOpen}
+        title={locale === "en" ? "Add matching pair manually" : "Thêm cặp đối sánh thủ công"}
+        okText={locale === "en" ? "Add (Pending)" : "Thêm (Chờ duyệt)"}
+        cancelText={t.cancel}
+        onOk={() => void submitManualCandidate()}
+        onCancel={closeManual}
+        confirmLoading={manualSubmitting}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500">
+            {locale === "en"
+              ? "Use this only when the automatic name-matching rules missed a pair that genuinely belongs together (e.g. word-order ambiguity). It only creates a PENDING candidate — it still goes through normal review."
+              : "Chỉ dùng khi rule đối sánh tên tự động bỏ sót một cặp thực sự đúng (vd. lệch thứ tự từ trong tên). Chỉ tạo ứng viên Chờ duyệt — vẫn phải qua duyệt bình thường."}
+          </p>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">
+              {locale === "en" ? "Lecturer" : "Giảng viên ICTU"}
+            </label>
+            <Select
+              showSearch
+              allowClear
+              value={manualLecturerId}
+              placeholder={locale === "en" ? "Search by name…" : "Tìm theo tên…"}
+              filterOption={false}
+              loading={manualLecturerSearching}
+              options={manualLecturerOptions}
+              onSearch={setManualLecturerQuery}
+              onChange={(value) => setManualLecturerId(value ?? null)}
+              className="w-full"
+              notFoundContent={
+                manualLecturerQuery.trim().length < 2
+                  ? (locale === "en" ? "Type at least 2 characters" : "Gõ ít nhất 2 ký tự")
+                  : (locale === "en" ? "No lecturer found" : "Không tìm thấy giảng viên")
+              }
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">Scopus ID</label>
+            <Input
+              value={manualScopusId}
+              onChange={(e) => setManualScopusId(e.target.value)}
+              placeholder={locale === "en" ? "e.g. 60024922300" : "VD: 60024922300"}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-600">
+              {locale === "en" ? "Reason / evidence" : "Lý do / căn cứ"}
+            </label>
+            <Input.TextArea
+              value={manualNote}
+              onChange={(e) => setManualNote(e.target.value)}
+              rows={3}
+              placeholder={
+                locale === "en"
+                  ? "e.g. ORCID 0009-... lists this employment at ICTU and this exact paper"
+                  : "VD: ORCID 0009-... ghi công tác tại ICTU và chính bài báo này"
+              }
+            />
+          </div>
+          {manualError && <Alert type="error" showIcon message={manualError} />}
+        </div>
+      </Modal>
 
       <Modal
         open={generateConfirmOpen}

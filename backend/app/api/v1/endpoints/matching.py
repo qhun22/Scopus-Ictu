@@ -26,9 +26,12 @@ from app.schemas.matching_api import (
     CrawApplyResponse,
     CrawPreviewResponse,
     GenerationRunResponse,
+    ManualCandidateRequest,
+    ManualCandidateResponse,
 )
 from app.services.lecturer_dataset import craw_ingestion_workflow
 from app.services.matching import generation_workflow
+from app.services.matching.manual_candidate import ManualCandidateError, create_manual_candidate
 
 router = APIRouter()
 DatabaseSession = Annotated[Session, Depends(get_session)]
@@ -70,6 +73,38 @@ def generate_candidates(_admin: AdminUser, db: DatabaseSession) -> GenerationRun
         craw_assisted_candidates=result.craw_assisted_candidates,
         craw_unattributed=result.craw_unattributed,
         publication_conflicts=result.publication_conflicts,
+    )
+
+
+@router.post(
+    "/candidates/manual",
+    response_model=ManualCandidateResponse,
+    summary="ADMIN-propose one lecturer/Scopus-author pair the name rules missed",
+)
+def create_manual_candidate_endpoint(
+    body: ManualCandidateRequest, admin: AdminUser, db: DatabaseSession
+) -> ManualCandidateResponse:
+    try:
+        result = create_manual_candidate(
+            db,
+            lecturer_id=body.lecturer_id,
+            scopus_id=body.scopus_id,
+            note=body.note,
+            reviewer_email=admin.email,
+        )
+    except ManualCandidateError as exc:
+        db.rollback()
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error(exc) from exc
+    return ManualCandidateResponse(
+        candidate_id=result.candidate_id,
+        run_id=result.run_id,
+        lecturer_full_name=result.lecturer_full_name,
+        scopus_id=result.scopus_id,
+        scopus_preferred_name=result.scopus_preferred_name,
+        idempotent_replay=result.idempotent_replay,
     )
 
 
