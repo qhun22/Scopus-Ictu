@@ -945,20 +945,20 @@ export default function NormalizationPage() {
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
-                      <div className="rounded-[5px] border border-slate-300/80 bg-slate-50 p-2.5 shadow-2xs">
-                        <span className="text-[10px] font-medium text-slate-600 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
+                      <div className="rounded-[5px] border border-slate-200 bg-slate-50/60 p-2.5">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
                         <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.total_records)}</p>
                       </div>
-                      <div className="rounded-[5px] border border-blue-200/80 bg-white p-2.5 shadow-2xs">
-                        <span className="text-[10px] font-medium text-blue-600 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                      <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
                         <p className="mt-0.5 text-base font-black text-blue-600">{numberFormatter.format(detailModalItem.processed_records ?? detailModalItem.imported_records)}</p>
                       </div>
-                      <div className="rounded-[5px] border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
-                        <span className="text-[10px] font-medium text-emerald-600 uppercase">{locale === "vi" ? "Hợp lệ" : "Valid"}</span>
+                      <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Hợp lệ" : "Valid"}</span>
                         <p className="mt-0.5 text-base font-black text-emerald-600">{numberFormatter.format(detailModalItem.imported_records)}</p>
                       </div>
-                      <div className="rounded-[5px] border border-rose-200/80 bg-white p-2.5 shadow-2xs">
-                        <span className="text-[10px] font-medium text-rose-600 uppercase">{locale === "vi" ? "Lỗi" : "Failed"}</span>
+                      <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Lỗi" : "Failed"}</span>
                         <p className="mt-0.5 text-base font-black text-rose-600">{numberFormatter.format(detailModalItem.failed_records)}</p>
                       </div>
                     </div>
@@ -1019,29 +1019,29 @@ export default function NormalizationPage() {
                     {detailModalItem.normalization ? (
                       <>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center mb-3">
-                          <div className="rounded-[5px] border border-blue-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-blue-600 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
                             <p className="mt-0.5 text-base font-black text-blue-600">{numberFormatter.format(detailModalItem.normalization.canonical_processed ?? (detailModalItem.normalization.canonical_new + detailModalItem.normalization.canonical_existing + detailModalItem.normalization.canonical_metadata_changed))}</p>
                           </div>
-                          <div className="rounded-[5px] border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-emerald-700 uppercase">{t.normalization.table.newPublications}</span>
-                            <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detailModalItem.normalization.canonical_new)}</p>
+                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.newPublications}</span>
+                            <p className="mt-0.5 text-base font-black text-emerald-600">{numberFormatter.format(detailModalItem.normalization.canonical_new)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-slate-600 uppercase">{t.normalization.table.existing}</span>
+                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.existing}</span>
                             <p className="mt-0.5 text-base font-black text-slate-700">{numberFormatter.format(detailModalItem.normalization.canonical_existing)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-amber-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-amber-700 uppercase">{t.normalization.table.metadataChanged}</span>
-                            <p className="mt-0.5 text-base font-black text-amber-700">{numberFormatter.format(detailModalItem.normalization.canonical_metadata_changed)}</p>
+                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.metadataChanged}</span>
+                            <p className="mt-0.5 text-base font-black text-amber-600">{numberFormatter.format(detailModalItem.normalization.canonical_metadata_changed)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-violet-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-violet-600 uppercase">{locale === "vi" ? "Trùng nội tệp" : "Intra-dup"}</span>
+                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Trùng nội tệp" : "Intra-dup"}</span>
                             <p className="mt-0.5 text-base font-black text-violet-600">{numberFormatter.format(detailModalItem.normalization.canonical_intra_duplicate)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-rose-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-rose-700 uppercase">{t.normalization.table.errors}</span>
-                            <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detailModalItem.normalization.canonical_failed)}</p>
+                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.errors}</span>
+                            <p className="mt-0.5 text-base font-black text-rose-600">{numberFormatter.format(detailModalItem.normalization.canonical_failed)}</p>
                           </div>
                         </div>
 
