@@ -1287,7 +1287,7 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="lecturer-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
+              className="flex h-full w-full flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in"
             >
               <div className="flex shrink-0 items-start justify-between gap-4 bg-blue-50 border-b border-blue-100 px-4 py-4 sm:px-6">
                 <div className="min-w-0">
