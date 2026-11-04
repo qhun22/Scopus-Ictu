@@ -110,7 +110,7 @@ const statusOf = (key: string, locale: Locale) => STATUS_LABEL[key.split("/")[1]
 function Card({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
   return (
     <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5" data-testid={testId}>
-      <h2 className="mb-3 text-sm font-bold text-slate-800">{title}</h2>
+      <h2 className="mb-3 text-base font-bold text-slate-800">{title}</h2>
       {children}
     </section>
   );
@@ -305,14 +305,14 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
   return (
     <div className="space-y-4" data-testid="affiliations-tab">
 
-      {loadError && <p className="text-xs font-medium text-rose-600" role="alert">{loadError}</p>}
+      {loadError && <p className="text-sm font-medium text-rose-600" role="alert">{loadError}</p>}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title={vi ? "1. Nguồn dữ liệu đơn vị" : "1. Affiliation source"} testId="aff-source-card">
           {!source ? (
-            <p className="text-xs text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
+            <p className="text-sm text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
           ) : !source.configured ? (
-            <div className="space-y-1 text-xs" data-testid="aff-source-missing">
+            <div className="space-y-1 text-sm" data-testid="aff-source-missing">
               <p className="font-medium text-slate-700">
                 {vi
                   ? "Chưa có dữ liệu đơn vị nào được nạp. Hãy chạy thu thập trực tuyến ở mục 3."
@@ -337,7 +337,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               </div>
             </div>
           ) : (
-            <div className="space-y-2 text-xs text-slate-700">
+            <div className="space-y-2 text-sm text-slate-700">
               <p>
                 <span className="font-semibold">{vi ? "Thư mục: " : "Directory: "}</span>
                 <code className="rounded bg-slate-100 px-1">{source.directory_label}</code>{" "}
@@ -387,9 +387,9 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
 
         <Card title={vi ? "2. Hiện trạng trong hệ thống" : "2. Current state"} testId="aff-state-card">
           {!db ? (
-            <p className="text-xs text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
+            <p className="text-sm text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
           ) : (
-            <div className="space-y-3 text-xs text-slate-700">
+            <div className="space-y-3 text-sm text-slate-700">
               <p className="text-slate-500">
                 {vi
                   ? "Số liệu tổng quan về công bố và đơn vị công tác đang có trong hệ thống."
@@ -438,7 +438,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
 
       <div className="grid gap-4 lg:grid-cols-2">
       <Card title={vi ? "3. Thu thập đơn vị trực tuyến" : "3. Online affiliation collection (optional)"} testId="aff-online-card">
-        <p className="mb-3 text-xs leading-relaxed text-slate-600">
+        <p className="mb-3 text-sm leading-relaxed text-slate-600">
           {vi
             ? "Tại đây có thể chủ động tra cứu OpenAlex, Crossref và ORCID công khai cho DOI của các công bố hiện có, thay vì cần chuẩn bị bộ nguồn offline thủ công. Chạy nền; có thể tạm dừng và tiếp tục bất cứ lúc nào."
             : "ADMIN may actively query public OpenAlex, Crossref and ORCID for the DOIs of existing publications, instead of preparing an offline bundle by hand. Runs in the background; can be paused and resumed at any time."}
@@ -507,7 +507,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
             <Button type="button" variant="secondary" onClick={runCancelEnrichment} data-testid="aff-online-cancel-btn">
               {vi ? "Tạm dừng" : "Pause"}
             </Button>
-            <span className="text-xs font-medium text-sky-700">
+            <span className="text-sm font-medium text-sky-700">
               {job.processed_dois >= job.total_dois
                 ? (vi ? "Đang hoàn tất…" : "Finishing…")
                 : `${ENRICHMENT_STATUS_LABEL[job.status]?.[locale] ?? job.status} (${fmt(job.processed_dois)}/${fmt(job.total_dois)} DOI)`}
@@ -515,7 +515,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
           </div>
         )}
         {job && !ENRICHMENT_ACTIVE.includes(job.status) && (
-          <div className="mt-3 text-xs text-slate-700" data-testid="aff-online-result">
+          <div className="mt-3 text-sm text-slate-700" data-testid="aff-online-result">
             <p>
               <span className={job.status === "COMPLETED" ? "font-bold text-emerald-700" : "font-bold text-rose-600"}>
                 {ENRICHMENT_STATUS_LABEL[job.status]?.[locale] ?? job.status}
@@ -569,7 +569,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
       </Card>
 
       <Card title={vi ? "4. Xem trước và áp dụng" : "4. Preview and apply"} testId="aff-preview-card">
-        <p className="mb-3 text-xs leading-relaxed text-slate-600">
+        <p className="mb-3 text-sm leading-relaxed text-slate-600">
           {vi
             ? "Bước cuối gồm 2 lượt bấm: \"Xem trước\" chỉ tính thử, không ghi gì vào hệ thống — cho biết đơn vị công tác nào sẽ được gán cho tác giả nào. Xem kỹ kết quả rồi mới nhấn \"Xác nhận áp dụng\" để lưu chính thức."
             : "Two clicks: \"Preview\" only computes the result, writing nothing yet — it shows which affiliation would be assigned to which author. Review it, then click \"Confirm and apply\" to save for real."}
@@ -579,7 +579,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
             {previewing ? (vi ? "Đang tính…" : "Computing…") : vi ? "Xem trước" : "Preview"}
           </Button>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-xs text-slate-500" data-testid="aff-preview-source-mode">
+            <span className="text-sm text-slate-500" data-testid="aff-preview-source-mode">
               {sourceMode === "online" && job?.status === "COMPLETED"
                 ? vi
                   ? "Dùng kết quả thu thập trực tuyến vừa chạy."
@@ -591,7 +591,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
             {job?.status === "COMPLETED" && source?.ready && (
               <button
                 type="button"
-                className="text-xs font-medium text-sky-700 underline"
+                className="text-sm font-medium text-sky-700 underline"
                 onClick={() => setSourceMode((m) => (m === "online" ? "offline" : "online"))}
                 data-testid="aff-source-mode-toggle"
               >
@@ -608,7 +608,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
         </div>
 
         {message && !preview && (
-          <p className={`mb-3 text-xs font-medium ${message.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="aff-message">
+          <p className={`mb-3 text-sm font-medium ${message.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="aff-message">
             {message.text}
           </p>
         )}
@@ -629,18 +629,18 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="rounded-t-card border-b border-blue-100 bg-blue-50 px-5 py-4">
-                <h2 id="aff-preview-modal-title" className="text-base font-semibold text-[#2f4ea6]">
+                <h2 id="aff-preview-modal-title" className="text-base font-bold text-[#2f4ea6]">
                   {vi ? "Xem trước & áp dụng đối chiếu đơn vị" : "Preview & apply affiliation reconciliation"}
                 </h2>
-                <p className="mt-0.5 text-xs text-[#3A5FC3]">
+                <p className="mt-0.5 text-sm text-[#3A5FC3]">
                   {vi ? "Chỉ ghi vào hệ thống sau khi bạn xác nhận bên dưới." : "Nothing is written until you confirm below."}
                 </p>
               </div>
 
               <div className="px-5 py-4">
-          <div className="space-y-3 text-xs text-slate-700" data-testid="aff-preview">
+          <div className="space-y-3 text-sm text-slate-700" data-testid="aff-preview">
             {message && (
-              <p className={`text-xs font-medium ${message.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="aff-message">
+              <p className={`text-sm font-medium ${message.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="aff-message">
                 {message.text}
               </p>
             )}
@@ -686,7 +686,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[32rem] border-collapse text-left" data-testid="aff-preview-table">
                     <thead>
-                      <tr className="border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                      <tr className="border-b border-slate-200 text-sm uppercase text-slate-500">
                         <th className="py-1 pr-3">{vi ? "Nguồn" : "Source"}</th>
                         <th className="py-1 pr-3">{vi ? "Mức" : "Level"}</th>
                         {Object.keys(OUTCOME_LABEL).map((k) => (
@@ -742,14 +742,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
           </div>
               </div>
 
-              <div className="flex flex-wrap justify-end gap-2 border-t border-gray-100 px-5 py-3">
-                <button
-                  type="button"
-                  onClick={() => { setPreview(null); setConfirmed(false); }}
-                  className={buttonClass("secondary")}
-                >
-                  {vi ? "Đóng" : "Close"}
-                </button>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
                 <Button
                   type="button"
                   variant="primary"
@@ -760,6 +753,13 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
                 >
                   {applying ? (vi ? "Đang áp dụng…" : "Applying…") : vi ? "Xác nhận áp dụng" : "Confirm and apply"}
                 </Button>
+                <button
+                  type="button"
+                  onClick={() => { setPreview(null); setConfirmed(false); }}
+                  className={buttonClass("secondary")}
+                >
+                  {vi ? "Đóng" : "Close"}
+                </button>
               </div>
             </div>
           </div>
