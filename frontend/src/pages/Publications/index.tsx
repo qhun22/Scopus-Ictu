@@ -18,7 +18,6 @@ const DEFAULT_PAGE_SIZE = 20;
 const FILTER_DELAY_MS = 350;
 
 const NULL_YEAR: Record<"vi" | "en", string> = { vi: "Chưa rõ", en: "Unknown" };
-const NULL_CITATION: Record<"vi" | "en", string> = { vi: "Chưa có dữ liệu", en: "No data" };
 const NULL_STRING: Record<"vi" | "en", string> = { vi: "Chưa cập nhật", en: "Not available" };
 
 interface AppliedFilters {
@@ -271,12 +270,6 @@ export default function PublicationsPage() {
   const fmtYear = (y: number | null) =>
     y === null ? NULL_YEAR[locale] : String(y);
 
-  const fmtCitations = (c: number | null) => {
-    if (c === null) return NULL_CITATION[locale];
-    if (c === 0) return "0";
-    return String(c);
-  };
-
   const fmtField = (v: string | null) =>
     v && v.trim() ? v.trim() : NULL_STRING[locale];
 
@@ -286,7 +279,6 @@ export default function PublicationsPage() {
   const colYear = locale === "vi" ? "Năm" : "Year";
   const colSource = locale === "vi" ? "Nguồn xuất bản" : "Source title";
   const colDocType = locale === "vi" ? "Loại tài liệu" : "Document Type";
-  const colCitations = locale === "vi" ? "Trích dẫn" : "Citations";
   const colStage = locale === "vi" ? "Giai đoạn" : "Stage";
   const colOa = locale === "vi" ? "Truy cập mở" : "Open Access";
   const colAction = locale === "vi" ? "Thao tác" : "Actions";
@@ -513,7 +505,6 @@ export default function PublicationsPage() {
               <col style={{ width: 180 }} />
               <col style={{ width: 100 }} />
               <col style={{ width: 88 }} />
-              <col style={{ width: 88 }} />
               <col style={{ width: 105 }} />
               <col style={{ width: 164 }} />
             </colgroup>
@@ -524,7 +515,6 @@ export default function PublicationsPage() {
                 <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colYear}</th>
                 <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colSource}</th>
                 <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colDocType}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 text-center font-semibold whitespace-nowrap">{colCitations}</th>
                 <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colStage}</th>
                 <th className="border-r border-slate-200/80 px-4 py-3 font-semibold whitespace-nowrap">{colOa}</th>
                 <th className="sticky right-0 z-[1] border-l border-slate-200/80 bg-slate-50 px-4 py-3 text-center font-semibold whitespace-nowrap">{colAction}</th>
@@ -534,7 +524,7 @@ export default function PublicationsPage() {
               {/* ── Initial loading / error — on error just keep spinning ── */}
               {(loading && items.length === 0) || error ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
                       {!error && <span>{loadingLabel}</span>}
@@ -544,7 +534,7 @@ export default function PublicationsPage() {
               ) : /* ── Empty state ── */
               !loading && items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-1">
                       <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -578,9 +568,6 @@ export default function PublicationsPage() {
                     </td>
                     <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
                       {fmtField(pub.document_type)}
-                    </td>
-                    <td className="border-r border-slate-100 px-4 py-3 text-center font-bold text-slate-800">
-                      {fmtCitations(pub.cited_by_count)}
                     </td>
                     <td className="border-r border-slate-100 px-4 py-3 break-words text-slate-700">
                       {fmtField(pub.publication_stage)}
