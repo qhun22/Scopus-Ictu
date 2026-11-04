@@ -7,11 +7,11 @@
 
 type Locale = "vi" | "en";
 
-const STATUS_STYLE: Record<AffiliationLinkStatus, string> = {
-  VERIFIED: "border-emerald-400 bg-white text-emerald-700 hover:bg-emerald-50",
-  CORROBORATED: "border-amber-400 bg-white text-amber-700 hover:bg-amber-50",
-  UNRESOLVED: "border-slate-400 bg-white text-slate-600 hover:bg-slate-50",
-  NOT_RECONCILED: "border-slate-300 bg-white text-slate-500 hover:bg-slate-50",
+const STATUS_TEXT_COLOR: Record<AffiliationLinkStatus, string> = {
+  VERIFIED: "text-emerald-700",
+  CORROBORATED: "text-amber-700",
+  UNRESOLVED: "text-slate-600",
+  NOT_RECONCILED: "text-slate-500",
 };
 
 // Display labels only: the enum values in the API and database are unchanged.
@@ -99,28 +99,18 @@ export function AffiliationBadge({ status, locale }: { status: AffiliationLinkSt
     <span
       title={statusHint(status, locale)}
       data-testid={`aff-badge-${status}`}
-      className={`inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border px-2.5 text-center text-xs font-bold leading-none ${STATUS_STYLE[status]}`}
+      className={`font-bold ${STATUS_TEXT_COLOR[status]}`}
     >
       {statusLabel(status, locale)}
     </span>
   );
 }
 
-/**
- * Trust level of the UNIT shown for an author (not of the identity link).
- * An author whose identity is verified by a source that lists no unit, while
- * another source lists a unit only by cross-checking, has a cross-checked unit.
- */
-type UnitLevel = "VERIFIED" | "CORROBORATED" | "NO_UNIT_VERIFIED" | "NO_UNIT_CORROBORATED" | "UNRESOLVED" | "NOT_RECONCILED";
-
-function unitLevel(author: PublicationAuthorRead): UnitLevel {
+function hasAssignedUnit(author: PublicationAuthorRead): boolean {
+  if ((author.affiliation_overrides ?? []).some((o) => o.confidence === "CORROBORATED")) return true;
   const status = author.affiliation_status ?? "NOT_RECONCILED";
-  if (status === "NOT_RECONCILED") return "NOT_RECONCILED";
-  if (status === "UNRESOLVED") return "UNRESOLVED";
-  const items = author.affiliations ?? [];
-  if (items.some((a) => a.link_status === "VERIFIED")) return "VERIFIED";
-  if (items.length > 0) return "CORROBORATED";
-  return status === "VERIFIED" ? "NO_UNIT_VERIFIED" : "NO_UNIT_CORROBORATED";
+  if (status === "NOT_RECONCILED" || status === "UNRESOLVED") return false;
+  return (author.affiliations ?? []).length > 0;
 }
 
 export function AffiliationSummaryBar({
@@ -131,46 +121,30 @@ export function AffiliationSummaryBar({
   locale: Locale;
 }) {
   if (authors.length === 0) return null;
-  const counts: Record<UnitLevel, number> = {
-    VERIFIED: 0,
-    CORROBORATED: 0,
-    NO_UNIT_VERIFIED: 0,
-    NO_UNIT_CORROBORATED: 0,
-    UNRESOLVED: 0,
-    NOT_RECONCILED: 0,
-  };
-  for (const a of authors) counts[unitLevel(a)] += 1;
-
+  const assigned = authors.filter(hasAssignedUnit).length;
+  const unassigned = authors.length - assigned;
   const vi = locale === "vi";
-  const all: Array<{ key: UnitLevel; status: AffiliationLinkStatus; label: string }> = [
-    { key: "VERIFIED", status: "VERIFIED", label: vi ? "có đơn vị" : "with unit" },
-    { key: "CORROBORATED", status: "CORROBORATED", label: vi ? "có đơn vị" : "with unit" },
-    {
-      key: "NO_UNIT_VERIFIED",
-      status: "VERIFIED",
-      label: vi ? "nguồn xác minh không có đơn vị" : "verifying source lists no unit",
-    },
-    { key: "NO_UNIT_CORROBORATED", status: "CORROBORATED", label: vi ? "nguồn không có đơn vị" : "source lists no unit" },
-    { key: "UNRESOLVED", status: "UNRESOLVED", label: vi ? "không gán được đơn vị" : "no unit assigned" },
-    { key: "NOT_RECONCILED", status: "NOT_RECONCILED", label: vi ? "chưa đối chiếu" : "not reconciled" },
-  ];
-  const items = all.filter((i) => counts[i.key] > 0);
   return (
     <div className="mb-3 space-y-2 rounded-[5px] border border-slate-100 bg-slate-50/60 p-3" data-testid="aff-summary">
       <div className={'flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-slate-600'}>
         <span className="font-semibold">
           {vi ? `Đơn vị theo ${authors.length} tác giả:` : `Units across ${authors.length} authors:`}
         </span>
-        {items.map((i) => (
-          <span key={i.key}>
-            {counts[i.key]} {vi ? "tác giả" : counts[i.key] === 1 ? "author" : "authors"} {i.label}
-          </span>
-        ))}
+        <span>
+          {vi
+            ? `${assigned} tác giả đã được gán đơn vị`
+            : `${assigned} ${assigned === 1 ? "author" : "authors"} with a unit assigned`}
+        </span>
+        <span>
+          {vi
+            ? `${unassigned} tác giả chưa gán được đơn vị`
+            : `${unassigned} ${unassigned === 1 ? "author" : "authors"} without a unit`}
+        </span>
         <span>
           {vi ? `${authors.length} tác giả, theo thứ tự trên bài báo.` : `${authors.length} authors, in publication order.`}
         </span>
       </div>
-      <p className="text-xs leading-snug text-slate-500">
+      <p className="text-sm leading-snug text-slate-500">
         {vi
           ? "Đơn vị được tra cứu từ nguồn bên ngoài (OpenAlex, Crossref), chưa được Scopus xác nhận trực tiếp."
           : "Units are looked up from external sources (OpenAlex, Crossref) and have not been directly confirmed by Scopus."}
@@ -183,7 +157,7 @@ function OverrideNote({ override, locale }: { override: AffiliationOverrideRead;
   const vi = locale === "vi";
   return (
     <div
-      className="mt-1.5 rounded-[5px] border border-emerald-200 bg-emerald-50/60 p-2 text-[11px] leading-snug"
+      className="mt-1.5 rounded-[5px] border border-blue-200 bg-blue-50/60 p-2 text-sm leading-snug"
       data-testid="aff-override"
     >
       <p className="font-medium text-slate-700">{override.affiliation_text}</p>
@@ -215,7 +189,7 @@ export function AuthorAffiliationCell({
   const noUnit = vi ? "Chưa có thông tin đơn vị" : "No unit information yet";
 
   const resolutionLine = isAdmin && resolutions.length > 0 && (
-    <div className="mt-1 text-[10px] text-slate-500" data-testid="aff-resolutions">
+    <div className="mt-1 text-sm text-slate-500" data-testid="aff-resolutions">
       {vi ? "Theo nguồn: " : "By source: "}
       {resolutions
         .map((r) =>
@@ -273,7 +247,7 @@ export function AuthorAffiliationCell({
         </div>
       )}
       {unitOnlyCrossChecked && (
-        <p className="mb-1 text-[11px] leading-snug text-amber-700" data-testid="aff-cross-checked-note">
+        <p className="mb-1 text-sm leading-snug text-amber-700" data-testid="aff-cross-checked-note">
           {vi
             ? `Định danh đã xác minh${verifiedWithoutUnitSources.length ? ` qua ${verifiedWithoutUnitSources.join(", ")}` : ""} nhưng nguồn đó không có đơn vị; đơn vị bên dưới chỉ ở mức đối chiếu, chưa xác minh.`
             : `Identity verified${verifiedWithoutUnitSources.length ? ` via ${verifiedWithoutUnitSources.join(", ")}` : ""} but that source lists no unit; the unit below is only cross-checked, not verified.`}
@@ -285,12 +259,12 @@ export function AuthorAffiliationCell({
             <li key={`${a.source_system}-${i}`} className="leading-snug" data-testid="aff-item">
               <div className="flex flex-wrap items-center gap-1.5">
                 <AffiliationBadge status={a.link_status} locale={locale} />
-                <span className="rounded bg-slate-100 px-1.5 text-[10px] font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
+                <span className="rounded bg-slate-100 px-1.5 text-sm font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
                 <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
               </div>
-              <div className="ml-1 mt-0.5 text-[10px] text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
+              <div className="ml-1 mt-0.5 text-sm text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
               {a.organizations.length > 0 && (
-                <div className="ml-1 mt-0.5 flex flex-wrap gap-1 text-[10px] text-slate-500">
+                <div className="ml-1 mt-0.5 flex flex-wrap gap-1 text-sm text-slate-500">
                   <span>{vi ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
                   {a.organizations.map((o, k) => (
                     <span key={`${o.source_org_id ?? o.display_name}-${k}`} className="rounded bg-sky-50 px-1.5 text-sky-700">

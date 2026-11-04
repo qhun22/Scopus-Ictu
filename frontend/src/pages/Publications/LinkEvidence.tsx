@@ -41,19 +41,19 @@ export function EvidenceBasisCell({ basis, locale }: { basis?: LinkEvidenceBasis
         {basis.independently_verified ? verifiedLabel : level[locale]}
       </Badge>
       {basis.supporting_evidence_types.length > 0 ? (
-        <span className="text-[11px] text-slate-500">
+        <span className="text-sm text-slate-500">
           {locale === "vi" ? "Nguồn: " : "Source: "}
           {sourceText(basis.supporting_evidence_types, locale)}
         </span>
       ) : (
-        <span className="text-[11px] text-slate-500">
+        <span className="text-sm text-slate-500">
           {locale === "vi"
             ? "Liên kết không có bản ghi chứng cứ (có thể tạo trước khi hệ thống lưu chứng cứ)."
             : "The link has no evidence record (it may predate evidence recording)."}
         </span>
       )}
       {basis.contradicting_evidence_types.length > 0 && (
-        <span className="text-[11px] font-semibold text-rose-700">
+        <span className="text-sm font-semibold text-rose-700">
           {locale === "vi" ? "Có chứng cứ mâu thuẫn: " : "Contradicting evidence: "}
           {sourceText(basis.contradicting_evidence_types, locale)}
         </span>
@@ -73,17 +73,17 @@ export function ReviewDecisionCell({
 }) {
   if (decision === undefined) return <span className="text-slate-400">—</span>;
   if (decision === null) {
-    return <span className="text-[11px] text-slate-500">{locale === "vi" ? "Không có bản ghi quyết định duyệt" : "No review decision on record"}</span>;
+    return <span className="text-sm text-slate-500">{locale === "vi" ? "Không có bản ghi quyết định duyệt" : "No review decision on record"}</span>;
   }
   return (
     <div className="flex max-w-[240px] flex-col items-start gap-1">
-      <span className="text-[11px] text-slate-700">
+      <span className="text-sm text-slate-700">
         {locale === "vi" ? "Đã chấp nhận" : "Accepted"} · {formatDate(decision.decided_at)}
       </span>
-      <span className="line-clamp-2 text-[11px] text-slate-500" title={decision.reason ?? undefined}>
+      <span className="line-clamp-2 text-sm text-slate-500" title={decision.reason ?? undefined}>
         {decision.reason ?? (locale === "vi" ? "Không ghi lý do" : "No reason recorded")}
       </span>
-      <Link to="/review-history" className="text-[11px] font-semibold text-brand hover:underline">
+      <Link to="/review-history" className="text-sm font-semibold text-brand hover:underline">
         {locale === "vi" ? "Xem lịch sử duyệt" : "View review history"}
       </Link>
     </div>

@@ -216,7 +216,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
 
         <h3 className="mb-3 text-sm font-bold text-[#3A5FC3]">{fmtField(title)}</h3>
 
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-xs sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <MetaItem label="EID" value={pubEid} />
           <MetaItem label="DOI" value={fmtField(doi)} />
           <MetaItem label={locale === "vi" ? "Năm xuất bản" : "Year"} value={fmtYear(year)} />
@@ -248,7 +248,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
         ) : (
           <div className="overflow-x-auto">
             <AffiliationSummaryBar authors={authors} locale={locale} />
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
                 <tr>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colAuthorOrder}</th>
@@ -301,7 +301,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
           <p className="py-6 text-center text-sm text-slate-400">{emptyLinksLabel}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
                 <tr>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colAuthorOrder}</th>
@@ -324,7 +324,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                     <td className="px-3 py-2.5 text-slate-600">{fmtField(link.staff_code)}</td>
                     <td className="px-3 py-2.5 text-slate-700">{fmtField(link.department)}</td>
                     <td className="px-3 py-2.5 text-slate-700">{fmtField(link.faculty)}</td>
-                    <td className="px-3 py-2.5 text-slate-500 text-[10px]">{fmtField(link.orcid)}</td>
+                    <td className="px-3 py-2.5 text-slate-500 text-sm">{fmtField(link.orcid)}</td>
                     <td className="px-3 py-2.5 text-slate-500">{link.scopus_id}</td>
                     <td className="px-3 py-2.5 align-top"><LinkStatusBadge locale={locale} /></td>
                     <td className="px-3 py-2.5 align-top"><EvidenceBasisCell basis={link.evidence_basis} locale={locale} /></td>
@@ -352,7 +352,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-sm">
                 <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
                   <tr>
                     <th className="px-3 py-2.5 text-left font-semibold whitespace-nowrap">{colFileName}</th>
@@ -381,7 +381,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                 <button
                   type="button"
                   onClick={() => setShowAllProvenance((v) => !v)}
-                  className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-300 bg-white px-4 py-1.5 text-xs font-semibold text-slate-600 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
+                  className="inline-flex items-center gap-1.5 rounded-[5px] border border-slate-300 bg-white px-4 py-1.5 text-sm font-semibold text-slate-600 hover:border-[#3A5FC3] hover:text-[#3A5FC3] transition-colors cursor-pointer shadow-2xs"
                 >
                   {showAllProvenance
                     ? (locale === "vi" ? "Thu gọn" : "Show less")
@@ -408,7 +408,7 @@ interface MetaItemProps {
 function MetaItem({ label, value, highlight }: MetaItemProps) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+      <span className="text-sm font-semibold uppercase tracking-wide text-slate-400">{label}</span>
       <span
         className={[
           "text-sm text-slate-800 font-medium",
