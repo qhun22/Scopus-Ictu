@@ -143,6 +143,10 @@ class PublicationAuthorRead(BaseModel):
     affiliation_resolutions: list[AffiliationResolutionRead] = Field(default_factory=list)
     # ALL currently-active ADMIN overrides for this position (0, 1, or many).
     affiliation_overrides: list[AffiliationOverrideRead] = Field(default_factory=list)
+    # Public-safe: just the lecturer's name when this position has an APPROVED
+    # LecturerScopusIdentity link, else None. No staff code/ORCID here — those
+    # stay in approved_lecturer_links, which is withheld from LECTURER readers.
+    ictu_lecturer_name: str | None = None
 
 
 class AffiliationSummaryRead(BaseModel):

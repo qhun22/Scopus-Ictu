@@ -137,6 +137,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
   const colAuthorOrder = locale === "vi" ? "STT" : "#";
   const colScopusId = "Scopus ID";
   const colAffiliation = locale === "vi" ? "Đơn vị theo tác giả & độ tin cậy" : "Author affiliation & confidence";
+  const colIctuLecturer = locale === "vi" ? "Trực thuộc" : "ICTU Lecturer";
   const colName = locale === "vi" ? "Tên ưu tiên" : "Preferred Name";
   const colStaffCode = locale === "vi" ? "Mã cán bộ" : "Staff Code";
   const colDepartment = locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept";
@@ -254,6 +255,7 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colAuthorOrder}</th>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colName}</th>
                   <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colScopusId}</th>
+                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colIctuLecturer}</th>
                   <th className="px-3 py-2.5 font-semibold">{colAffiliation}</th>
                 </tr>
               </thead>
@@ -273,6 +275,13 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                       </Link>
                     </td>
                     <td className="px-3 py-2.5 text-slate-500">{a.scopus_id}</td>
+                    <td className="px-3 py-2.5 align-top" data-testid="author-ictu-lecturer">
+                      {a.ictu_lecturer_name ? (
+                        <span className="font-medium text-emerald-700">{a.ictu_lecturer_name}</span>
+                      ) : (
+                        <span className="text-slate-400">{locale === "vi" ? "Không xác định" : "Undetermined"}</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 align-top">
                       <AuthorAffiliationCell author={a} locale={locale} isAdmin={!isLecturer} />
                     </td>

@@ -629,6 +629,9 @@ def get_publication_detail(
             orcid,
         ) in link_rows
     ]
+    lecturer_name_by_order = {link.author_order: link.full_name for link in lecturer_links}
+    for author in authors:
+        author.ictu_lecturer_name = lecturer_name_by_order.get(author.author_order)
     provenance = [
         PublicationProvenanceRead(
             file_name=file_name,

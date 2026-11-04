@@ -82,6 +82,8 @@ export interface PublicationAuthorRead {
   affiliation_resolutions?: AffiliationResolutionRead[];
   /** All currently-active ADMIN overrides for this position (0, 1, or many). */
   affiliation_overrides?: AffiliationOverrideRead[];
+  /** Lecturer's name when this position has an APPROVED lecturer link, else null. */
+  ictu_lecturer_name?: string | null;
 }
 
 export interface AffiliationSummaryRead {
