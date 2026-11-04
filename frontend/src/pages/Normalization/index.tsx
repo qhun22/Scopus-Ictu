@@ -907,7 +907,7 @@ export default function NormalizationPage() {
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="min-w-0">
                     <h2 className="text-sm sm:text-base font-bold text-[#2f4ea6] truncate">
-                      {locale === "vi" ? "Chi tiết chuẩn hóa dữ liệu" : "Data Normalization Details"}
+                      {locale === "vi" ? "Chi tiết dữ liệu công bố" : "Publication Data Details"}
                     </h2>
                     <p className="mt-0.5 text-xs text-[#3A5FC3] truncate" title={detailModalItem.file_name}>
                       {detailModalItem.file_name}
