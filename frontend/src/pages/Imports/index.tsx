@@ -301,15 +301,11 @@ export default function ImportsPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const formatDate = (value: string): string =>
-    new Intl.DateTimeFormat(locale === "vi" ? "vi-VN" : "en-US", {
-      dateStyle: "short",
-      // "medium" (adds seconds) instead of "short": several rows can share
-      // the same displayed minute while the sort (exact created_at, see
-      // tableHistory below) correctly tells them apart — without seconds
-      // shown, a technically-correct order can look random to the eye.
-      timeStyle: "medium",
-    }).format(new Date(value));
+  const formatDate = (value: string): string => {
+    const d = new Date(value);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  };
 
   const formatDuration = (seconds: number): string => {
     if (seconds < 60) return `${Math.round(seconds)}s`;

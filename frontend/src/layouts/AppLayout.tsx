@@ -29,7 +29,7 @@ export default function AppLayout() {
   }, [isSidebarCollapsed]);
 
   return (
-    <div className="min-h-screen bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">
+    <div className="min-h-screen overflow-x-hidden bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">
       {/* Role-aware Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
