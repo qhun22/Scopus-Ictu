@@ -121,13 +121,16 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
   const [authorSearchInput, setAuthorSearchInput] = useState("");
   const [authorPage, setAuthorPage] = useState(1);
   const [authorPageSize, setAuthorPageSize] = useState(10);
+  // Default to the full list; the admin opts into the ICTU-only subset.
+  const [authorScope, setAuthorScope] = useState<"ICTU" | "ALL">("ALL");
 
   const handleResetAuthorSearch = () => {
     setAuthorSearchInput("");
     setAuthorPage(1);
+    setAuthorScope("ALL");
   };
 
-  const isResetAuthorDisabled = !authorSearchInput;
+  const isResetAuthorDisabled = !authorSearchInput && authorScope === "ALL";
   const [historySearchInput, setHistorySearchInput] = useState("");
   const [historyStatusFilter, setHistoryStatusFilter] = useState<"ALL" | "COMPLETED" | "COMPLETED_WITH_ERRORS">("ALL");
   const [historyPage, setHistoryPage] = useState(1);
@@ -234,10 +237,15 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
   }, [scopusImports]);
 
   // Load author list
-  const loadAuthors = useCallback(async (q: string, page: number, pageSize: number) => {
+  const loadAuthors = useCallback(async (q: string, page: number, pageSize: number, scope: "ICTU" | "ALL") => {
     setAuthorsLoading(true);
     try {
-      const res = await getAuthors({ q: q || undefined, page, page_size: pageSize });
+      const res = await getAuthors({
+        q: q || undefined,
+        page,
+        page_size: pageSize,
+        ictu_related: scope === "ICTU",
+      });
       setAuthors(res.items);
       setAuthorTotal(res.total);
     } catch (err: unknown) {
@@ -252,18 +260,18 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
 
   // Reload author list after a normalization action
   const reloadAuthorsAndStats = useCallback(async () => {
-    await loadAuthors(authorSearchInput.trim(), authorPage, authorPageSize);
-  }, [authorSearchInput, authorPage, authorPageSize, loadAuthors]);
+    await loadAuthors(authorSearchInput.trim(), authorPage, authorPageSize, authorScope);
+  }, [authorSearchInput, authorPage, authorPageSize, authorScope, loadAuthors]);
 
   // Search filters live as you type, debounced so each keystroke doesn't fire
   // its own request to the server (this list is server-paginated, not a
   // client-side array like the two tables above).
   useEffect(() => {
     const handle = setTimeout(() => {
-      void loadAuthors(authorSearchInput.trim(), authorPage, authorPageSize);
+      void loadAuthors(authorSearchInput.trim(), authorPage, authorPageSize, authorScope);
     }, 300);
     return () => clearTimeout(handle);
-  }, [authorSearchInput, authorPage, authorPageSize, loadAuthors]);
+  }, [authorSearchInput, authorPage, authorPageSize, authorScope, loadAuthors]);
 
   // Handlers
   const handleNormalizePublication = async (item: ScopusImport) => {
@@ -403,16 +411,16 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
 
         <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                 <tr>
-                  <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Tên tệp</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Loại dữ liệu</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Thời gian</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Bản ghi</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Người thực hiện</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Trạng thái</th>
-                  <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">Thao tác</th>
+                  <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">Tên tệp</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Loại dữ liệu</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Thời gian</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Bản ghi</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Người thực hiện</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Trạng thái</th>
+                  <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -449,7 +457,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
                   className="transition-colors hover:bg-slate-50/70"
                 >
                     {/* Info */}
-                    <td className="px-3 py-3.5 align-middle whitespace-nowrap">
+                    <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -467,14 +475,14 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
                       </div>
                     </td>
 
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>Scopus</span></td>
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">{formatDate(item.created_at)}</td>
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">{formatCount(item.total_records)}</td>
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>{item.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span></td>
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={badgeClassName}>{authorStatusLabel(authorStatus)}</span></td>
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>Scopus</span></td>
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">{formatDate(item.created_at)}</td>
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">{formatCount(item.total_records)}</td>
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>{item.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span></td>
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap"><span className={badgeClassName}>{authorStatusLabel(authorStatus)}</span></td>
 
                     {/* Actions */}
-                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
+                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                       <div className="flex items-center justify-center gap-2">
                       {needsPublicationNormalization ? (
                         <button
@@ -639,16 +647,16 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
 
         <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                 <tr>
-                  <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">Tên tệp</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Loại dữ liệu</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Thời gian</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Bản ghi</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Người thực hiện</th>
-                  <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">Trạng thái</th>
-                  <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">Thao tác</th>
+                  <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">Tên tệp</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Loại dữ liệu</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Thời gian</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Bản ghi</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Người thực hiện</th>
+                  <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">Trạng thái</th>
+                  <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -677,7 +685,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
                 ) : (
                   paginatedHistory.map((item) => (
                     <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
-                      <td className="px-3 py-3.5 align-middle whitespace-nowrap">
+                      <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0">
                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -694,16 +702,16 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>Scopus</span></td>
-                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">{formatDate(item.created_at)}</td>
-                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">{formatCount(item.total_records)}</td>
-                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>{item.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span></td>
-                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                      <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>Scopus</span></td>
+                      <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">{formatDate(item.created_at)}</td>
+                      <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">{formatCount(item.total_records)}</td>
+                      <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap"><span className={basicBadgeClassName}>{item.performed_by || (locale === "vi" ? "Không xác định" : "Unknown")}</span></td>
+                      <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         <span className={item.normalization_summary?.authors?.status === "COMPLETED" && !hasAuthorErrors(item) ? "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50" : badgeClassName}>
                           {authorStatusLabel(item.normalization_summary?.authors?.status, hasAuthorErrors(item))}
                         </span>
                       </td>
-                      <td className="sticky right-0 z-[1] border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
+                      <td className="sticky right-0 z-[1] border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                         <button
                           type="button"
                           onClick={() => onViewDetail(item)}
@@ -793,6 +801,16 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <select
+              aria-label={t.common.status}
+              value={authorScope}
+              onChange={(e) => { setAuthorScope(e.target.value as "ICTU" | "ALL"); setAuthorPage(1); }}
+              className="h-control shrink-0 rounded-control border border-line bg-slate-50 px-3 text-[13px] font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">{t.normalization.authorsTab.scopeAll}</option>
+              <option value="ICTU">{t.normalization.authorsTab.scopeIctu}</option>
+            </select>
+
             {/* Nút Đặt lại */}
             <button
               type="button"
@@ -811,22 +829,22 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
         {/* Table */}
         <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50">
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">
+                  <th className="whitespace-nowrap px-2.5 py-3.5 font-bold text-slate-700">
                     {t.normalization.authorsTab.table.authorName}
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">
+                  <th className="whitespace-nowrap px-2.5 py-3.5 font-bold text-slate-700">
                     {t.normalization.authorsTab.table.scopusId}
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
+                  <th className="whitespace-nowrap px-2.5 py-3.5 text-center font-bold text-slate-700">
                     {t.normalization.authorsTab.table.publicationCount}
                   </th>
-                  <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
+                  <th className="whitespace-nowrap px-2.5 py-3.5 text-center font-bold text-slate-700">
                     {t.normalization.authorsTab.table.variantCount}
                   </th>
-                  <th className="w-44 whitespace-nowrap border-l border-slate-200/80 px-4 py-3 text-center font-semibold text-slate-600">
+                  <th className="w-44 whitespace-nowrap border-l border-slate-200/80 px-2.5 py-3.5 text-center font-bold text-slate-700">
                     {t.normalization.authorsTab.table.actions}
                   </th>
                 </tr>
@@ -864,16 +882,16 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
                 ) : (
                   authors.map((author) => (
                     <tr key={author.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-slate-800 max-w-[200px] truncate" title={author.preferred_name}>
+                      <td className="px-2.5 py-3.5 font-bold text-slate-800 max-w-[200px] truncate" title={author.preferred_name}>
                         {author.preferred_name}
                       </td>
-                      <td className="px-4 py-3 text-xs font-bold text-slate-700">
+                      <td className="px-2.5 py-3.5 font-bold text-slate-700">
                         {author.scopus_id}
                       </td>
-                      <td className="px-4 py-3 text-center text-slate-700 font-bold">
+                      <td className="px-2.5 py-3.5 text-center text-slate-700 font-bold">
                         {formatCount(author.publication_count)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2.5 py-3.5 text-center">
                         {author.variant_count > 0 ? (
                           <span className="font-bold text-slate-700">
                             {author.variant_count}
@@ -882,7 +900,7 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
                           <span className="text-slate-300">—</span>
                         )}
                       </td>
-                      <td className="w-44 border-l border-slate-100 px-4 py-3 text-center">
+                      <td className="w-44 border-l border-slate-100 px-2.5 py-3.5 text-center">
                         <button
                           type="button"
                           onClick={() => void handleViewAuthorDetail(author)}
@@ -965,21 +983,16 @@ export default function AuthorsTab({ scopusImports, locale, onRefresh, onViewDet
       {selectedAuthor && (
         <ModalPortal>
           <div
-            className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs modal-backdrop-in transition-[left] duration-200 ease-out"
+            className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
             onClick={() => setSelectedAuthor(null)}
           >
             <div
-              className="w-full max-w-lg rounded-card border border-slate-200 bg-white shadow-2xl modal-panel-in"
+              className="w-full max-w-lg rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-4">
+              <div className="flex items-center justify-between border-b border-blue-100 bg-blue-50 px-5 py-4">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[5px] bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-base font-bold text-slate-800 truncate">
+                  <h2 className="text-base font-bold text-[#2f4ea6] truncate">
                     {t.normalization.authorsTab.detail.title}
                   </h2>
                 </div>
