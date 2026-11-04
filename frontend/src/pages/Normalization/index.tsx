@@ -927,7 +927,7 @@ export default function NormalizationPage() {
                   <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-100 text-slate-600">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                           </svg>
@@ -945,8 +945,8 @@ export default function NormalizationPage() {
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
-                      <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
+                      <div className="rounded-[5px] border border-slate-300/80 bg-slate-50 p-2.5 shadow-2xs">
+                        <span className="text-[10px] font-medium text-slate-600 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
                         <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.total_records)}</p>
                       </div>
                       <div className="rounded-[5px] border border-blue-200/80 bg-white p-2.5 shadow-2xs">
@@ -990,7 +990,7 @@ export default function NormalizationPage() {
                   <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-100 text-slate-600">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
