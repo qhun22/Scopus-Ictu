@@ -710,7 +710,7 @@ export default function ApprovalQueuePage() {
             {t.subtitle}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <div className="text-xs text-slate-500">
             {t.totalLabel}: <span className="font-semibold text-slate-800">{total}</span>
           </div>
