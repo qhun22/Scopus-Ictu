@@ -24,6 +24,7 @@ import Button, { buttonClass } from "../../components/ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
+import ScopusIdentitiesSummary from "./ScopusIdentitiesSummary";
 
 export default function LecturersPage() {
   const toast = useToast();
@@ -850,16 +851,16 @@ export default function LecturersPage() {
                keeps w-full; overflow-x-auto on the wrapper handles horizontal scroll for the
                non-sticky columns. A thin separator line is painted via the pseudo-element
                shadow so the sticky column lifts visually when scrolled. */}
-          <table aria-busy={isTableLoading} className="w-full text-left text-xs">
+          <table aria-busy={isTableLoading} className="w-full text-left text-sm">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{locale === "vi" ? "Giảng viên" : "Lecturer"}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{t.lecturers.colEmail}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{locale === "vi" ? "Học vị / Học hàm" : "Degree / Rank"}</th>
-                <th className="px-4 py-3 font-semibold whitespace-nowrap">{locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept"}</th>
-                <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">{locale === "vi" ? "Tài khoản" : "Account"}</th>
-                <th className="px-4 py-3 text-center font-semibold whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
-                <th className="sticky right-0 z-10 bg-slate-50/90 px-4 py-3 text-center font-semibold whitespace-nowrap border-l border-slate-200/80">{t.common.actions}</th>
+                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{locale === "vi" ? "Giảng viên" : "Lecturer"}</th>
+                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{t.lecturers.colEmail}</th>
+                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{locale === "vi" ? "Học vị / Học hàm" : "Degree / Rank"}</th>
+                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept"}</th>
+                <th className="px-2.5 py-3.5 text-center font-bold whitespace-nowrap">{locale === "vi" ? "Tài khoản" : "Account"}</th>
+                <th className="px-2.5 py-3.5 text-center font-bold whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
+                <th className="sticky right-0 z-10 bg-slate-50/90 px-2.5 py-3.5 text-center font-bold whitespace-nowrap border-l border-slate-200/80">{t.common.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -892,7 +893,7 @@ export default function LecturersPage() {
                   const facultyDept = [lec.faculty, lec.department].filter(Boolean).join(" / ") || lec.specialization || "—";
                   return (
                     <tr key={lec.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3">
+                      <td className="px-2.5 py-3.5">
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-xs">
                             {lec.full_name.charAt(0).toUpperCase()}
@@ -910,19 +911,19 @@ export default function LecturersPage() {
                         </div>
                       </td>
 
-                      <td className="px-4 py-3 font-medium text-slate-700">
+                      <td className="px-2.5 py-3.5 font-medium text-slate-700">
                         {lec.institutional_email || "—"}
                       </td>
 
-                      <td className="px-4 py-3 font-medium text-slate-700">
+                      <td className="px-2.5 py-3.5 font-medium text-slate-700">
                         {degreeRank}
                       </td>
 
-                      <td className="px-4 py-3 font-medium text-slate-700">
+                      <td className="px-2.5 py-3.5 font-medium text-slate-700">
                         {facultyDept}
                       </td>
 
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2.5 py-3.5 text-center">
                         {lec.account ? (
                           <span
                             title={getAccountRoleLabel(lec.account.role)}
@@ -938,7 +939,7 @@ export default function LecturersPage() {
                       </td>
 
                       {/* Status Column: account lock takes precedence over data warnings. */}
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2.5 py-3.5 text-center">
                         {lec.account && !lec.account.is_active ? (
                           <span
                             title={locale === "vi" ? "Tài khoản đang bị khóa" : "Account locked"}
@@ -1075,31 +1076,24 @@ export default function LecturersPage() {
       {/* ====================================================================== */}
       {isAddModalOpen && (
         <ModalPortal>
-          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
             <div
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-lecturer-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
             >
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
-                    <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 id="add-lecturer-title" className="text-base font-bold text-slate-900 sm:text-lg">
-                      {locale === "vi" ? "Thêm mới Giảng viên" : "Add New Lecturer"}
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      {locale === "vi"
-                        ? "Khởi tạo hồ sơ cán bộ và tài khoản truy cập hệ thống"
-                        : "Create lecturer profile and system account"}
-                    </p>
-                  </div>
+              <div className="flex items-center justify-between bg-blue-50 border-b border-blue-100 px-5 py-4 shrink-0">
+                <div>
+                  <h3 id="add-lecturer-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
+                    {locale === "vi" ? "Thêm mới Giảng viên" : "Add New Lecturer"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {locale === "vi"
+                      ? "Khởi tạo hồ sơ cán bộ và tài khoản truy cập hệ thống"
+                      : "Create lecturer profile and system account"}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -1288,15 +1282,15 @@ export default function LecturersPage() {
       {/* ====================================================================== */}
       {isDetailModalOpen && selectedLecturer && (
         <ModalPortal>
-          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
             <div
               role="dialog"
               aria-modal="true"
               aria-labelledby="lecturer-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
+              className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
             >
-              <div className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-6">
-                <h3 id="lecturer-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
+              <div className="shrink-0 bg-blue-50 border-b border-blue-100 px-4 py-4 sm:px-6">
+                <h3 id="lecturer-detail-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
                   {locale === "vi" ? "Chi tiết Hồ sơ Giảng viên" : "Lecturer Profile Details"}
                 </h3>
                 <p className="mt-0.5 break-all text-[11px] font-mono text-slate-400">
@@ -1514,6 +1508,8 @@ export default function LecturersPage() {
                         </a>
                       </div>
                     )}
+
+                    <ScopusIdentitiesSummary lecturerId={selectedLecturer.id} locale={locale} />
 
                     {editError && <p className="mt-2 text-[11px] font-medium text-rose-600">{editError}</p>}
                   </section>
