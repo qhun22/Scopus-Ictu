@@ -1215,6 +1215,10 @@ export default function ImportsPage() {
   // still-in-progress state, not lumped into "Hoạt động" or "Bất thường".
   const isAwaitingNormalization = (item: ScopusImport): boolean =>
     statusLabel(item) === (locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization");
+  // Not yet confirmed/applied at all — distinct from "Chờ chuẩn hóa" (confirmed,
+  // waiting on the normalization pipeline). Previously lumped into "Hoạt động".
+  const isAwaitingProcessing = (item: ScopusImport): boolean =>
+    statusLabel(item) === (locale === "vi" ? "Chờ xử lý" : "Awaiting processing");
   // A real problem: failed outright, or completed with warnings. Deliberate
   // administrative states (cancelled, superseded) are their own categories,
   // not "abnormal" — nothing went wrong, an admin acted on purpose.
@@ -1223,11 +1227,13 @@ export default function ImportsPage() {
     (item.status === "FAILED" || isWarningStatus(item));
   // Active = everything still alive and working as intended: in progress,
   // awaiting confirmation, or finished cleanly — i.e. none of the other
-  // four categories.
+  // five categories.
   const isActive = (item: ScopusImport): boolean =>
-    !isAbnormal(item) && !isCancelled(item) && !isSuperseded(item) && !isAwaitingNormalization(item);
+    !isAbnormal(item) && !isCancelled(item) && !isSuperseded(item) &&
+    !isAwaitingNormalization(item) && !isAwaitingProcessing(item);
 
   const countTotal = tableHistory.length;
+  const countAwaitingProcessing = tableHistory.filter(isAwaitingProcessing).length;
   const countActive = tableHistory.filter(isActive).length;
   const countAbnormal = tableHistory.filter(isAbnormal).length;
   const countCancelled = tableHistory.filter(isCancelled).length;
@@ -1244,7 +1250,9 @@ export default function ImportsPage() {
       (item.type && item.type.toLowerCase().includes(q));
 
     let matchesStatus = true;
-    if (statusFilter === "ACTIVE") {
+    if (statusFilter === "AWAITING_PROCESSING") {
+      matchesStatus = isAwaitingProcessing(item);
+    } else if (statusFilter === "ACTIVE") {
       matchesStatus = isActive(item);
     } else if (statusFilter === "ABNORMAL") {
       matchesStatus = isAbnormal(item);
@@ -1499,6 +1507,9 @@ export default function ImportsPage() {
           >
             <option value="ALL">
               {t.imports.statusAll} ({numberFormatter.format(countTotal)})
+            </option>
+            <option value="AWAITING_PROCESSING">
+              {t.imports.statusAwaitingProcessing} ({numberFormatter.format(countAwaitingProcessing)})
             </option>
             <option value="ACTIVE">
               {t.imports.statusActive} ({numberFormatter.format(countActive)})

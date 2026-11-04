@@ -49,6 +49,10 @@ export interface TranslationSchema {
     lecturers: string;
     users: string;
     normalization: string;
+    normalizationPublications: string;
+    normalizationAuthors: string;
+    normalizationAffiliations: string;
+    normalizationMatching: string;
     publications: string;
     reviews: string;
     reviewHistory: string;
@@ -242,6 +246,13 @@ export interface TranslationSchema {
     failedCount: string;
     searchPlaceholder: string;
     filterAll: string;
+    statusAll: string;
+    statusAwaitingProcessing: string;
+    statusActive: string;
+    statusAbnormal: string;
+    statusCancelled: string;
+    statusSuperseded: string;
+    statusAwaitingNormalization: string;
     showing: string;
     records: string;
     previousPage: string;
@@ -388,6 +399,8 @@ export interface TranslationSchema {
       emptyPendingSub: string;
       historyTitle: string;
       scopusAuthorsTitle: string;
+      scopeIctu: string;
+      scopeAll: string;
       searchPlaceholder: string;
       table: {
         authorName: string;
