@@ -187,6 +187,7 @@ export function AuthorAffiliationCell({
   const affiliations = author.affiliations ?? [];
   const resolutions = author.affiliation_resolutions ?? [];
   const noUnit = vi ? "Chưa có thông tin đơn vị" : "No unit information yet";
+  const hasUnit = vi ? "Đã có thông tin đơn vị" : "Unit information available";
 
   const resolutionLine = isAdmin && resolutions.length > 0 && (
     <div className="mt-1 text-sm text-slate-500" data-testid="aff-resolutions">
@@ -246,7 +247,7 @@ export function AuthorAffiliationCell({
           </span>
         </div>
       )}
-      {unitOnlyCrossChecked && (
+      {unitOnlyCrossChecked && isAdmin && (
         <p className="mb-1 text-sm leading-snug text-amber-700" data-testid="aff-cross-checked-note">
           {vi
             ? `Định danh đã xác minh${verifiedWithoutUnitSources.length ? ` qua ${verifiedWithoutUnitSources.join(", ")}` : ""} nhưng nguồn đó không có đơn vị; đơn vị bên dưới chỉ ở mức đối chiếu, chưa xác minh.`
@@ -254,29 +255,35 @@ export function AuthorAffiliationCell({
         </p>
       )}
       {affiliations.length > 0 && (
-        <ul className="space-y-1.5">
-          {affiliations.map((a, i) => (
-            <li key={`${a.source_system}-${i}`} className="leading-snug" data-testid="aff-item">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <AffiliationBadge status={a.link_status} locale={locale} />
-                <span className="rounded bg-slate-100 px-1.5 text-sm font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
-                <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
-              </div>
-              <div className="mt-0.5 text-sm text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
-              {a.organizations.length > 0 && (
-                <div className="mt-0.5 flex flex-wrap gap-1 text-sm text-slate-500">
-                  <span>{vi ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
-                  {a.organizations.map((o, k) => (
-                    <span key={`${o.source_org_id ?? o.display_name}-${k}`} className="rounded bg-sky-50 px-1.5 text-sky-700">
-                      {o.display_name}
-                      {o.country_code ? ` (${o.country_code})` : ""}
-                    </span>
-                  ))}
+        isAdmin ? (
+          <ul className="space-y-1.5">
+            {affiliations.map((a, i) => (
+              <li key={`${a.source_system}-${i}`} className="leading-snug" data-testid="aff-item">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <AffiliationBadge status={a.link_status} locale={locale} />
+                  <span className="rounded bg-slate-100 px-1.5 text-sm font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
+                  <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
                 </div>
-              )}
-            </li>
-          ))}
-        </ul>
+                <div className="mt-0.5 text-sm text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
+                {a.organizations.length > 0 && (
+                  <div className="mt-0.5 flex flex-wrap gap-1 text-sm text-slate-500">
+                    <span>{vi ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
+                    {a.organizations.map((o, k) => (
+                      <span key={`${o.source_org_id ?? o.display_name}-${k}`} className="rounded bg-sky-50 px-1.5 text-sky-700">
+                        {o.display_name}
+                        {o.country_code ? ` (${o.country_code})` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="font-medium text-emerald-700" data-testid="aff-has-unit">
+            {hasUnit}
+          </span>
+        )
       )}
       {resolutionLine}
       {overrides.map((o, i) => (
