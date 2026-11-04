@@ -1,6 +1,6 @@
 import { adminLabel, isCorruptedName } from "../../utils/displayName";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   ScopusImport,
   getConfirmedImportIds,
@@ -22,12 +22,12 @@ import MatchingTab from "./MatchingTab";
 const numberFormatter = new Intl.NumberFormat("vi-VN");
 
 const badgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-sm font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
 // "Basic" neutral style — same as the "Chi tiết" action button, not the blue brand badge.
 const basicBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900";
 const ingestionSuccessBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-emerald-700 hover:bg-emerald-50";
 const completedStatusBadgeClassName = ingestionSuccessBadgeClassName;
 
 // Same convention as the Imports page: the full id is a 36-char UUID, too
@@ -42,13 +42,8 @@ function formatDate(isoString?: string | null): string {
   try {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return "—";
-    return d.toLocaleString("vi-VN", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
   } catch {
     return "—";
   }
@@ -65,24 +60,21 @@ function formatDuration(seconds: number): string {
 export default function NormalizationPage() {
   const { t, locale } = useI18n();
   const toast = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const requestedImportId = searchParams.get("import");
 
+  // Each tab is its own sidebar entry and route (/normalization/:tab); this
+  // page component is shared because the four tabs' data and modals overlap.
   type TabKey = "publications" | "authors" | "affiliations" | "matching";
-  const tabFromUrl = searchParams.get("tab") as TabKey | null;
   const validTabs: TabKey[] = ["publications", "authors", "affiliations", "matching"];
-  const [activeTab, setActiveTab] = useState<TabKey>(
-    tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : "publications"
-  );
+  const { tab: tabParam } = useParams<{ tab: string }>();
+  const activeTab: TabKey =
+    tabParam && validTabs.includes(tabParam as TabKey) ? (tabParam as TabKey) : "publications";
 
-  const switchTab = (tab: TabKey) => {
-    setActiveTab(tab);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("tab", tab);
-      return next;
-    }, { replace: true });
-  };
+  useEffect(() => {
+    if (activeTab === "publications") setHistoryPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
   const [history, setHistory] = useState<ScopusImport[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
@@ -352,87 +344,6 @@ export default function NormalizationPage() {
 
   return (
     <div className="app-page-container space-y-4 sm:space-y-5">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">
-            {t.normalization.title}
-          </h1>
-          <p className="text-xs text-slate-500 sm:text-sm">
-            {t.normalization.subtitle}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              switchTab("publications");
-              setHistoryPage(1);
-            }}
-            data-testid="tab-publications"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-              activeTab === "publications"
-                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
-                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
-            }`}
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
-            <span className="truncate">{t.normalization.tabs.publications}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => switchTab("authors")}
-            data-testid="tab-authors"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-              activeTab === "authors"
-                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
-                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
-            }`}
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-            <span className="truncate">{t.normalization.tabs.authors}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => switchTab("affiliations")}
-            data-testid="tab-affiliations"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-              activeTab === "affiliations"
-                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
-                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
-            }`}
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <span className="truncate">{locale === "vi" ? "Đơn vị tác giả" : "Author affiliations"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => switchTab("matching")}
-            data-testid="tab-matching"
-            className={`h-10 w-36 inline-flex items-center justify-center gap-1.5 rounded-[5px] px-2.5 py-2 text-xs font-bold transition-colors cursor-pointer shrink-0 ${
-              activeTab === "matching"
-                ? "bg-[#3A5FC3] text-white shadow-xs hover:bg-[#2f4ea6]"
-                : "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:text-[#3A5FC3] hover:border-[#3A5FC3]"
-            }`}
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            <span className="truncate">{locale === "vi" ? "Đối sánh" : "Matching"}</span>
-          </button>
-        </div>
-      </div>
-
       {activeTab === "affiliations" && (
         <div className="tab-fade-in space-y-4">
           <AffiliationsTab locale={locale} />
@@ -527,16 +438,16 @@ export default function NormalizationPage() {
 
             <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                     <tr>
-                      <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Bản ghi" : "Records"}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
-                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">{t.normalization.table.actions}</th>
+                      <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Bản ghi" : "Records"}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
+                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">{t.normalization.table.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -585,7 +496,7 @@ export default function NormalizationPage() {
                             }`}
                           >
                             {/* File Name */}
-                            <td className="px-3 py-3.5 align-middle whitespace-nowrap">
+                            <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
                               <div className="flex items-center gap-2.5">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0 shadow-2xs">
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -604,29 +515,29 @@ export default function NormalizationPage() {
                             </td>
 
                             {/* Data type */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
                               <span className={basicBadgeClassName}>Scopus</span>
                             </td>
 
                             {/* Time */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
                               {formatDate(item.created_at)}
                             </td>
 
                             {/* Records */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
                               {numberFormatter.format(item.processed_records || item.imported_records || item.total_records)} / {numberFormatter.format(item.total_records)}
                             </td>
 
                             {/* Performed by */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               <span className={basicBadgeClassName}>{formatPerformedBy(item.performed_by)}</span>
                             </td>
 
                             {/* Status */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               {superseded ? (
-                                <span className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50">
+                                <span className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-sm font-bold leading-none text-red-700 hover:bg-red-50">
                                   {locale === "vi" ? "Thay thế" : "Superseded"}
                                 </span>
                               ) : (
@@ -637,7 +548,7 @@ export default function NormalizationPage() {
                             </td>
 
                             {/* Actions */}
-                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
+                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                               <div className="flex items-center justify-center gap-2">
                                 <button
                                   type="button"
@@ -650,7 +561,7 @@ export default function NormalizationPage() {
                                           : "This import was superseded by a newer, confirmed duplicate.")
                                       : undefined
                                   }
-                                  className="inline-flex h-badge w-32 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-300/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 group"
+                                  className="inline-flex h-badge w-32 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-slate-300/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 group"
                                 >
                                   {normalizingId === item.id ? (
                                     <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
@@ -795,16 +706,16 @@ export default function NormalizationPage() {
             {/* Simple History Table */}
             <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+                <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                     <tr>
-                      <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Bản ghi" : "Records"}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
-                      <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
-                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">{t.normalization.table.actions}</th>
+                      <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Bản ghi" : "Records"}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
+                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
+                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">{t.normalization.table.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -839,7 +750,7 @@ export default function NormalizationPage() {
                         return (
                           <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
                             {/* File Name */}
-                            <td className="px-3 py-3.5 align-middle whitespace-nowrap">
+                            <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
                               <div className="flex items-center gap-2.5">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0">
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -858,27 +769,27 @@ export default function NormalizationPage() {
                             </td>
 
                             {/* Data type */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
                               <span className={basicBadgeClassName}>Scopus</span>
                             </td>
 
                             {/* Time */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
                               {formatDate(item.created_at)}
                             </td>
 
                             {/* Records */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
                               {numberFormatter.format(item.processed_records)} / {numberFormatter.format(item.total_records)}
                             </td>
 
                             {/* Performed by */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               <span className={basicBadgeClassName}>{formatPerformedBy(item.performed_by)}</span>
                             </td>
 
                             {/* Result */}
-                            <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               <span
                                 className={
                                   n && n.status === "COMPLETED" && !hasRowErrors(item)
@@ -901,11 +812,11 @@ export default function NormalizationPage() {
                             </td>
 
                             {/* Actions: [Chi tiết] only */}
-                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
+                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetailModal(item)}
-                                className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
+                                className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                               >
                                 <span>{t.normalization.actions.viewDetail}</span>
                               </button>
@@ -986,26 +897,24 @@ export default function NormalizationPage() {
       {/* NORMALIZATION DETAIL MODAL */}
       {detailModalItem && (
         <ModalPortal>
-          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto transition-[left] duration-200 ease-out">
-            <div
-              className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] bg-slate-900/60 backdrop-blur-xs modal-backdrop-in transition-[left,opacity] duration-200 ease-out"
-              onClick={() => setDetailModalItem(null)}
-            />
-
-            <section className="relative flex flex-col w-full max-w-4xl max-h-[90vh] rounded-card bg-white shadow-2xl overflow-hidden z-10 modal-panel-in">
+          <div
+            className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
+            onClick={(e) => { if (e.target === e.currentTarget) setDetailModalItem(null); }}
+          >
+            <section className="flex h-full w-full flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in">
               {/* Modal Header */}
-              <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/50">
+              <header className="flex items-start justify-between gap-4 border-b border-blue-100 bg-blue-50 px-5 py-4">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-[5px] bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3] border border-[#3A5FC3]/20 shrink-0">
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-sm sm:text-base font-bold text-slate-800 truncate">
+                    <h2 className="text-sm sm:text-base font-bold text-[#2f4ea6] truncate">
                       {locale === "vi" ? "Chi tiết chuẩn hóa dữ liệu" : "Data Normalization Details"}
                     </h2>
-                    <p className="text-xs text-slate-500 truncate" title={detailModalItem.file_name}>
+                    <p className="mt-0.5 text-xs text-[#3A5FC3] truncate" title={detailModalItem.file_name}>
                       {detailModalItem.file_name}
                     </p>
                   </div>
@@ -1013,20 +922,18 @@ export default function NormalizationPage() {
               </header>
 
               {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 text-xs text-slate-700">
-                {/* ROW 1: 2 Equal Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-                  {/* CARD 1: THÔNG TIN NGUỒN */}
-                  <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-4 text-xs text-slate-700">
+                {/* CARD 1: THÔNG TIN NGUỒN */}
+                  <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-200/70 text-slate-600">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-100 text-slate-600">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                           </svg>
                         </div>
                         <div>
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
                             {t.normalization.detail.rawIngestionTitle}
                           </h3>
                         </div>
@@ -1037,10 +944,14 @@ export default function NormalizationPage() {
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 text-center mb-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
                       <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
                         <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
                         <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.total_records)}</p>
+                      </div>
+                      <div className="rounded-[5px] border border-blue-200/80 bg-white p-2.5 shadow-2xs">
+                        <span className="text-[10px] font-medium text-blue-600 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                        <p className="mt-0.5 text-base font-black text-blue-600">{numberFormatter.format(detailModalItem.processed_records ?? detailModalItem.imported_records)}</p>
                       </div>
                       <div className="rounded-[5px] border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
                         <span className="text-[10px] font-medium text-emerald-600 uppercase">{locale === "vi" ? "Hợp lệ" : "Valid"}</span>
@@ -1053,33 +964,39 @@ export default function NormalizationPage() {
                     </div>
 
                     {/* Info */}
-                    <div className="mt-auto space-y-1.5 rounded-[5px] border border-slate-200/80 bg-white p-3 text-xs text-slate-600">
-                      <div className="flex justify-between gap-2">
-                        <span className="text-slate-400 shrink-0">{locale === "vi" ? "Tên tệp:" : "File name:"}</span>
-                        <span className="font-semibold text-slate-800 truncate text-right" title={detailModalItem.file_name}>{detailModalItem.file_name}</span>
+                    <div className="mt-auto rounded-[5px] border border-slate-200/80 bg-white p-3 text-xs text-slate-600">
+                      <div className="mb-2 pb-2 border-b border-slate-100">
+                        <span className="text-slate-400 block">{locale === "vi" ? "Tên tệp:" : "File name:"}</span>
+                        <span className="font-semibold text-slate-800 break-all" title={detailModalItem.file_name}>{detailModalItem.file_name}</span>
                       </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-slate-400 shrink-0">{locale === "vi" ? "Người thực hiện:" : "Performed by:"}</span>
-                        <span className="font-semibold text-slate-700">{formatPerformedBy(detailModalItem.performed_by)}</span>
-                      </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-slate-400 shrink-0">{locale === "vi" ? "Thời gian tiếp nhận:" : "Imported at:"}</span>
-                        <span className="font-medium text-slate-700">{formatDate(detailModalItem.created_at)}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <span className="text-slate-400 block">{locale === "vi" ? "Người thực hiện:" : "Performed by:"}</span>
+                          <span className="font-semibold text-slate-700">{formatPerformedBy(detailModalItem.performed_by)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">{locale === "vi" ? "Bắt đầu lúc:" : "Started at:"}</span>
+                          <span className="font-medium text-slate-700">{formatDate(detailModalItem.created_at)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block">{locale === "vi" ? "Thời lượng:" : "Duration:"}</span>
+                          <span className="font-medium text-slate-700">{formatDuration(detailModalItem.duration_seconds)}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* CARD 2: KẾT QUẢ XỬ LÝ */}
-                  <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
+                  <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-200/70 text-slate-600">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-100 text-slate-600">
                           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                           </svg>
                         </div>
                         <div>
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
                             {t.normalization.detail.metricsTitle}
                           </h3>
                         </div>
@@ -1101,7 +1018,11 @@ export default function NormalizationPage() {
 
                     {detailModalItem.normalization ? (
                       <>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center mb-3">
+                          <div className="rounded-[5px] border border-blue-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-[10px] font-medium text-blue-600 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                            <p className="mt-0.5 text-base font-black text-blue-600">{numberFormatter.format(detailModalItem.normalization.canonical_processed ?? (detailModalItem.normalization.canonical_new + detailModalItem.normalization.canonical_existing + detailModalItem.normalization.canonical_metadata_changed))}</p>
+                          </div>
                           <div className="rounded-[5px] border border-emerald-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-emerald-700 uppercase">{t.normalization.table.newPublications}</span>
                             <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detailModalItem.normalization.canonical_new)}</p>
@@ -1114,18 +1035,15 @@ export default function NormalizationPage() {
                             <span className="text-[10px] font-medium text-amber-700 uppercase">{t.normalization.table.metadataChanged}</span>
                             <p className="mt-0.5 text-base font-black text-amber-700">{numberFormatter.format(detailModalItem.normalization.canonical_metadata_changed)}</p>
                           </div>
+                          <div className="rounded-[5px] border border-violet-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-[10px] font-medium text-violet-600 uppercase">{locale === "vi" ? "Trùng nội tệp" : "Intra-dup"}</span>
+                            <p className="mt-0.5 text-base font-black text-violet-600">{numberFormatter.format(detailModalItem.normalization.canonical_intra_duplicate)}</p>
+                          </div>
                           <div className="rounded-[5px] border border-rose-200/80 bg-white p-2.5 shadow-2xs">
                             <span className="text-[10px] font-medium text-rose-700 uppercase">{t.normalization.table.errors}</span>
                             <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detailModalItem.normalization.canonical_failed)}</p>
                           </div>
                         </div>
-
-                        {detailModalItem.normalization.canonical_intra_duplicate > 0 && (
-                          <div className="mb-2 rounded-[5px] border border-slate-200 bg-white p-2 text-center">
-                            <span className="text-[10px] font-medium text-slate-600">{locale === "vi" ? "Trùng EID nội tệp:" : "Intra-file Duplicates:"} </span>
-                            <strong className="text-slate-800 font-bold">{numberFormatter.format(detailModalItem.normalization.canonical_intra_duplicate)}</strong>
-                          </div>
-                        )}
 
                         <div className="mt-auto rounded-[5px] border border-slate-200/60 bg-white/75 p-2.5 text-[11px] text-slate-500">
                           {locale === "vi"
@@ -1147,7 +1065,6 @@ export default function NormalizationPage() {
                       </div>
                     )}
                   </div>
-                </div>
 
                 {/* ROW 2: Chi tiết / Lỗi */}
                 {detailModalItem.row_errors && detailModalItem.row_errors.length > 0 && (
@@ -1205,15 +1122,33 @@ export default function NormalizationPage() {
               </div>
 
               {/* Modal Footer */}
-              <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 bg-slate-50/50">
-                <button
-                  type="button"
-                  onClick={() => setDetailModalItem(null)}
-                  className={buttonClass("secondary")}
-                >
-                  {locale === "vi" ? "Đóng" : "Close"}
-                </button>
-
+              <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-white px-5 py-3">
+                {/* Trái: badges thông tin */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`${basicBadgeClassName} font-mono`} title={detailModalItem.id}>
+                    {shortId(detailModalItem.id)}
+                  </span>
+                  <span className={basicBadgeClassName}>Scopus</span>
+                  <span className={
+                    detailModalItem.normalization?.status === "COMPLETED" && !hasRowErrors(detailModalItem)
+                      ? completedStatusBadgeClassName
+                      : detailModalItem.normalization?.status === "COMPLETED"
+                        ? `${badgeClassName} border-amber-200 text-amber-700 hover:bg-amber-50`
+                        : isPending(detailModalItem)
+                          ? badgeClassName
+                          : badgeClassName
+                  }>
+                    {detailModalItem.normalization?.status === "COMPLETED" && !hasRowErrors(detailModalItem)
+                      ? (locale === "vi" ? "Hoàn thành" : "Completed")
+                      : detailModalItem.normalization?.status === "COMPLETED"
+                        ? (locale === "vi" ? "Có lỗi" : "With errors")
+                        : isPending(detailModalItem)
+                          ? (locale === "vi" ? "Chờ xử lý" : "Pending")
+                          : (locale === "vi" ? "Đang xử lý" : "Processing")}
+                  </span>
+                </div>
+                {/* Phải: nút hành động */}
+                <div className="flex items-center gap-2">
                 {isPending(detailModalItem) ? (
                   <button
                     type="button"
@@ -1255,7 +1190,14 @@ export default function NormalizationPage() {
                     <span>{t.normalization.actions.reNormalize}</span>
                   </button>
                 )}
-
+                <button
+                  type="button"
+                  onClick={() => setDetailModalItem(null)}
+                  className={buttonClass("secondary")}
+                >
+                  {locale === "vi" ? "Đóng" : "Close"}
+                </button>
+                </div>
               </footer>
             </section>
           </div>

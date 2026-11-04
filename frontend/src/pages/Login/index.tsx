@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleNotice, setGoogleNotice] = useState(false);
   const [logoSrc, setLogoSrc] = useState("/logoictu.png");
+  const [logoLoaded, setLogoLoaded] = useState(false);
 
   // Redirect if already authenticated
   if (isAuthenticated && !isAuthLoading && !loading) {
@@ -134,18 +135,25 @@ export default function LoginPage() {
         <div className="grid grid-cols-1 md:grid-cols-2">
           {/* Cột trái: Branding ICTU */}
           <section className="flex flex-col items-center justify-center bg-[#fbfcfe] p-10 text-center md:border-r md:border-slate-200/80 md:p-14">
-            <div className="relative flex items-center justify-center">
+            <div className="relative flex h-28 w-28 items-center justify-center">
+              {!logoLoaded && (
+                <div className="absolute inset-0 rounded-full bg-slate-200 shadow-md ring-4 ring-white animate-pulse" />
+              )}
               <img
                 src={logoSrc}
                 alt="Logo Đại học Công nghệ Thông tin & Truyền thông"
+                onLoad={() => setLogoLoaded(true)}
                 onError={() => {
+                  setLogoLoaded(false);
                   if (logoSrc === "/logoictu.png") {
                     setLogoSrc("/assets/logoictu.png");
                   } else if (logoSrc === "/assets/logoictu.png") {
                     setLogoSrc("/assets/ictu.png");
+                  } else {
+                    setLogoLoaded(true);
                   }
                 }}
-                className="h-28 w-28 rounded-full bg-white object-contain shadow-md ring-4 ring-white"
+                className={`h-28 w-28 rounded-full bg-white object-contain shadow-md ring-4 ring-white transition-opacity duration-500 ${logoLoaded ? "opacity-100" : "opacity-0"}`}
               />
             </div>
 
