@@ -189,7 +189,6 @@ export function AuthorAffiliationCell({
   const overrides = author.affiliation_overrides ?? [];
   const noUnit = vi ? "Chưa có thông tin đơn vị" : "No unit information yet";
   const hasUnit = vi ? "Đã có thông tin đơn vị" : "Unit information available";
-  const hasUnitSimpleLabel = vi ? "Có đơn vị, nguồn đối chiếu" : "Unit available, source cross-checked";
 
   const resolutionLine = isAdmin && resolutions.length > 0 && (
     <div className="mt-1 text-sm text-slate-500" data-testid="aff-resolutions">
@@ -220,6 +219,9 @@ export function AuthorAffiliationCell({
         </a>
       ) : (vi ? "ADMIN xác nhận thủ công" : "Manually confirmed by ADMIN")
     : primaryAffiliation ? sourceLabel(primaryAffiliation.source_system) : null;
+  const hasUnitSimpleLabel = activeOverride
+    ? (vi ? "Có đơn vị, đã được rà soát thủ công" : "Unit available, manually reviewed")
+    : (vi ? "Có đơn vị, nguồn đối chiếu" : "Unit available, source cross-checked");
 
   const simpleUnitBlock = simpleUnitText && (
     <div className="space-y-0.5" data-testid="aff-has-unit">
