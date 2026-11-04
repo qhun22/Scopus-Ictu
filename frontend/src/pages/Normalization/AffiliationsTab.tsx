@@ -638,7 +638,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               </div>
 
               <div className="px-5 py-4">
-          <div className="space-y-3 text-sm text-slate-700" data-testid="aff-preview">
+          <div className="space-y-4 text-sm text-slate-700" data-testid="aff-preview">
             {message && (
               <p className={`text-sm font-medium ${message.kind === "ok" ? "text-emerald-700" : "text-rose-600"}`} role="status" data-testid="aff-message">
                 {message.text}
@@ -650,78 +650,113 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
               </p>
             )}
             {preview.input.papers !== undefined && (
-              <div data-testid="aff-coverage">
-                <p className="mb-1 font-semibold">{vi ? "Mức bao phủ của nguồn" : "Source coverage"}</p>
-                <ul className="grid gap-x-6 gap-y-0.5 sm:grid-cols-2">
-                  <li>{vi ? "Công bố cần đối chiếu" : "Publications"}: <b>{fmt(preview.input.papers)}</b></li>
-                  <li>{vi ? "Vị trí tác giả" : "Author positions"}: <b>{fmt(preview.input.author_slots)}</b></li>
-                  <li>{vi ? "Có bài trong OpenAlex" : "Found in OpenAlex"}: <b>{fmt(preview.input.papers_with_openalex_work)}</b></li>
-                  <li>{vi ? "Có bài trong Crossref" : "Found in Crossref"}: <b>{fmt(preview.input.papers_with_crossref_work)}</b></li>
-                  <li>{vi ? "Không có bài ở nguồn nào" : "In no source"}: <b>{fmt(preview.input.papers_without_any_work)}</b></li>
-                  <li>{vi ? "Không có DOI" : "Without DOI"}: <b>{fmt(preview.input.papers_without_doi)}</b></li>
-                  <li>{vi ? "DOI trùng (không dùng)" : "Duplicate DOI (unused)"}: <b>{fmt(preview.input.papers_with_duplicate_doi)}</b></li>
-                  <li data-testid="aff-cross-check">
-                    {vi ? "Đối chiếu chéo với tệp khảo sát" : "Cross-check with survey file"}:{" "}
-                    {preview.input.cross_check_against_survey_jsonl ? (
-                      <>
-                        <b>{fmt(preview.input.cross_check_links_matched)}</b> {vi ? "khớp" : "agree"}
-                        {(preview.input.cross_check_links_not_covered ?? 0) > 0 && (
-                          <>
-                            , <b>{fmt(preview.input.cross_check_links_not_covered)}</b> {vi ? "không có trong tệp (chỉ tính lại từ metadata gốc)" : "not in the file (recomputed from raw metadata only)"}
-                          </>
-                        )}
-                        {preview.source_mismatches > 0 && <b className="text-rose-600"> · {fmt(preview.source_mismatches)} {vi ? "lệch" : "mismatches"}</b>}
-                      </>
-                    ) : (
-                      <b>{vi ? "Không có tệp" : "No file"}</b>
-                    )}
-                  </li>
-                </ul>
-              </div>
+              <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs" data-testid="aff-coverage">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                    {vi ? "Mức bao phủ của nguồn" : "Source coverage"}
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+                  <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                    <span className="text-sm font-medium text-slate-500 uppercase">{vi ? "Công bố cần đối chiếu" : "Publications"}</span>
+                    <p className="mt-0.5 text-base font-black text-slate-800">{fmt(preview.input.papers)}</p>
+                  </div>
+                  <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                    <span className="text-sm font-medium text-slate-500 uppercase">{vi ? "Vị trí tác giả" : "Author positions"}</span>
+                    <p className="mt-0.5 text-base font-black text-slate-800">{fmt(preview.input.author_slots)}</p>
+                  </div>
+                  <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                    <span className="text-sm font-medium text-slate-500 uppercase">{vi ? "Có bài trong OpenAlex" : "Found in OpenAlex"}</span>
+                    <p className="mt-0.5 text-base font-black text-emerald-700">{fmt(preview.input.papers_with_openalex_work)}</p>
+                  </div>
+                  <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                    <span className="text-sm font-medium text-slate-500 uppercase">{vi ? "Có bài trong Crossref" : "Found in Crossref"}</span>
+                    <p className="mt-0.5 text-base font-black text-emerald-700">{fmt(preview.input.papers_with_crossref_work)}</p>
+                  </div>
+                  <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                    <span className="text-sm font-medium text-slate-500 uppercase">{vi ? "Không có bài ở nguồn nào" : "In no source"}</span>
+                    <p className="mt-0.5 text-base font-black text-amber-700">{fmt(preview.input.papers_without_any_work)}</p>
+                  </div>
+                  <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                    <span className="text-sm font-medium text-slate-500 uppercase">{vi ? "Không có DOI" : "Without DOI"}</span>
+                    <p className="mt-0.5 text-base font-black text-amber-700">{fmt(preview.input.papers_without_doi)}</p>
+                  </div>
+                  <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                    <span className="text-sm font-medium text-slate-500 uppercase">{vi ? "DOI trùng (không dùng)" : "Duplicate DOI"}</span>
+                    <p className="mt-0.5 text-base font-black text-slate-800">{fmt(preview.input.papers_with_duplicate_doi)}</p>
+                  </div>
+                </div>
+                <dl className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm" data-testid="aff-cross-check">
+                  <div className="flex flex-wrap items-baseline gap-x-1.5">
+                    <dt className="font-semibold text-slate-600">{vi ? "Đối chiếu chéo với tệp khảo sát:" : "Cross-check with survey file:"}</dt>
+                    <dd>
+                      {preview.input.cross_check_against_survey_jsonl ? (
+                        <>
+                          <b>{fmt(preview.input.cross_check_links_matched)}</b> {vi ? "khớp" : "agree"}
+                          {(preview.input.cross_check_links_not_covered ?? 0) > 0 && (
+                            <>
+                              , <b>{fmt(preview.input.cross_check_links_not_covered)}</b> {vi ? "không có trong tệp (chỉ tính lại từ metadata gốc)" : "not in the file (recomputed from raw metadata only)"}
+                            </>
+                          )}
+                          {preview.source_mismatches > 0 && <b className="text-rose-600"> · {fmt(preview.source_mismatches)} {vi ? "lệch" : "mismatches"}</b>}
+                        </>
+                      ) : (
+                        <b>{vi ? "Không có tệp" : "No file"}</b>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
             )}
 
             {preview.report.by_source_and_confidence && (
-              <div>
-                <p className="mb-1 font-semibold">{vi ? "Kết quả theo nguồn và mức tin cậy" : "Result by source and confidence"}</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[32rem] border-collapse text-left" data-testid="aff-preview-table">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-sm uppercase text-slate-500">
-                        <th className="py-1 pr-3">{vi ? "Nguồn" : "Source"}</th>
-                        <th className="py-1 pr-3">{vi ? "Mức" : "Level"}</th>
-                        {Object.keys(OUTCOME_LABEL).map((k) => (
-                          <th key={k} className="py-1 pr-3 text-right">{OUTCOME_LABEL[k][locale]}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(preview.report.by_source_and_confidence)
-                        .sort()
-                        .map(([key, counts]) => (
-                          <tr key={key} className="border-b border-slate-100">
-                            <td className="py-1 pr-3">{sourceOf(key)}</td>
-                            <td className="py-1 pr-3">{statusOf(key, locale)}</td>
-                            {Object.keys(OUTCOME_LABEL).map((k) => (
-                              <td key={k} className="py-1 pr-3 text-right tabular-nums">{fmt((counts as Record<string, number>)[k])}</td>
-                            ))}
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
+              <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                    {vi ? "Kết quả theo nguồn và mức tin cậy" : "Result by source and confidence"}
+                  </h3>
                 </div>
-                <p className="mt-1.5" data-testid="aff-preview-totals">
+                <div className="overflow-hidden rounded-[5px] border border-slate-200/80">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[32rem] text-left text-sm" data-testid="aff-preview-table">
+                      <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+                        <tr>
+                          <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{vi ? "Nguồn" : "Source"}</th>
+                          <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{vi ? "Mức" : "Level"}</th>
+                          {Object.keys(OUTCOME_LABEL).map((k) => (
+                            <th key={k} className="px-2.5 py-3.5 text-right font-bold whitespace-nowrap">{OUTCOME_LABEL[k][locale]}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {Object.entries(preview.report.by_source_and_confidence)
+                          .sort()
+                          .map(([key, counts]) => (
+                            <tr key={key} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-2.5 py-3.5 font-medium text-slate-700">{sourceOf(key)}</td>
+                              <td className="px-2.5 py-3.5 font-medium text-slate-700">{statusOf(key, locale)}</td>
+                              {Object.keys(OUTCOME_LABEL).map((k) => (
+                                <td key={k} className="px-2.5 py-3.5 text-right font-bold text-slate-800 tabular-nums">{fmt((counts as Record<string, number>)[k])}</td>
+                              ))}
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm" data-testid="aff-preview-totals">
                   {vi ? "Sẽ ghi: " : "Will write: "}
                   <b>{fmt(preview.report.resolutions_to_insert)}</b> {vi ? "kết quả đối chiếu" : "resolutions"},{" "}
                   <b>{fmt(preview.report.affiliations_to_insert)}</b> {vi ? "dòng đơn vị" : "affiliation lines"},{" "}
                   <b>{fmt(preview.report.organizations_to_insert)}</b> {vi ? "tổ chức mới" : "new organizations"}.
                 </p>
                 {preview.report.conflict_reasons && Object.keys(preview.report.conflict_reasons).length > 0 && (
-                  <p className="text-slate-500">
+                  <p className="mt-1 text-sm text-slate-500">
                     {vi ? "Xung đột được giữ lại an toàn: " : "Conflicts safely withheld: "}
                     {Object.entries(preview.report.conflict_reasons).map(([k, n]) => `${k} (${fmt(n)})`).join(" · ")}
                   </p>
                 )}
-              </div>
+              </section>
             )}
 
             <label className="flex items-start gap-2 rounded-[5px] border border-slate-200 bg-slate-50 p-2.5">
