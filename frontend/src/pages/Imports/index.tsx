@@ -64,21 +64,21 @@ function shortId(id: string): string {
 }
 
 const badgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-sm font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
 const statusBadgeClassName = badgeClassName;
 const cancelledStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-sm font-bold leading-none text-red-700 hover:bg-red-50";
 const activeStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700 hover:bg-emerald-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 text-center text-sm font-bold leading-none text-emerald-700 hover:bg-emerald-50";
 const supersededStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-red-700 hover:bg-red-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-sm font-bold leading-none text-red-700 hover:bg-red-50";
 const abnormalStatusBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700 hover:bg-amber-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-400 bg-white px-2.5 text-center text-sm font-bold leading-none text-amber-700 hover:bg-amber-50";
 const needsProcessingBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2.5 text-center text-sm font-bold leading-none text-[#3A5FC3] hover:bg-blue-50";
 // "Basic" neutral style — same as the "Chi tiết" action button, not the blue brand badge.
 const basicBadgeClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900";
 const typeBadgeClassName = basicBadgeClassName;
 const userBadgeClassName = basicBadgeClassName;
 const ACTIVE_STATUSES: ImportStatus[] = ["RECEIVED", "PARSING", "VALIDATED"];
@@ -462,7 +462,7 @@ export default function ImportsPage() {
   const renderIngestionBadge = (item: ScopusImport) => {
     if (ACTIVE_STATUSES.includes(item.status)) {
       return (
-        <span className="inline-flex items-center gap-1 rounded-[5px] border border-blue-300 bg-white px-2.5 py-0.5 text-xs font-bold text-[#3A5FC3]">
+        <span className={`${needsProcessingBadgeClassName} gap-1`}>
           <span className="h-2.5 w-2.5 animate-spin [animation-duration:1.5s] rounded-full border-2 border-[#3A5FC3] border-t-transparent" />
           {t.imports.inProgress}
         </span>
@@ -470,7 +470,7 @@ export default function ImportsPage() {
     }
     if (item.status === "FAILED") {
       return (
-        <span className="inline-flex items-center rounded-[5px] border border-rose-300 bg-white px-2.5 py-0.5 text-xs font-bold text-rose-700">
+        <span className={cancelledStatusBadgeClassName}>
           {t.imports.failed}
         </span>
       );
@@ -482,22 +482,33 @@ export default function ImportsPage() {
         </span>
       );
     }
+    // Trùng file chưa xác nhận → "Bất thường", không phải "Cảnh báo"
+    if (item.status === "STAGED" && item.duplicate_of) {
+      const confirmed = confirmedImportIds.includes(item.id) || Boolean(item.normalization_summary);
+      if (!confirmed) {
+        return (
+          <span className={abnormalStatusBadgeClassName}>
+            {locale === "vi" ? "Bất thường" : "Abnormal"}
+          </span>
+        );
+      }
+    }
     if (isWarningStatus(item)) {
       return (
-        <span className="inline-flex items-center rounded-[5px] border border-amber-300 bg-white px-2.5 py-0.5 text-xs font-bold text-amber-700">
+        <span className={abnormalStatusBadgeClassName}>
           {locale === "vi" ? "Cảnh báo" : "Warning"}
         </span>
       );
     }
     if (item.failed_records > 0) {
       return (
-        <span className={`${badgeClassName} border-emerald-400 text-emerald-700`}>
+        <span className={activeStatusBadgeClassName}>
           {locale === "vi" ? "Đã tiếp nhận (có lỗi)" : "Ingested with errors"}
         </span>
       );
     }
     return (
-      <span className={`${badgeClassName} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}>
+      <span className={activeStatusBadgeClassName}>
         {locale === "vi" ? "Đã tiếp nhận" : "Ingestion complete"}
       </span>
     );
@@ -522,7 +533,7 @@ export default function ImportsPage() {
     }
     if (n && n.status === "FAILED") {
       return (
-        <span className="inline-flex items-center rounded-[5px] border border-rose-300 bg-white px-2.5 py-0.5 text-xs font-bold text-rose-700">
+        <span className="inline-flex items-center rounded-[5px] border border-rose-300 bg-white px-2.5 py-0.5 text-sm font-bold text-rose-700">
           {locale === "vi" ? "Lỗi chuẩn hóa" : "Normalization failed"}
         </span>
       );
@@ -533,7 +544,6 @@ export default function ImportsPage() {
       </span>
     );
   };
-  void renderNormalizationBadge;
 
   const renderTypeBadge = (type?: string) => {
     if (type === "LECTURERS") {
@@ -1152,15 +1162,6 @@ export default function ImportsPage() {
     }
   };
 
-  const handleHeaderAddClick = () => {
-    if (uploading) return;
-    if (lecturerDataMissing) {
-      notifyLecturerDataRequired();
-      return;
-    }
-    inputRef.current?.click();
-  };
-
   // Filter & Pagination calculations
   const lecturerPreviewRow: ScopusImport | null = lecturerPreview
     ? {
@@ -1207,37 +1208,35 @@ export default function ImportsPage() {
       )
     : history;
 
-  // KPI Calculations — must include the in-progress lecturer preview row
-  // (tableHistory), not just confirmed server-side history, otherwise the
-  // "Total Imports" card undercounts by 1 while a JSON preview is pending.
-  // A row awaiting user confirmation (isAwaitingConfirmation) must count as
-  // "Processing", not "Success" — it has STAGED status but the user hasn't
-  // clicked "Confirm import" yet, so nothing has actually been imported.
-  const isFailedOrCancelledOrSuperseded = (item: ScopusImport): boolean =>
-    item.status === "FAILED" ||
-    item.status === "CANCELLED" ||
+  // Status-filter calculations — must include the in-progress lecturer
+  // preview row (tableHistory), not just confirmed server-side history,
+  // otherwise the "Total" count undercounts by 1 while a JSON preview is
+  // pending.
+  const isCancelled = (item: ScopusImport): boolean => item.status === "CANCELLED";
+  const isSuperseded = (item: ScopusImport): boolean =>
     statusLabel(item) === (locale === "vi" ? "Thay thế" : "Superseded");
-  // "Chờ chuẩn hóa" is still in progress — the Scopus rows haven't gone
-  // through normalization yet — so it belongs in "Đang xử lý", not "Thành công".
+  // Its Scopus rows haven't gone through normalization yet — a distinct,
+  // still-in-progress state, not lumped into "Hoạt động" or "Bất thường".
   const isAwaitingNormalization = (item: ScopusImport): boolean =>
     statusLabel(item) === (locale === "vi" ? "Chờ chuẩn hóa" : "Awaiting normalization");
+  // A real problem: failed outright, or completed with warnings. Deliberate
+  // administrative states (cancelled, superseded) are their own categories,
+  // not "abnormal" — nothing went wrong, an admin acted on purpose.
+  const isAbnormal = (item: ScopusImport): boolean =>
+    !isCancelled(item) && !isSuperseded(item) && !isAwaitingNormalization(item) &&
+    (item.status === "FAILED" || isWarningStatus(item));
+  // Active = everything still alive and working as intended: in progress,
+  // awaiting confirmation, or finished cleanly — i.e. none of the other
+  // four categories.
+  const isActive = (item: ScopusImport): boolean =>
+    !isAbnormal(item) && !isCancelled(item) && !isSuperseded(item) && !isAwaitingNormalization(item);
+
   const countTotal = tableHistory.length;
-  const countWarning = tableHistory.filter((item) => isWarningStatus(item)).length;
-  const countSuccess = tableHistory.filter(
-    (item) =>
-      (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
-      !isAwaitingConfirmation(item) &&
-      !isWarningStatus(item) &&
-      !isFailedOrCancelledOrSuperseded(item) &&
-      !isAwaitingNormalization(item),
-  ).length;
-  const countProcessing = tableHistory.filter(
-    (item) =>
-      ((["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item)) &&
-        !isWarningStatus(item)) ||
-      isAwaitingNormalization(item),
-  ).length;
-  const countFailed = tableHistory.filter(isFailedOrCancelledOrSuperseded).length;
+  const countActive = tableHistory.filter(isActive).length;
+  const countAbnormal = tableHistory.filter(isAbnormal).length;
+  const countCancelled = tableHistory.filter(isCancelled).length;
+  const countSuperseded = tableHistory.filter(isSuperseded).length;
+  const countAwaitingNormalization = tableHistory.filter(isAwaitingNormalization).length;
 
   const filteredHistory = tableHistory.filter((item) => {
     const q = searchInput.trim().toLowerCase();
@@ -1249,22 +1248,16 @@ export default function ImportsPage() {
       (item.type && item.type.toLowerCase().includes(q));
 
     let matchesStatus = true;
-    if (statusFilter === "COMPLETED") {
-      matchesStatus =
-        (item.status === "STAGED" || item.status === "APPLIED" || item.status === "IMPORTED") &&
-        !isAwaitingConfirmation(item) &&
-        !isWarningStatus(item) &&
-        !isFailedOrCancelledOrSuperseded(item) &&
-        !isAwaitingNormalization(item);
-    } else if (statusFilter === "WARNING") {
-      matchesStatus = isWarningStatus(item);
-    } else if (statusFilter === "PROCESSING") {
-      matchesStatus =
-        ((["RECEIVED", "PARSING", "VALIDATED"].includes(item.status) || isAwaitingConfirmation(item)) &&
-          !isWarningStatus(item)) ||
-        isAwaitingNormalization(item);
-    } else if (statusFilter === "FAILED") {
-      matchesStatus = isFailedOrCancelledOrSuperseded(item);
+    if (statusFilter === "ACTIVE") {
+      matchesStatus = isActive(item);
+    } else if (statusFilter === "ABNORMAL") {
+      matchesStatus = isAbnormal(item);
+    } else if (statusFilter === "CANCELLED") {
+      matchesStatus = isCancelled(item);
+    } else if (statusFilter === "SUPERSEDED") {
+      matchesStatus = isSuperseded(item);
+    } else if (statusFilter === "AWAITING_NORMALIZATION") {
+      matchesStatus = isAwaitingNormalization(item);
     }
 
     return matchesSearch && matchesStatus;
@@ -1305,38 +1298,6 @@ export default function ImportsPage() {
 
       <div className="app-page-container space-y-4 sm:space-y-5">
 
-      {/* Header Title Section with '+ Thêm tệp Scopus' Button */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">
-            {t.imports.title}
-          </h1>
-          <p className="text-xs text-slate-500 sm:text-sm">
-            {t.imports.subtitle}
-          </p>
-        </div>
-
-        <div className="page-action-group">
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={handleHeaderAddClick}
-            className={buttonClass("primary", "md", true)}
-          >
-            <span className="truncate">{t.imports.addImport}</span>
-          </button>
-
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => lecturerCardRef.current?.openFilePicker()}
-            className={buttonClass("primary", "md", true)}
-          >
-            <span className="truncate">{t.imports.addLecturers}</span>
-          </button>
-        </div>
-      </div>
-
       {/* Import Boxes Grid: 1 row, 2 boxes (1:1 ratio) - Left: Scopus CSV, Right: Lecturer JSON */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-stretch">
         {/* Left Box: Tải tệp Scopus */}
@@ -1351,7 +1312,7 @@ export default function ImportsPage() {
               <h2 className="text-sm font-bold text-slate-800">
                 {t.imports.uploadTitle}
               </h2>
-              <p className="text-xs text-slate-500">
+              <p className="text-sm text-slate-500">
                 {t.imports.uploadSubtitle}
               </p>
             </div>
@@ -1389,14 +1350,14 @@ export default function ImportsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M7 19a4 4 0 01-.88-7.903A5.002 5.002 0 0116.9 9H17a4 4 0 010 8h-1m-4-6v6m0 0l-2-2m2 2l2-2" />
                 </svg>
               </div>
-              <p className="text-xs font-semibold text-slate-700 sm:text-sm group-hover:text-[#3A5FC3] transition-colors">
+              <p className="text-sm font-semibold text-slate-700 group-hover:text-[#3A5FC3] transition-colors">
                 {dragging
                   ? t.imports.dragActivePrompt
                   : locale === "vi"
                     ? "Nhấp hoặc kéo thả tệp CSV vào đây để tải lên"
                     : "Click or drag and drop a CSV file here to upload"}
               </p>
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-sm text-slate-400">
                 {replaceToken(t.imports.supportedHint, "size", maxSize)}
               </p>
             </div>
@@ -1411,12 +1372,12 @@ export default function ImportsPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <span
-                      className="block font-semibold text-slate-800 text-xs leading-snug break-all line-clamp-2"
+                      className="block font-semibold text-slate-800 text-sm leading-snug break-all line-clamp-2"
                       title={selectedFile.name}
                     >
                       {selectedFile.name}
                     </span>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
                       <span>{locale === "vi" ? "Dung lượng:" : "Size:"} <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong></span>
                       <span>•</span>
                       <span>{locale === "vi" ? "Định dạng:" : "Format:"} <strong className="text-slate-700">CSV</strong></span>
@@ -1458,7 +1419,7 @@ export default function ImportsPage() {
           )}
 
           {selectionError && (
-            <div role="alert" className="mt-3 flex items-center gap-2 rounded-[5px] border border-rose-200 bg-rose-50/80 p-3 text-xs font-semibold text-rose-700">
+            <div role="alert" className="mt-3 flex items-center gap-2 rounded-[5px] border border-rose-200 bg-rose-50/80 p-3 text-sm font-semibold text-rose-700">
               <svg className="h-4 w-4 shrink-0 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -1529,31 +1490,34 @@ export default function ImportsPage() {
             value={searchInput}
             onChange={(e) => { setSearchInput(e.target.value); setPage(1); }}
             placeholder={t.imports.searchPlaceholder}
-            className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
+            className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <select
-            aria-label={locale === "vi" ? "Trạng thái" : "Status"}
+            aria-label={t.common.status}
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="h-control shrink-0 rounded-control border border-line bg-slate-50 px-3 text-[13px] font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 cursor-pointer"
+            className="h-control shrink-0 rounded-control border border-line bg-slate-50 px-3 text-sm font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20 cursor-pointer"
           >
             <option value="ALL">
-              {locale === "vi" ? "Tất cả" : "All"} ({numberFormatter.format(countTotal)})
+              {t.imports.statusAll} ({numberFormatter.format(countTotal)})
             </option>
-            <option value="COMPLETED">
-              {locale === "vi" ? "Thành công" : "Completed"} ({numberFormatter.format(countSuccess)})
+            <option value="ACTIVE">
+              {t.imports.statusActive} ({numberFormatter.format(countActive)})
             </option>
-            <option value="WARNING">
-              {locale === "vi" ? "Cảnh báo" : "Warnings"} ({numberFormatter.format(countWarning)})
+            <option value="ABNORMAL">
+              {t.imports.statusAbnormal} ({numberFormatter.format(countAbnormal)})
             </option>
-            <option value="PROCESSING">
-              {locale === "vi" ? "Cần xử lý" : "Processing"} ({numberFormatter.format(countProcessing)})
+            <option value="CANCELLED">
+              {t.imports.statusCancelled} ({numberFormatter.format(countCancelled)})
             </option>
-            <option value="FAILED">
-              {locale === "vi" ? "Lỗi / Đã hủy" : "Failed / Rolled back"} ({numberFormatter.format(countFailed)})
+            <option value="SUPERSEDED">
+              {t.imports.statusSuperseded} ({numberFormatter.format(countSuperseded)})
+            </option>
+            <option value="AWAITING_NORMALIZATION">
+              {t.imports.statusAwaitingNormalization} ({numberFormatter.format(countAwaitingNormalization)})
             </option>
           </select>
 
@@ -1580,17 +1544,17 @@ export default function ImportsPage() {
       {/* History Table Card */}
       <section className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="px-3 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.imports.fileName}</th>
-                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
-                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.time}</th>
-                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
-                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
-                <th className="px-3 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.common.status}</th>
+                <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">{t.imports.fileName}</th>
+                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
+                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.imports.time}</th>
+                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
+                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
+                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.common.status}</th>
                 {/* UI-10: keep the actions column visible at every width (sticky right edge) */}
-                <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-3 py-3.5 text-center font-semibold text-slate-700">{t.imports.actions}</th>
+                <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">{t.imports.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1613,7 +1577,7 @@ export default function ImportsPage() {
                         </svg>
                       </div>
                       <span className="text-sm font-bold text-slate-700">{t.imports.noHistory}</span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-sm text-slate-400">
                         {locale === "vi" ? "Các lần nhập dữ liệu CSV và JSON sẽ xuất hiện tại đây." : "Import history will appear here."}
                       </span>
                     </div>
@@ -1631,7 +1595,7 @@ export default function ImportsPage() {
                           : "hover:bg-slate-50/50"
                     }`}
                   >
-                    <td className="px-3 py-3.5 align-middle whitespace-nowrap">
+                    <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0 shadow-2xs">
                           {item.type === "LECTURERS" ? (
@@ -1649,7 +1613,7 @@ export default function ImportsPage() {
                             {item.file_name}
                           </span>
                           <span
-                            className="block text-[10px] font-mono text-slate-400 truncate"
+                            className="block text-sm font-mono font-medium text-slate-400 truncate"
                             title={item.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? item.id) : item.id}
                           >
                             ID: {shortId(item.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? item.id) : item.id)}
@@ -1658,15 +1622,15 @@ export default function ImportsPage() {
                       </div>
                     </td>
 
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium">
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
                       {renderTypeBadge(item.type)}
                     </td>
 
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
                       {formatDate(item.created_at)}
                     </td>
 
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
                       <span>
                         {`${numberFormatter.format(
                           item.status === "CANCELLED" ||
@@ -1685,19 +1649,19 @@ export default function ImportsPage() {
                       )}
                     </td>
 
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                       {renderUserBadge(item.performed_by)}
                     </td>
 
-                    <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                       {renderTableStatusBadge(item)}
                     </td>
 
-                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-3 py-3.5 text-center align-middle">
+                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                       <button
                         type="button"
                         onClick={() => openDetail(item)}
-                        className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
+                        className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors cursor-pointer"
                       >
                         {t.imports.detail}
                       </button>
@@ -1710,10 +1674,10 @@ export default function ImportsPage() {
         </div>
 
         {/* Footer info & Pagination Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
           <div className="flex items-center gap-3">
             <span>
-              {t.imports.showing} <strong>{paginatedHistory.length}</strong> {locale === "vi" ? "trong" : "of"} {filteredHistory.length} {locale === "vi" ? "đợt nhập" : "imports"}
+              {t.imports.showing} <strong>{paginatedHistory.length}</strong> {locale === "vi" ? "trong" : "of"} <strong>{filteredHistory.length}</strong> {locale === "vi" ? "đợt nhập" : "imports"}
             </span>
 
             {/* Page Size Selector */}
@@ -1723,7 +1687,7 @@ export default function ImportsPage() {
                 value={pageSize}
                 disabled={isPageLoading}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="h-7 rounded-[5px] border border-slate-200 bg-white px-1.5 text-xs font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
+                className="h-7 rounded-[5px] border border-slate-200 bg-white px-1.5 text-sm font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
               >
                 <option value={10}>10 / {locale === "vi" ? "trang" : "page"}</option>
                 <option value={30}>30 / {locale === "vi" ? "trang" : "page"}</option>
@@ -1754,7 +1718,7 @@ export default function ImportsPage() {
                 const val = Math.max(1, Math.min(totalPages, parseInt(e.target.value, 10) || 1));
                 handlePageChange(val);
               }}
-              className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             <span className="text-slate-400">/ <strong className="text-slate-600">{totalPages}</strong></span>
             <button
@@ -1774,36 +1738,27 @@ export default function ImportsPage() {
       {/* ====================================================================== */}
       {detailOpen && (
         <ModalPortal>
-          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-slate-900/50 p-3 backdrop-blur-xs sm:p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
             <section
               role="dialog"
               aria-modal="true"
               aria-labelledby="import-detail-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-4xl lg:max-w-5xl flex-col overflow-hidden rounded-card bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
+              className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in"
             >
-              <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 border-b border-slate-100 px-5 py-4">
+              <header className="flex shrink-0 items-start justify-between gap-4 border-b border-blue-100 bg-blue-50 px-5 py-4">
                 <div className="min-w-0">
-                  <h2 id="import-detail-title" className="text-base font-bold text-slate-900 sm:text-lg">
-                    {detail?.type === "LECTURERS"
-                      ? (locale === "vi" ? "Chi tiết tệp giảng viên" : "Lecturer file detail")
-                      : t.imports.detail}
+                  <h2 id="import-detail-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
+                    {locale === "vi" ? "Chi tiết đợt nhập" : "Import detail"}
                   </h2>
+                  <p className="mt-0.5 text-sm text-[#3A5FC3]">
+                    {locale === "vi"
+                      ? "Thông tin tiếp nhận và tình trạng sử dụng dữ liệu."
+                      : "Ingestion information and data usage status."}
+                  </p>
                 </div>
-                {detail && (
-                  <div className="flex shrink-0 items-center gap-2 pt-1">
-                    <span
-                      className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center font-mono text-xs font-bold leading-none text-slate-700"
-                      title={detail.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? detail.id) : detail.id}
-                    >
-                      ID: {shortId(detail.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? detail.id) : detail.id)}
-                    </span>
-                    {renderTypeBadge(detail.type)}
-                    {renderStatusBadge(detail)}
-                  </div>
-                )}
               </header>
 
-              <div className="min-h-48 overflow-y-auto p-4 sm:p-5">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
                 {detail?.duplicate_of &&
                   !confirmedImportIds.includes(detail.id) &&
                   !detail.normalization_summary && (
@@ -1815,12 +1770,12 @@ export default function ImportsPage() {
                       <h3 className="text-sm font-bold text-amber-700">
                         {locale === "vi" ? "Tệp dữ liệu đã được nhập trước đó" : "This file was imported before"}
                       </h3>
-                      <p className="mt-1 text-xs text-slate-600">
+                      <p className="mt-1 text-sm text-slate-600">
                         {locale === "vi"
                           ? "Tệp có nội dung trùng với một đợt nhập trước. Đợt này được đánh dấu \"Bất thường\"; bạn có thể \"Xem đợt trước\" để đối chiếu, hoặc xác nhận nhập/hủy tiến trình bên dưới."
                           : "The file content matches an earlier import. This one is marked \"Abnormal\"; you can view the earlier import to compare, or confirm/cancel below."}
                       </p>
-                      <dl className="mt-2 space-y-0.5 text-xs text-slate-700">
+                      <dl className="mt-2 space-y-0.5 text-sm text-slate-700">
                         <div>
                           <dt className="inline font-semibold">{locale === "vi" ? "Tệp đã chọn: " : "Selected file: "}</dt>
                           <dd className="inline break-all">{detail.file_name}</dd>
@@ -1840,77 +1795,79 @@ export default function ImportsPage() {
                   </div>
                 ) : detail.type === "LECTURERS" ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2">
-                      <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                        <div className="mb-3 border-b border-slate-200/70 pb-3">
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    <div className="space-y-4">
+                      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                        <div className="mb-3 border-b border-slate-100 pb-3">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
                             {locale === "vi" ? "Tiếp nhận dữ liệu" : "Data ingestion"}
                           </h3>
-                          <span className="text-[11px] font-medium text-slate-500">
+                          <span className="text-sm font-medium text-slate-500">
                             {locale === "vi" ? "Dữ liệu giảng viên" : "Lecturer dataset"}
                           </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-center">
                           <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.totalRecords}</span>
+                            <span className="text-sm font-medium uppercase text-slate-500">{t.lecturerImport.totalRecords}</span>
                             <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
                           </div>
                           <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.created}</span>
+                            <span className="text-sm font-medium uppercase text-slate-500">{t.lecturerImport.created}</span>
                             <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.lecturer_summary?.created ?? detail.imported_records)}</p>
                           </div>
                           <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.updated}</span>
+                            <span className="text-sm font-medium uppercase text-slate-500">{t.lecturerImport.updated}</span>
                             <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.lecturer_summary?.updated ?? 0)}</p>
                           </div>
                           <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.unchanged}</span>
+                            <span className="text-sm font-medium uppercase text-slate-500">{t.lecturerImport.unchanged}</span>
                             <p className="mt-0.5 text-base font-black text-slate-700">{numberFormatter.format(detail.lecturer_summary?.unchanged ?? 0)}</p>
                           </div>
                           {detail.id !== LECTURER_PREVIEW_ID && (
                             <>
                               <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                                <span className="text-[10px] font-medium uppercase text-slate-500">{t.lecturerImport.accountsCreated}</span>
+                                <span className="text-sm font-medium uppercase text-slate-500">{t.lecturerImport.accountsCreated}</span>
                                 <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.lecturer_summary?.accounts_created ?? 0)}</p>
                               </div>
                               <div className={`flex h-16 flex-col items-center justify-center rounded-[5px] border p-2.5 shadow-2xs ${(detail.lecturer_summary?.accounts_skipped ?? 0) > 0 ? "border-amber-200 bg-amber-50/80" : "border-slate-200/80 bg-white"}`}>
-                                <span className={`text-[10px] font-medium uppercase ${(detail.lecturer_summary?.accounts_skipped ?? 0) > 0 ? "text-amber-700" : "text-slate-500"}`}>{t.lecturerImport.accountsSkipped}</span>
+                                <span className={`text-sm font-medium uppercase ${(detail.lecturer_summary?.accounts_skipped ?? 0) > 0 ? "text-amber-700" : "text-slate-500"}`}>{t.lecturerImport.accountsSkipped}</span>
                                 <p className={`mt-0.5 text-base font-black ${(detail.lecturer_summary?.accounts_skipped ?? 0) > 0 ? "text-amber-800" : "text-slate-700"}`}>{numberFormatter.format(detail.lecturer_summary?.accounts_skipped ?? 0)}</p>
                               </div>
                             </>
                           )}
                         </div>
-                      </div>
+                      </section>
 
-                      <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                        <div className="mb-3 border-b border-slate-200/70 pb-3">
-                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                        <div className="mb-3 border-b border-slate-100 pb-3">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
                             {locale === "vi" ? "Thông tin tệp" : "File information"}
                           </h3>
-                          <span className="text-[11px] font-medium text-slate-500">
+                          <span className="text-sm font-medium text-slate-500">
                             {locale === "vi" ? "Thông tin đợt nhập" : "Import details"}
                           </span>
                         </div>
-                        <dl className="grid grid-cols-2 gap-2 text-center">
-                          <div className="col-span-2 flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <dt className="text-[10px] font-medium uppercase text-slate-500">{t.imports.fileName}</dt>
-                            <dd className="mt-0.5 truncate text-sm font-black text-slate-800" title={detail.file_name}>{detail.file_name}</dd>
+                        <dl className="space-y-3 text-sm">
+                          <div className="min-w-0">
+                            <dt className="text-slate-400">{t.imports.fileName}</dt>
+                            <dd className="font-semibold text-slate-800 whitespace-nowrap" title={detail.file_name}>{detail.file_name}</dd>
                           </div>
-                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <dt className="text-[10px] font-medium uppercase text-slate-500">{locale === "vi" ? "Thời gian nhập" : "Imported at"}</dt>
-                            <dd className="mt-0.5 text-sm font-black text-slate-800">{formatDate(detail.created_at)}</dd>
-                          </div>
-                          <div className="flex h-16 flex-col items-center justify-center rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <dt className="text-[10px] font-medium uppercase text-slate-500">{t.imports.performedBy}</dt>
-                            <dd className="mt-0.5 text-sm font-black text-slate-800">{formatPerformedBy(detail.performed_by)}</dd>
+                          <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+                            <div className="min-w-0">
+                              <dt className="text-slate-400">{locale === "vi" ? "Thời gian nhập" : "Imported at"}</dt>
+                              <dd className="font-medium text-slate-700">{formatDate(detail.created_at)}</dd>
+                            </div>
+                            <div className="min-w-0">
+                              <dt className="text-slate-400">{t.imports.performedBy}</dt>
+                              <dd className="font-semibold text-slate-700 truncate">{formatPerformedBy(detail.performed_by)}</dd>
+                            </div>
                           </div>
                         </dl>
-                      </div>
+                      </section>
                     </div>
 
                     {detail.id !== LECTURER_PREVIEW_ID && (detail.lecturer_summary?.accounts_skipped ?? 0) > 0 && (
-                      <div className="rounded-[5px] border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800" role="alert">
+                      <div className="rounded-[5px] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
                         <div className="flex items-start gap-2">
                           <svg className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1933,7 +1890,7 @@ export default function ImportsPage() {
                       </div>
                     )}
                     {lecturerPreview && detail.id === LECTURER_PREVIEW_ID && lecturerPreview.preview.conflicts.length > 0 ? (
-                      <div className="rounded-[5px] border border-amber-200 bg-amber-50/90 p-4 text-xs text-amber-900 shadow-2xs">
+                      <div className="rounded-[5px] border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-2xs">
                         <div className="flex items-center gap-2 font-bold text-amber-900">
                           <svg className="h-4 w-4 shrink-0 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -1946,14 +1903,14 @@ export default function ImportsPage() {
                         </div>
                         <ul className="mt-2.5 list-disc list-inside space-y-1 text-slate-700 max-h-32 overflow-y-auto">
                           {lecturerPreview.preview.conflicts.map((c, i) => (
-                            <li key={i} className="text-xs leading-relaxed">
+                            <li key={i} className="text-sm leading-relaxed">
                               <strong>{c.record_full_name}</strong> {locale === "vi" ? "trùng tên với" : "matches name of"} <strong>{c.existing_full_name}</strong> {c.existing_email ? `(${c.existing_email})` : ""}
                             </li>
                           ))}
                         </ul>
                       </div>
                     ) : (detail.lecturer_summary?.warnings ?? detail.duplicate_candidates) > 0 ? (
-                      <div className="rounded-[5px] border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                      <div className="rounded-[5px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                         <strong>{locale === "vi" ? "Cảnh báo trùng tên" : "Duplicate name warnings"}:</strong>{" "}
                         {numberFormatter.format(detail.lecturer_summary?.warnings ?? detail.duplicate_candidates)}
                       </div>
@@ -1961,80 +1918,170 @@ export default function ImportsPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {/* ROW 1: Two equal cards side-by-side on desktop, stacked on mobile */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-                      {/* CARD 1: TIẾP NHẬN NGUỒN */}
-                      <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200/70">
-                          <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-slate-200/70 text-slate-600">
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                                {t.imports.sourceIngestion}
-                              </h3>
-                              <span className="text-[11px] font-medium text-slate-500">
-                                {locale === "vi" ? "Đã tiếp nhận nguồn" : "Source received"}
-                              </span>
-                            </div>
-                          </div>
-                          {renderIngestionBadge(detail)}
+                    {/* SECTION 1: TIẾP NHẬN NGUỒN */}
+                    <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                      <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                            {t.imports.sourceIngestion}
+                          </h3>
                         </div>
+                        {renderIngestionBadge(detail)}
+                      </div>
 
-                        {/* Raw stats */}
-                        <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.imports.totalRecords}</span>
-                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
-                          </div>
-                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.imports.importedRecords}</span>
-                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.status === "CANCELLED" || detail.status === "FAILED" || statusLabel(detail) === (locale === "vi" ? "Thay thế" : "Superseded") ? 0 : detail.imported_records)}</p>
-                          </div>
-                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.imports.failedRecords}</span>
-                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.failed_records)}</p>
-                          </div>
+                      {/* Raw stats */}
+                      <div className="grid grid-cols-2 gap-2 text-center mb-3 sm:grid-cols-4">
+                        <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <span className="text-sm font-medium text-slate-500 uppercase">{t.imports.totalRecords}</span>
+                          <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.total_records)}</p>
                         </div>
-
-                        {/* Metadata summary */}
-                        <div className="mt-auto space-y-1.5 rounded-[5px] border border-slate-200/80 bg-white/75 p-3 text-xs text-slate-600">
-                          <div className="flex justify-between gap-2">
-                            <span className="text-slate-400 shrink-0">{t.imports.fileName}:</span>
-                            <span className="font-semibold text-slate-800 truncate text-right" title={detail.file_name}>{detail.file_name}</span>
-                          </div>
-                          <div className="flex justify-between gap-2">
-                            <span className="text-slate-400 shrink-0">{t.imports.performedBy}:</span>
-                            <span className="font-semibold text-slate-700">{formatPerformedBy(detail.performed_by)}</span>
-                          </div>
-                          <div className="flex justify-between gap-2">
-                            <span className="text-slate-400 shrink-0">{locale === "vi" ? "Bắt đầu lúc" : "Started at"}:</span>
-                            <span className="font-medium text-slate-700">{formatDate(detail.started_at)}</span>
-                          </div>
-                          {detail.finished_at && (
-                            <div className="flex justify-between gap-2">
-                              <span className="text-slate-400 shrink-0">
-                                {detail.status === "CANCELLED"
-                                  ? (locale === "vi" ? "Thời điểm hủy" : "Cancelled at")
-                                  : (locale === "vi" ? "Kết thúc lúc" : "Finished at")}:
-                              </span>
-                              <span className="font-medium text-slate-700">{formatDate(detail.finished_at)} ({formatDuration(detail.duration_seconds)})</span>
-                            </div>
-                          )}
+                        <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                          <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.processed_records)}</p>
+                        </div>
+                        <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <span className="text-sm font-medium text-slate-500 uppercase">{t.imports.importedRecords}</span>
+                          <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.status === "CANCELLED" || detail.status === "FAILED" || statusLabel(detail) === (locale === "vi" ? "Thay thế" : "Superseded") ? 0 : detail.imported_records)}</p>
+                        </div>
+                        <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                          <span className="text-sm font-medium text-slate-500 uppercase">{t.imports.failedRecords}</span>
+                          <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.failed_records)}</p>
                         </div>
                       </div>
 
-                    <div className="rounded-[5px] border border-slate-200/80 bg-slate-50/40 p-4 shadow-2xs">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-[5px] bg-slate-200/70 text-slate-600">
-                          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 015.656 0l1.415 1.415a4 4 0 010 5.656l-3 3a4 4 0 01-5.656 0M10.172 13.828a4 4 0 01-5.656 0l-1.415-1.415a4 4 0 010-5.656l3-3a4 4 0 015.656 0" />
-                          </svg>
+                      {/* Metadata summary */}
+                      <dl className="space-y-3 border-t border-slate-100 pt-3 text-sm">
+                        <div className="min-w-0">
+                          <dt className="text-slate-400">{t.imports.fileName}</dt>
+                          <dd className="font-semibold text-slate-800 whitespace-nowrap" title={detail.file_name}>{detail.file_name}</dd>
                         </div>
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                        <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+                          <div className="min-w-0">
+                            <dt className="text-slate-400">{t.imports.performedBy}</dt>
+                            <dd className="font-semibold text-slate-700 truncate">{formatPerformedBy(detail.performed_by)}</dd>
+                          </div>
+                          <div className="min-w-0">
+                            <dt className="text-slate-400">{locale === "vi" ? "Bắt đầu lúc" : "Started at"}</dt>
+                            <dd className="font-medium text-slate-700">{formatDate(detail.started_at)}</dd>
+                          </div>
+                          {detail.finished_at && (
+                            <div className="min-w-0">
+                              <dt className="text-slate-400">
+                                {detail.status === "CANCELLED"
+                                  ? (locale === "vi" ? "Thời điểm hủy" : "Cancelled at")
+                                  : (locale === "vi" ? "Kết thúc lúc" : "Finished at")}
+                              </dt>
+                              <dd className="font-medium text-slate-700">{formatDate(detail.finished_at)} ({formatDuration(detail.duration_seconds)})</dd>
+                            </div>
+                          )}
+                        </div>
+                      </dl>
+                    </section>
+
+                    {/* SECTION: KẾT QUẢ CHUẨN HÓA CÔNG BỐ (admin full visibility) */}
+                    {detail.normalization && (
+                      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                            {locale === "vi" ? "Kết quả chuẩn hóa công bố" : "Publication normalization result"}
+                          </h3>
+                          {renderNormalizationBadge(detail)}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3 lg:grid-cols-6">
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.normalization.canonical_processed)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Công bố mới" : "New"}</span>
+                            <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detail.normalization.canonical_new)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã tồn tại" : "Existing"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.normalization.canonical_existing)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Đổi metadata" : "Metadata changed"}</span>
+                            <p className="mt-0.5 text-base font-black text-amber-700">{numberFormatter.format(detail.normalization.canonical_metadata_changed)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Trùng lặp nội bộ" : "Intra-duplicate"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.normalization.canonical_intra_duplicate)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{t.imports.failedRecords}</span>
+                            <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detail.normalization.canonical_failed)}</p>
+                          </div>
+                        </div>
+                      </section>
+                    )}
+
+                    {/* SECTION: KẾT QUẢ CHUẨN HÓA TÁC GIẢ (admin full visibility) */}
+                    {detail.normalization_summary?.authors && (
+                      <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                        <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                            {locale === "vi" ? "Kết quả chuẩn hóa tác giả" : "Author normalization result"}
+                          </h3>
+                          <span className={
+                            detail.normalization_summary.authors.status === "COMPLETED"
+                              ? badgeClassName
+                              : detail.normalization_summary.authors.status === "FAILED"
+                                ? "inline-flex items-center rounded-[5px] border border-rose-300 bg-white px-2.5 py-0.5 text-sm font-bold text-rose-700"
+                                : activeStatusBadgeClassName
+                          }>
+                            {detail.normalization_summary.authors.status === "COMPLETED"
+                              ? (locale === "vi" ? "Đã hoàn thành" : "Completed")
+                              : detail.normalization_summary.authors.status === "FAILED"
+                                ? (locale === "vi" ? "Lỗi chuẩn hóa" : "Normalization failed")
+                                : (locale === "vi" ? "Đang xử lý..." : "Processing")}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3 lg:grid-cols-6">
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Tác giả duy nhất" : "Unique authors"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.normalization_summary.authors.unique_authors_seen)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Tác giả mới" : "New authors"}</span>
+                            <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detail.normalization_summary.authors.authors_created)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Tác giả đã có" : "Existing authors"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.normalization_summary.authors.authors_existing)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Biến thể tên mới" : "New name variants"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.normalization_summary.authors.variants_created)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Liên kết mới" : "New links"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detail.normalization_summary.authors.publication_author_links_created)}</p>
+                          </div>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Xung đột" : "Conflicts"}</span>
+                            <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detail.normalization_summary.authors.conflicts)}</p>
+                          </div>
+                        </div>
+                        {(detail.normalization_summary.authors.errors?.length ?? 0) > 0 && (
+                          <div className="mt-3 rounded-[5px] border border-amber-200 bg-amber-50/60 p-3 text-sm">
+                            <h4 className="mb-2 font-bold text-amber-800">{t.imports.rowErrors}</h4>
+                            <ul className="max-h-36 space-y-1 overflow-y-auto text-amber-900">
+                              {detail.normalization_summary.authors.errors!.map((rowError, index) => (
+                                <li key={`${rowError.row_number ?? "row"}-${index}`}>
+                                  {locale === "vi" ? "Dòng" : "Row"} {rowError.row_number ?? "—"}: {rowError.message ?? rowError.code ?? t.imports.failed}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </section>
+                    )}
+
+                    {/* SECTION 2: TÌNH TRẠNG SỬ DỤNG DỮ LIỆU */}
+                    <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                      <div className="flex items-center gap-2 mb-3">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
                           {locale === "vi" ? "Tình trạng sử dụng dữ liệu" : "Data Usage State"}
                         </h3>
                         {detail.archived && (
@@ -2043,12 +2090,12 @@ export default function ImportsPage() {
                           </span>
                         )}
                       </div>
-                      <dl className="grid grid-cols-1 gap-2.5 text-xs sm:grid-cols-3">
+                      <dl className="grid grid-cols-1 gap-2.5 text-sm sm:grid-cols-3">
                         <div className="rounded-[5px] border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
-                          <dt className="text-[11px] font-medium text-slate-500">
+                          <dt className="text-sm font-medium text-slate-500">
                             {locale === "vi" ? "Trạng thái" : "Status"}
                           </dt>
-                          <dd className={`mt-0.5 text-lg font-black ${
+                          <dd className={`mt-0.5 text-base font-black ${
                             "text-slate-800"
                           }`}>
                             {isInUse(detail)
@@ -2057,46 +2104,38 @@ export default function ImportsPage() {
                           </dd>
                         </div>
                         <div className="rounded-[5px] border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
-                          <dt className="text-[11px] font-medium text-slate-500">
+                          <dt className="text-sm font-medium text-slate-500">
                             {locale === "vi" ? "Liên kết nguồn" : "Publication source links"}
                           </dt>
-                          <dd className="mt-0.5 text-lg font-black text-slate-800">
+                          <dd className="mt-0.5 text-base font-black text-slate-800">
                             {numberFormatter.format(detail.usage?.publication_source_links ?? 0)}
                           </dd>
                         </div>
                         <div className="rounded-[5px] border border-slate-200/80 bg-white p-3 text-center shadow-2xs">
-                          <dt className="text-[11px] font-medium text-slate-500">
+                          <dt className="text-sm font-medium text-slate-500">
                             {locale === "vi" ? "Biến thể tên tác giả" : "Author name variants"}
                           </dt>
-                          <dd className="mt-0.5 text-lg font-black text-slate-800">
+                          <dd className="mt-0.5 text-base font-black text-slate-800">
                             {numberFormatter.format(detail.usage?.author_variant_links ?? 0)}
                           </dd>
                         </div>
                       </dl>
-                      {isInUse(detail) && (
-                        <p className="mt-3 text-[11px] text-slate-500">
-                          {locale === "vi"
-                            ? "Dữ liệu nguồn của đợt nhập đã được sử dụng ở bước xử lý tiếp theo nên không thể xóa vật lý mà không làm mất provenance."
-                            : "Source data has been consumed by downstream processing, so it cannot be physically deleted without losing provenance."}
-                        </p>
-                      )}
-                    </div>
-                    </div>
+                    </section>
 
                     {detail.duplicate_candidates > 0 && (
-                      <div className="rounded-[5px] border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                      <div className="rounded-[5px] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                         <strong>{t.imports.duplicateRows}:</strong> {numberFormatter.format(detail.duplicate_candidates)}
                       </div>
                     )}
 
                     {fatalErrorMessage(detail.error_summary) && (
-                      <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+                      <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
                         <strong>{t.imports.errorDetail}:</strong> {fatalErrorMessage(detail.error_summary)}
                       </div>
                     )}
 
                     {detail.row_errors.length > 0 && (
-                      <div className="rounded-[5px] border border-amber-200 bg-amber-50/60 p-3 text-xs">
+                      <div className="rounded-[5px] border border-amber-200 bg-amber-50/60 p-3 text-sm">
                         <h4 className="mb-2 font-bold text-amber-800">{t.imports.rowErrors}</h4>
                         <ul className="max-h-36 space-y-1 overflow-y-auto text-amber-900">
                           {detail.row_errors.map((rowError, index) => (
@@ -2112,14 +2151,30 @@ export default function ImportsPage() {
               </div>
 
               <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 bg-white px-5 py-3">
-                {/* Left: destructive actions */}
+                {/* Left: ID / type / status badges */}
+                <div className="flex shrink-0 items-center gap-2">
+                  {detail && (
+                    <>
+                      <span
+                        className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center font-mono text-sm font-bold leading-none text-slate-700"
+                        title={detail.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? detail.id) : detail.id}
+                      >
+                        ID: {shortId(detail.id === LECTURER_PREVIEW_ID ? (lecturerPreview?.displayId ?? detail.id) : detail.id)}
+                      </span>
+                      {renderTypeBadge(detail.type)}
+                      {renderStatusBadge(detail)}
+                    </>
+                  )}
+                </div>
+
+                {/* Right: all actions (destructive first, then confirm/close) */}
                 <div className="flex items-center gap-2">
                   {detail && !detail.archived && !ACTIVE_STATUSES.includes(detail.status) && detail.id !== LECTURER_PREVIEW_ID && (detail.status !== "STAGED" || confirmedImportIds.includes(detail.id)) && (
                     <button
                       type="button"
                       disabled={detailLoading}
                       onClick={() => handleDeleteIntent(detail)}
-                      className={buttonClass("danger")}
+                      className={`${buttonClass("danger")} font-bold`}
                     >
                       {locale === "vi" ? "Xóa đợt nhập" : "Delete import"}
                     </button>
@@ -2129,7 +2184,7 @@ export default function ImportsPage() {
                       type="button"
                       disabled={detailLoading || isRestoring}
                       onClick={() => handleOpenRestoreModal(detail)}
-                      className={buttonClass("secondary")}
+                      className={`${buttonClass("secondary")} font-bold`}
                     >
                       {isRestoring ? (locale === "vi" ? "Đang khôi phục..." : "Restoring...") : (locale === "vi" ? "Khôi phục hiển thị" : "Restore visibility")}
                     </button>
@@ -2139,7 +2194,7 @@ export default function ImportsPage() {
                       type="button"
                       disabled={detailLoading}
                       onClick={() => handleOpenCancelModal(detail)}
-                      className={"inline-flex h-control min-w-action items-center justify-center gap-1.5 rounded-control border border-amber-300 bg-amber-50 px-4 text-[13px] font-semibold text-amber-800 hover:bg-amber-100 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"}
+                      className={"inline-flex h-control min-w-action items-center justify-center gap-1.5 rounded-control border border-amber-300 bg-amber-50 px-4 text-sm font-bold text-amber-800 hover:bg-amber-100 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-50"}
                     >
                       <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 6l12 12M18 6L6 18" />
@@ -2147,41 +2202,8 @@ export default function ImportsPage() {
                       <span>{t.imports.cancelImport}</span>
                     </button>
                   )}
-                </div>
-
-                {/* Right: confirm / close */}
-                <div className="flex items-center gap-2">
                   {detail?.id === LECTURER_PREVIEW_ID ? (
                     <>
-                      <button
-                        type="button"
-                        disabled={detailLoading || lecturerImporting || lecturerCancelling}
-                        onClick={() => setDetailOpen(false)}
-                        className={buttonClass("secondary")}
-                      >
-                        {t.imports.close}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={detailLoading || lecturerImporting || lecturerCancelling}
-                        onClick={() => void cancelLecturerPreview()}
-                        className={buttonClass("secondary")}
-                      >
-                        {lecturerCancelling ? (
-                          <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-                        ) : null}
-                        <span>{locale === "vi" ? "Hủy tiến trình" : "Cancel process"}</span>
-                      </button>
-                      {detail?.duplicate_of && (
-                        <button
-                          type="button"
-                          disabled={detailLoading || lecturerImporting || lecturerCancelling}
-                          onClick={() => void viewPreviousImport(detail.duplicate_of?.import_id)}
-                          className={buttonClass("secondary")}
-                        >
-                          {locale === "vi" ? "Xem đợt trước" : "View earlier import"}
-                        </button>
-                      )}
                       <button
                         type="button"
                         disabled={
@@ -2192,12 +2214,41 @@ export default function ImportsPage() {
                           lecturerPreview.preview.summary.valid === 0
                         }
                         onClick={() => void handleConfirmLecturerImport()}
-                        className={buttonClass("primary")}
+                        className={`${buttonClass("primary")} font-bold`}
                       >
                         {lecturerImporting && (
                           <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                         )}
                         <span>{t.lecturerImport.confirmImport}</span>
+                      </button>
+                      {detail?.duplicate_of && (
+                        <button
+                          type="button"
+                          disabled={detailLoading || lecturerImporting || lecturerCancelling}
+                          onClick={() => void viewPreviousImport(detail.duplicate_of?.import_id)}
+                          className={`${buttonClass("secondary")} font-bold`}
+                        >
+                          {locale === "vi" ? "Xem đợt trước" : "View earlier import"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={detailLoading || lecturerImporting || lecturerCancelling}
+                        onClick={() => void cancelLecturerPreview()}
+                        className={`${buttonClass("secondary")} font-bold`}
+                      >
+                        {lecturerCancelling ? (
+                          <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+                        ) : null}
+                        <span>{locale === "vi" ? "Hủy tiến trình" : "Cancel process"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={detailLoading || lecturerImporting || lecturerCancelling}
+                        onClick={() => setDetailOpen(false)}
+                        className={`${buttonClass("secondary")} font-bold`}
+                      >
+                        {t.imports.close}
                       </button>
                     </>
                   ) : detail && detail.type !== "LECTURERS" && detail.status === "STAGED" && !confirmedImportIds.includes(detail.id) ? (
@@ -2205,25 +2256,17 @@ export default function ImportsPage() {
                       <button
                         type="button"
                         disabled={detailLoading || isCancelling || confirmingImportId === detail.id}
-                        onClick={() => setDetailOpen(false)}
-                        className={buttonClass("secondary")}
+                        onClick={() => void handleConfirmImport(detail)}
+                        className={`${buttonClass("primary")} font-bold`}
                       >
-                        {t.imports.close}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={detailLoading || isCancelling || confirmingImportId === detail.id}
-                        onClick={() => void handleCancelProcess(detail)}
-                        className={buttonClass("secondary")}
-                      >
-                        <span>{locale === "vi" ? "Hủy tiến trình" : "Cancel process"}</span>
+                        <span>{locale === "vi" ? "Xác nhận nhập" : "Confirm import"}</span>
                       </button>
                       {detail.duplicate_of && (
                         <button
                           type="button"
                           disabled={detailLoading || isCancelling || confirmingImportId === detail.id}
                           onClick={() => void viewPreviousImport(detail.duplicate_of?.import_id)}
-                          className={buttonClass("secondary")}
+                          className={`${buttonClass("secondary")} font-bold`}
                         >
                           {locale === "vi" ? "Xem đợt trước" : "View earlier import"}
                         </button>
@@ -2231,10 +2274,18 @@ export default function ImportsPage() {
                       <button
                         type="button"
                         disabled={detailLoading || isCancelling || confirmingImportId === detail.id}
-                        onClick={() => void handleConfirmImport(detail)}
-                        className={buttonClass("primary")}
+                        onClick={() => void handleCancelProcess(detail)}
+                        className={`${buttonClass("secondary")} font-bold`}
                       >
-                        <span>{locale === "vi" ? "Xác nhận nhập" : "Confirm import"}</span>
+                        <span>{locale === "vi" ? "Hủy tiến trình" : "Cancel process"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={detailLoading || isCancelling || confirmingImportId === detail.id}
+                        onClick={() => setDetailOpen(false)}
+                        className={`${buttonClass("secondary")} font-bold`}
+                      >
+                        {t.imports.close}
                       </button>
                     </>
                   ) : (
@@ -2242,7 +2293,7 @@ export default function ImportsPage() {
                       type="button"
                       disabled={detailLoading}
                       onClick={() => setDetailOpen(false)}
-                      className={buttonClass("secondary")}
+                      className={`${buttonClass("secondary")} font-bold`}
                     >
                       {t.imports.close}
                     </button>
@@ -2280,7 +2331,7 @@ export default function ImportsPage() {
                     ? "Dữ liệu của đợt nhập này đang được sử dụng ở các bước xử lý tiếp theo nên không thể xóa vật lý mà không làm mất provenance."
                     : "This import's data is consumed by downstream processing and cannot be physically deleted without losing provenance."}
                   {blockedDeleteState.item.usage && (
-                    <span className="my-2.5 block rounded-[5px] border border-amber-200/80 bg-amber-50/50 p-2.5 text-xs text-slate-700">
+                    <span className="my-2.5 block rounded-[5px] border border-amber-200/80 bg-amber-50/50 p-2.5 text-sm text-slate-700">
                       <span className="block">
                         {locale === "vi" ? "Liên kết nguồn:" : "Publication source links:"}{" "}
                         <strong className="text-slate-800 font-bold">
