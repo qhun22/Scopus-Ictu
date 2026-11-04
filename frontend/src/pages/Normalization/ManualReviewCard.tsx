@@ -46,9 +46,9 @@ const REASON_KIND_STYLE: Record<string, string> = {
 
 // Same fixed width for the "Trạng thái rà soát" and "Nguồn đối soát" labels, so the column reads evenly.
 const STATUS_BADGE_BASE =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center truncate whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center truncate whitespace-nowrap rounded-[5px] border px-2 text-center text-sm font-bold leading-none";
 const UNIT_BADGE_BASE =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border px-2 text-center text-xs font-bold leading-none";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border px-2 text-center text-sm font-bold leading-none";
 const UNIT_BADGE_ICTU = "border-[#3A5FC3] bg-white text-[#3A5FC3] hover:bg-blue-50";
 const UNIT_BADGE_OTHER = "border-slate-400 bg-white text-slate-700 hover:bg-slate-50";
 
@@ -64,7 +64,7 @@ const isIctuUnit = (text: string): boolean => {
     /ictu/.test(plain);
 };
 const SOURCE_BADGE_BASE =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center truncate whitespace-nowrap rounded border border-slate-200 px-2 text-center text-[10px] leading-none";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center truncate whitespace-nowrap rounded border border-slate-200 px-2 text-center text-sm leading-none";
 
 const ERROR_LABEL: Record<string, Record<Locale, string>> = {
   STALE_OVERRIDE_VERSION: {
@@ -84,7 +84,7 @@ const ERROR_LABEL: Record<string, Record<Locale, string>> = {
 };
 
 const neutralDetailButtonClassName =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 hover:bg-slate-50 cursor-pointer";
+  "inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 cursor-pointer";
 
 function explain(error: unknown, locale: Locale): string {
   if (error instanceof ApiError) {
@@ -147,11 +147,11 @@ function OverrideForm({
 
   return (
     <div className="mt-2 space-y-2.5 rounded-[5px] border border-slate-200 bg-white p-3">
-      <p className="text-xs font-bold text-slate-800">{title}</p>
+      <p className="text-sm font-bold text-slate-800">{title}</p>
       <div>
-        <label className="text-[11px] font-semibold text-slate-600">{vi ? "Tên đơn vị *" : "Unit name *"}</label>
+        <label className="text-sm font-semibold text-slate-600">{vi ? "Tên đơn vị *" : "Unit name *"}</label>
         <input
-          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
           value={form.affiliation_text}
           onChange={(e) => setForm((f) => ({ ...f, affiliation_text: e.target.value }))}
           placeholder={vi ? "VD: Trường Đại học Công nghệ Thông tin và Truyền thông" : "e.g. ICTU"}
@@ -159,9 +159,9 @@ function OverrideForm({
         />
       </div>
       <div>
-        <label className="text-[11px] font-semibold text-slate-600">{vi ? "Mức tin cậy" : "Confidence"}</label>
+        <label className="text-sm font-semibold text-slate-600">{vi ? "Mức tin cậy" : "Confidence"}</label>
         <select
-          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
+          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
           value={form.confidence}
           onChange={(e) => setForm((f) => ({ ...f, confidence: e.target.value as EditForm["confidence"] }))}
           data-testid="override-input-confidence"
@@ -171,11 +171,11 @@ function OverrideForm({
         </select>
       </div>
       <div>
-        <label className="text-[11px] font-semibold text-slate-600">
+        <label className="text-sm font-semibold text-slate-600">
           {vi ? "Nguồn chứng cứ (URL) *" : "Evidence source (URL) *"}
         </label>
         <input
-          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
           value={form.evidence_url}
           onChange={(e) => setForm((f) => ({ ...f, evidence_url: e.target.value }))}
           placeholder="https://..."
@@ -183,9 +183,9 @@ function OverrideForm({
         />
       </div>
       <div>
-        <label className="text-[11px] font-semibold text-slate-600">{vi ? "Lý do *" : "Reason *"}</label>
+        <label className="text-sm font-semibold text-slate-600">{vi ? "Lý do *" : "Reason *"}</label>
         <textarea
-          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
+          className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
           rows={2}
           value={form.reason}
           onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
@@ -194,7 +194,7 @@ function OverrideForm({
         />
       </div>
       {error && (
-        <p className="text-[11px] font-medium text-rose-600" role="alert">
+        <p className="text-sm font-medium text-rose-600" role="alert">
           {error}
         </p>
       )}
@@ -258,14 +258,14 @@ function OverrideRow({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-800">{o.affiliation_text}</span>
+            <span className="text-sm font-bold text-slate-800">{o.affiliation_text}</span>
             {isRevoked ? (
-              <span className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2 text-center text-xs font-bold leading-none text-slate-600 hover:bg-slate-50">
+              <span className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2 text-center text-sm font-bold leading-none text-slate-600 hover:bg-slate-50">
                 {vi ? "Đã thu hồi" : "Revoked"}
               </span>
             ) : null}
           </div>
-          <p className="text-[11px] text-slate-600">
+          <p className="text-sm text-slate-600">
             <span className="text-slate-400">{vi ? "Mức tin cậy: " : "Confidence: "}</span>
             <span className="font-semibold text-slate-700">
               {o.confidence === "CORROBORATED"
@@ -277,7 +277,7 @@ function OverrideRow({
                   : "Still unresolved"}
             </span>
           </p>
-          <p className="text-[11px] text-slate-600 break-all">
+          <p className="text-sm text-slate-600 break-all">
             <span className="text-slate-400">{vi ? "Nguồn: " : "Evidence: "}</span>
             <a
               href={o.evidence_url}
@@ -288,7 +288,7 @@ function OverrideRow({
               {o.evidence_url}
             </a>
           </p>
-          <p className="text-[11px] text-slate-600">
+          <p className="text-sm text-slate-600">
             <span className="text-slate-400">{vi ? "Lý do: " : "Reason: "}</span>
             {o.reason}
           </p>
@@ -306,7 +306,7 @@ function OverrideRow({
             </Button>
             <button
               type="button"
-              className="rounded-[5px] border border-rose-300 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 cursor-pointer transition-colors"
+              className="rounded-[5px] border border-rose-300 px-2.5 py-1 text-sm font-semibold text-rose-700 hover:bg-rose-50 cursor-pointer transition-colors"
               onClick={() => setRevoking(true)}
               data-testid="override-revoke-btn"
             >
@@ -344,11 +344,11 @@ function OverrideRow({
 
       {revoking && (
         <div className="mt-2 space-y-2 rounded-[5px] border border-rose-200 bg-rose-50/40 p-2.5">
-          <label className="text-[11px] font-semibold text-slate-700">
+          <label className="text-sm font-semibold text-slate-700">
             {vi ? "Lý do thu hồi *" : "Revoke reason *"}
           </label>
           <textarea
-            className="w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1 text-xs focus:border-rose-400 focus:outline-none"
+            className="w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1 text-sm focus:border-rose-400 focus:outline-none"
             rows={2}
             value={revokeReason}
             onChange={(e) => setRevokeReason(e.target.value)}
@@ -356,14 +356,14 @@ function OverrideRow({
             data-testid="revoke-input-reason"
           />
           {revokeError && (
-            <p className="text-[11px] font-medium text-rose-600" role="alert">
+            <p className="text-sm font-medium text-rose-600" role="alert">
               {revokeError}
             </p>
           )}
           <div className="flex gap-2">
             <button
               type="button"
-              className="rounded-[5px] border border-rose-400 bg-rose-600 px-3 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-50 cursor-pointer transition-colors"
+              className="rounded-[5px] border border-rose-400 bg-rose-600 px-3 py-1 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50 cursor-pointer transition-colors"
               onClick={doRevoke}
               disabled={revokeSaving || !revokeReason.trim()}
               data-testid="revoke-confirm-btn"
@@ -490,7 +490,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
         <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">
           {vi ? "5. Rà soát và hiệu chỉnh thủ công" : "5. Manual review and override"}
         </h2>
-        <p className="mt-1 text-xs leading-relaxed text-slate-600 max-w-5xl">
+        <p className="mt-1 text-sm leading-relaxed text-slate-600 max-w-5xl">
           {vi
             ? "Các vị trí tác giả chưa có đơn vị, có nguồn mâu thuẫn, hoặc chỉ mới đối chiếu (chưa xác minh). Một vị trí có thể có nhiều đơn vị đang hoạt động cùng lúc (ví dụ kiêm nhiệm). ADMIN có thể thêm/sửa/thu hồi từng đơn vị độc lập, kèm nguồn chứng cứ và lý do; hệ thống không tự nâng mức tin cậy lên \"Đã xác minh\" chỉ vì ADMIN xác nhận."
             : "Author positions with no unit, conflicting sources, or only corroborated (not verified). A position may have several units active at once (e.g. a dual appointment). ADMIN may add/edit/revoke each unit independently, with evidence and a reason; the system never promotes confidence to \"Verified\" just because an ADMIN confirmed it."}
@@ -578,7 +578,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
       </div>
 
       {loadError && (
-        <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+        <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
           {loadError}
         </div>
       )}
@@ -586,7 +586,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
       {/* Main Table */}
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">
@@ -596,13 +596,10 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                   {vi ? "Bài báo / EID" : "Publication / EID"}
                 </th>
                 <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
-                  {vi ? "Nguồn đối soát" : "Reconciliation Sources"}
-                </th>
-                <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
                   {vi ? "Trạng thái rà soát" : "Review Status"}
                 </th>
                 <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
-                  {vi ? "Đơn vị đang hoạt động" : "Active Units"}
+                  {vi ? "Trực thuộc" : "Affiliated Unit"}
                 </th>
                 <th className="w-44 whitespace-nowrap border-l border-slate-200/80 px-4 py-3 text-center font-semibold text-slate-600">
                   {vi ? "Thao tác" : "Actions"}
@@ -612,10 +609,10 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                  <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
                     <div className="flex items-center justify-center gap-2">
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
-                      <span className="text-xs font-medium">
+                      <span className="text-sm font-medium">
                         {vi ? "Đang tải dữ liệu…" : "Loading data…"}
                       </span>
                     </div>
@@ -623,7 +620,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={5} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
                       <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -633,7 +630,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       <span className="text-sm font-bold text-slate-700">
                         {vi ? "Không có dữ liệu cần rà soát" : "No review items found"}
                       </span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-sm text-slate-400">
                         {vi ? "Tất cả vị trí tác giả đều đã được xác minh hoặc không khớp tiêu chí tìm kiếm." : "All author positions are either verified or do not match current filters."}
                       </span>
                     </div>
@@ -646,40 +643,25 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                     <tr key={item.publication_author_id} className="hover:bg-slate-50/50 transition-colors" data-testid="review-item">
                       {/* Tác giả */}
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-800 text-xs line-clamp-1" title={item.preferred_name}>
+                        <p className="font-semibold text-slate-800 text-sm line-clamp-1" title={item.preferred_name}>
                           {item.preferred_name}
                         </p>
-                        <p className="text-[11px] text-slate-500 mt-0.5 whitespace-nowrap">
+                        <p className="text-sm text-slate-500 mt-0.5 whitespace-nowrap">
                           {vi ? "Vị trí" : "Order"} <span className="font-semibold text-slate-700">{item.author_order}</span>
                         </p>
-                        <p className="text-[11px] text-slate-500 whitespace-nowrap">
+                        <p className="text-sm text-slate-500 whitespace-nowrap">
                           Scopus ID: <span className="font-semibold text-slate-600">{item.scopus_id}</span>
                         </p>
                       </td>
 
                       {/* Bài báo / EID */}
                       <td className="px-4 py-3 max-w-[280px]">
-                        <p className="font-medium text-slate-700 text-xs line-clamp-2 leading-relaxed" title={item.title}>
+                        <p className="font-medium text-slate-700 text-sm line-clamp-2 leading-relaxed" title={item.title}>
                           {item.title}
                         </p>
-                        <p className="text-[10px] text-slate-400 mt-0.5">
+                        <p className="text-sm text-slate-400 mt-0.5">
                           EID: {item.eid}
                         </p>
-                      </td>
-
-                      {/* Nguồn đối soát */}
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col items-center gap-1 text-[10px]">
-                          {item.resolution_summaries.map((r, idx) => (
-                            <span
-                              key={idx}
-                              className={`${SOURCE_BADGE_BASE} bg-white text-slate-600`}
-                              title={`${r.source_system}: ${r.link_status}${r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}`}
-                            >
-                              {r.source_system}: <strong className="text-slate-700">{r.link_status}</strong>
-                            </span>
-                          ))}
-                        </div>
                       </td>
 
                       {/* Trạng thái rà soát */}
@@ -697,7 +679,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                         </div>
                       </td>
 
-                      {/* Đơn vị đang hoạt động */}
+                      {/* Trực thuộc */}
                       <td className="px-4 py-3 text-center">
                         {activeOverrides.length > 0 ? (
                           <span
@@ -733,7 +715,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
         </div>
 
         {/* Footer info & Pagination Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-sm text-slate-500">
           <div className="flex items-center gap-3">
             <span>
               {vi ? "Hiển thị" : "Showing"} <strong>{items.length}</strong> {vi ? "trong" : "of"}{" "}
@@ -750,7 +732,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                   setPageSize(newSize);
                   setPage(1);
                 }}
-                className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
+                className="h-6.5 rounded-[5px] border border-slate-200 bg-white px-1.5 text-sm font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer"
               >
                 <option value={10}>10 / {vi ? "trang" : "page"}</option>
                 <option value={20}>20 / {vi ? "trang" : "page"}</option>
@@ -780,7 +762,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                 const val = Math.max(1, Math.min(totalPages, parseInt(e.target.value, 10) || 1));
                 setPage(val);
               }}
-              className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-[11px] font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
             <span className="text-slate-400">
               / <strong className="text-slate-600">{totalPages}</strong>
@@ -808,7 +790,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                   <h2 className="text-base font-bold text-slate-800">
                     {vi ? "Chi tiết rà soát & Hiệu chỉnh đơn vị tác giả" : "Author Unit Review & Override"}
                   </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-sm text-slate-500 mt-0.5">
                     {selectedItem.preferred_name} · {vi ? "Vị trí" : "Position"} {selectedItem.author_order} (Scopus ID: {selectedItem.scopus_id})
                   </p>
                 </div>
@@ -830,15 +812,15 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
               <div className="overflow-y-auto p-5 space-y-4 flex-1">
                 {/* Paper Context Card */}
                 <div className="rounded-[5px] border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2">
-                  <span className="block text-xs font-semibold text-slate-700">
+                  <span className="block text-sm font-semibold text-slate-700">
                     EID: <span className="font-bold text-slate-900">{selectedItem.eid}</span>
                   </span>
-                  <p className="text-xs font-medium text-slate-800 leading-snug">{selectedItem.title}</p>
-                  <div className="flex flex-col items-start gap-1 text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
+                  <p className="text-sm font-medium text-slate-800 leading-snug">{selectedItem.title}</p>
+                  <div className="flex flex-col items-start gap-1 text-sm text-slate-500 pt-1.5 border-t border-slate-200/60">
                     <span className="font-semibold">{vi ? "Trạng thái rà soát:" : "Review status:"}</span>
                     <div className="flex flex-col items-start gap-2">
                       <div className="flex flex-col items-start gap-1">
-                        <span className="text-[11px] text-slate-500">
+                        <span className="text-sm text-slate-500">
                           {selectedItem.overrides.some((o) => o.status === "ACTIVE")
                             ? vi ? "Trạng thái cũ" : "Previous status"
                             : vi ? "Trạng thái hiện tại" : "Current status"}
@@ -853,14 +835,14 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       </div>
                       {selectedItem.overrides.some((o) => o.status === "ACTIVE") && (
                         <div className="flex flex-col items-start gap-1">
-                          <span className="text-[11px] text-slate-500">{vi ? "Trạng thái mới" : "New status"}</span>
+                          <span className="text-sm text-slate-500">{vi ? "Trạng thái mới" : "New status"}</span>
                           <span className={`${STATUS_BADGE_BASE} ${ADJUSTED_STYLE}`}>{ADJUSTED_LABEL[locale]}</span>
                         </div>
                       )}
                     </div>
                   </div>
                   {selectedItem.resolution_summaries.some((r) => r.link_status !== "UNRESOLVED") && (
-                  <div className="flex flex-col items-start gap-1 text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60">
+                  <div className="flex flex-col items-start gap-1 text-sm text-slate-500 pt-1.5 border-t border-slate-200/60">
                     <span className="font-semibold">{vi ? "Nguồn đối soát:" : "Reconciled sources:"}</span>
                     <div className="flex flex-col items-start gap-2">
                       {selectedItem.resolution_summaries.filter((r) => r.link_status !== "UNRESOLVED").map((r, idx) => (
@@ -873,13 +855,13 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                             {r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}
                           </span>
                           {(r.raw_affiliations ?? []).length > 0 ? (
-                            <ul className="ml-1 list-disc space-y-0.5 pl-4 text-[11px] text-slate-700">
+                            <ul className="ml-1 list-disc space-y-0.5 pl-4 text-sm text-slate-700">
                               {(r.raw_affiliations ?? []).map((text) => (
                                 <li key={text}>{text}</li>
                               ))}
                             </ul>
                           ) : (
-                            <span className="ml-1 text-[11px] text-slate-400">
+                            <span className="ml-1 text-sm text-slate-400">
                               {vi ? "Nguồn này không ghi đơn vị." : "This source reports no affiliation."}
                             </span>
                           )}
@@ -893,7 +875,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                 {/* Overrides List & Add Button */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">
                       {vi ? "Danh sách đơn vị đã ghi nhận" : "Recorded units list"}
                       {selectedItem.overrides.some((o) => o.status === "ACTIVE") && (
                         <span className="ml-1.5 font-normal text-slate-400">
@@ -905,7 +887,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       <button
                         type="button"
                         onClick={() => setModalAdding(true)}
-                        className="inline-flex h-badge w-32 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-center text-xs font-bold leading-none text-[#3A5FC3] hover:bg-blue-50"
+                        className="inline-flex h-badge w-32 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-[#3A5FC3] bg-white px-2 text-center text-sm font-bold leading-none text-[#3A5FC3] hover:bg-blue-50"
                         data-testid="review-add-btn"
                       >
                         <span>{vi ? "Thêm đơn vị" : "Add unit"}</span>
@@ -914,7 +896,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                   </div>
 
                   {selectedItem.overrides.filter((o) => showRevoked || o.status === "ACTIVE").length === 0 && !modalAdding ? (
-                    <div className="rounded-[5px] border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400">
+                    <div className="rounded-[5px] border border-dashed border-slate-200 p-6 text-center text-sm text-slate-400">
                       {vi
                         ? "Chưa có đơn vị nào được ghi nhận thủ công cho vị trí tác giả này."
                         : "No manual units recorded for this author position yet."}
@@ -939,7 +921,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                     <button
                       type="button"
                       onClick={() => setShowRevoked((v) => !v)}
-                      className="mt-2 text-[11px] font-semibold text-slate-500 underline underline-offset-2 hover:text-slate-700"
+                      className="mt-2 text-sm font-semibold text-slate-500 underline underline-offset-2 hover:text-slate-700"
                       data-testid="toggle-revoked-units"
                     >
                       {showRevoked
