@@ -555,24 +555,24 @@ export default function PublicationsPage() {
                         {pub.title}
                       </span>
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-500">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-500">
                       {pub.eid}
                     </td>
                     <td className="border-r border-slate-100 px-4 py-3 whitespace-nowrap font-bold text-slate-800">
                       {fmtYear(pub.year)}
                     </td>
                     <td className="border-r border-slate-100 px-4 py-3">
-                      <span className="block line-clamp-2 break-words font-bold text-slate-700" title={pub.source_title ?? ""}>
+                      <span className="block line-clamp-2 break-words font-medium text-slate-700" title={pub.source_title ?? ""}>
                         {fmtField(pub.source_title)}
                       </span>
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-700">
                       {fmtField(pub.document_type)}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-700">
                       {fmtField(pub.publication_stage)}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-bold text-slate-700">
+                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-700">
                       {fmtField(pub.open_access_status)}
                     </td>
                     <td className="sticky right-0 z-[1] border-l border-slate-100 bg-white px-4 py-3 text-center">
