@@ -703,14 +703,14 @@ export default function ApprovalQueuePage() {
     <ConfigProvider theme={ANTD_THEME}>
     <div className="app-page-container space-y-4 sm:space-y-5">
       {/* ── Page Header ──────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">{t.title}</h1>
           <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
             {t.subtitle}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="text-xs text-slate-500">
             {t.totalLabel}: <span className="font-semibold text-slate-800">{total}</span>
           </div>
