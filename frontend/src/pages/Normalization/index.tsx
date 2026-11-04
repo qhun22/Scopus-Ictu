@@ -922,22 +922,13 @@ export default function NormalizationPage() {
               </header>
 
               {/* Modal Body */}
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-4 text-xs text-slate-700">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-4 text-sm text-slate-700">
                 {/* CARD 1: THÔNG TIN NGUỒN */}
-                  <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                  <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                            {t.normalization.detail.rawIngestionTitle}
-                          </h3>
-                        </div>
-                      </div>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                        {t.normalization.detail.rawIngestionTitle}
+                      </h3>
                       <span className={ingestionSuccessBadgeClassName}>
                         {locale === "vi" ? "Đã tiếp nhận" : "Ingestion complete"}
                       </span>
@@ -945,62 +936,53 @@ export default function NormalizationPage() {
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center mb-3">
-                      <div className="rounded-[5px] border border-slate-200 bg-slate-50/60 p-2.5">
-                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
+                      <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                        <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Tổng bản ghi" : "Total records"}</span>
                         <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.total_records)}</p>
                       </div>
-                      <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
-                        <p className="mt-0.5 text-base font-black text-blue-600">{numberFormatter.format(detailModalItem.processed_records ?? detailModalItem.imported_records)}</p>
+                      <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                        <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                        <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.processed_records ?? detailModalItem.imported_records)}</p>
                       </div>
-                      <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Hợp lệ" : "Valid"}</span>
-                        <p className="mt-0.5 text-base font-black text-emerald-600">{numberFormatter.format(detailModalItem.imported_records)}</p>
+                      <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                        <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Hợp lệ" : "Valid"}</span>
+                        <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detailModalItem.imported_records)}</p>
                       </div>
-                      <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                        <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Lỗi" : "Failed"}</span>
-                        <p className="mt-0.5 text-base font-black text-rose-600">{numberFormatter.format(detailModalItem.failed_records)}</p>
+                      <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                        <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Lỗi" : "Failed"}</span>
+                        <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detailModalItem.failed_records)}</p>
                       </div>
                     </div>
 
                     {/* Info */}
-                    <div className="mt-auto rounded-[5px] border border-slate-200/80 bg-white p-3 text-xs text-slate-600">
-                      <div className="mb-2 pb-2 border-b border-slate-100">
-                        <span className="text-slate-400 block">{locale === "vi" ? "Tên tệp:" : "File name:"}</span>
-                        <span className="font-semibold text-slate-800 break-all" title={detailModalItem.file_name}>{detailModalItem.file_name}</span>
+                    <dl className="space-y-3 border-t border-slate-100 pt-3 text-sm">
+                      <div className="min-w-0">
+                        <dt className="text-slate-400">{locale === "vi" ? "Tên tệp" : "File name"}</dt>
+                        <dd className="font-semibold text-slate-800 break-all" title={detailModalItem.file_name}>{detailModalItem.file_name}</dd>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <div>
-                          <span className="text-slate-400 block">{locale === "vi" ? "Người thực hiện:" : "Performed by:"}</span>
-                          <span className="font-semibold text-slate-700">{formatPerformedBy(detailModalItem.performed_by)}</span>
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+                        <div className="min-w-0">
+                          <dt className="text-slate-400">{locale === "vi" ? "Người thực hiện" : "Performed by"}</dt>
+                          <dd className="font-semibold text-slate-700">{formatPerformedBy(detailModalItem.performed_by)}</dd>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block">{locale === "vi" ? "Bắt đầu lúc:" : "Started at:"}</span>
-                          <span className="font-medium text-slate-700">{formatDate(detailModalItem.created_at)}</span>
+                        <div className="min-w-0">
+                          <dt className="text-slate-400">{locale === "vi" ? "Bắt đầu lúc" : "Started at"}</dt>
+                          <dd className="font-medium text-slate-700">{formatDate(detailModalItem.created_at)}</dd>
                         </div>
-                        <div>
-                          <span className="text-slate-400 block">{locale === "vi" ? "Thời lượng:" : "Duration:"}</span>
-                          <span className="font-medium text-slate-700">{formatDuration(detailModalItem.duration_seconds)}</span>
+                        <div className="min-w-0">
+                          <dt className="text-slate-400">{locale === "vi" ? "Thời lượng" : "Duration"}</dt>
+                          <dd className="font-medium text-slate-700">{formatDuration(detailModalItem.duration_seconds)}</dd>
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    </dl>
+                  </section>
 
                   {/* CARD 2: KẾT QUẢ XỬ LÝ */}
-                  <div className="flex flex-col rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
+                  <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
                     <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-[5px] bg-[#3A5FC3]/10 text-[#3A5FC3]">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
-                            {t.normalization.detail.metricsTitle}
-                          </h3>
-                        </div>
-                      </div>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                        {t.normalization.detail.metricsTitle}
+                      </h3>
                       {detailModalItem.normalization && detailModalItem.normalization.status === "COMPLETED" && hasRowErrors(detailModalItem) ? (
                         <span className={`${badgeClassName} border-amber-200 bg-amber-50 text-amber-700`}>
                           {t.normalization.status.completedWithErrors}
@@ -1018,30 +1000,30 @@ export default function NormalizationPage() {
 
                     {detailModalItem.normalization ? (
                       <>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center mb-3">
-                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
-                            <p className="mt-0.5 text-base font-black text-blue-600">{numberFormatter.format(detailModalItem.normalization.canonical_processed ?? (detailModalItem.normalization.canonical_new + detailModalItem.normalization.canonical_existing + detailModalItem.normalization.canonical_metadata_changed))}</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Đã xử lý" : "Processed"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.normalization.canonical_processed ?? (detailModalItem.normalization.canonical_new + detailModalItem.normalization.canonical_existing + detailModalItem.normalization.canonical_metadata_changed))}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.newPublications}</span>
-                            <p className="mt-0.5 text-base font-black text-emerald-600">{numberFormatter.format(detailModalItem.normalization.canonical_new)}</p>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{t.normalization.table.newPublications}</span>
+                            <p className="mt-0.5 text-base font-black text-emerald-700">{numberFormatter.format(detailModalItem.normalization.canonical_new)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.existing}</span>
-                            <p className="mt-0.5 text-base font-black text-slate-700">{numberFormatter.format(detailModalItem.normalization.canonical_existing)}</p>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{t.normalization.table.existing}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.normalization.canonical_existing)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.metadataChanged}</span>
-                            <p className="mt-0.5 text-base font-black text-amber-600">{numberFormatter.format(detailModalItem.normalization.canonical_metadata_changed)}</p>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{t.normalization.table.metadataChanged}</span>
+                            <p className="mt-0.5 text-base font-black text-amber-700">{numberFormatter.format(detailModalItem.normalization.canonical_metadata_changed)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{locale === "vi" ? "Trùng nội tệp" : "Intra-dup"}</span>
-                            <p className="mt-0.5 text-base font-black text-violet-600">{numberFormatter.format(detailModalItem.normalization.canonical_intra_duplicate)}</p>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{locale === "vi" ? "Trùng nội tệp" : "Intra-dup"}</span>
+                            <p className="mt-0.5 text-base font-black text-slate-800">{numberFormatter.format(detailModalItem.normalization.canonical_intra_duplicate)}</p>
                           </div>
-                          <div className="rounded-[5px] border border-slate-200 bg-white p-2.5">
-                            <span className="text-[10px] font-medium text-slate-500 uppercase">{t.normalization.table.errors}</span>
-                            <p className="mt-0.5 text-base font-black text-rose-600">{numberFormatter.format(detailModalItem.normalization.canonical_failed)}</p>
+                          <div className="rounded-[5px] border border-slate-200/80 bg-white p-2.5 shadow-2xs">
+                            <span className="text-sm font-medium text-slate-500 uppercase">{t.normalization.table.errors}</span>
+                            <p className="mt-0.5 text-base font-black text-rose-700">{numberFormatter.format(detailModalItem.normalization.canonical_failed)}</p>
                           </div>
                         </div>
 
@@ -1064,7 +1046,7 @@ export default function NormalizationPage() {
                         </p>
                       </div>
                     )}
-                  </div>
+                  </section>
 
                 {/* ROW 2: Chi tiết / Lỗi */}
                 {detailModalItem.row_errors && detailModalItem.row_errors.length > 0 && (
