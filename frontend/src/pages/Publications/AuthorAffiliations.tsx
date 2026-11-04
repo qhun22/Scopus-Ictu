@@ -242,8 +242,8 @@ export function AuthorAffiliationCell({
       {affiliations.length === 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <AffiliationBadge status={status} locale={locale} />
-          <span className="font-medium text-slate-500" data-testid="aff-no-unit">
-            {noUnit}
+          <span className="font-medium text-slate-500" data-testid={overrides.length > 0 ? "aff-has-unit" : "aff-no-unit"}>
+            {overrides.length > 0 ? hasUnit : noUnit}
           </span>
         </div>
       )}
