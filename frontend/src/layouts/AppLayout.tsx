@@ -29,7 +29,7 @@ export default function AppLayout() {
   }, [isSidebarCollapsed]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">
+    <div className="h-screen overflow-x-hidden bg-[#f4f6fb] text-slate-800 antialiased font-['Saira',Arial,sans-serif]">
       {/* Role-aware Sidebar */}
       <Sidebar
         isCollapsed={isSidebarCollapsed}
@@ -39,7 +39,7 @@ export default function AppLayout() {
 
       {/* Main Content Area */}
       <div
-        className={`flex min-h-screen min-w-0 flex-1 flex-col transition-all duration-200 ease-out ${
+        className={`flex h-screen min-w-0 min-h-0 flex-1 flex-col transition-all duration-200 ease-out ${
           isSidebarCollapsed ? "md:pl-20" : "md:pl-64"
         }`}
       >
@@ -53,7 +53,7 @@ export default function AppLayout() {
         {/* Dynamic Page Content */}
         <main
           ref={mainRef}
-          className="relative flex-1 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6"
+          className="relative flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6"
         >
           <PageLoadingBar isSidebarCollapsed={isSidebarCollapsed} />
           <div key={location.pathname} className="page-fade-in w-full">
