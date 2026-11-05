@@ -26,6 +26,10 @@ from app.api.dependencies import get_current_user
 from app.core.config import settings
 from app.core.database import get_session
 from app.main import app
+from app.models.affiliation import (
+    PublicationAuthorAffiliation,
+    PublicationAuthorAffiliationResolution,
+)
 from app.models.affiliation_enrichment import AffiliationEnrichmentJob
 from app.models.base import Base
 from app.models.governance import User
@@ -411,6 +415,74 @@ def test_latest_is_most_recently_created_not_most_recently_updated(
     resp = client.get("/api/v1/affiliations/enrichment/online/latest")
     assert resp.status_code == 200
     assert resp.json()["id"] == str(second.id)
+
+
+def test_dois_to_enrich_prioritizes_publications_that_still_have_a_gap(
+    db_session, monkeypatch
+) -> None:
+    """A run capped below the total publication count must still make real
+    progress: a publication with no trusted unit for an author position comes
+    before one that is already fully resolved, so repeated runs advance
+    through the backlog instead of looping on the same already-good
+    publications forever (the bug a two-stage V1/V2 import surfaced: a
+    second, capped run re-fetched the same first-N-by-EID publications and
+    their fresh "no data" result outranked the first run's good one)."""
+
+    imp = ScopusImport(
+        id=uuid.uuid4(), file_name="gap-priority.csv", file_sha256="d" * 64, total_records=2,
+        valid_records=2, invalid_records=0, status="APPLIED", version=1,
+        created_at=NOW, updated_at=NOW,
+    )
+    db_session.add(imp)
+    db_session.flush()
+    # "RESOLVED" sorts before "ZGAPPED" by EID — if the cap still picked by EID
+    # order alone, the already-resolved publication would win the one slot.
+    _paper(db_session, imp, 1, "RESOLVED", "10.1/resolved", "111111", "Alpha, Ann (111111)")
+    _paper(db_session, imp, 2, "ZGAPPED", "10.1/gapped", "222222", "Beta, Bob (222222)")
+    db_session.commit()
+
+    pa = (
+        db_session.query(PublicationAuthor)
+        .join(Publication, Publication.id == PublicationAuthor.publication_id)
+        .filter(Publication.eid == "RESOLVED")
+        .one()
+    )
+    resolution = PublicationAuthorAffiliationResolution(
+        id=uuid.uuid4(),
+        publication_author_id=pa.id,
+        source_system="crossref",
+        source_payload_sha256="a" * 64,
+        link_status="CORROBORATED",
+        link_method="POSITION_COUNT_NAME",
+        unresolved_reason=None,
+        affiliation_presence="PRESENT",
+        evidence={},
+        source_doi="10.1/resolved",
+        source_work_id=None,
+        external_position=1,
+        external_author_name="Alpha, Ann",
+        external_author_orcid=None,
+        retrieved_at=NOW,
+        importer_version="affiliation-import/1",
+        created_at=NOW,
+    )
+    db_session.add(resolution)
+    db_session.flush()
+    db_session.add(
+        PublicationAuthorAffiliation(
+            resolution_id=resolution.id, link_status="CORROBORATED", ord=1,
+            raw_index=1, raw_affiliation_text="ICTU", organization_id=None,
+        )
+    )
+    db_session.commit()
+
+    monkeypatch.setattr(settings, "affiliation_online_max_dois_per_run", 1, raising=False)
+    assert enrichment._dois_to_enrich(db_session) == ["10.1/gapped"]
+
+    # With room for both, the already-resolved one still trails: a refresh
+    # tail, never crowding out a gap for the single-slot run above.
+    monkeypatch.setattr(settings, "affiliation_online_max_dois_per_run", 2, raising=False)
+    assert enrichment._dois_to_enrich(db_session) == ["10.1/gapped", "10.1/resolved"]
 
 
 def test_latest_is_admin_only(client, as_role) -> None:

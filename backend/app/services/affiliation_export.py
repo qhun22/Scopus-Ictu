@@ -376,6 +376,26 @@ def load_positions(
     return result
 
 
+def publications_with_gaps(
+    session: Session, publication_ids: Sequence[uuid.UUID]
+) -> set[uuid.UUID]:
+    """Of the given publications, those with at least one author position still
+    missing a unit (``decide_position`` found no trusted unit for it).
+
+    Used to prioritise online affiliation enrichment at publications that still
+    need it, instead of a fixed, arbitrary order — so a run capped below the
+    total publication count makes monotonic progress batch after batch rather
+    than repeatedly re-fetching ones that already have a good result.
+    """
+
+    positions_by_pub = load_positions(session, publication_ids)
+    return {
+        pub_id
+        for pub_id, positions in positions_by_pub.items()
+        if any(p.decision.gap_reason is not None for p in positions)
+    }
+
+
 # ----------------------------------------------------------------------------- CSV
 def _cell(value: object) -> object:
     """Neutralise spreadsheet formulas in text that comes from outside (titles, names, units)."""
@@ -462,5 +482,5 @@ __all__ = [
     "ADMIN_SOURCE", "CSV_COLUMNS", "Decision", "GAPS_CSV_COLUMNS", "GAP_REASONS", "MANUAL_REVIEW",
     "NOT_RECONCILED", "OverrideInput", "Position", "ResolutionInput", "SourceOutcome", "Unit",
     "csv_bytes", "decide_position", "evidence_url_for", "export_csv_rows", "gaps_csv_rows",
-    "load_positions", "unit_label",
+    "load_positions", "publications_with_gaps", "unit_label",
 ]

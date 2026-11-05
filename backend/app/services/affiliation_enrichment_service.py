@@ -37,6 +37,8 @@ from app.models.affiliation_enrichment import (
     AffiliationEnrichmentJob,
 )
 from app.models.governance import AuditEvent, User
+from app.models.publication import Publication
+from app.services.affiliation_export import publications_with_gaps
 from app.services.affiliation_online_fetch import (
     AffiliationFetchCancelled,
     FetchProgress,
@@ -141,12 +143,35 @@ def cache_root() -> Path | None:
 
 
 def _dois_to_enrich(db: Session) -> list[str]:
+    """DOIs for one enrichment run, capped at
+    ``settings.affiliation_online_max_dois_per_run`` and ordered so a run
+    smaller than the total publication count still makes real progress:
+    publications that still have a gap (no trusted unit for some author
+    position) come first; publications already fully resolved trail at the
+    end as a low-priority refresh tail, never crowding out genuinely new
+    work. Without this, a fixed cap on a growing, incrementally-imported
+    dataset would silently stop covering new imports once the total exceeds
+    the cap, re-fetching the same already-resolved publications forever."""
+
     rows = load_scopus_rows(db)
-    seen: dict[str, None] = {}
+    doi_by_eid: dict[str, str] = {}
     for row in rows:
         doi = normalize_doi(row.get("DOI"))
         if doi:
-            seen.setdefault(doi, None)
+            doi_by_eid.setdefault(row["EID"], doi)
+    if not doi_by_eid:
+        return []
+    pub_id_by_eid = dict(
+        db.execute(
+            select(Publication.eid, Publication.id).where(Publication.eid.in_(doi_by_eid))
+        ).all()
+    )
+    gapped_pub_ids = publications_with_gaps(db, list(pub_id_by_eid.values()))
+    gapped_eids = {eid for eid, pub_id in pub_id_by_eid.items() if pub_id in gapped_pub_ids}
+    ordered_eids = sorted(doi_by_eid, key=lambda eid: (eid not in gapped_eids, eid))
+    seen: dict[str, None] = {}
+    for eid in ordered_eids:
+        seen.setdefault(doi_by_eid[eid], None)
     return list(seen)[: settings.affiliation_online_max_dois_per_run]
 
 

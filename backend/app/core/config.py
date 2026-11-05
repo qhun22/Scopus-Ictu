@@ -114,8 +114,14 @@ class Settings(BaseSettings):
     # enrichment endpoint reports "not configured".
     # ------------------------------------------------------------------
     affiliation_online_cache_dir: str | None = Field(None, validation_alias="AFFILIATION_ONLINE_CACHE_DIR")
+    # 1000, not 300: a first-time bulk import (or several incremental ones before
+    # anyone runs enrichment) easily exceeds a few hundred publications, and
+    # `_dois_to_enrich` already orders gapped publications first, so a run that
+    # still falls short of the total makes real progress rather than looping on
+    # the same publications — this cap is a safety margin against pathologically
+    # large one-off imports, not the primary defence against unbounded growth.
     affiliation_online_max_dois_per_run: int = Field(
-        300, ge=1, le=5000, validation_alias="AFFILIATION_ONLINE_MAX_DOIS_PER_RUN"
+        1000, ge=1, le=5000, validation_alias="AFFILIATION_ONLINE_MAX_DOIS_PER_RUN"
     )
 
     model_config = SettingsConfigDict(
