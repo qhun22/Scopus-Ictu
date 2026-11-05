@@ -87,7 +87,7 @@ app/
 
 ### Matching pipeline (key concept)
 
-`services/matching/` implements a **read-only candidate generation** phase (no auto-confirm). The name-matching rules (the `RuleId` values in `candidate_types.py`, run in order by `candidate_generator.py`) each emit `CandidateEvidence` with a `RuleId` tag. `candidate_persistence.py` saves to DB. The review workflow in `candidate_review_service.py` is the only path that changes candidate state. The `review_reason_policy.py` enforces D-2 policy: ACCEPT decisions require an explicit reason when evidence is name-only, the Scopus author is shared, or there are multiple candidates for one lecturer.
+`services/matching/` implements a **read-only candidate generation** phase (no auto-confirm). The name-matching rules (the `RuleId` values in `candidate_types.py`, run in order by `candidate_generator.py`) each emit `CandidateEvidence` with a `RuleId` tag. `RULE_TOKEN_SET` (same words, any order) is the weakest rule: `CandidateGenerator` keeps such a pair only when the Scopus author has at least one paper whose affiliation names ICTU, so collect affiliations before generating candidates. `candidate_persistence.py` saves to DB. The review workflow in `candidate_review_service.py` is the only path that changes candidate state. The `review_reason_policy.py` enforces D-2 policy: ACCEPT decisions require an explicit reason when evidence is name-only, the Scopus author is shared, or there are multiple candidates for one lecturer.
 
 ### Frontend architecture
 

@@ -9,8 +9,10 @@ import pytest
 
 from app.services.matching.candidate_generator import (
     OBSERVED_TITLE_PREFIXES,
+    drop_unsupported_token_set_candidates,
     generate_candidates,
     has_observed_title_prefix,
+    is_token_set_only,
     normalize_comma_equivalence,
     normalize_name_n2,
     normalize_token_set_equivalence,
@@ -177,6 +179,35 @@ def test_token_set_rule_is_the_lowest_priority_rule() -> None:
     from app.services.matching.candidate_generator import RULE_ORDER
 
     assert RULE_ORDER[-1] == "RULE_TOKEN_SET"
+
+
+def test_gate_drops_a_token_set_only_pair_without_ictu_evidence() -> None:
+    lecturer_row = lecturer("Tran Thi Mai")
+    scopus_author = author("Mai Tran Thi")
+    results = run([lecturer_row], [scopus_author])
+
+    assert is_token_set_only(results[0])
+    assert drop_unsupported_token_set_candidates(results, {}) == ()
+    assert drop_unsupported_token_set_candidates(results, {scopus_author.id: 0}) == ()
+
+
+def test_gate_keeps_a_token_set_only_pair_with_ictu_evidence() -> None:
+    lecturer_row = lecturer("Tran Thi Mai")
+    scopus_author = author("Mai Tran Thi")
+    results = run([lecturer_row], [scopus_author])
+
+    kept = drop_unsupported_token_set_candidates(results, {scopus_author.id: 1})
+
+    assert kept == results
+
+
+def test_gate_never_touches_a_pair_an_ordered_rule_found() -> None:
+    lecturer_row = lecturer("Nguyen Van A")
+    scopus_author = author("Nguyen Van A")
+    results = run([lecturer_row], [scopus_author])
+
+    assert not is_token_set_only(results[0])
+    assert drop_unsupported_token_set_candidates(results, {}) == results
 
 
 def test_token_set_candidates_are_deterministic() -> None:

@@ -8,7 +8,8 @@ It is the school's statement, not a verdict confirmed by the thesis supervisor, 
 lecturers with TWO OR MORE IDs, so the figures describe that group and must be reported as such.
 
 Measures, over lecturers present in both the reference and the system:
-* recall     : reference IDs that exist in the Scopus data AND were proposed as candidates
+* recall     : reference IDs that exist in the Scopus data AND were proposed as candidates by an
+               automatic name rule (any review status; SOURCE_CLAIM and manual candidates excluded)
 * precision  : proposed candidates (of those lecturers) that the reference confirms
 * by degree of fit : precision per HIGH / MEDIUM / LOW / INSUFFICIENT
 * coverage   : reference IDs absent from the imported Scopus data (they cannot be proposed)
@@ -25,16 +26,36 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app.api.v1.endpoints.reviews import _queue_statement
+from app.models.candidate import (
+    LecturerScopusCandidateEvidence,
+    LecturerScopusCandidateObservation,
+)
 from app.models.master_lecturer import Lecturer
-from app.models.publication import ScopusAuthor
+from app.models.publication import Publication, ScopusAuthor
 from app.services.candidate_fit import assess_fit, ictu_affiliation_paper_counts
 from scripts import demo_launcher as dl
 
 _FIT_ORDER = ("HIGH", "MEDIUM", "LOW", "INSUFFICIENT")
+_REVIEW_STATUSES = ("PENDING", "ACCEPTED", "REJECTED", "SUPERSEDED")
+
+
+def _name_rule_candidate_ids(session: Session) -> set:
+    """Candidates that at least one automatic name rule produced (any review status)."""
+    return set(session.scalars(
+        select(LecturerScopusCandidateObservation.candidate_id)
+        .join(
+            LecturerScopusCandidateEvidence,
+            LecturerScopusCandidateEvidence.observation_id == LecturerScopusCandidateObservation.id,
+        )
+        .where(
+            LecturerScopusCandidateEvidence.evidence_kind == "NAME",
+            LecturerScopusCandidateEvidence.rule_id != "RULE_MANUAL_ADMIN",
+        )
+    ).all())
 
 
 def _engine():
@@ -58,9 +79,18 @@ def evaluate(session: Session, reference: dict) -> dict:
     in_both = {email: ids for email, ids in by_email.items() if email in lecturers}
     known_ids = set(session.scalars(select(ScopusAuthor.scopus_id)).all())
 
-    rows = session.execute(_queue_statement(
-        candidate_status="PENDING", evidence_category=None, ambiguity=None,
-    )).mappings().all()
+    # Every review status, not only PENDING: a pair the generator proposed stays "proposed" after an
+    # ADMIN accepted or rejected it. Candidates made by the ICTU reference itself (SOURCE_CLAIM) or by
+    # hand (RULE_MANUAL_ADMIN) are left out: counting them would be circular.
+    rule_candidates = _name_rule_candidate_ids(session)
+    rows = [
+        row
+        for status in _REVIEW_STATUSES
+        for row in session.execute(_queue_statement(
+            candidate_status=status, evidence_category=None, ambiguity=None,
+        )).mappings().all()
+        if row["candidate_id"] in rule_candidates
+    ]
     ictu_papers = ictu_affiliation_paper_counts(session, {r["scopus_author_id"] for r in rows})
     lecturer_email = {lid: email for email, lid in lecturers.items()}
 
@@ -93,6 +123,12 @@ def evaluate(session: Session, reference: dict) -> dict:
         return round(a / b, 3) if b else None
 
     return {
+        # The data this measurement was taken on (whatever files were imported at the time).
+        "data_snapshot": {
+            "publications": session.scalar(select(func.count()).select_from(Publication)) or 0,
+            "scopus_authors": len(known_ids),
+            "lecturers": len(lecturers),
+        },
         "reference_lecturers": len(by_email),
         "lecturers_in_both": len(in_both),
         "reference_pairs": reference_pairs,
@@ -123,6 +159,11 @@ def render(result: dict, database: str, reference_path: Path) -> str:
         "",
         f"- Thời điểm: {datetime.now().strftime('%Y-%m-%d %H:%M')} · database: `{database}`",
         f"- Tập đối chiếu: `{reference_path.name}` (danh sách gộp tài khoản Scopus của ICTU).",
+        "- Dữ liệu tại thời điểm đo: "
+        f"{result['data_snapshot']['publications']} công bố, "
+        f"{result['data_snapshot']['scopus_authors']} tác giả Scopus, "
+        f"{result['data_snapshot']['lecturers']} giảng viên (theo các file đang nạp).",
+        "- Chỉ tính ứng viên do quy tắc tên tự động sinh ra, ở mọi trạng thái duyệt.",
         "- **Giới hạn:** đây là lời khai của nhà trường, chưa phải tập đối chiếu do GVHD xác nhận, và chỉ gồm",
         "  giảng viên có từ 2 ID trở lên. Số liệu chỉ mô tả nhóm này, không suy ra cho toàn bộ giảng viên.",
         "",

@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.models.master_lecturer import Lecturer
 from app.models.publication import ScopusAuthor, ScopusAuthorNameVariant
+from app.services.candidate_fit import ictu_affiliation_paper_counts
 from app.services.matching.candidate_types import (
     CandidateEvidence,
     LecturerScopusCandidate,
@@ -321,11 +322,50 @@ def generate_candidates(
     return tuple(result)
 
 
+def is_token_set_only(candidate: LecturerScopusCandidate) -> bool:
+    """True when the only evidence for the pair is the word-order-insensitive name rule."""
+    return bool(candidate.evidence) and all(
+        evidence.rule_id == "RULE_TOKEN_SET" for evidence in candidate.evidence
+    )
+
+
+def drop_unsupported_token_set_candidates(
+    candidates: Iterable[LecturerScopusCandidate],
+    ictu_paper_counts: Mapping[UUID, int],
+) -> tuple[LecturerScopusCandidate, ...]:
+    """Evidence gate for RULE_TOKEN_SET: "same words, any order" alone is a weak signal.
+
+    A pair found only by that rule is kept when the Scopus author has at least one paper whose
+    affiliation names ICTU (independent evidence); otherwise it is dropped. Pairs that any
+    order-preserving rule found are never touched.
+    """
+    return tuple(
+        candidate
+        for candidate in candidates
+        if not is_token_set_only(candidate)
+        or ictu_paper_counts.get(candidate.scopus_author_id, 0) >= 1
+    )
+
+
 class CandidateGenerator:
     """Read-only service that loads canonical rows in three bulk queries."""
 
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def _apply_evidence_gate(
+        self, candidates: tuple[LecturerScopusCandidate, ...]
+    ) -> tuple[LecturerScopusCandidate, ...]:
+        """Apply the RULE_TOKEN_SET evidence gate.
+
+        It reads the collected affiliation data, so run it in the pipeline order:
+        affiliations first, then matching.
+        """
+        weak_authors = {item.scopus_author_id for item in candidates if is_token_set_only(item)}
+        if not weak_authors:
+            return candidates
+        counts = ictu_affiliation_paper_counts(self._session, weak_authors)
+        return drop_unsupported_token_set_candidates(candidates, counts)
 
     def _load_inputs(
         self,
@@ -347,7 +387,7 @@ class CandidateGenerator:
     def generate_all(self) -> tuple[LecturerScopusCandidate, ...]:
         """Generate candidates for every canonical lecturer without writes."""
         lecturers, authors, variants = self._load_inputs()
-        return generate_candidates(lecturers, authors, variants)
+        return self._apply_evidence_gate(generate_candidates(lecturers, authors, variants))
 
     def generate_for_lecturer(self, lecturer_id: UUID) -> tuple[LecturerScopusCandidate, ...]:
         """Generate candidates for one lecturer using the same bulk author index."""
@@ -355,7 +395,7 @@ class CandidateGenerator:
         if lecturer is None:
             return ()
         _, authors, variants = self._load_inputs()
-        return generate_candidates((lecturer,), authors, variants)
+        return self._apply_evidence_gate(generate_candidates((lecturer,), authors, variants))
 
     def generate(self, context: object | None = None) -> tuple[LecturerScopusCandidate, ...]:
         """Compatibility entry point for the previous matching scaffold."""

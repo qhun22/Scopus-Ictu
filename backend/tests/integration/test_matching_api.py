@@ -177,9 +177,18 @@ def _persisted_evidence(db_session: Session) -> list[tuple[str, str, str]]:
     return [(row[0], row[1], row[2]) for row in rows]
 
 
-def test_reordered_name_is_persisted_as_name_evidence_from_the_token_set_rule(
-    client, as_role, db_session
+def _ictu_evidence_for_every_author(monkeypatch) -> None:
+    """Stand in for the collected affiliation data: every author has one paper naming ICTU."""
+    monkeypatch.setattr(
+        "app.services.matching.candidate_generator.ictu_affiliation_paper_counts",
+        lambda _session, author_ids: {author_id: 1 for author_id in author_ids},
+    )
+
+
+def test_reordered_name_with_ictu_evidence_is_persisted_by_the_token_set_rule(
+    client, as_role, db_session, monkeypatch
 ) -> None:
+    _ictu_evidence_for_every_author(monkeypatch)
     db_session.add_all(
         [
             Lecturer(full_name="Tran Thi Mai", full_name_normalized="tran thi mai"),
@@ -198,9 +207,27 @@ def test_reordered_name_is_persisted_as_name_evidence_from_the_token_set_rule(
     assert _persisted_evidence(db_session) == [("11111111111", "NAME", "RULE_TOKEN_SET")]
 
 
+def test_reordered_name_without_ictu_evidence_is_not_proposed(client, as_role, db_session) -> None:
+    db_session.add_all(
+        [
+            Lecturer(full_name="Tran Thi Mai", full_name_normalized="tran thi mai"),
+            ScopusAuthor(scopus_id="11111111111", preferred_name="Mai Tran Thi"),
+        ]
+    )
+    db_session.commit()
+    as_role("ADMIN")
+
+    response = client.post("/api/v1/matching/candidates/generate")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["candidate_roots"] == 0
+    assert _persisted_evidence(db_session) == []
+
+
 def test_token_set_rule_only_proposes_pairs_no_ordered_rule_found(
-    client, as_role, db_session
+    client, as_role, db_session, monkeypatch
 ) -> None:
+    _ictu_evidence_for_every_author(monkeypatch)
     db_session.add_all(
         [
             Lecturer(full_name="Nguyen Van A", full_name_normalized="nguyen van a"),
