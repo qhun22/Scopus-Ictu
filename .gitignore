@@ -92,5 +92,6 @@ data/diagram-skills-package/
 # Moved out of repo
 docs/
 scripts/
+!backend/scripts/
 *.bat
 !scopus-ictu-qhun22.bat
