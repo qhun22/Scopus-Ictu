@@ -263,8 +263,10 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
         ) : (
           <div className="relative overflow-x-auto">
             <AffiliationSummaryBar authors={authors} locale={locale} />
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+            {/* Phone: each author is one block (order, name, ID on a line, the unit below, full width).
+                From md up it is the usual table. */}
+            <table className="block w-full text-left text-sm md:table">
+              <thead className="hidden border-b border-slate-200/80 bg-slate-50/70 text-slate-600 md:table-header-group">
                 <tr>
                   <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{colAuthorOrder}</th>
                   <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colName}</th>
@@ -272,11 +274,14 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                   <th className="px-2.5 py-3.5 font-medium text-slate-700">{colAffiliation}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="block md:table-row-group">
                 {authors.map((a) => (
-                  <tr key={`${a.scopus_id}-${a.author_order}`} className="transition-colors duration-300 hover:bg-slate-50/50">
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-top text-slate-500">{a.author_order}</td>
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-top font-medium text-slate-800">
+                  <tr
+                    key={`${a.scopus_id}-${a.author_order}`}
+                    className="flex flex-wrap items-baseline gap-x-3 border-b border-slate-100 px-2.5 py-3 transition-colors duration-300 hover:bg-slate-50/50 md:table-row md:border-b-0 md:p-0"
+                  >
+                    <td className="text-slate-500 md:table-cell md:border-b md:border-r md:border-slate-100 md:px-2.5 md:py-3.5 md:text-center md:align-top">{a.author_order}</td>
+                    <td className="font-medium text-slate-800 md:table-cell md:border-b md:border-r md:border-slate-100 md:px-2.5 md:py-3.5 md:align-top">
                       <Link
                         to={`/publications?scopus_id=${encodeURIComponent(a.scopus_id)}`}
                         onClick={onNavigateAway}
@@ -287,8 +292,8 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                         {a.preferred_name}
                       </Link>
                     </td>
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-top font-mono text-sm font-medium text-slate-500 whitespace-nowrap">{a.scopus_id}</td>
-                    <td className="border-b border-slate-100 px-2.5 py-3.5 align-top">
+                    <td className="font-mono text-sm font-medium text-slate-500 whitespace-nowrap md:table-cell md:border-b md:border-r md:border-slate-100 md:px-2.5 md:py-3.5 md:align-top">{a.scopus_id}</td>
+                    <td className="mt-2 w-full basis-full md:mt-0 md:table-cell md:w-auto md:basis-auto md:border-b md:border-slate-100 md:px-2.5 md:py-3.5 md:align-top">
                       <AuthorAffiliationCell author={a} locale={locale} isAdmin={isAdmin} />
                     </td>
                   </tr>

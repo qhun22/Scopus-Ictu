@@ -171,7 +171,7 @@ function OverrideNote({ override, locale }: { override: AffiliationOverrideRead;
         {override.evidence_url && (
           <p className="mt-0.5 text-slate-500">
             {vi ? "Nguồn: " : "Source: "}
-            <a href={override.evidence_url} target="_blank" rel="noreferrer" className="text-sky-700 underline">
+            <a href={override.evidence_url} target="_blank" rel="noreferrer" className="break-all text-sky-700 underline">
               {override.evidence_url}
             </a>
           </p>
