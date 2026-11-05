@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import {
+  exportPublicationsCsv,
   exportPublicationsJson,
   getPublicationFilterOptions,
   getPublications,
@@ -11,6 +12,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 import { PublicationListItem } from "../../types/publication";
 import { useI18n } from "../../i18n";
+import { saveBlob } from "../../utils/saveBlob";
 import Button from "../../components/ui/Button";
 import PublicationDetailModal from "./PublicationDetailModal";
 
@@ -98,7 +100,7 @@ export default function PublicationsPage() {
   }, [qForApi, effectiveScopusId, appliedFilters]);
 
   // ── Export state (ADMIN only) ─────────────────────────────────────────────
-  const [isExporting, setIsExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<"csv" | "json" | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
   // ── Stale-request defenses: AbortController + monotonic generation ─────
@@ -297,29 +299,35 @@ export default function PublicationsPage() {
     ? "Danh mục công bố khoa học đã được chuẩn hóa."
     : "Catalog of canonically normalized scientific publications.";
 
-  const exportLabel = locale === "vi" ? "Xuất JSON" : "Export JSON";
   const exportingLabel = locale === "vi" ? "Đang xuất..." : "Exporting...";
+  const exportLabels: Record<"csv" | "json", string> = {
+    csv: locale === "vi" ? "Xuất CSV" : "Export CSV",
+    json: locale === "vi" ? "Xuất JSON" : "Export JSON",
+  };
+  const exportHints: Record<"csv" | "json", string> = {
+    csv: locale === "vi"
+      ? "Mỗi dòng là một tác giả, kèm đơn vị, mức tin cậy và nguồn. Mở được bằng Excel."
+      : "One row per author, with affiliation, confidence and source. Opens in Excel.",
+    json: locale === "vi"
+      ? "Dữ liệu đầy đủ theo bài, kèm đơn vị từng tác giả."
+      : "Full data per publication, with each author's affiliations.",
+  };
 
-  const handleExport = async () => {
-    if (!isAdmin || isExporting) return;
-    setIsExporting(true);
+  const handleExport = async (format: "csv" | "json") => {
+    if (!isAdmin || exportingFormat) return;
+    setExportingFormat(format);
     setExportError(null);
     try {
-      const { blob, filename } = await exportPublicationsJson({
+      const filters = {
         q: qDebounced || undefined,
         year: appliedFilters.year,
         document_type: appliedFilters.document_type,
         publication_stage: appliedFilters.publication_stage,
         open_access_status: appliedFilters.open_access_status,
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      };
+      const { blob, filename } =
+        format === "csv" ? await exportPublicationsCsv(filters) : await exportPublicationsJson(filters);
+      saveBlob(blob, filename);
     } catch (err) {
       setExportError(
         err instanceof ApiError
@@ -327,7 +335,7 @@ export default function PublicationsPage() {
           : "Không thể xuất dữ liệu công bố.",
       );
     } finally {
-      setIsExporting(false);
+      setExportingFormat(null);
     }
   };
 
@@ -343,18 +351,25 @@ export default function PublicationsPage() {
         </div>
         {isAdmin && (
           <div className="flex flex-col items-end gap-1">
-            <Button
-              variant="secondary"
-              onClick={() => { void handleExport(); }}
-              disabled={isExporting}
-              icon={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {(["csv", "json"] as const).map((format) => (
+                <Button
+                  key={format}
+                  variant="secondary"
+                  title={exportHints[format]}
+                  onClick={() => { void handleExport(format); }}
+                  disabled={exportingFormat !== null}
+                  data-testid={`export-${format}`}
+                  icon={
                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
               }
-            >
-              {isExporting ? exportingLabel : exportLabel}
-            </Button>
+                >
+                  {exportingFormat === format ? exportingLabel : exportLabels[format]}
+                </Button>
+              ))}
+            </div>
             {exportError && (
               <p className="text-sm font-medium text-rose-500">{exportError}</p>
             )}

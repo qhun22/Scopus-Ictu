@@ -56,6 +56,9 @@ const REASON_VI: Record<string, string> = {
   ID_CONFLICT: "Mâu thuẫn định danh",
   ID_AMBIGUOUS: "Định danh không rõ ràng",
   WITHHELD_SOURCE_CONFLICT: "Giữ lại do xung đột giữa các nguồn",
+  NO_RAW_AUTHOR_NAME: "Nguồn ngoài không có tên tác giả gốc",
+  OPENALEX_ENTITY_NAME_CONFLICT: "Tên tác giả trên OpenAlex tự mâu thuẫn",
+  DUPLICATE_DOI_IN_SOURCE: "Nhiều bài trùng DOI nên không tra được",
 };
 const REASON_EN: Record<string, string> = {
   NO_EXTERNAL_WORK: "Paper not found in the external source",
@@ -67,6 +70,9 @@ const REASON_EN: Record<string, string> = {
   ID_CONFLICT: "Identifier conflict",
   ID_AMBIGUOUS: "Ambiguous identifier",
   WITHHELD_SOURCE_CONFLICT: "Withheld because sources conflict",
+  NO_RAW_AUTHOR_NAME: "The external source has no original author name",
+  OPENALEX_ENTITY_NAME_CONFLICT: "The OpenAlex author name contradicts itself",
+  DUPLICATE_DOI_IN_SOURCE: "Several papers share this DOI, so it cannot be looked up",
 };
 
 export function reasonLabel(code: string, locale: Locale): string {

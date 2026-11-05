@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   addOverride,
+  AffiliationGapItem,
+  AffiliationGapSummary,
+  exportAffiliationGapsCsv,
+  getAffiliationGaps,
   getNeedsReview,
   NeedsReviewItem,
   OverrideFull,
@@ -12,15 +16,87 @@ import Button, { buttonClass } from "../../components/ui/Button";
 import ModalPortal from "../../components/common/ModalPortal";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
+import { saveBlob } from "../../utils/saveBlob";
 import ApplyToOtherPositions from "./ApplyToOtherPositions";
 
 type Locale = "vi" | "en";
 
 const REASON_KIND_LABEL: Record<string, Record<Locale, string>> = {
-  UNRESOLVED: { vi: "Chưa có đơn vị", en: "No unit" },
+  UNRESOLVED: { vi: "Chưa xác định được", en: "Unresolved" },
   CONFLICTING_SOURCES: { vi: "Nguồn mâu thuẫn", en: "Conflicting sources" },
   LOW_CONFIDENCE: { vi: "Chỉ đối chiếu, chưa xác minh", en: "Corroborated only, not verified" },
 };
+
+// "Chưa có đơn vị" mode: every position the export file shows with an empty unit, one reason each.
+// Short text fits the fixed-width badge; the full text is the tooltip.
+const GAP_MODE = "GAPS";
+const GAP_REASON_ORDER = [
+  "ADMIN_MARKED_UNRESOLVED", "SOURCE_HAS_NO_AFFILIATION", "ID_CONFLICT", "ID_AMBIGUOUS",
+  "POSITION_CLAIMED_BY_OTHER_ID", "ORDER_INCONSISTENT_WITH_VERIFIED_ID", "WITHHELD_SOURCE_CONFLICT",
+  "OPENALEX_ENTITY_NAME_CONFLICT", "NAME_MISMATCH", "NO_RAW_AUTHOR_NAME", "AUTHOR_COUNT_MISMATCH",
+  "NO_EXTERNAL_AUTHOR_LIST", "DUPLICATE_DOI_IN_SOURCE", "NO_EXTERNAL_WORK", "NOT_RECONCILED", "UNKNOWN",
+];
+// NO_DOI is display-only: NO_EXTERNAL_WORK on a paper that has no DOI to look up.
+const GAP_REASON_SHORT: Record<string, Record<Locale, string>> = {
+  ADMIN_MARKED_UNRESOLVED: { vi: "Đã xem, chưa rõ", en: "Seen, unclear" },
+  SOURCE_HAS_NO_AFFILIATION: { vi: "Nguồn không ghi", en: "Source lists none" },
+  ID_CONFLICT: { vi: "Mâu thuẫn ID", en: "ID conflict" },
+  ID_AMBIGUOUS: { vi: "ID không rõ", en: "Ambiguous ID" },
+  POSITION_CLAIMED_BY_OTHER_ID: { vi: "Thuộc ID khác", en: "Other ID's slot" },
+  ORDER_INCONSISTENT_WITH_VERIFIED_ID: { vi: "Sai thứ tự", en: "Order mismatch" },
+  WITHHELD_SOURCE_CONFLICT: { vi: "Nguồn mâu thuẫn", en: "Sources conflict" },
+  OPENALEX_ENTITY_NAME_CONFLICT: { vi: "Lệch tên OpenAlex", en: "OpenAlex name" },
+  NAME_MISMATCH: { vi: "Tên không khớp", en: "Name mismatch" },
+  NO_RAW_AUTHOR_NAME: { vi: "Nguồn thiếu tên", en: "No source name" },
+  AUTHOR_COUNT_MISMATCH: { vi: "Lệch số tác giả", en: "Count mismatch" },
+  NO_EXTERNAL_AUTHOR_LIST: { vi: "Thiếu DS tác giả", en: "No author list" },
+  DUPLICATE_DOI_IN_SOURCE: { vi: "Trùng DOI", en: "Duplicate DOI" },
+  NO_EXTERNAL_WORK: { vi: "Không thấy bài", en: "Paper not found" },
+  NO_DOI: { vi: "Bài không có DOI", en: "No DOI" },
+  NOT_RECONCILED: { vi: "Chưa đối chiếu", en: "Not reconciled" },
+  UNKNOWN: { vi: "Chưa xác định", en: "Unknown" },
+};
+const GAP_REASON_FULL: Record<string, Record<Locale, string>> = {
+  ADMIN_MARKED_UNRESOLVED: { vi: "Quản trị viên đã xem, chưa kết luận được", en: "An ADMIN looked at it and could not conclude" },
+  SOURCE_HAS_NO_AFFILIATION: { vi: "Nguồn ngoài có bài nhưng không ghi đơn vị", en: "The external source has the paper but lists no unit" },
+  ID_CONFLICT: { vi: "Mâu thuẫn định danh tác giả", en: "Author identifier conflict" },
+  ID_AMBIGUOUS: { vi: "Định danh tác giả không rõ ràng", en: "Ambiguous author identifier" },
+  POSITION_CLAIMED_BY_OTHER_ID: { vi: "Vị trí này thuộc định danh khác", en: "This position belongs to another identifier" },
+  ORDER_INCONSISTENT_WITH_VERIFIED_ID: { vi: "Thứ tự tác giả không khớp định danh đã xác minh", en: "Author order contradicts a verified identifier" },
+  WITHHELD_SOURCE_CONFLICT: { vi: "Tạm giữ do các nguồn mâu thuẫn", en: "Withheld because sources conflict" },
+  OPENALEX_ENTITY_NAME_CONFLICT: { vi: "Tên trên OpenAlex mâu thuẫn", en: "OpenAlex author name is self-contradictory" },
+  NAME_MISMATCH: { vi: "Tên tác giả lệch giữa Scopus và nguồn ngoài", en: "Author name differs between Scopus and the source" },
+  NO_RAW_AUTHOR_NAME: { vi: "Nguồn ngoài không có tên tác giả gốc", en: "The source has no original author name" },
+  AUTHOR_COUNT_MISMATCH: { vi: "Số tác giả lệch giữa Scopus và nguồn ngoài", en: "Author count differs between Scopus and the source" },
+  NO_EXTERNAL_AUTHOR_LIST: { vi: "Nguồn ngoài không có danh sách tác giả", en: "The source has no author list" },
+  DUPLICATE_DOI_IN_SOURCE: { vi: "Nhiều bài trùng DOI nên không tra được", en: "Several papers share this DOI, so it cannot be looked up" },
+  NO_EXTERNAL_WORK: { vi: "Không tìm thấy bài trên OpenAlex/Crossref", en: "Paper not found on OpenAlex/Crossref" },
+  NO_DOI: { vi: "Bài không có DOI nên chưa tra được trên nguồn ngoài", en: "The paper has no DOI, so it cannot be looked up" },
+  NOT_RECONCILED: { vi: "Chưa chạy đối chiếu đơn vị", en: "Affiliation reconciliation has not run" },
+  UNKNOWN: { vi: "Chưa xác định (dữ liệu cũ hoặc mã lạ)", en: "Unknown (older data or an unrecognised code)" },
+};
+
+/** The list's row type is shared with the needs-review list, so the table and the detail modal are reused. */
+function gapToItem(g: AffiliationGapItem): NeedsReviewItem {
+  return {
+    publication_author_id: g.publication_author_id,
+    eid: g.eid,
+    title: g.title,
+    author_order: g.author_order,
+    scopus_id: g.scopus_id,
+    preferred_name: g.author_name,
+    reason_kind: g.reason === "NO_EXTERNAL_WORK" && !g.doi ? "NO_DOI" : g.reason,
+    resolution_summaries: g.by_source.map((x) => ({
+      source_system: x.source,
+      link_status: x.link_status,
+      unresolved_reason: x.reason,
+      raw_affiliations: [],
+    })),
+    has_override: g.admin_reviewed,
+    doi: g.doi,
+    overrides: g.overrides,
+  };
+}
 
 // A status that carries two facts is shown as two stacked labels, like the source labels beside it.
 const REASON_KIND_PARTS: Record<string, Record<Locale, string[]>> = {
@@ -36,7 +112,9 @@ const ADJUSTED_LABEL: Record<Locale, string> = { vi: "Đã hiệu chỉnh", en: 
 const ADJUSTED_STYLE = "border-emerald-400 bg-white text-emerald-700 hover:bg-emerald-50";
 
 const reasonParts = (kind: string, locale: Locale): string[] =>
-  REASON_KIND_PARTS[kind]?.[locale] ?? [REASON_KIND_LABEL[kind]?.[locale] ?? kind];
+  REASON_KIND_PARTS[kind]?.[locale] ?? [
+    REASON_KIND_LABEL[kind]?.[locale] ?? GAP_REASON_SHORT[kind]?.[locale] ?? kind,
+  ];
 
 const REASON_KIND_STYLE: Record<string, string> = {
   UNRESOLVED: "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
@@ -420,6 +498,12 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   // Scope of the list: only Scopus authors tied to an ICTU lecturer (default), or every author.
   const [scopeFilter, setScopeFilter] = useState<"ICTU" | "ALL">("ICTU");
   const [appliedScope, setAppliedScope] = useState<"ICTU" | "ALL">("ICTU");
+  // "Chưa có đơn vị" mode only: publication year, the reason chosen on the chips, the counts and export state.
+  const [yearInput, setYearInput] = useState("");
+  const [appliedYear, setAppliedYear] = useState("");
+  const [gapReason, setGapReason] = useState("ALL");
+  const [gapSummary, setGapSummary] = useState<AffiliationGapSummary | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -432,17 +516,40 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   const [showRevoked, setShowRevoked] = useState(false);
 
   const loadItems = useCallback(
-    async (q: string, filter: string, scope: "ICTU" | "ALL", targetPage: number, targetPageSize: number) => {
+    async (
+      q: string,
+      filter: string,
+      scope: "ICTU" | "ALL",
+      targetPage: number,
+      targetPageSize: number,
+      year: string,
+      reason: string,
+    ) => {
       setLoading(true);
       setLoadError(null);
       try {
-        const res = await getNeedsReview({
-          limit: targetPageSize,
-          offset: (targetPage - 1) * targetPageSize,
-          query: q.trim() || undefined,
-          reason_kind: filter !== "ALL" ? filter : undefined,
-          ictu_only: scope === "ICTU",
-        });
+        let res: { items: NeedsReviewItem[]; total: number };
+        if (filter === GAP_MODE) {
+          const gaps = await getAffiliationGaps({
+            page: targetPage,
+            page_size: targetPageSize,
+            eid: q.trim() || undefined,
+            year: /^\d{4}$/.test(year) ? Number(year) : undefined,
+            reason: reason !== "ALL" ? reason : undefined,
+            ictu_only: scope === "ICTU",
+          });
+          setGapSummary(gaps.summary);
+          res = { items: gaps.items.map(gapToItem), total: gaps.total };
+        } else {
+          setGapSummary(null);
+          res = await getNeedsReview({
+            limit: targetPageSize,
+            offset: (targetPage - 1) * targetPageSize,
+            query: q.trim() || undefined,
+            reason_kind: filter !== "ALL" ? filter : undefined,
+            ictu_only: scope === "ICTU",
+          });
+        }
         setItems(res.items);
         setTotal(res.total);
         setSelectedItem((prev) => {
@@ -459,12 +566,15 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
   );
 
   useEffect(() => {
-    void loadItems(appliedSearch, appliedReasonFilter, appliedScope, page, pageSize);
-  }, [loadItems, appliedSearch, appliedReasonFilter, appliedScope, page, pageSize]);
+    void loadItems(appliedSearch, appliedReasonFilter, appliedScope, page, pageSize, appliedYear, gapReason);
+  }, [loadItems, appliedSearch, appliedReasonFilter, appliedScope, page, pageSize, appliedYear, gapReason]);
 
   const refresh = useCallback(async () => {
-    await loadItems(appliedSearch, appliedReasonFilter, appliedScope, page, pageSize);
-  }, [loadItems, appliedSearch, appliedReasonFilter, appliedScope, page, pageSize]);
+    await loadItems(appliedSearch, appliedReasonFilter, appliedScope, page, pageSize, appliedYear, gapReason);
+  }, [loadItems, appliedSearch, appliedReasonFilter, appliedScope, page, pageSize, appliedYear, gapReason]);
+
+  const isGaps = appliedReasonFilter === GAP_MODE;
+  const pendingGaps = reasonFilter === GAP_MODE;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -472,6 +582,8 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
     setAppliedSearch(searchInput.trim());
     setAppliedReasonFilter(reasonFilter);
     setAppliedScope(scopeFilter);
+    setAppliedYear(pendingGaps ? yearInput.trim() : "");
+    setGapReason("ALL");
     setPage(1);
   };
 
@@ -482,20 +594,45 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
     setAppliedReasonFilter("ALL");
     setScopeFilter("ICTU");
     setAppliedScope("ICTU");
+    setYearInput("");
+    setAppliedYear("");
+    setGapReason("ALL");
     setPage(1);
+  };
+
+  const handleExportGaps = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const { blob, filename } = await exportAffiliationGapsCsv({
+        eid: appliedSearch.trim() || undefined,
+        year: /^\d{4}$/.test(appliedYear) ? Number(appliedYear) : undefined,
+        reason: gapReason !== "ALL" ? gapReason : undefined,
+        ictu_only: appliedScope === "ICTU",
+      });
+      saveBlob(blob, filename);
+    } catch (err) {
+      toast.error(vi ? "Không xuất được danh sách" : "Could not export the list", explain(err, locale));
+    } finally {
+      setExporting(false);
+    }
   };
 
   const isApplyDisabled =
     searchInput.trim() === appliedSearch.trim() &&
     reasonFilter === appliedReasonFilter &&
-    scopeFilter === appliedScope;
+    scopeFilter === appliedScope &&
+    (!pendingGaps || yearInput.trim() === appliedYear);
   const isResetDisabled =
     !searchInput.trim() &&
     !appliedSearch &&
     reasonFilter === "ALL" &&
     appliedReasonFilter === "ALL" &&
     scopeFilter === "ICTU" &&
-    appliedScope === "ICTU";
+    appliedScope === "ICTU" &&
+    !yearInput &&
+    !appliedYear &&
+    gapReason === "ALL";
 
   return (
     <section className="space-y-4" data-testid="aff-manual-review-card">
@@ -530,9 +667,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
               }
             }}
             placeholder={
-              vi
-                ? "Tìm theo tên tác giả, Scopus ID, EID hoặc tiêu đề bài báo..."
-                : "Search by author name, Scopus ID, EID or title..."
+              pendingGaps
+                ? (vi ? "Nhập đúng mã EID của một bài..." : "Enter the exact EID of one paper...")
+                : vi
+                  ? "Tìm theo tên tác giả, Scopus ID, EID hoặc tiêu đề bài báo..."
+                  : "Search by author name, Scopus ID, EID or title..."
             }
             className="h-control w-full rounded-control border border-line bg-slate-50 pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint focus:border-brand focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand/20"
           />
@@ -546,7 +685,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
             aria-label={vi ? "Phạm vi tác giả" : "Author scope"}
             className="h-control rounded-control border border-line bg-slate-50 px-3 text-[13px] text-ink focus:border-brand focus:bg-white focus:outline-none cursor-pointer"
           >
-            <option value="ICTU">{vi ? "Tác giả liên quan ICTU" : "ICTU-related authors"}</option>
+            <option value="ICTU">
+              {pendingGaps
+                ? (vi ? "Giảng viên ICTU đã xác nhận" : "Confirmed ICTU lecturers")
+                : (vi ? "Tác giả liên quan ICTU" : "ICTU-related authors")}
+            </option>
             <option value="ALL">{vi ? "Tất cả tác giả" : "All authors"}</option>
           </select>
 
@@ -557,11 +700,30 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
             className="h-control rounded-control border border-line bg-slate-50 px-3 text-[13px] text-ink focus:border-brand focus:bg-white focus:outline-none cursor-pointer"
           >
             <option value="ALL">{vi ? "Tất cả trạng thái" : "All statuses"}</option>
-            <option value="UNRESOLVED">{vi ? "Chưa có đơn vị" : "No unit"}</option>
+            <option value={GAP_MODE}>
+              {vi ? "Chưa có đơn vị (như trong file xuất)" : "No unit (as in the export file)"}
+            </option>
+            <option value="UNRESOLVED">{vi ? "Chưa xác định được" : "Unresolved"}</option>
             <option value="CONFLICTING_SOURCES">{vi ? "Nguồn mâu thuẫn" : "Conflicting sources"}</option>
             <option value="LOW_CONFIDENCE">{vi ? "Chỉ đối chiếu, chưa xác minh" : "Corroborated only"}</option>
             <option value="ADJUSTED">{vi ? "Đã hiệu chỉnh" : "Adjusted"}</option>
           </select>
+
+          {pendingGaps && (
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={4}
+              value={yearInput}
+              onChange={(e) => setYearInput(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleApplySearch();
+              }}
+              aria-label={vi ? "Năm xuất bản" : "Publication year"}
+              placeholder={vi ? "Năm" : "Year"}
+              className="h-control w-20 rounded-control border border-line bg-slate-50 px-3 text-[13px] text-ink focus:border-brand focus:bg-white focus:outline-none"
+            />
+          )}
 
           {/* Nút Áp dụng */}
           <button
@@ -588,8 +750,56 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
             </svg>
             <span className="truncate">{vi ? "Đặt lại" : "Reset"}</span>
           </button>
+
+          {isGaps && (
+            <button
+              type="button"
+              onClick={() => { void handleExportGaps(); }}
+              disabled={exporting}
+              className={buttonClass("secondary")}
+              data-testid="export-gaps-csv"
+              title={vi ? "Tải danh sách đang lọc, mở được bằng Excel" : "Download the filtered list; opens in Excel"}
+            >
+              <span className="truncate">{exporting ? (vi ? "Đang xuất..." : "Exporting...") : (vi ? "Xuất CSV" : "Export CSV")}</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {isGaps && gapSummary && (
+        <div className="space-y-2 rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs" data-testid="gap-summary">
+          <p className="text-sm text-slate-700">
+            {vi ? "Chưa có đơn vị: " : "No unit: "}
+            <strong>{gapSummary.total_gaps}</strong> / {gapSummary.total_positions} {vi ? "vị trí tác giả, thuộc" : "author positions, in"}{" "}
+            <strong>{gapSummary.publications_with_gaps}</strong> {vi ? "bài." : "papers."}{" "}
+            <span className="text-slate-500">
+              {vi
+                ? "Vị trí đã có đơn vị do ADMIN nhập tay không còn nằm trong danh sách này."
+                : "A position with a unit typed by an ADMIN is no longer in this list."}
+            </span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {[["ALL", gapSummary.total_gaps] as const, ...GAP_REASON_ORDER
+              .filter((code) => (gapSummary.by_reason[code] ?? 0) > 0)
+              .map((code) => [code, gapSummary.by_reason[code]] as const)].map(([code, count]) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => { setGapReason(code); setPage(1); }}
+                title={code === "ALL" ? undefined : GAP_REASON_FULL[code]?.[locale]}
+                className={`inline-flex h-7 items-center gap-1.5 rounded-[5px] border px-2.5 text-sm font-semibold ${
+                  gapReason === code
+                    ? "border-[#3A5FC3] bg-blue-50 text-[#3A5FC3]"
+                    : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {code === "ALL" ? (vi ? "Tất cả" : "All") : GAP_REASON_SHORT[code]?.[locale] ?? code}
+                <span className="font-bold">{count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loadError && (
         <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
@@ -684,8 +894,8 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                           {(activeOverrides.length > 0 ? [ADJUSTED_LABEL[locale]] : reasonParts(item.reason_kind, locale)).map((part) => (
                             <span
                               key={part}
-                              className={`${STATUS_BADGE_BASE} ${activeOverrides.length > 0 ? ADJUSTED_STYLE : REASON_KIND_STYLE[item.reason_kind]}`}
-                              title={`${vi ? "Trạng thái từ nguồn" : "Source status"}: ${REASON_KIND_LABEL[item.reason_kind]?.[locale] ?? item.reason_kind}`}
+                              className={`${STATUS_BADGE_BASE} ${activeOverrides.length > 0 ? ADJUSTED_STYLE : (REASON_KIND_STYLE[item.reason_kind] ?? REASON_KIND_STYLE.UNRESOLVED)}`}
+                              title={`${vi ? "Trạng thái từ nguồn" : "Source status"}: ${GAP_REASON_FULL[item.reason_kind]?.[locale] ?? REASON_KIND_LABEL[item.reason_kind]?.[locale] ?? item.reason_kind}`}
                             >
                               {part}
                             </span>

@@ -1,6 +1,6 @@
 /** ADMIN workflow: author-affiliation source status -> preview -> apply. */
 
-import { apiGet, apiPost, apiPut, ApiRequestOptions } from "./client";
+import { apiDownload, apiGet, apiPost, apiPut, ApiRequestOptions } from "./client";
 
 export interface AffiliationBundleFile {
   name: string;
@@ -168,7 +168,8 @@ export interface NeedsReviewItem {
   author_order: number;
   scopus_id: string;
   preferred_name: string;
-  reason_kind: "UNRESOLVED" | "CONFLICTING_SOURCES" | "LOW_CONFIDENCE";
+  /** needs-review: UNRESOLVED | CONFLICTING_SOURCES | LOW_CONFIDENCE; gap list: a gap reason code. */
+  reason_kind: string;
   resolution_summaries: Array<{
     source_system: string;
     link_status: string;
@@ -278,4 +279,79 @@ export function revokeOverride(
     body,
     options,
   );
+}
+
+// --------------------------------------------------------------------------- positions with no unit (week 7)
+export interface AffiliationGapItem {
+  publication_author_id: string;
+  eid: string;
+  doi: string | null;
+  title: string;
+  year: number | null;
+  author_count: number;
+  author_order: number;
+  scopus_id: string;
+  author_name: string;
+  affiliation_status: string;
+  /** One of the 16 gap reason codes. */
+  reason: string;
+  by_source: Array<{ source: string; link_status: string; reason: string | null }>;
+  admin_reviewed: boolean;
+  ictu_lecturer: string | null;
+  /** Every override of the position, ACTIVE and REVOKED, newest first. */
+  overrides: OverrideFull[];
+}
+
+export interface AffiliationGapSummary {
+  total_positions: number;
+  total_gaps: number;
+  publications_with_gaps: number;
+  by_reason: Record<string, number>;
+}
+
+export interface AffiliationGapListResponse {
+  items: AffiliationGapItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  summary: AffiliationGapSummary;
+}
+
+export interface AffiliationGapQuery {
+  page?: number;
+  page_size?: number;
+  year?: number;
+  eid?: string;
+  reason?: string;
+  /** Only positions with an APPROVED ICTU lecturer link (not pending proposals). */
+  ictu_only?: boolean;
+}
+
+function gapQuery(params: AffiliationGapQuery): string {
+  const query = new URLSearchParams();
+  if (params.page != null) query.set("page", String(params.page));
+  if (params.page_size != null) query.set("page_size", String(params.page_size));
+  if (params.year != null) query.set("year", String(params.year));
+  if (params.eid) query.set("eid", params.eid);
+  if (params.reason) query.set("reason", params.reason);
+  if (params.ictu_only) query.set("ictu_only", "true");
+  const qs = query.toString();
+  return qs ? `?${qs}` : "";
+}
+
+/** ADMIN: author positions with no affiliation to show, one reason each. */
+export function getAffiliationGaps(
+  params: AffiliationGapQuery = {},
+  options: ApiRequestOptions = {},
+): Promise<AffiliationGapListResponse> {
+  return apiGet<AffiliationGapListResponse>(`/api/v1/publications/affiliation-gaps${gapQuery(params)}`, options);
+}
+
+/** ADMIN: the same list as a CSV Excel can open (no paging; page and page_size are ignored). */
+export function exportAffiliationGapsCsv(
+  params: AffiliationGapQuery = {},
+  options: ApiRequestOptions = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const { page: _page, page_size: _pageSize, ...filters } = params;
+  return apiDownload(`/api/v1/publications/affiliation-gaps/export${gapQuery(filters)}`, options);
 }

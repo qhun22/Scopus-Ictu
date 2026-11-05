@@ -118,15 +118,7 @@ export async function getPublicationByEid(
   return apiGet<PublicationDetailResponse>(`/api/v1/publications/${encodedEid}`, options);
 }
 
-/**
- * Export the canonical publication dataset as a downloadable JSON file.
- * Uses HttpOnly-cookie auth via the shared apiDownload helper.
- * Only ADMIN role is authorised by the backend.
- */
-export async function exportPublicationsJson(
-  filters: PublicationExportFilters = {},
-  options = {},
-): Promise<{ blob: Blob; filename: string; recordCount: number }> {
+function exportQuery(filters: PublicationExportFilters, format?: "csv"): string {
   const params = new URLSearchParams();
   if (filters.q !== undefined && filters.q.trim()) params.set("q", filters.q.trim());
   if (filters.year !== undefined) params.set("year", String(filters.year));
@@ -139,23 +131,32 @@ export async function exportPublicationsJson(
   if (filters.open_access_status !== undefined && filters.open_access_status.trim()) {
     params.set("open_access_status", filters.open_access_status.trim());
   }
-  const suffix = params.toString() ? `?${params.toString()}` : "";
+  if (format) params.set("format", format);
+  return params.toString() ? `?${params.toString()}` : "";
+}
 
-  const { blob, filename } = await apiDownload(
-    `/api/v1/publications/export${suffix}`,
-    options,
-  );
+/**
+ * Export the canonical publication dataset as a downloadable JSON file (schema 1.1).
+ * Uses HttpOnly-cookie auth via the shared apiDownload helper.
+ * Only ADMIN role is authorised by the backend.
+ */
+export async function exportPublicationsJson(
+  filters: PublicationExportFilters = {},
+  options = {},
+): Promise<{ blob: Blob; filename: string }> {
+  return apiDownload(`/api/v1/publications/export${exportQuery(filters)}`, options);
+}
 
-  let recordCount = 0;
-  try {
-    const text = await blob.text();
-    const parsed = JSON.parse(text) as { dataset?: { record_count?: number } };
-    recordCount = parsed?.dataset?.record_count ?? 0;
-  } catch {
-    // ignore parse errors — caller receives blob regardless
-  }
-
-  return { blob, filename, recordCount };
+/**
+ * Export the same dataset as a CSV file Excel can open: one row per author position,
+ * with each author's affiliation, confidence and source. The row count is not read from
+ * the response (the backend exposes no custom header and the file is not parsed here).
+ */
+export async function exportPublicationsCsv(
+  filters: PublicationExportFilters = {},
+  options = {},
+): Promise<{ blob: Blob; filename: string }> {
+  return apiDownload(`/api/v1/publications/export${exportQuery(filters, "csv")}`, options);
 }
 
 export interface NormalizationCompare {
