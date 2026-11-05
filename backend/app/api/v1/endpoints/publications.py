@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -45,6 +45,8 @@ PublicationAdmin = Annotated[User, Depends(require_role("ADMIN"))]
 PublicationStaff = Annotated[User, Depends(require_role("ADMIN", "REVIEWER"))]
 DatabaseSession = Annotated[Session, Depends(get_session)]
 
+# Exported file names carry Vietnam time (UTC+7), the clock the users read, not UTC.
+VIETNAM_TZ = timezone(timedelta(hours=7))
 CSV_MEDIA_TYPE = "text/csv; charset=utf-8"
 GAP_REASON_PATTERN = "^(" + "|".join(GAP_REASONS) + ")$"
 
@@ -69,7 +71,20 @@ def _for_role(result: PublicationDetailResponse, reader: User | None) -> Publica
 
     if reader is not None and reader.role == "ADMIN":
         return result
-    return result.model_copy(update={"provenance": [], "approved_lecturer_links": []})
+    # The ADMIN's free-text reason on a manual affiliation is an internal note (it can name people):
+    # the unit text, its confidence and its evidence link stay visible, the note does not.
+    authors = [
+        author.model_copy(update={
+            "affiliation_overrides": [
+                override.model_copy(update={"reason": ""})
+                for override in author.affiliation_overrides
+            ]
+        })
+        for author in result.authors
+    ]
+    return result.model_copy(
+        update={"provenance": [], "approved_lecturer_links": [], "authors": authors}
+    )
 
 
 @router.get("", response_model=PublicationListResponse)
@@ -203,7 +218,7 @@ def export_publication_endpoint(
 
     export_id = uuid.uuid4()
     now = datetime.now(UTC)
-    timestamp_str = now.strftime("%Y%m%d_%H%M%S")
+    timestamp_str = now.astimezone(VIETNAM_TZ).strftime("%Y%m%d_%H%M%S")
     filters = {
         "q": q,
         "year": year,
@@ -321,7 +336,7 @@ def export_affiliation_gaps_endpoint(
     """The same list as a CSV (no pagination). Audited like the publication export."""
 
     export_id = uuid.uuid4()
-    timestamp_str = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    timestamp_str = datetime.now(VIETNAM_TZ).strftime("%Y%m%d_%H%M%S")
     try:
         content, row_count = gaps_csv(db, year=year, eid=eid, reason=reason, ictu_only=ictu_only)
     except SQLAlchemyError as exc:
