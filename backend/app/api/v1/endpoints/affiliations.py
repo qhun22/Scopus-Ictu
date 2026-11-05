@@ -24,6 +24,7 @@ from app.api.dependencies import require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
 from app.models.governance import User
+from app.schemas.affiliation_override_api import OverrideRead, override_to_read
 from app.services import affiliation_enrichment_service as enrichment
 from app.services import affiliation_override_service as override_service
 from app.services import affiliation_workflow as workflow
@@ -321,29 +322,12 @@ class NeedsReviewItemRead(BaseModel):
     has_override: bool
     doi: str | None = None
     # ALL overrides for this position — active and revoked, newest first.
-    overrides: list["OverrideRead"] = Field(default_factory=list)
+    overrides: list[OverrideRead] = Field(default_factory=list)
 
 
 class NeedsReviewListResponse(BaseModel):
     items: list[NeedsReviewItemRead]
     total: int
-
-
-class OverrideRead(BaseModel):
-    id: uuid.UUID
-    publication_author_id: uuid.UUID
-    affiliation_text: str
-    confidence: str
-    status: str
-    evidence_url: str
-    reason: str
-    created_by_user_id: uuid.UUID
-    updated_by_user_id: uuid.UUID
-    revoked_by_user_id: uuid.UUID | None
-    revoked_at: str | None
-    version: int
-    created_at: str
-    updated_at: str
 
 
 class AddOverrideRequest(BaseModel):
@@ -390,22 +374,7 @@ class RevokeOverrideRequest(BaseModel):
 
 
 def _override_read(row: override_service.PublicationAuthorAffiliationOverride) -> OverrideRead:
-    return OverrideRead(
-        id=row.id,
-        publication_author_id=row.publication_author_id,
-        affiliation_text=row.affiliation_text,
-        confidence=row.confidence,
-        status=row.status,
-        evidence_url=row.evidence_url,
-        reason=row.reason,
-        created_by_user_id=row.created_by_user_id,
-        updated_by_user_id=row.updated_by_user_id,
-        revoked_by_user_id=row.revoked_by_user_id,
-        revoked_at=row.revoked_at.isoformat() if row.revoked_at else None,
-        version=row.version,
-        created_at=row.created_at.isoformat(),
-        updated_at=row.updated_at.isoformat(),
-    )
+    return override_to_read(row)
 
 
 @router.get(

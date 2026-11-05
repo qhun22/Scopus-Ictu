@@ -302,7 +302,7 @@ def test_export_envelope_shape(client: TestClient, authenticate, seeded) -> None
     assert "dataset" in body
     assert "publications" in body
     ds = body["dataset"]
-    assert ds["schema_version"] == "1.0"
+    assert ds["schema_version"] == "1.1"
     assert ds["name"] == "ICTU Publication Export"
     assert ds["source"] == "SCOPUS_ICTU_SYSTEM_EXPORT"
     assert "export_id" in ds
@@ -768,3 +768,203 @@ def test_reviewer_can_browse_but_not_export(
     authenticate("REVIEWER")
     assert client.get(LIST_URL).status_code == 200
     assert client.get(EXPORT_URL).status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Week 7: affiliations in the export, CSV format, affiliation-gaps list
+# ---------------------------------------------------------------------------
+
+GAPS_URL = "/api/v1/publications/affiliation-gaps"
+GAPS_EXPORT_URL = "/api/v1/publications/affiliation-gaps/export"
+
+
+def _csv_rows(response) -> list[list[str]]:
+    import csv
+    import io
+
+    assert response.content.startswith(b"\xef\xbb\xbf"), "Excel needs the BOM"
+    return list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"), newline="")))
+
+
+def _position(db_session: Session, pub: Publication, author: ScopusAuthor) -> PublicationAuthor:
+    return db_session.query(PublicationAuthor).filter_by(
+        publication_id=pub.id, scopus_author_id=author.id
+    ).one()
+
+
+def _override(position: PublicationAuthor, admin: User, text: str, **kw):
+    from app.models.affiliation_override import PublicationAuthorAffiliationOverride
+
+    revoked = kw.get("status") == "REVOKED"
+    return PublicationAuthorAffiliationOverride(
+        id=uuid.uuid4(),
+        publication_author_id=position.id,
+        affiliation_text=text,
+        confidence=kw.get("confidence", "CORROBORATED"),
+        status=kw.get("status", "ACTIVE"),
+        evidence_url="https://example.invalid/evidence",
+        reason="internal note",
+        created_by_user_id=admin.id,
+        updated_by_user_id=admin.id,
+        revoked_by_user_id=admin.id if revoked else None,
+        revoked_at=_now() if revoked else None,
+        version=1,
+    )
+
+
+def test_export_authors_carry_status_reason_and_empty_units_when_never_reconciled(
+    client: TestClient, authenticate, seeded
+) -> None:
+    authenticate("ADMIN")
+    pub = client.get(EXPORT_URL, params={"q": "alpha"}).json()["publications"][0]
+    assert pub["author_count"] == len(pub["authors"]) == 2
+    for author in pub["authors"]:
+        assert author["affiliation_status"] == "NOT_RECONCILED"
+        assert author["gap_reason"] == "NOT_RECONCILED"
+        assert author["affiliations"] == []
+
+
+def test_export_shows_active_admin_unit_only_and_hides_the_internal_note(
+    client: TestClient, authenticate, db_session: Session, seeded
+) -> None:
+    admin = authenticate("ADMIN")
+    pos = _position(db_session, seeded["p1"], seeded["a1"])
+    db_session.add_all([
+        _override(pos, admin, "Typed unit"),
+        _override(pos, admin, "Revoked unit", status="REVOKED"),
+    ])
+    db_session.commit()
+
+    response = client.get(EXPORT_URL, params={"q": "alpha"})
+    first = response.json()["publications"][0]["authors"][0]
+    assert first["gap_reason"] is None
+    assert [(a["text"], a["confidence"], a["source"]) for a in first["affiliations"]] == [
+        ("Typed unit", "MANUAL_REVIEW", "admin")
+    ]
+    assert first["affiliation_status"] == "NOT_RECONCILED"  # a typed unit never raises it
+    assert "internal note" not in response.text and "Revoked unit" not in response.text
+
+
+def test_export_csv_http_contract(
+    client: TestClient, authenticate, db_session: Session, seeded
+) -> None:
+    authenticate("ADMIN")
+    r = client.get(EXPORT_URL, params={"format": "csv"})
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/csv")
+    cd = r.headers["content-disposition"]
+    assert "attachment" in cd and "ictu_publications_" in cd and cd.rstrip('"').endswith(".csv")
+    rows = _csv_rows(r)
+    assert len(rows[0]) == 16 and rows[0][0] == "eid" and rows[0][-1] == "ictu_lecturer"
+    assert all(len(row) == 16 for row in rows)
+    # 3 author positions + one row for each of the 2 publications without authors
+    assert len(rows) - 1 == 3 + 2
+    ev = db_session.query(AuditEvent).filter(
+        AuditEvent.action == "PUBLICATION_DATASET_EXPORTED"
+    ).one()
+    assert ev.event_metadata["format"] == "CSV"
+    assert ev.event_metadata["schema_version"] == "1.1"
+    assert ev.event_metadata["record_count"] == 4 and ev.event_metadata["row_count"] == 5
+
+
+def test_export_csv_applies_the_same_filters(client: TestClient, authenticate, seeded) -> None:
+    authenticate("ADMIN")
+    rows = _csv_rows(client.get(EXPORT_URL, params={"format": "csv", "q": "alpha"}))
+    assert len(rows) - 1 == 2 and {row[0] for row in rows[1:]} == {"2-s2.0-EXP001"}
+
+
+def test_export_default_format_is_still_json_and_unknown_format_is_rejected(
+    client: TestClient, authenticate, seeded
+) -> None:
+    authenticate("ADMIN")
+    assert "application/json" in client.get(EXPORT_URL).headers["content-type"]
+    assert client.get(EXPORT_URL, params={"format": "xml"}).status_code == 422
+
+
+@pytest.mark.parametrize("url", [GAPS_URL, GAPS_EXPORT_URL])
+def test_gap_endpoints_are_admin_only_and_not_taken_for_an_eid(
+    client: TestClient, authenticate, seeded, url: str
+) -> None:
+    assert client.get(url).status_code == 401
+    authenticate("LECTURER")
+    assert client.get(url).status_code == 403
+    authenticate("REVIEWER")
+    assert client.get(url).status_code == 403  # 403, not a 404 from /{eid}
+
+
+def test_gap_list_for_unreconciled_data(client: TestClient, authenticate, seeded) -> None:
+    authenticate("ADMIN")
+    body = client.get(GAPS_URL).json()
+    assert body["total"] == 3 and body["page"] == 1 and body["page_size"] == 20
+    assert body["summary"] == {
+        "total_positions": 3, "total_gaps": 3, "publications_with_gaps": 2,
+        "by_reason": {"NOT_RECONCILED": 3},
+    }
+    first = body["items"][0]
+    assert first["eid"] == "2-s2.0-EXP001" and first["author_count"] == 2
+    assert first["reason"] == "NOT_RECONCILED" and first["overrides"] == []
+    assert "publication_author_id" in first  # for the review form; not in the export file
+
+
+def test_gap_list_filters_and_pagination(client: TestClient, authenticate, seeded) -> None:
+    authenticate("ADMIN")
+    assert client.get(GAPS_URL, params={"year": 2020}).json()["total"] == 1
+    assert client.get(GAPS_URL, params={"eid": "2-s2.0-EXP001"}).json()["total"] == 2
+    none = client.get(GAPS_URL, params={"reason": "NAME_MISMATCH"}).json()
+    assert none["total"] == 0 and none["summary"]["total_gaps"] == 3
+    assert client.get(GAPS_URL, params={"ictu_only": "true"}).json()["summary"]["total_positions"] == 1
+    page2 = client.get(GAPS_URL, params={"page": 2, "page_size": 2}).json()
+    assert len(page2["items"]) == 1 and page2["total"] == 3
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"reason": "NOT_A_REASON"}, {"page": 0}, {"page_size": 101}, {"year": "abc"}],
+)
+def test_gap_list_rejects_bad_parameters(
+    client: TestClient, authenticate, seeded, params: dict
+) -> None:
+    authenticate("ADMIN")
+    assert client.get(GAPS_URL, params=params).status_code == 422
+
+
+def test_position_with_a_typed_unit_leaves_the_gap_list(
+    client: TestClient, authenticate, db_session: Session, seeded
+) -> None:
+    admin = authenticate("ADMIN")
+    pos = _position(db_session, seeded["p1"], seeded["a1"])
+    db_session.add(_override(pos, admin, "Typed unit"))
+    db_session.commit()
+    body = client.get(GAPS_URL).json()
+    assert body["summary"]["total_gaps"] == 2 and body["summary"]["total_positions"] == 3
+
+
+def test_position_the_admin_only_marked_unresolved_stays_a_gap(
+    client: TestClient, authenticate, db_session: Session, seeded
+) -> None:
+    admin = authenticate("ADMIN")
+    pos = _position(db_session, seeded["p1"], seeded["a1"])
+    db_session.add(_override(pos, admin, "Not sure", confidence="UNRESOLVED"))
+    db_session.commit()
+    items = client.get(GAPS_URL, params={"eid": "2-s2.0-EXP001"}).json()["items"]
+    marked = next(i for i in items if i["author_order"] == 1)
+    assert marked["reason"] == "ADMIN_MARKED_UNRESOLVED" and marked["admin_reviewed"] is True
+    assert marked["overrides"][0]["confidence"] == "UNRESOLVED"
+
+
+def test_gap_export_csv_and_audit(
+    client: TestClient, authenticate, db_session: Session, seeded
+) -> None:
+    admin = authenticate("ADMIN")
+    r = client.get(GAPS_EXPORT_URL, params={"year": 2022})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert "ictu_affiliation_gaps_" in r.headers["content-disposition"]
+    rows = _csv_rows(r)
+    assert rows[0][0] == "eid" and "overrides" not in rows[0]
+    assert len(rows) - 1 == 2 and {row[0] for row in rows[1:]} == {"2-s2.0-EXP001"}
+    ev = db_session.query(AuditEvent).filter(
+        AuditEvent.action == "PUBLICATION_AFFILIATION_GAPS_EXPORTED"
+    ).one()
+    assert ev.actor_user_id == admin.id and ev.entity_type == "publication_affiliation_gaps_export"
+    assert ev.event_metadata["row_count"] == 2
+    assert ev.event_metadata["filters_applied"] == {"year": 2022}

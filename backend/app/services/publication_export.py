@@ -17,9 +17,18 @@ from app.models.identity import LecturerScopusIdentity
 from app.models.master_lecturer import Lecturer
 from app.models.publication import Publication, PublicationAuthor, ScopusAuthor
 from app.schemas.publication_export import (
+    PublicationExportAffiliation,
     PublicationExportAuthor,
     PublicationExportItem,
     PublicationExportLecturerLink,
+    PublicationExportOrganization,
+)
+from app.services.affiliation_export import (
+    CSV_COLUMNS,
+    Position,
+    csv_bytes,
+    export_csv_rows,
+    load_positions,
 )
 from app.services.publication_queries import publication_filters
 
@@ -55,37 +64,28 @@ def _build_filters_applied(
     return result
 
 
-def _batch_authors(
-    session: Session, publication_ids: list[uuid.UUID]
-) -> dict[uuid.UUID, list[PublicationExportAuthor]]:
-    if not publication_ids:
-        return {}
-    rows = session.execute(
-        select(
-            PublicationAuthor.publication_id,
-            PublicationAuthor.author_order,
-            ScopusAuthor.scopus_id,
-            ScopusAuthor.preferred_name,
-        )
-        .join(ScopusAuthor, ScopusAuthor.id == PublicationAuthor.scopus_author_id)
-        .where(PublicationAuthor.publication_id.in_(publication_ids))
-        .order_by(
-            PublicationAuthor.publication_id.asc(),
-            PublicationAuthor.author_order.asc(),
-            ScopusAuthor.scopus_id.asc(),
-        )
-    ).all()
-
-    result: dict[uuid.UUID, list[PublicationExportAuthor]] = defaultdict(list)
-    for pub_id, author_order, scopus_id, preferred_name in rows:
-        result[pub_id].append(
-            PublicationExportAuthor(
-                author_order=author_order,
-                scopus_id=scopus_id,
-                preferred_name=preferred_name,
+def _export_author(position: Position) -> PublicationExportAuthor:
+    d = position.decision
+    return PublicationExportAuthor(
+        author_order=position.author_order,
+        scopus_id=position.scopus_id,
+        preferred_name=position.author_name,
+        affiliation_status=d.affiliation_status,
+        gap_reason=d.gap_reason,
+        affiliations=[
+            PublicationExportAffiliation(
+                text=u.text,
+                organizations=[
+                    PublicationExportOrganization(name=name, country=country)
+                    for name, country in u.organizations
+                ],
+                confidence=u.confidence,
+                source=u.source,
+                evidence_url=u.evidence_url,
             )
-        )
-    return result
+            for u in d.units
+        ],
+    )
 
 
 from app.services.publication_exclusions import not_excluded  # noqa: E402
@@ -143,21 +143,15 @@ def _batch_lecturer_links(
     return result
 
 
-def export_publications(
+def _select_publications(
     session: Session,
     *,
-    q: str | None = None,
-    year: int | None = None,
-    document_type: str | None = None,
-    publication_stage: str | None = None,
-    open_access_status: str | None = None,
-) -> tuple[list[PublicationExportItem], dict]:
-    """Return (items, filters_applied) for the export endpoint.
-
-    Queries are read-only.  The AuditEvent commit is the caller's responsibility.
-    Raises SQLAlchemyError on DB failure — the caller wraps this in a 503.
-    """
-
+    q: str | None,
+    year: int | None,
+    document_type: str | None,
+    publication_stage: str | None,
+    open_access_status: str | None,
+) -> tuple[list[Publication], dict]:
     filters_applied = _build_filters_applied(
         q=q,
         year=year,
@@ -165,7 +159,6 @@ def export_publications(
         publication_stage=publication_stage,
         open_access_status=open_access_status,
     )
-
     pubs = session.scalars(
         select(Publication)
         .where(
@@ -182,9 +175,34 @@ def export_publications(
             Publication.eid.asc(),
         )
     ).all()
+    return list(pubs), filters_applied
 
+
+def export_publications(
+    session: Session,
+    *,
+    q: str | None = None,
+    year: int | None = None,
+    document_type: str | None = None,
+    publication_stage: str | None = None,
+    open_access_status: str | None = None,
+) -> tuple[list[PublicationExportItem], dict]:
+    """Return (items, filters_applied) for the export endpoint.
+
+    Queries are read-only.  The AuditEvent commit is the caller's responsibility.
+    Raises SQLAlchemyError on DB failure — the caller wraps this in a 503.
+    """
+
+    pubs, filters_applied = _select_publications(
+        session,
+        q=q,
+        year=year,
+        document_type=document_type,
+        publication_stage=publication_stage,
+        open_access_status=open_access_status,
+    )
     pub_ids = [p.id for p in pubs]
-    authors_by_pub = _batch_authors(session, pub_ids)
+    positions_by_pub = load_positions(session, pub_ids)
     links_by_pub = _batch_lecturer_links(session, pub_ids)
 
     items = [
@@ -203,10 +221,36 @@ def export_publications(
             document_type=p.document_type,
             publication_stage=p.publication_stage,
             open_access_status=p.open_access_status,
-            authors=authors_by_pub.get(p.id, []),
+            author_count=len(positions_by_pub.get(p.id, [])),
+            authors=[_export_author(pos) for pos in positions_by_pub.get(p.id, [])],
             approved_lecturer_links=links_by_pub.get(p.id, []),
         )
         for p in pubs
     ]
 
     return items, filters_applied
+
+
+def export_publications_csv(
+    session: Session,
+    *,
+    q: str | None = None,
+    year: int | None = None,
+    document_type: str | None = None,
+    publication_stage: str | None = None,
+    open_access_status: str | None = None,
+) -> tuple[bytes, int, int, dict]:
+    """Return (csv_bytes, publication_count, row_count, filters_applied): one row per author
+    position, same filters and same unit rules as the JSON export."""
+
+    pubs, filters_applied = _select_publications(
+        session,
+        q=q,
+        year=year,
+        document_type=document_type,
+        publication_stage=publication_stage,
+        open_access_status=open_access_status,
+    )
+    positions_by_pub = load_positions(session, [p.id for p in pubs])
+    rows = export_csv_rows([(p, positions_by_pub.get(p.id, [])) for p in pubs])
+    return csv_bytes(CSV_COLUMNS, rows), len(pubs), len(rows), filters_applied
