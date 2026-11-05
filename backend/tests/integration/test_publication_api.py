@@ -834,6 +834,23 @@ def test_detail_for_lecturer_withholds_administrative_data(
     assert admin["approved_lecturer_links"], "fixture must have an approved link for the contrast to mean anything"
 
 
+def test_detail_for_reviewer_withholds_administrative_data(
+    client: TestClient, authenticate, catalog
+) -> None:
+    admin = _get(client, "ADMIN", "/api/v1/publications/EID-2024-A", authenticate).json()
+    reviewer = _get(client, "REVIEWER", "/api/v1/publications/EID-2024-A", authenticate)
+    assert reviewer.status_code == 200
+    body = reviewer.json()
+    for key in ("eid", "title", "doi", "authors", "affiliation_summary"):
+        assert body[key] == admin[key], key
+    # Approved lecturer links and import provenance are ADMIN-only now —
+    # REVIEWER sees the same withheld view as guests and LECTURER.
+    assert body["provenance"] == [] and body["approved_lecturer_links"] == []
+    assert admin["approved_lecturer_links"], (
+        "fixture must have an approved link for the contrast to mean anything"
+    )
+
+
 def test_detail_unknown_eid_is_stable_404(client: TestClient, authenticate) -> None:
     response = _get(
         client, "ADMIN", "/api/v1/publications/does-not-exist", authenticate

@@ -48,14 +48,16 @@ def _database_unavailable(exc: SQLAlchemyError) -> APIError:
 
 
 def _for_role(result: PublicationDetailResponse, reader: User | None) -> PublicationDetailResponse:
-    """Withhold internal data from guests and LECTURER readers.
+    """Withhold internal/administrative data from everyone but ADMIN.
 
-    Authors, affiliations and their evidence stay visible.  Internal import
-    provenance (file names/hashes, row numbers) and the approved lecturer links
-    (staff code, ORCID of other lecturers) are removed.
+    Authors, affiliations and their evidence stay visible to everyone.
+    Approved lecturer links (another person's name, staff code, ORCID) and
+    internal import provenance (file names/hashes, row numbers) are
+    ADMIN-only — guests, LECTURER and REVIEWER readers all get the same
+    withheld view.
     """
 
-    if reader is not None and reader.role != "LECTURER":
+    if reader is not None and reader.role == "ADMIN":
         return result
     return result.model_copy(update={"provenance": [], "approved_lecturer_links": []})
 
