@@ -34,8 +34,9 @@ export interface PublicationDetailBodyProps {
 export default function PublicationDetailBody({ eid, onNavigateAway, errorActions }: PublicationDetailBodyProps) {
   const { locale } = useI18n();
   const { user } = useAuth();
-  // LECTURER gets a read-only academic view: no import trace, no other lecturers' data.
-  const isLecturer = user?.role === "LECTURER";
+  // Approved lecturer links and import provenance are ADMIN-only — everyone
+  // else (guests, LECTURER, REVIEWER) gets the same academic-only view.
+  const isAdmin = user?.role === "ADMIN";
 
   const [publication, setPublication] = useState<PublicationDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,12 +133,11 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
   const sectionAuthors = locale === "vi" ? "Danh sách tác giả Scopus" : "Scopus Authors";
   const sectionLinks = locale === "vi" ? "Liên kết giảng viên ICTU" : "ICTU Lecturer Links";
   const sectionProvenance = locale === "vi" ? "Nguồn dữ liệu & truy vết" : "Data Provenance";
-  const loadingLabel = locale === "vi" ? "Đang tải thông tin công bố..." : "Loading publication details...";
+  const loadingLabel = locale === "vi" ? "Đang tải dữ liệu..." : "Loading publication details...";
   const retryLabel = locale === "vi" ? "Thử lại" : "Retry";
   const colAuthorOrder = locale === "vi" ? "STT" : "#";
   const colScopusId = "Scopus ID";
   const colAffiliation = locale === "vi" ? "Đơn vị theo tác giả & độ tin cậy" : "Author affiliation & confidence";
-  const colIctuLecturer = locale === "vi" ? "Trực thuộc" : "ICTU Lecturer";
   const colName = locale === "vi" ? "Tên ưu tiên" : "Preferred Name";
   const colStaffCode = locale === "vi" ? "Mã cán bộ" : "Staff Code";
   const colDepartment = locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept";
@@ -206,20 +206,34 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
 
   const provenanceToShow = showAllProvenance ? provenance : provenance.slice(0, 3);
   const hasMoreProvenance = provenance.length > 3;
+  const hasDoi = typeof doi === "string" && doi.trim() !== "";
+  const doiUrl = hasDoi ? `https://doi.org/${doi.trim()}` : undefined;
 
   return (
     <div className="space-y-5">
       {/* ── Section A: Canonical Metadata ─────────────────────────────── */}
       <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
-        <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
-          {sectionMeta}
-        </h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <h2 className="text-base font-bold text-slate-800">
+            {sectionMeta}
+          </h2>
+          {doiUrl && (
+            <a
+              href={doiUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 text-sm font-medium text-[#3A5FC3] hover:underline"
+            >
+              {locale === "vi" ? "Xem bài gốc" : "View original"}
+            </a>
+          )}
+        </div>
 
         <h3 className="mb-3 text-sm font-bold text-[#3A5FC3]">{fmtField(title)}</h3>
 
         <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
           <MetaItem label="EID" value={pubEid} />
-          <MetaItem label="DOI" value={fmtField(doi)} />
+          <MetaItem label="DOI" value={fmtField(doi)} href={doiUrl} />
           <MetaItem label={locale === "vi" ? "Năm xuất bản" : "Year"} value={fmtYear(year)} />
           <MetaItem label={locale === "vi" ? "Nguồn xuất bản" : "Source title"} value={fmtField(source_title)} />
           <MetaItem label={locale === "vi" ? "Tập" : "Volume"} value={fmtField(volume)} />
@@ -247,23 +261,22 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
         {authors.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-400">{emptyAuthorsLabel}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <AffiliationSummaryBar authors={authors} locale={locale} />
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/60 text-slate-500">
+              <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                 <tr>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colAuthorOrder}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colName}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colScopusId}</th>
-                  <th className="px-3 py-2.5 font-semibold whitespace-nowrap">{colIctuLecturer}</th>
-                  <th className="px-3 py-2.5 font-semibold">{colAffiliation}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{colAuthorOrder}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colName}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colScopusId}</th>
+                  <th className="px-2.5 py-3.5 font-medium text-slate-700">{colAffiliation}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody>
                 {authors.map((a) => (
-                  <tr key={`${a.scopus_id}-${a.author_order}`} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-3 py-2.5 text-center text-slate-500">{a.author_order}</td>
-                    <td className="px-3 py-2.5 font-medium text-slate-800">
+                  <tr key={`${a.scopus_id}-${a.author_order}`} className="transition-colors duration-300 hover:bg-slate-50/50">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-top text-slate-500">{a.author_order}</td>
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-top font-medium text-slate-800">
                       <Link
                         to={`/publications?scopus_id=${encodeURIComponent(a.scopus_id)}`}
                         onClick={onNavigateAway}
@@ -274,16 +287,9 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
                         {a.preferred_name}
                       </Link>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-500">{a.scopus_id}</td>
-                    <td className="px-3 py-2.5" data-testid="author-ictu-lecturer">
-                      {a.ictu_lecturer_name ? (
-                        <span className="font-medium text-emerald-700">ICTU</span>
-                      ) : (
-                        <span className="text-slate-400">{locale === "vi" ? "Không xác định" : "Undetermined"}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 align-top">
-                      <AuthorAffiliationCell author={a} locale={locale} isAdmin={!isLecturer} />
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-top font-mono text-sm font-medium text-slate-500 whitespace-nowrap">{a.scopus_id}</td>
+                    <td className="border-b border-slate-100 px-2.5 py-3.5 align-top">
+                      <AuthorAffiliationCell author={a} locale={locale} isAdmin={isAdmin} />
                     </td>
                   </tr>
                 ))}
@@ -293,19 +299,13 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
         )}
       </section>
 
-      {!isLecturer && (
+      {isAdmin && (
         <>
-      {/* ── Section C: Approved Lecturer Links (always visible) ─────────── */}
+      {/* ── Section C: Approved Lecturer Links — ADMIN only ─────────── */}
       <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
           {sectionLinks}
         </h2>
-        <p className="-mt-2 mb-3 text-sm leading-relaxed text-slate-500" data-testid="link-evidence-note">
-          {locale === "vi"
-            ? "Liên kết đã duyệt là quyết định của người duyệt. Liên kết chỉ được coi là định danh đã xác minh khi có chứng cứ định danh độc lập (ví dụ ORCID trùng khớp); mức chứng cứ bên dưới lấy từ dữ liệu chứng cứ đã lưu, không từ việc chấp nhận."
-            : "An approved link is a reviewer's decision. It counts as a verified identity only with independent identity evidence (for example a matching ORCID); the evidence level below comes from stored evidence, not from the acceptance."}
-        </p>
-
         {approved_lecturer_links.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-400">{emptyLinksLabel}</p>
         ) : (
@@ -348,9 +348,12 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
         )}
       </section>
 
-      {!isLecturer && user && <NormalizationCompareCard eid={publication.eid} locale={locale === "en" ? "en" : "vi"} />}
+      {user && <NormalizationCompareCard eid={publication.eid} locale={locale === "en" ? "en" : "vi"} />}
+        </>
+      )}
 
-      {/* ── Section D: Safe Provenance (always visible) ────────────────── */}
+      {/* ── Section D: Safe Provenance — ADMIN only, not public/guest/lecturer facing ── */}
+      {isAdmin && (
       <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
         <h2 className="mb-4 text-base font-bold text-slate-800 border-b border-slate-100 pb-3">
           {sectionProvenance}
@@ -401,7 +404,6 @@ export default function PublicationDetailBody({ eid, onNavigateAway, errorAction
           </>
         )}
       </section>
-        </>
       )}
     </div>
   );
@@ -412,20 +414,33 @@ interface MetaItemProps {
   label: string;
   value: string;
   highlight?: boolean;
+  /** When set, the value renders as an external link (e.g. the DOI resolver). */
+  href?: string;
 }
 
-function MetaItem({ label, value, highlight }: MetaItemProps) {
+function MetaItem({ label, value, highlight, href }: MetaItemProps) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-sm font-bold text-slate-800">{label}</span>
-      <span
-        className={[
-          "text-sm font-medium",
-          highlight ? "text-emerald-700" : "text-slate-800",
-        ].join(" ")}
-      >
-        {value}
-      </span>
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm font-medium text-[#3A5FC3] hover:underline break-all"
+        >
+          {value}
+        </a>
+      ) : (
+        <span
+          className={[
+            "text-sm font-medium",
+            highlight ? "text-emerald-700" : "text-slate-800",
+          ].join(" ")}
+        >
+          {value}
+        </span>
+      )}
     </div>
   );
 }

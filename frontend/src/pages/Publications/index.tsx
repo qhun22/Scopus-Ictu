@@ -510,14 +510,14 @@ export default function PublicationsPage() {
             </colgroup>
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colTitle}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colEid}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colYear}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colSource}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colDocType}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colStage}</th>
-                <th className="border-r border-slate-200/80 px-4 py-3 font-bold whitespace-nowrap">{colOa}</th>
-                <th className="sticky right-0 z-[1] border-l border-slate-200/80 bg-slate-50 px-4 py-3 text-center font-bold whitespace-nowrap">{colAction}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colTitle}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colEid}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colYear}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colSource}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colDocType}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colStage}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colOa}</th>
+                <th className="sticky right-0 z-[1] border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{colAction}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -525,9 +525,9 @@ export default function PublicationsPage() {
               {(loading && items.length === 0) || error ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center justify-center gap-2">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
-                      {!error && <span>{loadingLabel}</span>}
+                      {!error && <span className="text-xs font-medium">{loadingLabel}</span>}
                     </div>
                   </td>
                 </tr>
@@ -539,43 +539,43 @@ export default function PublicationsPage() {
                       <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      <span className="font-semibold text-slate-600">{noDataLabel}</span>
-                      <span className="text-sm">{noDataSubLabel}</span>
+                      <span className="text-sm font-bold text-slate-700">{noDataLabel}</span>
+                      <span className="text-xs text-slate-400">{noDataSubLabel}</span>
                     </div>
                   </td>
                 </tr>
               ) : /* ── Data rows ── */
                 items.map((pub) => (
-                  <tr key={pub.eid} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="border-r border-slate-100 px-4 py-3">
+                  <tr key={pub.eid} className="transition-colors duration-300 hover:bg-slate-50/50">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
                       <span
-                        className="block line-clamp-2 break-words font-bold text-slate-800"
+                        className="block line-clamp-2 break-words font-medium text-slate-800"
                         title={pub.title}
                       >
                         {pub.title}
                       </span>
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-500">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-500 align-middle">
                       {pub.eid}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 whitespace-nowrap font-bold text-slate-800">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 whitespace-nowrap font-medium text-slate-800 align-middle">
                       {fmtYear(pub.year)}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
                       <span className="block line-clamp-2 break-words font-medium text-slate-700" title={pub.source_title ?? ""}>
                         {fmtField(pub.source_title)}
                       </span>
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-700">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-700 align-middle">
                       {fmtField(pub.document_type)}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-700">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-700 align-middle">
                       {fmtField(pub.publication_stage)}
                     </td>
-                    <td className="border-r border-slate-100 px-4 py-3 break-words font-medium text-slate-700">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-700 align-middle">
                       {fmtField(pub.open_access_status)}
                     </td>
-                    <td className="sticky right-0 z-[1] border-l border-slate-100 bg-white px-4 py-3 text-center">
+                    <td className="sticky right-0 z-[1] border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                       {isAdmin ? (
                         <button
                           type="button"
@@ -613,7 +613,7 @@ export default function PublicationsPage() {
         </div>
 
         {/* ── Footer: count + pagination ──────────────────────────────────── */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
           {/* Record count */}
           <div className="flex items-center gap-3">
             <span>
@@ -640,7 +640,7 @@ export default function PublicationsPage() {
           </div>
 
           {/* Server-driven pagination */}
-          <nav aria-label={locale === "vi" ? "Phân trang công bố" : "Publication pagination"} className="flex items-center gap-2">
+          <nav aria-label={locale === "vi" ? "Phân trang công bố" : "Publication pagination"} className="flex items-center gap-1.5">
             <Button
               variant="secondary"
               size="sm"
@@ -649,9 +649,21 @@ export default function PublicationsPage() {
             >
               {prevLabel}
             </Button>
-            <span aria-live="polite" className="min-w-[72px] text-center font-medium text-slate-600">
-              {pageLabel} <strong>{page}</strong> / {totalPages}
-            </span>
+            <span className="px-0.5 text-slate-400">{pageLabel}</span>
+            <input
+              type="number"
+              aria-label={locale === "vi" ? "Đến trang" : "Go to page"}
+              min={1}
+              max={totalPages}
+              value={page}
+              disabled={isFiltering}
+              onChange={(e) => {
+                const val = Math.max(1, Math.min(totalPages, parseInt(e.target.value, 10) || 1));
+                setPage(val);
+              }}
+              className="h-8 w-14 rounded-[5px] border border-slate-200 bg-white px-2 text-center text-sm font-bold text-slate-700 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <span className="text-slate-400">/ <strong className="text-slate-600">{totalPages}</strong></span>
             <Button
               variant="secondary"
               size="sm"

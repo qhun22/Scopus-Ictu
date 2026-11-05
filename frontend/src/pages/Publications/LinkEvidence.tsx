@@ -9,7 +9,7 @@ type Locale = "vi" | "en";
 
 const LEVEL: Record<LinkEvidenceBasisRead["level"], { tone: BadgeTone; vi: string; en: string }> = {
   IDENTIFIER_SUPPORT: { tone: "success", vi: "Có định danh độc lập", en: "Independent identifier" },
-  PUBLICATION_SUPPORT: { tone: "info", vi: "Có công bố hỗ trợ", en: "Publication-supported" },
+  PUBLICATION_SUPPORT: { tone: "info", vi: "Có bài báo trùng", en: "Matching paper" },
   NAME_ONLY: { tone: "warning", vi: "Chỉ trùng tên", en: "Name match only" },
   NO_RECORDED_EVIDENCE: { tone: "neutral", vi: "Chưa ghi nhận chứng cứ", en: "No recorded evidence" },
 };

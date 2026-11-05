@@ -146,8 +146,8 @@ export function AffiliationSummaryBar({
       </div>
       <p className="text-sm leading-snug text-slate-500">
         {vi
-          ? "Đơn vị được tra cứu từ nguồn bên ngoài (OpenAlex, Crossref), chưa được Scopus xác nhận trực tiếp."
-          : "Units are looked up from external sources (OpenAlex, Crossref) and have not been directly confirmed by Scopus."}
+          ? "Đơn vị được tra cứu từ nguồn bên ngoài (OpenAlex, Crossref), cần được rà soát để đảm bảo chính xác."
+          : "Units are looked up from external sources (OpenAlex, Crossref) and need review to ensure accuracy."}
       </p>
     </div>
   );
@@ -156,19 +156,26 @@ export function AffiliationSummaryBar({
 function OverrideNote({ override, locale }: { override: AffiliationOverrideRead; locale: Locale }) {
   const vi = locale === "vi";
   return (
-    <div
-      className="mt-1.5 rounded-[5px] border border-blue-200 bg-blue-50/60 p-2 text-sm leading-snug"
-      data-testid="aff-override"
-    >
-      <p className="font-medium text-slate-700">{override.affiliation_text}</p>
-      {override.evidence_url && (
-        <p className="mt-0.5 text-slate-500">
-          {vi ? "Nguồn: " : "Source: "}
-          <a href={override.evidence_url} target="_blank" rel="noreferrer" className="text-sky-700 underline">
-            {override.evidence_url}
-          </a>
-        </p>
-      )}
+    <div className="space-y-0.5">
+      <div
+        className="mt-1.5 rounded-[5px] border border-blue-200 bg-blue-50/60 p-2 text-sm leading-snug"
+        data-testid="aff-override"
+      >
+        <p className="font-medium text-slate-700">{override.affiliation_text}</p>
+        {override.evidence_url && (
+          <p className="mt-0.5 text-slate-500">
+            {vi ? "Nguồn: " : "Source: "}
+            <a href={override.evidence_url} target="_blank" rel="noreferrer" className="text-sky-700 underline">
+              {override.evidence_url}
+            </a>
+          </p>
+        )}
+      </div>
+      <p className="font-medium text-emerald-700">
+        {override.confidence === "CORROBORATED"
+          ? (vi ? "Đã được rà soát thủ công, có đơn vị" : "Manually reviewed, unit available")
+          : (vi ? "Đã được rà soát thủ công" : "Manually reviewed")}
+      </p>
     </div>
   );
 }
@@ -203,40 +210,72 @@ export function AuthorAffiliationCell({
     </div>
   );
 
-  // Simplified (LECTURER) view: one plain-language block — org text, source,
-  // a short confidence line — instead of the badges/evidence trail ADMIN sees.
-  // Prefer an ADMIN-confirmed override (deliberate, human-checked); otherwise
-  // the first automatic cross-checked affiliation.
-  const activeOverride = overrides.find((o) => o.confidence === "CORROBORATED");
+  // Simplified (LECTURER) view: one plain-language block per unit — org text,
+  // source, a short confidence line — instead of the badges/evidence trail
+  // ADMIN sees. Prefer ALL ADMIN-confirmed overrides (deliberate, human-checked,
+  // an author can have more than one unit); otherwise the automatic
+  // cross-checked affiliations. The original auto cross-check source and the
+  // "manually reviewed AND cross-checked" wording are ADMIN-only detail — a
+  // lecturer only needs to know the unit was manually reviewed.
+  const activeOverrides = overrides.filter((o) => o.confidence === "CORROBORATED");
   const primaryAffiliation = affiliations[0];
-  const simpleUnitText = activeOverride
-    ? activeOverride.affiliation_text
-    : primaryAffiliation?.raw_affiliation_text ?? primaryAffiliation?.organizations[0]?.display_name ?? null;
-  const simpleUnitSource = activeOverride
-    ? activeOverride.evidence_url ? (
-        <a href={activeOverride.evidence_url} target="_blank" rel="noreferrer" className="break-all text-sky-700 underline">
-          {activeOverride.evidence_url}
-        </a>
-      ) : (vi ? "ADMIN xác nhận thủ công" : "Manually confirmed by ADMIN")
-    : primaryAffiliation ? sourceLabel(primaryAffiliation.source_system) : null;
-  const hasUnitSimpleLabel = activeOverride
-    ? (vi ? "Có đơn vị, đã được rà soát thủ công" : "Unit available, manually reviewed")
-    : (vi ? "Có đơn vị, nguồn đối chiếu" : "Unit available, source cross-checked");
+  const primaryVerified = primaryAffiliation?.link_status === "VERIFIED";
+  const overrideUnitLabel = vi ? "Đã được rà soát thủ công, có đơn vị" : "Manually reviewed, unit available";
+  // Cross-checked-only (not verified) must read as "not verified" in plain language and
+  // not be painted green like a verified/reviewed result — amber signals "take with a grain of salt".
+  const fallbackUnitLabel = primaryVerified
+    ? (vi ? "Đã xác minh định danh, có đơn vị" : "Identity verified, unit available")
+    : (vi ? "Đã có nguồn đối chiếu, chưa xác minh, có đơn vị" : "Cross-checked source, not verified, unit available");
+  const fallbackUnitColorClass = primaryVerified ? "text-emerald-700" : "text-amber-700";
 
-  const simpleUnitBlock = simpleUnitText && (
-    <div className="space-y-0.5" data-testid="aff-has-unit">
-      <p className="font-medium text-slate-700">{simpleUnitText}</p>
-      <p className="text-sm text-slate-500">
-        {vi ? "Nguồn: " : "Source: "}
-        {simpleUnitSource}
-      </p>
-      <p className="text-sm font-medium text-emerald-700">{hasUnitSimpleLabel}</p>
+  const simpleUnitBlock = activeOverrides.length > 0 ? (
+    <div className="divide-y divide-slate-200" data-testid="aff-has-unit">
+      {activeOverrides.map((o, i) => (
+        <div key={`override-${i}`} className={["space-y-0.5", i > 0 ? "pt-3" : "", i < activeOverrides.length - 1 ? "pb-3" : ""].join(" ")}>
+          <p className="font-medium text-slate-700">
+            {vi ? "Đơn vị: " : "Unit: "}
+            {o.affiliation_text}
+          </p>
+          <p className="text-sm font-medium text-slate-700">
+            {vi ? "Nguồn: " : "Source: "}
+            {o.evidence_url ? (
+              <a href={o.evidence_url} target="_blank" rel="noreferrer" className="break-all text-slate-700 underline">
+                {o.evidence_url}
+              </a>
+            ) : (vi ? "ADMIN xác nhận thủ công" : "Manually confirmed by ADMIN")}
+          </p>
+          <p className="text-sm font-medium text-emerald-700">{overrideUnitLabel}</p>
+        </div>
+      ))}
     </div>
-  );
+  ) : primaryAffiliation && (primaryAffiliation.raw_affiliation_text || primaryAffiliation.organizations[0]?.display_name) ? (
+    <div className="space-y-0.5" data-testid="aff-has-unit">
+      <p className="font-medium text-slate-700">
+        {vi ? "Đơn vị: " : "Unit: "}
+        {primaryAffiliation.raw_affiliation_text ?? primaryAffiliation.organizations[0]?.display_name}
+      </p>
+      <p className={`text-sm font-medium ${fallbackUnitColorClass}`}>{fallbackUnitLabel}</p>
+    </div>
+  ) : null;
   const simpleNoUnit = (
-    <span className="font-medium text-slate-500" data-testid="aff-no-unit">
-      {noUnit}
-    </span>
+    <div className="space-y-0.5">
+      {status === "VERIFIED" && author.source_has_affiliation === false ? (
+        <p className="font-medium text-emerald-700" data-testid="aff-no-unit">
+          {vi ? "Đã xác minh định danh, nguồn không có đơn vị" : "Identity verified, source lists no unit"}
+        </p>
+      ) : (
+        <>
+          {status !== "NOT_RECONCILED" && (
+            <p className="font-bold text-slate-700">
+              {statusLabel(status, locale)}
+            </p>
+          )}
+          <span className="font-medium text-slate-500" data-testid="aff-no-unit">
+            {noUnit}
+          </span>
+        </>
+      )}
+    </div>
   );
 
   if (!isAdmin) {
@@ -247,9 +286,16 @@ export function AuthorAffiliationCell({
     return (
       <div>
         <AffiliationBadge status={status} locale={locale} />
-        {overrides.map((o, i) => (
-          <OverrideNote key={i} override={o} locale={locale} />
-        ))}
+        {overrides.length > 0 && (
+          <div className="mt-2 space-y-2">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              {vi ? "Nguồn rà soát" : "Review source"}
+            </p>
+            {overrides.map((o, i) => (
+              <OverrideNote key={i} override={o} locale={locale} />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -261,9 +307,16 @@ export function AuthorAffiliationCell({
           <AffiliationBadge status={status} locale={locale} />
         )}
         {resolutionLine}
-        {overrides.map((o, i) => (
-          <OverrideNote key={i} override={o} locale={locale} />
-        ))}
+        {overrides.length > 0 && (
+          <div className="mt-2 space-y-2">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              {vi ? "Nguồn rà soát" : "Review source"}
+            </p>
+            {overrides.map((o, i) => (
+              <OverrideNote key={i} override={o} locale={locale} />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -278,7 +331,7 @@ export function AuthorAffiliationCell({
 
   return (
     <div>
-      {affiliations.length === 0 && (
+      {affiliations.length === 0 && overrides.length === 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <AffiliationBadge status={status} locale={locale} />
           <span className="font-medium text-slate-500" data-testid={overrides.length > 0 ? "aff-has-unit" : "aff-no-unit"}>
@@ -293,35 +346,55 @@ export function AuthorAffiliationCell({
             : `Identity verified${verifiedWithoutUnitSources.length ? ` via ${verifiedWithoutUnitSources.join(", ")}` : ""} but that source lists no unit; the unit below is only cross-checked, not verified.`}
         </p>
       )}
-      {affiliations.length > 0 && (
-        <ul className="space-y-1.5">
-          {affiliations.map((a, i) => (
-            <li key={`${a.source_system}-${i}`} className="leading-snug" data-testid="aff-item">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <AffiliationBadge status={a.link_status} locale={locale} />
-                <span className="rounded bg-slate-100 px-1.5 text-sm font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
-                <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
-              </div>
-              <div className="mt-0.5 text-sm text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
-              {a.organizations.length > 0 && (
-                <div className="mt-0.5 flex flex-wrap gap-1 text-sm text-slate-500">
-                  <span>{vi ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
-                  {a.organizations.map((o, k) => (
-                    <span key={`${o.source_org_id ?? o.display_name}-${k}`} className="rounded bg-sky-50 px-1.5 text-sky-700">
-                      {o.display_name}
-                      {o.country_code ? ` (${o.country_code})` : ""}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </li>
+      {overrides.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            {vi ? "Nguồn rà soát" : "Review source"}
+          </p>
+          {overrides.map((o, i) => (
+            <OverrideNote key={i} override={o} locale={locale} />
           ))}
-        </ul>
+        </div>
+      )}
+      {affiliations.length === 0 && resolutions.length > 0 && (
+        <div className="mt-3 space-y-2 border-t border-slate-200 pt-2">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            {vi ? "Nguồn đề xuất gốc" : "Original suggested source"}
+          </p>
+          {resolutionLine}
+        </div>
+      )}
+      {affiliations.length > 0 && (
+        <div className={overrides.length > 0 ? "mt-3 space-y-2 border-t border-slate-200 pt-2" : "space-y-2"}>
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            {vi ? "Nguồn đề xuất gốc" : "Original suggested source"}
+          </p>
+          <ul className="space-y-1.5">
+            {affiliations.map((a, i) => (
+              <li key={`${a.source_system}-${i}`} className="leading-snug" data-testid="aff-item">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <AffiliationBadge status={a.link_status} locale={locale} />
+                  <span className="rounded bg-slate-100 px-1.5 text-sm font-semibold text-slate-600">{sourceLabel(a.source_system)}</span>
+                  <span className="min-w-0 break-words text-slate-700">{a.raw_affiliation_text ?? <em className="text-slate-400">{vi ? "(chỉ có tổ chức chuẩn hóa)" : "(normalized organization only)"}</em>}</span>
+                </div>
+                <div className="mt-0.5 text-sm text-slate-400" data-testid="aff-evidence">{evidenceLine(a, locale)}</div>
+                {a.organizations.length > 0 && (
+                  <div className="mt-0.5 flex flex-wrap gap-1 text-sm text-slate-500">
+                    <span>{vi ? "Tổ chức (do nguồn chuẩn hóa):" : "Organization (source-normalized):"}</span>
+                    {a.organizations.map((o, k) => (
+                      <span key={`${o.source_org_id ?? o.display_name}-${k}`} className="rounded bg-sky-50 px-1.5 text-sky-700">
+                        {o.display_name}
+                        {o.country_code ? ` (${o.country_code})` : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {resolutionLine}
-      {overrides.map((o, i) => (
-        <OverrideNote key={i} override={o} locale={locale} />
-      ))}
     </div>
   );
 }
