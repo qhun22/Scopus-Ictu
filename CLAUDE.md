@@ -60,8 +60,7 @@ python scripts/run_m2_6a_acceptance.py --dataset ../data/scopus/local.csv
 ```
 app/
   api/v1/endpoints/   — FastAPI route handlers (thin: validate → call service → return schema)
-  services/           — business logic, organized by domain
-  repositories/       — SQLAlchemy query objects (no business logic)
+  services/           — business logic, organized by domain; services query SQLAlchemy directly (there is no separate repositories layer)
   models/             — SQLAlchemy ORM models
   schemas/            — Pydantic v2 request/response schemas
   core/               — config, database, security, exceptions
@@ -79,16 +78,16 @@ app/
 
 | Service | Location | Purpose |
 |---|---|---|
-| Import pipeline | `services/import_pipeline/` | Scopus CSV ingestion: validate → normalize → diff → stage → apply. SHA-256 deduplication. |
-| Normalization | `services/normalization/` | DOI, name, ORCID, title, text normalizers |
-| Matching engine | `services/matching/` | Candidate generation + confidence scoring rules (rules/ sub-package) |
-| Review service | `services/review_service.py` | ACCEPT/REJECT/SUPERSEDE review decisions with `review_reason_policy.py` enforcement |
+| Scopus CSV import | `services/scopus_import_service.py`, `services/parser/scopus_csv_parser.py` | Upload → parse/validate → immutable raw records, with import lifecycle, provenance and file SHA-256 deduplication. |
+| Normalization | `services/normalization/scopus_normalizer.py` | Maps valid raw records to canonical publications, deduplicated by EID (raw rows never overwritten). |
+| Matching | `services/matching/` | Read-only candidate generation (name rules, publication evidence, manual and source-claim candidates) |
+| Candidate review | `services/candidate_review_service.py` | ACCEPT / REJECT / REVOKE identity / REOPEN decisions with `review_reason_policy.py` enforcement |
 | Affiliation workflow | `services/affiliation_workflow.py` | ADMIN-driven online affiliation collection + enrichment |
 | Lecturer dataset | `services/lecturer_dataset/` | ICTU lecturer import, parser, rollback, export |
 
 ### Matching pipeline (key concept)
 
-`services/matching/` implements a **read-only candidate generation** phase (no auto-confirm). Rules in `rules/` each emit `CandidateEvidence` with a `RuleId` tag. `candidate_persistence.py` saves to DB. The review workflow in `candidate_review_service.py` is the only path that changes candidate state. The `review_reason_policy.py` enforces D-2 policy: ACCEPT decisions require an explicit reason when evidence is name-only, the Scopus author is shared, or there are multiple candidates for one lecturer.
+`services/matching/` implements a **read-only candidate generation** phase (no auto-confirm). The name-matching rules (the `RuleId` values in `candidate_types.py`, run in order by `candidate_generator.py`) each emit `CandidateEvidence` with a `RuleId` tag. `candidate_persistence.py` saves to DB. The review workflow in `candidate_review_service.py` is the only path that changes candidate state. The `review_reason_policy.py` enforces D-2 policy: ACCEPT decisions require an explicit reason when evidence is name-only, the Scopus author is shared, or there are multiple candidates for one lecturer.
 
 ### Frontend architecture
 

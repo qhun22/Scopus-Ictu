@@ -18,8 +18,7 @@ Vite + Tailwind + Ant Design (frontend).
 ```
 backend/app/
   api/v1/endpoints/   thin routes (validate → service → schema); aggregated in api/v1/router.py
-  services/           business logic by domain
-  repositories/       SQLAlchemy query objects (no business logic)
+  services/           business logic by domain; queries SQLAlchemy directly (no separate repositories layer)
   models/             ORM models
   schemas/            Pydantic v2
   core/               config, database, security, exceptions, logging
@@ -96,11 +95,10 @@ Docker: `docker compose -f compose.yaml -f compose.local.yaml up --build`.
 
 | Area | Path | Notes |
 |---|---|---|
-| Scopus CSV import | `import_pipeline/`, `scopus_import_service.py` | validate → normalize → diff → stage → apply; SHA-256 dedupe |
-| Normalization | `normalization/` | DOI, name, ORCID, title, text |
-| Matching | `matching/` | read-only candidate generation; rules in `matching/rules/` emit `CandidateEvidence` + `RuleId` |
-| Candidate review | `candidate_review_service.py`, `review_reason_policy.py` | the only path that changes candidate state |
-| Review decisions | `review_service.py` | ACCEPT / REJECT / SUPERSEDE |
+| Scopus CSV import | `scopus_import_service.py`, `parser/scopus_csv_parser.py` | upload → parse/validate → immutable raw records; import lifecycle, provenance, file SHA-256 dedupe |
+| Normalization | `normalization/scopus_normalizer.py` | valid raw records → canonical publications, deduplicated by EID |
+| Matching | `matching/` | read-only candidate generation; the name rules (`RuleId` in `candidate_types.py`, run by `candidate_generator.py`) emit `CandidateEvidence` |
+| Candidate review | `candidate_review_service.py`, `review_reason_policy.py` | the only path that changes candidate state: ACCEPT / REJECT / REVOKE identity / REOPEN |
 | Affiliation | `affiliation_workflow.py`, `affiliation_*.py`, `author_affiliation.py` | ADMIN-driven collection + enrichment |
 | Lecturer dataset | `lecturer_dataset/` | import, parser, rollback, export |
 | ICTU source claims (E3) | `source_claims/`, `source_staging/`, `source_claim_matching/` | contract/parser/canonical/provenance; append-only staging tables; bridge turning claims into evidence |
