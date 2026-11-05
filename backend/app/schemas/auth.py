@@ -7,7 +7,7 @@ that strictly omit sensitive fields such as password_hash.
 from __future__ import annotations
 
 import uuid
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -15,6 +15,14 @@ class LoginRequest(BaseModel):
 
     email: str = Field(..., description="Email address of the user")
     password: str = Field(..., description="Plaintext password submitted by user")
+
+    @field_validator("email", "password")
+    @classmethod
+    def _reject_nul(cls, value: str) -> str:
+        # PostgreSQL text cannot store NUL; answer 422 instead of letting the lookup end as a 500.
+        if "\x00" in value:
+            raise ValueError("must not contain a NUL character")
+        return value
 
 
 class UserResponse(BaseModel):

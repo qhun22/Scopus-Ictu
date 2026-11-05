@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.v1.router import router as v1_router
 from app.core.config import settings
 from app.core.exceptions import APIError, api_error_handler
+from app.core.request_guards import reject_nul_in_url
 from app.services.affiliation_enrichment_service import recover_interrupted_enrichment_jobs
 from app.services.scopus_import_service import recover_interrupted_imports
 
@@ -59,6 +60,8 @@ def create_app() -> FastAPI:
     if not origins:
         origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # Added before CORS so CORS stays outermost and the 422 still carries the CORS headers.
+    app.middleware("http")(reject_nul_in_url)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
