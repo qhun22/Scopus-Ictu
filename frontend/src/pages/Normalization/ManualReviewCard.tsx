@@ -141,8 +141,11 @@ const isIctuUnit = (text: string): boolean => {
     (plain.includes("information and communication technology") && plain.includes("thai nguyen")) ||
     /ictu/.test(plain);
 };
+// Unlike the fixed-width status badges above, this one shows a variable-length
+// sentence ("crossref: CORROBORATED (SOURCE_HAS_NO_AFFILIATION)") — a fixed
+// w-32 + truncate cut it off mid-word, so this wraps instead of truncating.
 const SOURCE_BADGE_BASE =
-  "inline-flex h-badge w-32 shrink-0 items-center justify-center truncate whitespace-nowrap rounded border border-slate-200 px-2 text-center text-sm leading-none";
+  "inline-flex max-w-full items-center rounded-[5px] border border-slate-200 px-2.5 py-1 text-left text-sm leading-snug";
 
 const ERROR_LABEL: Record<string, Record<Locale, string>> = {
   STALE_OVERRIDE_VERSION: {
