@@ -845,37 +845,39 @@ export default function LecturersPage() {
 
       {/* Lecturers Table */}
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
-        <div className="relative overflow-x-auto">
-          {/* UI-10 fix (P11.5): action column is now sticky-right so it stays visible when the
-               table overflows horizontally (e.g. sidebar expanded at 1024–1440px). The <table>
-               keeps w-full; overflow-x-auto on the wrapper handles horizontal scroll for the
-               non-sticky columns. A thin separator line is painted via the pseudo-element
-               shadow so the sticky column lifts visually when scrolled. */}
-          <table aria-busy={isTableLoading} className="w-full text-left text-sm">
+        <div className="relative overflow-x-hidden">
+          <table aria-busy={isTableLoading} className="w-full table-fixed text-left text-sm">
+            <colgroup>
+              <col className="w-[27%]" />
+              <col className="w-[20%]" />
+              <col className="w-[10%]" />
+              <col className="w-[15%]" />
+              <col className="w-[15%]" />
+              <col className="w-[13%]" />
+            </colgroup>
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{locale === "vi" ? "Giảng viên" : "Lecturer"}</th>
-                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{t.lecturers.colEmail}</th>
-                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{locale === "vi" ? "Học vị / Học hàm" : "Degree / Rank"}</th>
-                <th className="px-2.5 py-3.5 font-bold whitespace-nowrap">{locale === "vi" ? "Khoa / Bộ môn" : "Faculty / Dept"}</th>
-                <th className="px-2.5 py-3.5 text-center font-bold whitespace-nowrap">{locale === "vi" ? "Tài khoản" : "Account"}</th>
-                <th className="px-2.5 py-3.5 text-center font-bold whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
-                <th className="sticky right-0 z-10 bg-slate-50/90 px-2.5 py-3.5 text-center font-bold whitespace-nowrap border-l border-slate-200/80">{t.common.actions}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Giảng viên" : "Lecturer"}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{t.lecturers.colEmail}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Học vị / Học hàm" : "Degree / Rank"}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Tài khoản" : "Account"}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
+                <th className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">{t.common.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center gap-2">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    <div className="flex items-center justify-center gap-2">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
-                      <span>{t.common.loading}</span>
+                      <span className="text-xs font-medium">{t.common.loading}</span>
                     </div>
                   </td>
                 </tr>
               ) : filteredLecturers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center justify-center gap-1.5">
                       <div className="flex h-10 w-10 items-center justify-center rounded-[5px] bg-slate-100/80 border border-slate-200/80 text-slate-400 mb-1">
                         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -890,19 +892,18 @@ export default function LecturersPage() {
               ) : (
                 pagedLecturers.map((lec) => {
                   const degreeRank = [lec.academic_rank, lec.academic_degree].filter(Boolean).join(" / ") || "—";
-                  const facultyDept = [lec.faculty, lec.department].filter(Boolean).join(" / ") || lec.specialization || "—";
                   return (
-                    <tr key={lec.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-2.5 py-3.5">
+                    <tr key={lec.id} className="transition-colors duration-300 hover:bg-slate-50/50">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
                           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-xs">
                             {lec.full_name.charAt(0).toUpperCase()}
                           </div>
-                          <div className="min-w-0 max-w-xs">
-                            <span className="font-bold text-slate-800 block truncate" title={lec.full_name}>
+                          <div className="min-w-0">
+                            <span className="block whitespace-normal break-words font-medium leading-tight text-slate-800" title={lec.full_name}>
                               {lec.full_name}
                             </span>
-                            <span className="block text-[10px] text-slate-400 truncate">
+                            <span className="block truncate text-[10px] text-slate-400" title={lec.position || lec.staff_code || "—"}>
                               {lec.position
                                 ? lec.position
                                 : lec.staff_code || "—"}
@@ -911,19 +912,17 @@ export default function LecturersPage() {
                         </div>
                       </td>
 
-                      <td className="px-2.5 py-3.5 font-medium text-slate-700">
-                        {lec.institutional_email || "—"}
+                      <td className="max-w-0 border-r border-b border-slate-100 px-2.5 py-3.5 font-medium text-slate-700 align-middle whitespace-nowrap">
+                        <span className="block truncate" title={lec.institutional_email || "—"}>
+                          {lec.institutional_email || "—"}
+                        </span>
                       </td>
 
-                      <td className="px-2.5 py-3.5 font-medium text-slate-700">
-                        {degreeRank}
+                      <td className="max-w-0 border-r border-b border-slate-100 px-2.5 py-3.5 font-medium text-slate-700 align-middle whitespace-nowrap">
+                        <span className="block truncate" title={degreeRank}>{degreeRank}</span>
                       </td>
 
-                      <td className="px-2.5 py-3.5 font-medium text-slate-700">
-                        {facultyDept}
-                      </td>
-
-                      <td className="px-2.5 py-3.5 text-center">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         {lec.account ? (
                           <span
                             title={getAccountRoleLabel(lec.account.role)}
@@ -939,7 +938,7 @@ export default function LecturersPage() {
                       </td>
 
                       {/* Status Column: account lock takes precedence over data warnings. */}
-                      <td className="px-2.5 py-3.5 text-center">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         {lec.account && !lec.account.is_active ? (
                           <span
                             title={locale === "vi" ? "Tài khoản đang bị khóa" : "Account locked"}
@@ -962,7 +961,7 @@ export default function LecturersPage() {
                       </td>
 
                       {/* Actions Column: [Chi tiết] only — delete moved inside detail modal */}
-                      <td className="sticky right-0 z-10 bg-white px-3 py-3.5 text-center align-middle whitespace-nowrap border-l border-slate-100">
+                      <td className="sticky right-0 z-[1] border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleOpenDetailModal(lec)}
@@ -980,7 +979,7 @@ export default function LecturersPage() {
         </div>
 
         {/* Footer info & Server-Side Pagination Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
           <div className="flex items-center gap-3">
             <span>
               {activeFilter && activeFilter !== "all" ? (
