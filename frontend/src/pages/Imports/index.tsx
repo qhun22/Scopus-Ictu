@@ -545,7 +545,7 @@ export default function ImportsPage() {
     if (type === "LECTURERS") {
       return (
         <span className={typeBadgeClassName}>
-          {locale === "vi" ? "Giảng viên" : "Lecturer"}
+          Json data
         </span>
       );
     }
@@ -555,6 +555,8 @@ export default function ImportsPage() {
       </span>
     );
   };
+
+  const importTypeLabel = (type?: string): string => (type === "LECTURERS" ? "Json data" : "Scopus");
 
   const formatPerformedBy = (name: string | null | undefined): string => {
     if (!name || name === "Không xác định") {
@@ -1554,17 +1556,17 @@ export default function ImportsPage() {
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
-                <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">{t.imports.fileName}</th>
-                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
-                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.imports.time}</th>
-                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã nạp / Bản ghi" : "Imported / Total"}</th>
-                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
-                <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.common.status}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{t.imports.fileName}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã ghi nạp" : "Imported / Total"}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.imports.time}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.imports.performedBy}</th>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.common.status}</th>
                 {/* UI-10: keep the actions column visible at every width (sticky right edge) */}
-                <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">{t.imports.actions}</th>
+                <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">{t.imports.actions}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {loading || isPageLoading ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400">
@@ -1602,7 +1604,7 @@ export default function ImportsPage() {
                           : "hover:bg-slate-50/50"
                     }`}
                   >
-                    <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
                         <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0 shadow-2xs">
                           {item.type === "LECTURERS" ? (
@@ -1616,7 +1618,7 @@ export default function ImportsPage() {
                           )}
                         </div>
                         <div className="min-w-0 max-w-xs sm:max-w-sm">
-                          <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
+                          <span className="block font-medium text-slate-800 truncate" title={item.file_name}>
                             {item.file_name}
                           </span>
                           <span
@@ -1629,15 +1631,7 @@ export default function ImportsPage() {
                       </div>
                     </td>
 
-                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
-                      {renderTypeBadge(item.type)}
-                    </td>
-
-                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
-                      {formatDate(item.created_at)}
-                    </td>
-
-                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-800">
                       <span>
                         {`${numberFormatter.format(
                           item.status === "CANCELLED" ||
@@ -1656,15 +1650,23 @@ export default function ImportsPage() {
                       )}
                     </td>
 
-                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
+                      {formatDate(item.created_at)}
+                    </td>
+
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
+                      {renderTypeBadge(item.type)}
+                    </td>
+
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                       {renderUserBadge(item.performed_by)}
                     </td>
 
-                    <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                       {renderTableStatusBadge(item)}
                     </td>
 
-                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
+                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                       <button
                         type="button"
                         onClick={() => openDetail(item)}
@@ -1756,6 +1758,7 @@ export default function ImportsPage() {
                 <div className="min-w-0">
                   <h2 id="import-detail-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
                     {locale === "vi" ? "Chi tiết đợt nhập" : "Import detail"}
+                    {detail && ` - ${importTypeLabel(detail.type)}`}
                   </h2>
                   <p className="mt-0.5 text-sm text-[#3A5FC3]">
                     {locale === "vi"
