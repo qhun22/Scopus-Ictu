@@ -21,6 +21,7 @@ from app.schemas.dashboard import (
     PublicationsByDocumentTypeItem,
     PublicationsByYearItem,
 )
+from app.services.affiliation_export import load_positions
 from app.services.audit_queries import list_audits
 from app.services.candidate_review_queries import current_reviewable_candidates_subquery
 from app.services.publication_exclusions import not_excluded
@@ -173,18 +174,18 @@ def get_dashboard_charts(session: Session) -> DashboardChartsResponse:
         select(func.count()).select_from(best_status_subq)
     ).scalar_one()
 
-    # "Has affiliation" = best resolution is VERIFIED or CORROBORATED AND at
-    # least one of its affiliation rows is actually present (not an ABSENT
-    # outcome). A position whose only resolutions are UNRESOLVED, or whose
-    # trusted resolution reports affiliation_presence='ABSENT', counts as
-    # without-affiliation.
-    positions_with_affiliation = session.execute(
-        select(func.count(func.distinct(PublicationAuthorAffiliationResolution.publication_author_id)))
-        .where(
-            PublicationAuthorAffiliationResolution.link_status.in_(("VERIFIED", "CORROBORATED")),
-            PublicationAuthorAffiliationResolution.affiliation_presence == "PRESENT",
-        )
-    ).scalar_one()
+    # "Has affiliation" uses the same decision as the publication export and the
+    # unresolved-position list (affiliation_export.decide_position): a position
+    # has an affiliation when it ends up with at least one unit, counting
+    # ADMIN-entered units and only the newest resolution of each source. This
+    # keeps the dashboard and the exported files on one number.
+    publication_ids = list(session.execute(select(Publication.id)).scalars())
+    positions_with_affiliation = sum(
+        1
+        for positions in load_positions(session, publication_ids).values()
+        for position in positions
+        if position.decision.units
+    )
     positions_without_affiliation = total_author_positions - positions_with_affiliation
 
     return DashboardChartsResponse(

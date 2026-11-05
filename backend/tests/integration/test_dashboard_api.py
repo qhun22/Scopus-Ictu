@@ -23,7 +23,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.dependencies import get_current_user
 from app.core.database import get_session
 from app.main import app
-from app.models.affiliation import PublicationAuthorAffiliationResolution
+from app.models.affiliation import (
+    PublicationAuthorAffiliation,
+    PublicationAuthorAffiliationResolution,
+)
 from app.models.base import Base
 from app.models.candidate import (
     CandidateGenerationRun,
@@ -279,6 +282,20 @@ def _make_affiliation_resolution(
     )
     db.add(res)
     db.flush()
+    if not is_unresolved and affiliation_presence == "PRESENT":
+        # The dashboard counts a position as "with affiliation" only when it ends
+        # up with at least one unit, so a PRESENT resolution carries one row.
+        db.add(
+            PublicationAuthorAffiliation(
+                id=uuid.uuid4(),
+                resolution_id=res.id,
+                link_status=link_status,
+                ord=1,
+                raw_index=1,
+                raw_affiliation_text="Test University, Test City",
+            )
+        )
+        db.flush()
     return res
 
 
@@ -1064,6 +1081,50 @@ class TestChartsAffiliationCoverage:
         assert cov["positions_with_affiliation"] == 0
         assert cov["positions_without_affiliation"] == 1
         assert cov["by_link_status"]["UNRESOLVED"] == 1
+
+    def test_admin_entered_unit_counts_as_with_affiliation(
+        self, db_session: Session, admin_client
+    ):
+        """Same rule as the export: an active ADMIN unit makes the position 'with'."""
+        from app.models.affiliation_override import PublicationAuthorAffiliationOverride
+
+        c, admin = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa = _make_publication_author(db_session, pub, author)
+        _make_affiliation_resolution(db_session, pa, link_status="UNRESOLVED")
+        db_session.add(
+            PublicationAuthorAffiliationOverride(
+                id=uuid.uuid4(),
+                publication_author_id=pa.id,
+                affiliation_text="Manual University",
+                confidence="CORROBORATED",
+                status="ACTIVE",
+                evidence_url="https://example.invalid/evidence",
+                reason="internal note",
+                created_by_user_id=admin.id,
+                updated_by_user_id=admin.id,
+                version=1,
+            )
+        )
+        db_session.flush()
+        cov = c.get(CHARTS_URL).json()["affiliation_coverage"]
+        assert cov["positions_with_affiliation"] == 1
+        assert cov["positions_without_affiliation"] == 0
+
+    def test_trusted_resolution_without_unit_rows_counts_as_without(
+        self, db_session: Session, admin_client
+    ):
+        c, _ = admin_client
+        author = _make_scopus_author(db_session)
+        pub = _make_publication(db_session)
+        pa = _make_publication_author(db_session, pub, author)
+        res = _make_affiliation_resolution(db_session, pa, link_status="CORROBORATED")
+        db_session.query(PublicationAuthorAffiliation).filter_by(resolution_id=res.id).delete()
+        db_session.flush()
+        cov = c.get(CHARTS_URL).json()["affiliation_coverage"]
+        assert cov["positions_with_affiliation"] == 0
+        assert cov["positions_without_affiliation"] == 1
 
     def test_position_never_attempted_counts_as_without_affiliation(
         self, db_session: Session, admin_client
