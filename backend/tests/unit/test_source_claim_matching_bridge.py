@@ -536,8 +536,8 @@ def test_r2_ambiguity_never_revokes_an_approved_identity(uuid_order):
     assert "SOURCE_NO_LONGER_LISTS_APPROVED_ID" not in codes(result)
 
 
-def test_source_claim_storage_is_explicit_but_reviewer_promotion_stays_blocked():
-    """P3-B1 extends storage only; promotion and D-2 remain unchanged."""
+def test_source_claim_storage_is_explicit_and_promotion_does_not_lift_d2():
+    """SOURCE_CLAIM promotes to APPROVED_ID on ACCEPT; D-2 remains unchanged."""
     import inspect
 
     from app.models import Base
@@ -548,7 +548,8 @@ def test_source_claim_storage_is_explicit_but_reviewer_promotion_stays_blocked()
     kinds = [str(c.sqltext) for c in table.constraints
              if getattr(c, "name", None) and "evidence_kind" in str(c.name)]
     assert kinds == ["evidence_kind IN ('NAME', 'PUBLICATION', 'SOURCE_CLAIM')"]
-    assert set(CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE) == {"NAME", "PUBLICATION"}
+    assert set(CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE) == {"NAME", "PUBLICATION", "SOURCE_CLAIM"}
+    assert CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE["SOURCE_CLAIM"] == "APPROVED_ID"
     # D-2: only PUBLICATION evidence lifts NAME_EVIDENCE_ONLY; a source listing must not (R-05).
     assert '"PUBLICATION" not in set(evidence_kinds)' in inspect.getsource(
         review_reason_policy.accept_reason_policy)

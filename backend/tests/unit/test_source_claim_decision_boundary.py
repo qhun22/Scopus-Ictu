@@ -120,7 +120,8 @@ def test_identical_prepare_and_replay_are_deterministic_and_inactive(setup, monk
     assert calls == []
     assert world[0].scalar(select(LecturerScopusCandidate)).status == "PENDING"
     assert world[0].scalars(select(LecturerScopusIdentity)).all() == []
-    assert "SOURCE_CLAIM" not in CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE
+    # The service can promote this kind, yet this boundary still refuses to reach it.
+    assert CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE["SOURCE_CLAIM"] == "APPROVED_ID"
 
 
 @pytest.mark.parametrize(("role", "active", "expected"), [

@@ -576,7 +576,6 @@ class CandidateReviewService:
                 pub_count += 1
             elif ev.evidence_kind == "SOURCE_CLAIM":
                 identity_evidence_type = "APPROVED_ID"
-                name_count += 1
             else:
                 raise EvidencePromotionUnsupportedError(
                     f"Candidate evidence kind {ev.evidence_kind!r} "

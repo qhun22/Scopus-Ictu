@@ -119,7 +119,7 @@ def test_source_only_candidate_is_pending_and_inactive_for_reviewers(world):
     with pytest.raises(ObservationNotFoundError):
         current_reviewable_observation(db, root.id)
     assert db.execute(select(current_reviewable_candidates_subquery("PENDING"))).all() == []
-    assert "SOURCE_CLAIM" not in CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE
+    assert CANDIDATE_TO_IDENTITY_EVIDENCE_TYPE["SOURCE_CLAIM"] == "APPROVED_ID"
     assert "NAME_EVIDENCE_ONLY" in accept_reason_policy(
         db, lecturer_id=root.lecturer_id, scopus_author_id=root.scopus_author_id,
         evidence_kinds=[ev.evidence_kind],
