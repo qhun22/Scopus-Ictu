@@ -106,7 +106,7 @@ app/
 
 ## Database and migrations
 
-Migrations live in `backend/alembic/versions/`. **Append-only — never rewrite a published migration.** Current head: `c7f2a9b1d3e5`.
+Migrations live in `backend/alembic/versions/`. **Append-only — never rewrite a published migration.** Current head: `f2b8c3d19a47` (single head; confirm with `python -m alembic heads`).
 
 ```bash
 cd backend

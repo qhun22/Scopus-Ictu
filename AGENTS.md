@@ -112,8 +112,8 @@ decisions are echoed, never modified.
 ## Database and migrations
 
 - Migrations are append-only. Never rewrite a published revision; add a new one.
-- Current head: `a77e01c33ee1` (E3-P2-B1 source-claim staging). Some docs still say
-  `c7f2a9b1d3e5`; verify with `python -m alembic heads`.
+- Current head: `f2b8c3d19a47` (lecturer primary Scopus events), single head; verify with
+  `python -m alembic heads`.
 - `python -m alembic revision --autogenerate -m "describe change"`.
 
 ## Data and safety invariants
