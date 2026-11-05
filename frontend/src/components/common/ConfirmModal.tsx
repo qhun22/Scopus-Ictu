@@ -18,6 +18,8 @@ export interface ConfirmModalProps {
   variant?: ConfirmVariant;
   confirmClassName?: string;
   loading?: boolean;
+  /** Keeps the confirm button disabled (e.g. a required reason is still empty). */
+  confirmDisabled?: boolean;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -32,6 +34,7 @@ export default function ConfirmModal({
   variant = "danger",
   confirmClassName,
   loading = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -90,7 +93,7 @@ export default function ConfirmModal({
           <button
             ref={confirmBtnRef}
             type="button"
-            disabled={loading}
+            disabled={loading || confirmDisabled}
             onClick={onConfirm}
             className={dialogConfirmButtonClass(variant, confirmClassName)}
           >

@@ -1,18 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   Button,
-  Card,
   ConfigProvider,
-  Descriptions,
-  Divider,
   Empty,
   Input,
-  Modal,
   Select,
   Space,
-  Spin,
-  Typography,
 } from "antd";
 // Design system tokens scoped to this page's AntD usage.
 const ANTD_THEME = {
@@ -48,6 +42,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n/I18nContext";
 import Badge, { type BadgeTone } from "../../components/ui/Badge";
 import UiButton from "../../components/ui/Button";
+import ModalPortal from "../../components/common/ModalPortal";
+import FullModal from "../../components/common/FullModal";
+import ConfirmModal from "../../components/common/ConfirmModal";
 import FitBadge, { fitLevelLabel, fitReasonText } from "./FitBadge";
 import GroupReviewPanel from "./GroupReviewPanel";
 import PrimaryIdPanel from "./PrimaryIdPanel";
@@ -67,7 +64,8 @@ const NHAN_TONE_STYLE: Record<BadgeTone, string> = {
 };
 
 function nhanBadgeClass(tone: BadgeTone): string {
-  return `inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border bg-white px-2.5 text-center text-xs font-bold leading-none ${NHAN_TONE_STYLE[tone]}`;
+  // Fixed w-32 keeps rows aligned; labels must fit in ~106px of text (text-sm bold) — shorten the wording, never widen the badge.
+  return `inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border bg-white px-2.5 text-center text-sm font-bold leading-none ${NHAN_TONE_STYLE[tone]}`;
 }
 import { reconciliationLabel, ruleLabel, surfaceLabel } from "./ruleLabels";
 import type { TranslationSchema } from "../../i18n/types";
@@ -83,7 +81,6 @@ import type {
   ReviewReasonTrigger,
 } from "../../types/review";
 
-const { Text } = Typography;
 
 type EvidenceFilter = EvidenceCategory | "all";
 type AmbiguitySelection = AmbiguityFilter | "all";
@@ -152,49 +149,112 @@ function provenanceText(t: T, ref: unknown): string {
   return values.length > 0 ? values.join(" · ") : t.sourceNoDescription;
 }
 
+/** One titled card per section of the review detail, so every block reads the same way. */
+function DetailSection({ title, count, extra, children, testId }: {
+  title: string;
+  count?: number;
+  extra?: ReactNode;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <section className="rounded-[5px] border border-slate-200 bg-white p-4" data-testid={testId}>
+      <div className="mb-3 flex flex-wrap items-center gap-3 border-b border-slate-100 pb-2.5">
+        <h3 className="text-sm font-bold text-slate-800">
+          {title}
+          {count !== undefined && <span className="ml-1 font-medium text-slate-500">({count})</span>}
+        </h3>
+        {extra}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const NOTICE_TONE = {
+  warning: "border-amber-300 bg-amber-50/60 text-amber-800",
+  danger: "border-red-300 bg-red-50/60 text-red-800",
+  info: "border-slate-200 bg-slate-50 text-slate-700",
+} as const;
+
+function Notice({ tone, title, children }: { tone: keyof typeof NOTICE_TONE; title: string; children?: ReactNode }) {
+  return (
+    <div className={`rounded-[5px] border px-4 py-3 text-sm ${NOTICE_TONE[tone]}`} role={tone === "info" ? undefined : "alert"}>
+      <p className="font-semibold">{title}</p>
+      {children && <div className="mt-1 leading-relaxed">{children}</div>}
+    </div>
+  );
+}
+
+/** Which pair a confirm dialog acts on — same block in accept / reject / revoke / reopen. */
+function PairSummary({ t, detail }: { t: T; detail: ReviewCandidateDetail }) {
+  return (
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1.5 rounded-[5px] border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm">
+      <dt className="text-slate-500">{t.fieldLecturer}</dt>
+      <dd className="font-semibold text-slate-900">{detail.lecturer.full_name}</dd>
+      <dt className="text-slate-500">{t.fieldScopusAuthor}</dt>
+      <dd className="text-slate-800">{detail.scopus_author.preferred_name}</dd>
+      <dt className="text-slate-500">{t.fieldScopusId}</dt>
+      <dd className="font-mono font-medium text-slate-700">{detail.scopus_author.scopus_id}</dd>
+    </dl>
+  );
+}
+
+/** Raw provenance (ids, kinds) is for audit, not for deciding: keep it folded away. */
+function TechnicalSources({ t, locale, refs, keyPrefix }: { t: T; locale: "vi" | "en"; refs: unknown[]; keyPrefix: string }) {
+  if (refs.length === 0) return null;
+  return (
+    <details className="mt-3 border-t border-slate-100 pt-2">
+      <summary className="cursor-pointer select-none text-sm font-medium text-slate-500 hover:text-slate-700">
+        {locale === "en" ? "Technical source data" : "Dữ liệu nguồn (kỹ thuật)"}
+      </summary>
+      <div className="mt-2 break-all text-xs leading-relaxed text-slate-500">
+        {refs.map((ref, index) => (
+          <span key={`${keyPrefix}-source-${index}`}>
+            {index > 0 && " | "}
+            {provenanceText(t, ref)}
+          </span>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function NameEvidenceCard({ t, locale, evidence }: { t: T; locale: "vi" | "en"; evidence: ReviewNameEvidence }) {
   return (
-    <div className="rounded-[5px] border border-slate-200 bg-slate-50/70 p-4">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-slate-800" title={evidence.rule_id} data-testid="name-rule-label">
-          {ruleLabel(evidence.rule_id, locale)}
-        </span>
+    <div className="rounded-[5px] border border-slate-200 bg-slate-50/60 p-4">
+      <div className="mb-3 text-sm font-semibold text-slate-800" title={evidence.rule_id} data-testid="name-rule-label">
+        {ruleLabel(evidence.rule_id, locale)}
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-4 text-sm md:grid-cols-2">
         <div>
-          <Text type="secondary">{t.lecturerProfileNameLabel}</Text>
-          <div className="font-medium text-slate-900">
+          <div className="text-slate-500">{t.lecturerProfileNameLabel}</div>
+          <div className="mt-0.5 font-semibold text-slate-900">
             {displayValue(t, evidence.lecturer_source_value)}
           </div>
           {evidence.lecturer_comparison_value && (
-            <div className="mt-1 text-xs text-slate-500">
-              {t.comparisonValueLabel}: {evidence.lecturer_comparison_value}
+            <div className="mt-1 text-slate-500">
+              {t.comparisonValueLabel}: <span className="font-mono">{evidence.lecturer_comparison_value}</span>
             </div>
           )}
         </div>
         <div>
-          <Text type="secondary">{t.scopusNameLabel}</Text>
-          <div className="font-medium text-slate-900">
+          <div className="text-slate-500">{t.scopusNameLabel}</div>
+          <div className="mt-0.5 font-semibold text-slate-900">
             {displayValue(t, evidence.scopus_surface_value)}
           </div>
-          <div className="mt-1 text-xs text-slate-500">
+          <div className="mt-1 text-slate-500">
             {evidence.scopus_surface_type && `${t.typeLabel}: ${surfaceLabel(evidence.scopus_surface_type, locale)}`}
-            {evidence.scopus_comparison_value &&
-              `${evidence.scopus_surface_type ? " · " : ""}${t.comparisonValueLabel}: ${evidence.scopus_comparison_value}`}
+            {evidence.scopus_comparison_value && (
+              <>
+                {evidence.scopus_surface_type ? " · " : ""}
+                {t.comparisonValueLabel}: <span className="font-mono">{evidence.scopus_comparison_value}</span>
+              </>
+            )}
           </div>
         </div>
       </div>
-      {evidence.source_refs.length > 0 && (
-        <div className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
-          <span className="font-semibold text-slate-600">{t.sourceLabel}: </span>
-          {evidence.source_refs.map((ref, index) => (
-            <span key={`${evidence.evidence_id}-source-${index}`}>
-              {index > 0 && " | "}
-              {provenanceText(t, ref)}
-            </span>
-          ))}
-        </div>
-      )}
+      <TechnicalSources t={t} locale={locale} refs={evidence.source_refs} keyPrefix={evidence.evidence_id} />
     </div>
   );
 }
@@ -300,6 +360,8 @@ export default function ApprovalQueuePage() {
   const [gapsTotal, setGapsTotal] = useState(0);
 
   const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupCount, setGroupCount] = useState(0);
   const [generating, setGenerating] = useState(false);
 
   const [manualOpen, setManualOpen] = useState(false);
@@ -479,15 +541,15 @@ export default function ApprovalQueuePage() {
     try {
       await createManualCandidate({ lecturer_id: manualLecturerId, scopus_id: scopusId, note });
       toast.success(
-        locale === "en" ? "Candidate added" : "Đã thêm ứng viên",
+        locale === "en" ? "Pair added" : "Đã thêm cặp đề xuất",
         locale === "en"
-          ? "A PENDING candidate was created. Review it like any other."
-          : "Đã tạo 1 ứng viên Chờ duyệt. Duyệt như bình thường.",
+          ? "The pair is now pending review. Review it like any other."
+          : "Cặp này đang ở trạng thái Chờ duyệt. Duyệt như bình thường.",
       );
       closeManual();
       await loadQueue();
     } catch (error) {
-      setManualError(getApiErrorMessage(error, locale === "en" ? "Could not add candidate." : "Không thêm được ứng viên."));
+      setManualError(getApiErrorMessage(error, locale === "en" ? "Could not add the pair." : "Không thêm được cặp đề xuất."));
     } finally {
       setManualSubmitting(false);
     }
@@ -575,7 +637,7 @@ export default function ApprovalQueuePage() {
         reason,
       });
       toast.success(
-        locale === "en" ? "Candidate reopened" : "Đã mở lại ứng viên",
+        locale === "en" ? "Pair reopened" : "Đã mở lại cặp đề xuất",
         locale === "en" ? "Back to PENDING for a fresh review." : "Đã quay về Chờ duyệt.",
       );
       setReopenOpen(false);
@@ -703,7 +765,7 @@ export default function ApprovalQueuePage() {
     <ConfigProvider theme={ANTD_THEME}>
     <div className="app-page-container space-y-4 sm:space-y-5">
       {/* ── Page Header ──────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="space-y-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">{t.title}</h1>
           <p className="mt-0.5 text-xs text-slate-500 sm:text-sm">
@@ -711,21 +773,28 @@ export default function ApprovalQueuePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <div className="text-xs text-slate-500">
-            {t.totalLabel}: <span className="font-semibold text-slate-800">{total}</span>
-          </div>
+          {/* No "Tổng số" here: the table footer already reads "Hiển thị X trong Y cặp đề xuất". */}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+          {status === "PENDING" && groupCount > 0 && (
+            <UiButton
+              variant="secondary"
+              size="md"
+              onClick={() => setGroupOpen((v) => !v)}
+              aria-expanded={groupOpen}
+              data-testid="review-group-toggle"
+            >
+              <span className="truncate">
+                {locale === "en" ? "Review by lecturer group" : "Duyệt theo nhóm giảng viên"} ({groupCount})
+              </span>
+            </UiButton>
+          )}
           {(user?.role === "ADMIN" || user?.role === "REVIEWER") && (
             <UiButton
               variant="secondary"
               size="md"
               onClick={() => setGapsOpen(true)}
-              icon={
-                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              }
             >
-              <span className="truncate">{locale === "en" ? "Lecturers without candidates" : "Giảng viên chưa có ứng viên"}</span>
+              <span className="truncate">{locale === "en" ? "Lecturers without proposals" : "Giảng viên chưa có đề xuất"}</span>
             </UiButton>
           )}
           {user?.role === "ADMIN" && (
@@ -733,11 +802,6 @@ export default function ApprovalQueuePage() {
               variant="secondary"
               size="md"
               onClick={() => setManualOpen(true)}
-              icon={
-                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              }
             >
               <span className="truncate">{locale === "en" ? "Add pair manually" : "Thêm cặp thủ công"}</span>
             </UiButton>
@@ -748,40 +812,47 @@ export default function ApprovalQueuePage() {
               size="md"
               loading={generating}
               onClick={() => setGenerateConfirmOpen(true)}
-              icon={
-                <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M12 4v16m8-8H4" />
-                </svg>
-              }
             >
               <span className="truncate">{t.generateBtn}</span>
             </UiButton>
           )}
+          </div>
         </div>
       </div>
 
-      <Modal
+      <FullModal
         open={gapsOpen}
-        title={locale === "en" ? "Lecturers without any matching candidate" : "Giảng viên chưa có ứng viên đối sánh nào"}
-        footer={null}
-        onCancel={() => setGapsOpen(false)}
-        width={640}
+        title={locale === "en" ? "Lecturers without proposals" : "Giảng viên chưa có đề xuất"}
+        description={
+          locale === "en"
+            ? "The system has never proposed a Scopus account for these lecturers (not even one that was later rejected). Use \"Add pair\" if you find their Scopus ID yourself."
+            : "Hệ thống chưa từng đề xuất tài khoản Scopus nào cho các giảng viên này (kể cả đề xuất đã bị từ chối). Bấm \"Thêm cặp\" nếu bạn tự tìm được Scopus ID của họ."
+        }
+        onClose={() => setGapsOpen(false)}
+        footerStart={
+          <>
+            {locale === "en" ? "Total" : "Tổng"}: <strong className="text-slate-700">{gapsTotal}</strong>
+          </>
+        }
+        footerActions={
+          <UiButton variant="secondary" onClick={() => setGapsOpen(false)}>
+            {locale === "en" ? "Close" : "Đóng"}
+          </UiButton>
+        }
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {locale === "en"
-              ? "These lecturers have zero candidate roots in any status — the automatic name rules never proposed anything for them at all (not even a rejected one). Use \"Add pair manually\" if you find a matching Scopus ID for one."
-              : "Các giảng viên này chưa có ứng viên đối sánh nào ở bất kỳ trạng thái nào — rule tự động chưa từng đề xuất gì cho họ (kể cả bị từ chối). Dùng \"Thêm cặp thủ công\" nếu cậu tìm được Scopus ID khớp."}
-          </p>
           <Input
             value={gapsSearch}
             onChange={(e) => setGapsSearch(e.target.value)}
             placeholder={locale === "en" ? "Search by name, email or staff code…" : "Tìm theo tên, email hoặc mã cán bộ…"}
             allowClear
           />
-          <div className="max-h-[50vh] overflow-y-auto rounded-[5px] border border-slate-200">
+          <div className="rounded-[5px] border border-slate-200">
             {gapsLoading ? (
-              <div className="flex justify-center py-8"><Spin /></div>
+              <div className="flex items-center justify-center gap-2 py-12 text-sm font-medium text-slate-400">
+                <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+                <span>{locale === "en" ? "Loading data..." : "Đang tải dữ liệu..."}</span>
+              </div>
             ) : gapsItems.length === 0 ? (
               <Empty
                 description={locale === "en" ? "No gaps found" : "Không có giảng viên nào bị bỏ sót"}
@@ -793,7 +864,7 @@ export default function ApprovalQueuePage() {
                   <li key={lec.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
                     <div className="min-w-0">
                       <div className="truncate font-medium text-slate-800">{lec.full_name}</div>
-                      <div className="truncate text-xs text-slate-500">
+                      <div className="truncate text-sm text-slate-500">
                         {[lec.staff_code, lec.department, lec.email].filter(Boolean).join(" · ") || "—"}
                       </div>
                     </div>
@@ -805,29 +876,33 @@ export default function ApprovalQueuePage() {
               </ul>
             )}
           </div>
-          <p className="text-xs text-slate-400">
-            {locale === "en" ? "Total" : "Tổng"}: {gapsTotal}
-          </p>
         </div>
-      </Modal>
+      </FullModal>
 
-      <Modal
+      <FullModal
         open={manualOpen}
-        title={locale === "en" ? "Add matching pair manually" : "Thêm cặp đối sánh thủ công"}
-        okText={locale === "en" ? "Add (Pending)" : "Thêm (Chờ duyệt)"}
-        cancelText={t.cancel}
-        onOk={() => void submitManualCandidate()}
-        onCancel={closeManual}
-        confirmLoading={manualSubmitting}
+        title={locale === "en" ? "Add pair manually" : "Thêm cặp thủ công"}
+        description={
+          locale === "en"
+            ? "Use this only when the system missed a pair you know is correct (e.g. the name words are in a different order). The pair is added as pending and still goes through normal review."
+            : "Chỉ dùng khi hệ thống bỏ sót một cặp bạn biết chắc là đúng (vd. tên bị đảo thứ tự từ). Cặp được thêm ở trạng thái Chờ duyệt và vẫn phải qua duyệt bình thường."
+        }
+        onClose={closeManual}
+        closeDisabled={manualSubmitting}
+        footerActions={
+          <>
+            <UiButton variant="primary" loading={manualSubmitting} onClick={() => void submitManualCandidate()}>
+              {locale === "en" ? "Add (Pending)" : "Thêm (Chờ duyệt)"}
+            </UiButton>
+            <UiButton variant="secondary" onClick={closeManual} disabled={manualSubmitting}>
+              {t.cancel}
+            </UiButton>
+          </>
+        }
       >
-        <div className="space-y-3">
-          <p className="text-sm text-slate-500">
-            {locale === "en"
-              ? "Use this only when the automatic name-matching rules missed a pair that genuinely belongs together (e.g. word-order ambiguity). It only creates a PENDING candidate — it still goes through normal review."
-              : "Chỉ dùng khi rule đối sánh tên tự động bỏ sót một cặp thực sự đúng (vd. lệch thứ tự từ trong tên). Chỉ tạo ứng viên Chờ duyệt — vẫn phải qua duyệt bình thường."}
-          </p>
+        <div className="max-w-3xl space-y-4">
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
               {locale === "en" ? "Lecturer" : "Giảng viên ICTU"}
             </label>
             <Select
@@ -849,7 +924,7 @@ export default function ApprovalQueuePage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">Scopus ID</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Scopus ID</label>
             <Input
               value={manualScopusId}
               onChange={(e) => setManualScopusId(e.target.value)}
@@ -857,13 +932,13 @@ export default function ApprovalQueuePage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-600">
+            <label className="mb-1 block text-sm font-medium text-slate-700">
               {locale === "en" ? "Reason / evidence" : "Lý do / căn cứ"}
             </label>
             <Input.TextArea
               value={manualNote}
               onChange={(e) => setManualNote(e.target.value)}
-              rows={3}
+              rows={4}
               placeholder={
                 locale === "en"
                   ? "e.g. ORCID 0009-... lists this employment at ICTU and this exact paper"
@@ -873,25 +948,28 @@ export default function ApprovalQueuePage() {
           </div>
           {manualError && <Alert type="error" showIcon message={manualError} />}
         </div>
-      </Modal>
+      </FullModal>
 
-      <Modal
+      <ConfirmModal
         open={generateConfirmOpen}
+        variant="primary"
         title={t.generateConfirmTitle}
-        okText={t.generateConfirmOk}
-        cancelText={t.cancel}
-        onOk={() => void handleGenerate()}
+        description={<p>{t.generateConfirmText}</p>}
+        confirmLabel={t.generateConfirmOk}
+        cancelLabel={t.cancel}
+        loading={generating}
+        onConfirm={() => void handleGenerate()}
         onCancel={() => setGenerateConfirmOpen(false)}
-        confirmLoading={generating}
-      >
-        <p className="text-sm text-slate-600">{t.generateConfirmText}</p>
-      </Modal>
+      />
 
       {/* ── Review by lecturer group (lecturers with 2+ pending Scopus IDs) ───── */}
       {status === "PENDING" && (
         <GroupReviewPanel
           locale={locale === "en" ? "en" : "vi"}
           refreshKey={total}
+          open={groupOpen}
+          onClose={() => setGroupOpen(false)}
+          onCountChange={setGroupCount}
           onChanged={() => void loadQueue()}
         />
       )}
@@ -953,7 +1031,7 @@ export default function ApprovalQueuePage() {
             </select>
           </div>
 
-          {/* Mức độ mơ hồ */}
+          {/* Đề xuất khác */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-600">{t.ambiguityLabel}</label>
             <select
@@ -1003,27 +1081,27 @@ export default function ApprovalQueuePage() {
           </div>
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-sm">
               <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                 <tr>
-                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.colLecturer}</th>
-                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.colScopusAuthor}</th>
-                  <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">{t.colStatus}</th>
-                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.colEvidence}</th>
-                  <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap">
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{t.colLecturer}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{t.colScopusAuthor}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.colStatus}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.colEvidence}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">
                     {locale === "en" ? "Degree of fit" : "Mức phù hợp"}
                   </th>
-                  <th className="px-4 py-3.5 font-semibold text-slate-700 whitespace-nowrap">{t.colAmbiguityContext}</th>
-                  <th className="px-4 py-3.5 text-center font-semibold text-slate-700 whitespace-nowrap w-28">{t.colActions}</th>
+                  <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.colAmbiguityContext}</th>
+                  <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">{t.colActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {queueLoading ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400">
-                      <div className="flex flex-col items-center gap-2">
+                      <div className="flex items-center justify-center gap-2">
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
-                        <span>{t.loadingQueue}</span>
+                        <span className="text-xs font-medium">{t.loadingQueue}</span>
                       </div>
                     </td>
                   </tr>
@@ -1050,49 +1128,38 @@ export default function ApprovalQueuePage() {
                       className="hover:bg-slate-50/50 transition-colors cursor-default"
                       onDoubleClick={() => openDetail(item.candidate_id)}
                     >
-                      <td className="px-4 py-3.5 align-middle whitespace-nowrap">
-                        <span className="font-bold text-slate-800">{item.lecturer.full_name}</span>
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle whitespace-nowrap">
+                        <span className="font-medium text-slate-800">{item.lecturer.full_name}</span>
                       </td>
-                      <td className="px-4 py-3.5 align-middle">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
                         <div className="font-medium text-slate-900">{item.scopus_author.preferred_name}</div>
-                        <div className="mt-0.5 font-mono text-[10px] text-slate-400">{item.scopus_author.scopus_id}</div>
+                        <div className="mt-0.5 font-mono text-sm font-medium text-slate-400">{item.scopus_author.scopus_id}</div>
                       </td>
-                      <td className="px-4 py-3.5 text-center align-middle whitespace-nowrap">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         <span className={nhanBadgeClass(CANDIDATE_STATUS_TONE[item.candidate_status])}>
                           {statusLabels(t)[item.candidate_status]}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 align-middle">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         {item.publication_support_count > 0 && item.name_evidence_count === 0 ? (
-                          <div>
-                            <span className={nhanBadgeClass("violet")} title={t.craweOnlyBadgeTooltip}>
-                              {t.craweOnlyBadge}
-                            </span>
-                            <div className="mt-1 text-[10px] text-slate-400">{format(t.craweOnlyCount, { count: item.publication_support_count })}</div>
-                          </div>
+                          <span className={nhanBadgeClass("violet")} title={t.craweOnlyBadgeTooltip}>
+                            {t.craweOnlyBadge}
+                          </span>
                         ) : item.publication_support_count > 0 ? (
-                          <div>
-                            <span className={nhanBadgeClass("info")}>
-                              {t.publicationSupportedBadge}
-                            </span>
-                            <div className="mt-1 text-[10px] text-slate-400">
-                              {format(t.publicationSupportedCount, { publications: item.publication_support_count, names: item.name_evidence_count })}
-                            </div>
-                          </div>
+                          <span className={nhanBadgeClass("info")}>
+                            {t.publicationSupportedBadge}
+                          </span>
                         ) : (
-                          <div>
-                            <span className={nhanBadgeClass("neutral")}>
-                              {t.nameOnlyBadge}
-                            </span>
-                            <div className="mt-1 text-[10px] text-slate-400">{format(t.nameOnlyCount, { count: item.name_evidence_count })}</div>
-                          </div>
+                          <span className={nhanBadgeClass("neutral")}>
+                            {t.nameOnlyBadge}
+                          </span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5 text-center align-middle">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle">
                         {item.fit ? <FitBadge fit={item.fit} locale={locale === "en" ? "en" : "vi"} /> : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-4 py-3.5 align-middle">
-                        <div className="flex flex-col items-start gap-1">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
+                        <div className="flex flex-col items-center gap-1">
                           <span className={nhanBadgeClass(item.is_ambiguous ? "warning" : "neutral")}>
                             {ambiguityText(t, item.candidate_count_for_lecturer)}
                           </span>
@@ -1107,16 +1174,12 @@ export default function ApprovalQueuePage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-3 py-3.5 text-center align-middle whitespace-nowrap">
+                      <td className="sticky right-0 z-[1] border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => openDetail(item.candidate_id)}
-                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700 transition-colors hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 cursor-pointer"
+                          className="inline-flex h-badge w-32 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 transition-colors hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 cursor-pointer"
                         >
-                          <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
                           <span>{t.viewDetail}</span>
                         </button>
                       </td>
@@ -1130,7 +1193,7 @@ export default function ApprovalQueuePage() {
 
         {/* Footer: record count + page size + pagination */}
         {!queueError && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-[11px] text-slate-500">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
             <div className="flex items-center gap-3">
               <span>{format(t.showingOf, { shown: items.length, total })}</span>
               <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
@@ -1139,7 +1202,7 @@ export default function ApprovalQueuePage() {
                   value={pageSize}
                   disabled={queueLoading}
                   onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)); }}
-                  className="h-6 rounded-[5px] border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
+                  className="h-7 rounded-[5px] border border-slate-200 bg-white px-1.5 text-sm font-semibold text-slate-700 focus:border-[#3A5FC3] focus:outline-none cursor-pointer disabled:opacity-50"
                 >
                   <option value={10}>{t.perPageOption(10)}</option>
                   <option value={20}>{t.perPageOption(20)}</option>
@@ -1173,23 +1236,40 @@ export default function ApprovalQueuePage() {
         )}
       </section>
 
-      <Modal
-        open={selectedCandidateId !== null}
-        title={t.detailModalTitle}
-        width={1040}
-        footer={null}
-        centered
-        destroyOnHidden
-        maskClosable={!decisionSubmitting}
-        closable={!decisionSubmitting}
-        onCancel={closeDetail}
-        styles={{ body: { padding: 0 } }}
-        zIndex={1000}
-      >
+      {selectedCandidateId !== null && (
+        <ModalPortal>
+          <div
+            className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
+            onClick={() => {
+              if (!decisionSubmitting) closeDetail();
+            }}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="review-detail-modal-title"
+              className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="flex shrink-0 items-center justify-between border-b border-blue-100 bg-blue-50 px-5 py-4">
+                <div className="min-w-0">
+                  <h2 id="review-detail-modal-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
+                    {t.detailModalTitle}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-[#3A5FC3]">
+                    {locale === "en"
+                      ? "Compare the lecturer with the Scopus account, then accept or reject the pair."
+                      : "Đối chiếu thông tin giảng viên với tài khoản Scopus, rồi chấp nhận hoặc từ chối cặp này."}
+                  </p>
+                </div>
+              </header>
+              <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
         {detailLoading ? (
-          <div className="flex min-h-72 flex-col items-center justify-center gap-3">
-            <Spin size="large" />
-            <Text type="secondary">{t.loadingEvidence}</Text>
+          <div className="flex min-h-40 items-center justify-center py-12">
+            <div className="flex items-center justify-center gap-2 text-sm font-medium text-slate-400">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+              <span>{locale === "en" ? "Loading data..." : "Đang tải dữ liệu..."}</span>
+            </div>
           </div>
         ) : detailError ? (
           <Alert
@@ -1204,375 +1284,372 @@ export default function ApprovalQueuePage() {
             }
           />
         ) : detail ? (
-          <div className="flex max-h-[80vh] flex-col">
-          <div className="flex-1 overflow-y-auto px-6 pb-2 pt-4">
+          <div className="flex h-full min-h-0 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-1 pb-2 pt-1">
             {conflictMessage && (
-              <Alert className="mb-4" showIcon closable type="warning" message={t.conflictAlertTitle} description={conflictMessage} onClose={() => setConflictMessage(null)} />
+              <Alert showIcon closable type="warning" message={t.conflictAlertTitle} description={conflictMessage} onClose={() => setConflictMessage(null)} />
             )}
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card size="small" title={t.sectionLecturer}>
-                <Descriptions size="small" column={1} colon={false}>
-                  <Descriptions.Item label={t.fieldFullName}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
-                  <Descriptions.Item label={t.fieldAcademicDegree}>{displayValue(t, detail.lecturer.academic_degree)}</Descriptions.Item>
-                  <Descriptions.Item label={t.fieldAcademicRank}>{displayValue(t, detail.lecturer.academic_rank)}</Descriptions.Item>
-                  <Descriptions.Item label={t.fieldSourceProfile}>
+              <DetailSection title={t.sectionLecturer}>
+                <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2.5 text-sm">
+                  <dt className="text-slate-500">{t.fieldFullName}</dt>
+                  <dd className="font-semibold text-slate-900">{detail.lecturer.full_name}</dd>
+                  <dt className="text-slate-500">{t.fieldAcademicDegree}</dt>
+                  <dd className="text-slate-800">{displayValue(t, detail.lecturer.academic_degree)}</dd>
+                  <dt className="text-slate-500">{t.fieldAcademicRank}</dt>
+                  <dd className="text-slate-800">{displayValue(t, detail.lecturer.academic_rank)}</dd>
+                  <dt className="text-slate-500">{t.fieldSourceProfile}</dt>
+                  <dd>
                     {detail.lecturer.repository_profile_url ? (
-                      <a href={detail.lecturer.repository_profile_url} target="_blank" rel="noreferrer">{t.openIctuProfile}</a>
-                    ) : t.noData}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
+                      <a href={detail.lecturer.repository_profile_url} target="_blank" rel="noreferrer" className="font-medium text-[#3A5FC3] hover:underline">
+                        {t.openIctuProfile}
+                      </a>
+                    ) : <span className="text-slate-800">{t.noData}</span>}
+                  </dd>
+                </dl>
+              </DetailSection>
 
-              <Card size="small" title={t.sectionScopusAuthor}>
-                <Descriptions size="small" column={1} colon={false}>
-                  <Descriptions.Item label={t.fieldPreferredName}><Text strong>{detail.scopus_author.preferred_name}</Text></Descriptions.Item>
-                  <Descriptions.Item label={t.fieldScopusId}><Text code>{detail.scopus_author.scopus_id}</Text></Descriptions.Item>
-                  <Descriptions.Item label={t.fieldNameVariants}>
+              <DetailSection title={t.sectionScopusAuthor}>
+                <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2.5 text-sm">
+                  <dt className="text-slate-500">{t.fieldPreferredName}</dt>
+                  <dd className="font-semibold text-slate-900">{detail.scopus_author.preferred_name}</dd>
+                  <dt className="text-slate-500">{t.fieldScopusId}</dt>
+                  <dd className="font-mono font-medium text-slate-700">{detail.scopus_author.scopus_id}</dd>
+                  <dt className="text-slate-500">{t.fieldNameVariants}</dt>
+                  <dd>
                     {detail.scopus_author.name_variants.length > 0 ? (
-                      <Space wrap>{detail.scopus_author.name_variants.map((variant) => <Badge key={variant} tone="neutral" className="!rounded-[5px]">{variant}</Badge>)}</Space>
-                    ) : t.noNameVariants}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Card>
+                      <div className="flex flex-wrap gap-1.5">
+                        {detail.scopus_author.name_variants.map((variant) => (
+                          <Badge key={variant} tone="neutral" className="!rounded-[5px]">{variant}</Badge>
+                        ))}
+                      </div>
+                    ) : <span className="text-slate-800">{t.noNameVariants}</span>}
+                  </dd>
+                </dl>
+              </DetailSection>
             </div>
 
             {detail.fit && (
-              <section className="rounded-[5px] border border-slate-200 bg-white p-3.5" data-testid="fit-section">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h3 className="text-sm font-bold text-slate-800">
-                    {locale === "en" ? "Degree of fit and its grounds" : "Mức độ phù hợp và căn cứ"}
-                  </h3>
-                  <FitBadge fit={detail.fit} locale={locale === "en" ? "en" : "vi"} />
-                </div>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-700">
+              <DetailSection
+                testId="fit-section"
+                title={locale === "en" ? "Degree of fit and its grounds" : "Mức độ phù hợp và căn cứ"}
+                extra={<FitBadge fit={detail.fit} locale={locale === "en" ? "en" : "vi"} />}
+              >
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-700">
                   {detail.fit.reasons.map((code) => (
                     <li key={code}>{fitReasonText(code, locale === "en" ? "en" : "vi", detail.fit?.ictu_affiliation_papers ?? 0)}</li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[11px] text-slate-500">
+                <p className="mt-3 text-sm text-slate-500">
                   {locale === "en"
-                    ? `"${fitLevelLabel(detail.fit.level, "en")}" is an aid for the reviewer. It is not a probability and confirms nothing; the decision stays with the reviewer.`
-                    : `"${fitLevelLabel(detail.fit.level, "vi")}" chỉ là gợi ý cho người duyệt. Đây không phải xác suất và không tự xác nhận; quyết định vẫn thuộc người duyệt.`}
+                    ? `"${fitLevelLabel(detail.fit.level, "en")}" is only a hint for the reviewer — not a probability, and it confirms nothing. The decision stays with you.`
+                    : `"${fitLevelLabel(detail.fit.level, "vi")}" chỉ là gợi ý cho người duyệt — không phải xác suất và không tự xác nhận. Quyết định vẫn thuộc về bạn.`}
                 </p>
-              </section>
+              </DetailSection>
             )}
 
-            <Divider orientation="left">{t.sectionNameEvidence}</Divider>
-            {detail.name_evidence.length > 0 ? (
-              <div className="space-y-3">{detail.name_evidence.map((evidence) => <NameEvidenceCard key={evidence.evidence_id} t={t} locale={locale} evidence={evidence} />)}</div>
-            ) : detail.publication_evidence.length > 0 ? (
-              <Alert
-                type="warning"
-                showIcon
-                message={t.nameMismatchWarningTitle}
-                description={t.nameMismatchWarningDescription}
-              />
-            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t.noNameEvidence} />}
+            <DetailSection title={t.sectionNameEvidence} count={detail.name_evidence.length}>
+              {detail.name_evidence.length > 0 ? (
+                <div className="space-y-3">{detail.name_evidence.map((evidence) => <NameEvidenceCard key={evidence.evidence_id} t={t} locale={locale} evidence={evidence} />)}</div>
+              ) : detail.publication_evidence.length > 0 ? (
+                <Notice tone="warning" title={t.nameMismatchWarningTitle}>{t.nameMismatchWarningDescription}</Notice>
+              ) : (
+                <p className="py-2 text-sm text-slate-500">{t.noNameEvidence}</p>
+              )}
+            </DetailSection>
 
-            <Divider orientation="left">{t.sectionPublicationEvidence}</Divider>
-            {detail.publication_evidence.length > 0 ? (
-              <div className="space-y-3">
-                {detail.publication_evidence.map((evidence) => (
-                  <div key={evidence.evidence_id} className="rounded-[5px] border border-slate-200 p-4">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Badge tone={evidence.reconciliation === "DOI_EXACT" ? "success" : "brand"} className="!rounded-[5px]" title={evidence.reconciliation ?? undefined}>
-                        {reconciliationLabel(evidence.reconciliation, locale, t.reconciliationUnknown)}
-                      </Badge>
-                      <Text type="secondary" title={evidence.rule_id}>{ruleLabel(evidence.rule_id, locale)}</Text>
-                    </div>
-                    <div className="text-base font-semibold text-slate-900">{displayValue(t, evidence.title)}</div>
-                    <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
-                      <div><span className="font-semibold text-slate-600">{t.doiLabel}: </span>{displayValue(t, evidence.doi)}</div>
-                      <div><span className="font-semibold text-slate-600">{t.eidLabel}: </span>{displayValue(t, evidence.eid)}</div>
-                    </div>
-                    {evidence.source_refs.length > 0 && (
-                      <div className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-                        <span className="font-semibold text-slate-600">{t.sourceLabel}: </span>
-                        {evidence.source_refs.map((ref, index) => (
-                          <span key={`${evidence.evidence_id}-source-${index}`}>{index > 0 && " | "}{provenanceText(t, ref)}</span>
-                        ))}
+            <DetailSection title={t.sectionPublicationEvidence} count={detail.publication_evidence.length}>
+              {detail.publication_evidence.length > 0 ? (
+                <div className="space-y-3">
+                  {detail.publication_evidence.map((evidence) => (
+                    <div key={evidence.evidence_id} className="rounded-[5px] border border-slate-200 bg-slate-50/60 p-4">
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <Badge tone={evidence.reconciliation === "DOI_EXACT" ? "success" : "brand"} className="!rounded-[5px]" title={evidence.reconciliation ?? undefined}>
+                          {reconciliationLabel(evidence.reconciliation, locale, t.reconciliationUnknown)}
+                        </Badge>
+                        <span className="text-sm text-slate-500" title={evidence.rule_id}>{ruleLabel(evidence.rule_id, locale)}</span>
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t.noPublicationEvidence} />}
+                      <div className="text-[15px] font-semibold leading-snug text-slate-900">{displayValue(t, evidence.title)}</div>
+                      <div className="mt-2 grid gap-2 text-sm md:grid-cols-2">
+                        <div>
+                          <span className="text-slate-500">{t.doiLabel}: </span>
+                          {evidence.doi ? (
+                            <a href={`https://doi.org/${evidence.doi}`} target="_blank" rel="noopener noreferrer" className="font-medium text-[#3A5FC3] hover:underline">
+                              {evidence.doi}
+                            </a>
+                          ) : <span className="text-slate-800">{t.noData}</span>}
+                        </div>
+                        <div>
+                          <span className="text-slate-500">{t.eidLabel}: </span>
+                          <span className="font-medium text-slate-800">{displayValue(t, evidence.eid)}</span>
+                        </div>
+                      </div>
+                      <TechnicalSources t={t} locale={locale} refs={evidence.source_refs} keyPrefix={evidence.evidence_id} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-2 text-sm text-slate-500">{t.noPublicationEvidence}</p>
+              )}
+            </DetailSection>
 
-            <Divider orientation="left">{t.sectionAmbiguityContext}</Divider>
-            <Alert
-              showIcon
-              type={detail.ambiguity.is_ambiguous ? "warning" : "info"}
-              message={ambiguityText(t, detail.ambiguity.candidate_count_for_lecturer)}
-              description={detail.ambiguity.other_candidates.length > 0 ? t.ambiguityOtherListed : t.ambiguityNoOthers}
-            />
-            {detail.ambiguity.is_shared_scopus_author && (
-              <Alert
-                className="mt-3"
-                showIcon
-                type="error"
-                message={sharedAuthorText(t, detail.ambiguity.candidate_count_for_scopus_author)}
-                description={t.ambiguitySharedWarning}
-              />
-            )}
-            {detail.ambiguity.other_candidates.length > 0 && (
-              <div className="mt-3 space-y-2">
+            <DetailSection title={t.sectionAmbiguityContext}>
+              <div className="space-y-3">
+                <Notice tone={detail.ambiguity.is_ambiguous ? "warning" : "info"} title={ambiguityText(t, detail.ambiguity.candidate_count_for_lecturer)}>
+                  {detail.ambiguity.other_candidates.length > 0 ? t.ambiguityOtherListed : t.ambiguityNoOthers}
+                </Notice>
+                {detail.ambiguity.is_shared_scopus_author && (
+                  <Notice tone="danger" title={sharedAuthorText(t, detail.ambiguity.candidate_count_for_scopus_author)}>
+                    {t.ambiguitySharedWarning}
+                  </Notice>
+                )}
                 {detail.ambiguity.other_candidates.map((candidate) => (
                   <div key={candidate.candidate_id} className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] border border-slate-200 px-4 py-3">
-                    <div>
-                      <div className="font-medium text-slate-900">{candidate.scopus_author.preferred_name}</div>
-                      <div className="font-mono text-xs text-slate-500">{candidate.scopus_author.scopus_id}</div>
+                    <div className="text-sm">
+                      <div className="font-semibold text-slate-900">{candidate.scopus_author.preferred_name}</div>
+                      <div className="font-mono text-slate-500">{candidate.scopus_author.scopus_id}</div>
                     </div>
-                    <Badge tone={CANDIDATE_STATUS_TONE[candidate.candidate_status]} size="md" className="min-w-[96px] justify-center !rounded-[5px]">{statusLabels(t)[candidate.candidate_status]}</Badge>
+                    <span className={nhanBadgeClass(CANDIDATE_STATUS_TONE[candidate.candidate_status])}>
+                      {statusLabels(t)[candidate.candidate_status]}
+                    </span>
                   </div>
                 ))}
               </div>
-            )}
+            </DetailSection>
 
             {detail.candidate_status === "ACCEPTED" && (
               <PrimaryIdPanel lecturerId={detail.lecturer.id} locale={locale === "en" ? "en" : "vi"} />
             )}
 
           </div>
-          <div className="shrink-0 border-t border-slate-200 px-6 py-3">
+          <footer className="shrink-0 border-t border-slate-100 bg-white px-5 py-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm text-slate-500">
-                {t.currentStatusLabel}: <Badge tone={CANDIDATE_STATUS_TONE[detail.candidate_status]} size="md" className="min-w-[96px] justify-center !rounded-[5px]">{statusLabels(t)[detail.candidate_status]}</Badge>
+                {t.currentStatusLabel}: <span className="font-medium text-slate-700">{statusLabels(t)[detail.candidate_status]}</span>
               </div>
-              {detail.candidate_status === "PENDING" && (
-                <Space wrap>
-                  <Button danger onClick={() => setDecisionAction("REJECT")}>{t.rejectAction}</Button>
-                  <Button type="primary" onClick={() => setDecisionAction("ACCEPT")}>{t.acceptAction}</Button>
-                </Space>
-              )}
-              {user?.role === "ADMIN" && detail.candidate_status === "ACCEPTED" && (
-                <Button
-                  danger
-                  onClick={() => {
-                    setRevocationError(null);
-                    setRevocationOpen(true);
-                  }}
-                >
-                  {t.revokeAction}
-                </Button>
-              )}
-              {detail.candidate_status === "REJECTED" && (
-                <Button
-                  onClick={() => {
-                    setReopenError(null);
-                    setReopenOpen(true);
-                  }}
-                >
-                  {locale === "en" ? "Reopen" : "Mở lại"}
-                </Button>
-              )}
-            </div>
+              {/* One right-aligned group: main action(s) first, "Đóng" always last. */}
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {detail.candidate_status === "PENDING" && (
+                  <>
+                    <UiButton variant="primary" onClick={() => setDecisionAction("ACCEPT")}>
+                      {t.acceptAction}
+                    </UiButton>
+                    <UiButton variant="danger" onClick={() => setDecisionAction("REJECT")}>
+                      {t.rejectAction}
+                    </UiButton>
+                  </>
+                )}
+                {user?.role === "ADMIN" && detail.candidate_status === "ACCEPTED" && (
+                  <UiButton
+                    variant="danger"
+                    onClick={() => {
+                      setRevocationError(null);
+                      setRevocationOpen(true);
+                    }}
+                  >
+                    {t.revokeAction}
+                  </UiButton>
+                )}
+                {detail.candidate_status === "REJECTED" && (
+                  <UiButton
+                    variant="primary"
+                    onClick={() => {
+                      setReopenError(null);
+                      setReopenOpen(true);
+                    }}
+                  >
+                    {locale === "en" ? "Reopen" : "Mở lại"}
+                  </UiButton>
+                )}
+                <UiButton variant="secondary" onClick={closeDetail} disabled={decisionSubmitting}>
+                  {locale === "en" ? "Close" : "Đóng"}
+                </UiButton>
+              </div>
           </div>
+          </footer>
           </div>
         ) : <Empty description={t.noDetailData} className="py-10" />}
-      </Modal>
+              </div>
+            </section>
+          </div>
+        </ModalPortal>
+      )}
 
-      <Modal
+      <ConfirmModal
         open={reopenOpen && detail !== null}
-        title={locale === "en" ? "Reopen rejected candidate" : "Mở lại ứng viên đã từ chối"}
-        zIndex={1050}
-        okText={locale === "en" ? "Reopen (Pending)" : "Mở lại (Chờ duyệt)"}
-        okButtonProps={{ disabled: reopenReason.trim().length === 0 }}
-        cancelText={t.cancel}
-        confirmLoading={reopenSubmitting}
-        closable={!reopenSubmitting}
-        maskClosable={!reopenSubmitting}
-        onOk={() => void submitReopen()}
+        variant="primary"
+        title={locale === "en" ? "Reopen rejected pair" : "Mở lại cặp đề xuất đã từ chối"}
+        confirmLabel={locale === "en" ? "Reopen (Pending)" : "Mở lại (Chờ duyệt)"}
+        cancelLabel={t.cancel}
+        loading={reopenSubmitting}
+        confirmDisabled={reopenReason.trim().length === 0}
+        onConfirm={() => void submitReopen()}
         onCancel={closeReopen}
-      >
-        {detail && (
-          <div className="space-y-4">
-            <Alert
-              showIcon
-              type="info"
-              message={
-                locale === "en"
-                  ? "The candidate goes back to PENDING for a fresh review. Nothing is accepted automatically."
-                  : "Ứng viên sẽ quay về trạng thái Chờ duyệt. Không có gì được tự động chấp nhận."
-              }
-            />
-            <Descriptions size="small" column={1} colon={false}>
-              <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
-              <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name} ({detail.scopus_author.scopus_id})</Descriptions.Item>
-            </Descriptions>
-            <div>
-              <label htmlFor="review-reopen-reason" className="mb-1.5 block font-semibold text-slate-700">
-                {locale === "en" ? "Reason" : "Lý do"} <span className="text-rose-600">*</span>
-              </label>
-              <Input.TextArea
-                id="review-reopen-reason"
-                value={reopenReason}
-                onChange={(e) => setReopenReason(e.target.value)}
-                rows={3}
-                placeholder={locale === "en" ? "e.g. rejected by mistake" : "VD: từ chối nhầm"}
-              />
-            </div>
-            {reopenError && <Alert type="error" showIcon message={reopenError} />}
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        open={revocationOpen && detail !== null}
-        title={t.revokeModalTitle}
-        zIndex={1050}
-        okText={t.confirmRevokeOk}
-        okButtonProps={{ danger: true, disabled: revocationReason.trim().length === 0 }}
-        cancelText={t.cancel}
-        confirmLoading={revocationSubmitting}
-        closable={!revocationSubmitting}
-        maskClosable={!revocationSubmitting}
-        onOk={() => void submitRevocation()}
-        onCancel={closeRevocation}
-      >
-        {detail && (
-          <div className="space-y-4">
-            <Alert showIcon type="warning" message={t.revokeModalText} />
-            <Descriptions size="small" column={1} colon={false}>
-              <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
-              <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name} ({detail.scopus_author.scopus_id})</Descriptions.Item>
-            </Descriptions>
-            <div>
-              <label htmlFor="review-revoke-reason" className="mb-1.5 block font-semibold text-slate-700">
-                {t.revokeReasonLabel} <span className="text-rose-600">*</span>
-              </label>
-              <Input.TextArea
-                id="review-revoke-reason"
-                value={revocationReason}
-                rows={4}
-                maxLength={4000}
-                showCount
-                status={revocationError ? "error" : undefined}
-                placeholder={t.revokeReasonPlaceholder}
-                onChange={(event) => {
-                  setRevocationReason(event.target.value);
-                  if (event.target.value.trim()) setRevocationError(null);
-                }}
-              />
-              {revocationError && <div className="mt-1 text-sm text-rose-600" role="alert">{revocationError}</div>}
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        open={decisionAction === "ACCEPT" && detail !== null}
-        title={t.confirmAcceptTitle}
-        zIndex={1050}
-        okText={t.confirmAcceptOk}
-        okButtonProps={{ disabled: acceptReasonRequired && decisionReason.trim().length === 0 }}
-        cancelText={t.cancel}
-        confirmLoading={decisionSubmitting}
-        closable={!decisionSubmitting}
-        maskClosable={!decisionSubmitting}
-        onOk={() => void submitDecision()}
-        onCancel={closeDecision}
-      >
-        {detail && (
-          <div className="space-y-3">
-            <Alert showIcon type="info" message={t.confirmAcceptHint} />
-            <Descriptions size="small" column={1} colon={false}>
-              <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
-              <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name}</Descriptions.Item>
-              <Descriptions.Item label={t.fieldScopusId}><Text code>{detail.scopus_author.scopus_id}</Text></Descriptions.Item>
-              <Descriptions.Item label={t.fieldAction}><Badge tone="success" className="!rounded-[5px]">{t.decisionAccept}</Badge></Descriptions.Item>
-            </Descriptions>
-            {acceptReasonRequired && (
-              <Alert
-                showIcon
-                type="warning"
-                data-testid="accept-reason-required"
-                message={t.acceptReasonRequiredTitle}
-                description={
-                  <ul className="m-0 list-disc pl-4">
-                    {acceptReasonTriggers.map((trigger) => (
-                      <li key={trigger}>{reasonTriggerText(t, trigger)}</li>
-                    ))}
-                  </ul>
+        description={
+          detail && (
+            <div className="space-y-3">
+              <Notice
+                tone="info"
+                title={
+                  locale === "en"
+                    ? "The pair goes back to pending for a fresh review. Nothing is accepted automatically."
+                    : "Cặp đề xuất sẽ quay về trạng thái Chờ duyệt. Không có gì được tự động chấp nhận."
                 }
               />
-            )}
-            <div>
-              <label htmlFor="review-accept-reason" className="mb-1.5 block font-semibold text-slate-700">
-                {acceptReasonRequired ? (
-                  <>
-                    {t.acceptReasonLabel} <span className="text-rose-600">*</span>
-                  </>
-                ) : (
-                  t.acceptReasonOptionalLabel
-                )}
-              </label>
-              <Input.TextArea
-                id="review-accept-reason"
-                className="mb-5"
-                value={decisionReason}
-                rows={3}
-                maxLength={4000}
-                showCount
-                aria-required={acceptReasonRequired}
-                aria-invalid={Boolean(reasonError)}
-                status={reasonError ? "error" : undefined}
-                placeholder={t.acceptReasonPlaceholder}
-                onChange={(event) => {
-                  setDecisionReason(event.target.value);
-                  if (event.target.value.trim()) setReasonError(null);
-                }}
-              />
-              {reasonError && <div className="mt-1 text-sm text-rose-600" role="alert">{reasonError}</div>}
-              <div className="mt-1 text-xs text-slate-500">{t.acceptReasonNotEvidence}</div>
+              <PairSummary t={t} detail={detail} />
+              <div>
+                <label htmlFor="review-reopen-reason" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  {locale === "en" ? "Reason" : "Lý do"} <span className="text-rose-600">*</span>
+                </label>
+                <Input.TextArea
+                  id="review-reopen-reason"
+                  value={reopenReason}
+                  onChange={(e) => setReopenReason(e.target.value)}
+                  rows={3}
+                  placeholder={locale === "en" ? "e.g. rejected by mistake" : "VD: từ chối nhầm"}
+                />
+              </div>
+              {reopenError && <Notice tone="danger" title={reopenError} />}
             </div>
-          </div>
-        )}
-      </Modal>
+          )
+        }
+      />
 
-      <Modal
-        open={decisionAction === "REJECT" && detail !== null}
-        title={t.rejectModalTitle}
-        zIndex={1050}
-        okText={t.confirmRejectOk}
-        okButtonProps={{ danger: true, disabled: decisionReason.trim().length === 0 }}
-        cancelText={t.cancel}
-        confirmLoading={decisionSubmitting}
-        closable={!decisionSubmitting}
-        maskClosable={!decisionSubmitting}
-        onOk={() => void submitDecision()}
-        onCancel={closeDecision}
-      >
-        {detail && (
-          <div className="space-y-4">
-            <Descriptions size="small" column={1} colon={false}>
-              <Descriptions.Item label={t.fieldLecturer}><Text strong>{detail.lecturer.full_name}</Text></Descriptions.Item>
-              <Descriptions.Item label={t.fieldScopusAuthor}>{detail.scopus_author.preferred_name} ({detail.scopus_author.scopus_id})</Descriptions.Item>
-              <Descriptions.Item label={t.fieldAction}><Badge tone="danger" className="!rounded-[5px]">{t.decisionReject}</Badge></Descriptions.Item>
-            </Descriptions>
-            <div>
-              <label htmlFor="review-reject-reason" className="mb-1.5 block font-semibold text-slate-700">
-                {t.rejectReasonLabel} <span className="text-rose-600">*</span>
-              </label>
-              <Input.TextArea
-                id="review-reject-reason"
-                className="mb-5"
-                value={decisionReason}
-                rows={4}
-                maxLength={4000}
-                showCount
-                status={reasonError ? "error" : undefined}
-                placeholder={t.rejectReasonPlaceholder}
-                onChange={(event) => {
-                  setDecisionReason(event.target.value);
-                  if (event.target.value.trim()) setReasonError(null);
-                }}
-              />
-              {reasonError && <div className="mt-1 text-sm text-rose-600" role="alert">{reasonError}</div>}
+      <ConfirmModal
+        open={revocationOpen && detail !== null}
+        variant="danger"
+        title={t.revokeModalTitle}
+        confirmLabel={t.confirmRevokeOk}
+        cancelLabel={t.cancel}
+        loading={revocationSubmitting}
+        confirmDisabled={revocationReason.trim().length === 0}
+        onConfirm={() => void submitRevocation()}
+        onCancel={closeRevocation}
+        description={
+          detail && (
+            <div className="space-y-3">
+              <Notice tone="warning" title={t.revokeModalText} />
+              <PairSummary t={t} detail={detail} />
+              <div>
+                <label htmlFor="review-revoke-reason" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  {t.revokeReasonLabel} <span className="text-rose-600">*</span>
+                </label>
+                <Input.TextArea
+                  id="review-revoke-reason"
+                  value={revocationReason}
+                  rows={4}
+                  maxLength={4000}
+                  showCount
+                  status={revocationError ? "error" : undefined}
+                  placeholder={t.revokeReasonPlaceholder}
+                  onChange={(event) => {
+                    setRevocationReason(event.target.value);
+                    if (event.target.value.trim()) setRevocationError(null);
+                  }}
+                />
+                {revocationError && <div className="mt-6 text-sm text-rose-600" role="alert">{revocationError}</div>}
+              </div>
             </div>
-          </div>
-        )}
-      </Modal>
+          )
+        }
+      />
+
+      <ConfirmModal
+        open={decisionAction === "ACCEPT" && detail !== null}
+        variant="primary"
+        title={t.confirmAcceptTitle}
+        confirmLabel={t.confirmAcceptOk}
+        cancelLabel={t.cancel}
+        loading={decisionSubmitting}
+        confirmDisabled={acceptReasonRequired && decisionReason.trim().length === 0}
+        onConfirm={() => void submitDecision()}
+        onCancel={closeDecision}
+        description={
+          detail && (
+            <div className="space-y-3">
+              <PairSummary t={t} detail={detail} />
+              {acceptReasonRequired && (
+                <div data-testid="accept-reason-required">
+                  <Notice tone="warning" title={t.acceptReasonRequiredTitle}>
+                    <ul className="m-0 list-disc space-y-0.5 pl-4">
+                      {acceptReasonTriggers.map((trigger) => (
+                        <li key={trigger}>{reasonTriggerText(t, trigger)}</li>
+                      ))}
+                    </ul>
+                  </Notice>
+                </div>
+              )}
+              <div>
+                <label htmlFor="review-accept-reason" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  {acceptReasonRequired ? (
+                    <>
+                      {t.acceptReasonLabel} <span className="text-rose-600">*</span>
+                    </>
+                  ) : (
+                    t.acceptReasonOptionalLabel
+                  )}
+                </label>
+                <Input.TextArea
+                  id="review-accept-reason"
+                  value={decisionReason}
+                  rows={3}
+                  maxLength={4000}
+                  showCount
+                  aria-required={acceptReasonRequired}
+                  aria-invalid={Boolean(reasonError)}
+                  status={reasonError ? "error" : undefined}
+                  placeholder={t.acceptReasonPlaceholder}
+                  onChange={(event) => {
+                    setDecisionReason(event.target.value);
+                    if (event.target.value.trim()) setReasonError(null);
+                  }}
+                />
+                {reasonError && <div className="mt-6 text-sm text-rose-600" role="alert">{reasonError}</div>}
+                <p className="mt-6 text-xs leading-relaxed text-slate-500">{t.acceptReasonNotEvidence}</p>
+              </div>
+            </div>
+          )
+        }
+      />
+
+      <ConfirmModal
+        open={decisionAction === "REJECT" && detail !== null}
+        variant="danger"
+        title={t.rejectModalTitle}
+        confirmLabel={t.confirmRejectOk}
+        cancelLabel={t.cancel}
+        loading={decisionSubmitting}
+        confirmDisabled={decisionReason.trim().length === 0}
+        onConfirm={() => void submitDecision()}
+        onCancel={closeDecision}
+        description={
+          detail && (
+            <div className="space-y-3">
+              <PairSummary t={t} detail={detail} />
+              <div>
+                <label htmlFor="review-reject-reason" className="mb-1.5 block text-sm font-medium text-slate-700">
+                  {t.rejectReasonLabel} <span className="text-rose-600">*</span>
+                </label>
+                <Input.TextArea
+                  id="review-reject-reason"
+                  value={decisionReason}
+                  rows={4}
+                  maxLength={4000}
+                  showCount
+                  status={reasonError ? "error" : undefined}
+                  placeholder={t.rejectReasonPlaceholder}
+                  onChange={(event) => {
+                    setDecisionReason(event.target.value);
+                    if (event.target.value.trim()) setReasonError(null);
+                  }}
+                />
+                {reasonError && <div className="mt-6 text-sm text-rose-600" role="alert">{reasonError}</div>}
+              </div>
+            </div>
+          )
+        }
+      />
     </div>
     </ConfigProvider>
   );

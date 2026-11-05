@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
 import { getMergeGuide, getReviewCandidates, groupAcceptLecturerCandidates, MergeGuideResponse } from "../../api/reviews";
 import Button from "../../components/ui/Button";
+import FullModal from "../../components/common/FullModal";
 import { useToast } from "../../contexts/ToastContext";
 import { ReviewQueueItem } from "../../types/review";
 
@@ -133,7 +134,7 @@ function GroupCard({ group, locale, hint, onDone }: { group: Group; locale: Loca
             </label>
             <span className="text-slate-600">{m.scopus_author.preferred_name}</span>
             <span className="text-slate-500">
-              {m.publication_support_count} {vi ? "công bố hỗ trợ" : "supporting publications"} · {m.name_evidence_count} {vi ? "bằng chứng tên" : "name evidence"}
+              {m.publication_support_count} {vi ? "bài báo trùng" : "matching papers"} · {m.name_evidence_count} {vi ? "lần trùng tên" : "name matches"}
             </span>
             {hint?.entry && !listed(m) && (
               <span className="inline-flex h-badge items-center rounded-[5px] border border-amber-300 bg-white px-2 text-[10px] font-bold text-amber-700">
@@ -195,10 +196,24 @@ function GroupCard({ group, locale, hint, onDone }: { group: Group; locale: Loca
  * Lecturers with two or more pending Scopus IDs, grouped so a reviewer can decide the whole
  * group at once. Each member still passes every single-decision rule on the server.
  */
-export default function GroupReviewPanel({ locale, refreshKey, onChanged }: { locale: Locale; refreshKey: number; onChanged: () => void }) {
+export default function GroupReviewPanel({
+  locale,
+  refreshKey,
+  open,
+  onClose,
+  onCountChange,
+  onChanged,
+}: {
+  locale: Locale;
+  refreshKey: number;
+  /** The open button lives in the page header; this component renders the modal. */
+  open: boolean;
+  onClose: () => void;
+  onCountChange: (count: number) => void;
+  onChanged: () => void;
+}) {
   const vi = locale === "vi";
   const [items, setItems] = useState<ReviewQueueItem[]>([]);
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [guide, setGuide] = useState<MergeGuideResponse | null>(null);
@@ -237,6 +252,15 @@ export default function GroupReviewPanel({ locale, refreshKey, onChanged }: { lo
     return [...byLecturer.values()].filter((g) => g.members.length >= 2).sort((a, b) => a.lecturerName.localeCompare(b.lecturerName, "vi"));
   }, [items]);
 
+  useEffect(() => {
+    onCountChange(error ? 0 : groups.length);
+  }, [groups.length, error, onCountChange]);
+
+  // Last group decided while the modal is open: close it instead of leaving it armed for later.
+  useEffect(() => {
+    if (open && !loading && groups.length === 0) onClose();
+  }, [open, loading, groups.length, onClose]);
+
   const lecturerKey = groups.map((g) => g.lecturerId).join(",");
   useEffect(() => {
     let cancelled = false;
@@ -269,31 +293,33 @@ export default function GroupReviewPanel({ locale, refreshKey, onChanged }: { lo
   if (groups.length === 0) return null;
 
   return (
-    <section className="mb-4 rounded-[5px] border border-[#cfd9f3] bg-[#f6f8fe] p-4" data-testid="review-group-panel">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-bold text-slate-800">
-            {vi ? "Duyệt theo nhóm giảng viên" : "Review by lecturer group"}{" "}
-            <span className="ml-1 rounded-[5px] bg-white px-2 py-0.5 text-xs font-semibold text-[#2f4ea6]">{groups.length}</span>
-          </h2>
-          <p className="mt-0.5 text-xs text-slate-600">
-            {vi
-              ? `${groups.length} giảng viên có từ 2 ID Scopus được đề xuất. Duyệt cả nhóm một lần và chọn ID chính.`
-              : `${groups.length} lecturers have two or more proposed Scopus IDs. Review the whole group at once and pick the main ID.`}
-          </p>
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => setOpen((v) => !v)} data-testid="review-group-toggle">
-          {open ? (vi ? "Thu gọn" : "Collapse") : (vi ? "Xem các nhóm" : "Show groups")}
+    <FullModal
+      open={open}
+      title={`${vi ? "Duyệt theo nhóm giảng viên" : "Review by lecturer group"} (${groups.length})`}
+      description={
+        vi
+          ? `${groups.length} giảng viên có từ 2 ID Scopus được đề xuất. Duyệt cả nhóm một lần và chọn ID chính.`
+          : `${groups.length} lecturers have two or more proposed Scopus IDs. Review the whole group at once and pick the main ID.`
+      }
+      onClose={onClose}
+      footerActions={
+        <Button variant="secondary" onClick={onClose}>
+          {vi ? "Đóng" : "Close"}
         </Button>
-      </div>
-      {open && (
-        <div className="mt-3 max-h-[520px] space-y-3 overflow-y-auto pr-1">
-          {!guideReady && <p className="text-xs text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>}
-          {guideReady && groups.map((group) => (
+      }
+    >
+      <div className="space-y-3" data-testid="review-group-panel">
+        {!guideReady ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-sm font-medium text-slate-400">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+            <span>{vi ? "Đang tải dữ liệu..." : "Loading data..."}</span>
+          </div>
+        ) : (
+          groups.map((group) => (
             <GroupCard key={group.lecturerId} group={group} locale={locale} hint={hintFor(group.lecturerId)} onDone={() => { onChanged(); void load(); }} />
-          ))}
-        </div>
-      )}
-    </section>
+          ))
+        )}
+      </div>
+    </FullModal>
   );
 }

@@ -6,13 +6,13 @@ const LEVEL_LABEL: Record<ReviewFit["level"], Record<Locale, string>> = {
   HIGH: { vi: "Phù hợp cao", en: "High fit" },
   MEDIUM: { vi: "Phù hợp vừa", en: "Medium fit" },
   LOW: { vi: "Phù hợp thấp", en: "Low fit" },
-  INSUFFICIENT: { vi: "Chưa đủ căn cứ", en: "Not enough grounds" },
+  INSUFFICIENT: { vi: "Chưa đủ căn cứ", en: "Too little data" },
 };
 
 const LEVEL_STYLE: Record<ReviewFit["level"], string> = {
-  HIGH: "border-emerald-300 text-emerald-700 hover:bg-emerald-50",
+  HIGH: "border-emerald-400 text-emerald-700 hover:bg-emerald-50",
   MEDIUM: "border-[#3A5FC3] text-[#3A5FC3] hover:bg-blue-50",
-  LOW: "border-amber-300 text-amber-700 hover:bg-amber-50",
+  LOW: "border-amber-400 text-amber-700 hover:bg-amber-50",
   INSUFFICIENT: "border-slate-300 text-slate-600 hover:bg-slate-50",
 };
 
@@ -46,7 +46,7 @@ export function fitLevelLabel(level: ReviewFit["level"], locale: Locale): string
 export default function FitBadge({ fit, locale }: { fit: ReviewFit; locale: Locale }) {
   return (
     <span
-      className={`inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border bg-white px-2 text-center text-xs font-bold leading-none ${LEVEL_STYLE[fit.level]}`}
+      className={`inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border bg-white px-2.5 text-center text-sm font-bold leading-none ${LEVEL_STYLE[fit.level]}`}
       title={fit.reasons.map((r) => fitReasonText(r, locale, fit.ictu_affiliation_papers)).join("\n")}
       data-testid="fit-badge"
     >

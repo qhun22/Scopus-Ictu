@@ -42,8 +42,8 @@ const RULES: Record<string, Record<Locale, string>> = {
     en: "Lecturer's known publication with the same title",
   },
   RULE_CRAW_KNOWN_PUBLICATION_AUTHOR_POSITION: {
-    vi: "Công bố Craw trùng ở đúng vị trí tác giả",
-    en: "Crawled publication matching at the author position",
+    vi: "Bài báo trong hồ sơ ICTU trùng ở đúng vị trí tác giả",
+    en: "Paper on the ICTU profile matching at the author position",
   },
   RULE_MANUAL_ADMIN: {
     vi: "ADMIN đề xuất thủ công (rule tên tự động không khớp được)",
