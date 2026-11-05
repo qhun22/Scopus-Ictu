@@ -1,4 +1,4 @@
-"""Identity matching — M0 scaffold.
+"""Identity matching: read-only candidate generation and persistence (no auto-confirm).
 
 Evidence strength order (canonical):
   1. Approved Scopus ID
@@ -33,17 +33,14 @@ from app.services.matching.candidate_types import (
     PublicationEvidence,
     PublicationEvidenceConflict,
 )
-from app.services.matching.engine import MatchingEngine
 from app.services.matching.publication_evidence_enricher import (
     PublicationEvidenceEnricher,
     PublicationEvidenceEnrichmentResult,
     enrich_candidates,
     normalize_doi_for_matching,
 )
-from app.services.matching.scoring import ScoreCalculator, ScoreResult
 
 __all__ = [
-    "MatchingEngine",
     "CandidateGenerator",
     "CandidateEvidence",
     "LecturerScopusCandidate",
@@ -61,8 +58,6 @@ __all__ = [
     "normalize_comma_equivalence",
     "normalize_hyphen_equivalence",
     "strip_observed_title_prefix",
-    "ScoreCalculator",
-    "ScoreResult",
     "CandidatePersistenceResult",
     "CandidatePersistenceService",
     "GenerationRunConflict",
