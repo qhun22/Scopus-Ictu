@@ -310,7 +310,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title={vi ? "1. Nguồn dữ liệu đơn vị" : "1. Affiliation source"} testId="aff-source-card">
           {!source ? (
-            <p className="text-sm text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
+            <p className="text-sm text-slate-500">{vi ? "Đang tải dữ liệu..." : "Loading…"}</p>
           ) : !source.configured ? (
             <div className="space-y-1 text-sm" data-testid="aff-source-missing">
               <p className="font-medium text-slate-700">
@@ -387,7 +387,7 @@ export default function AffiliationsTab({ locale }: { locale: Locale }) {
 
         <Card title={vi ? "2. Hiện trạng trong hệ thống" : "2. Current state"} testId="aff-state-card">
           {!db ? (
-            <p className="text-sm text-slate-500">{vi ? "Đang tải…" : "Loading…"}</p>
+            <p className="text-sm text-slate-500">{vi ? "Đang tải dữ liệu..." : "Loading…"}</p>
           ) : (
             <div className="space-y-3 text-sm text-slate-700">
               <p className="text-slate-500">

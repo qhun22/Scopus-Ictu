@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
@@ -108,7 +108,8 @@ export default function App() {
               <Route element={<RoleRoute allowedRoles={["ADMIN"]} />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/imports" element={<ImportsPage />} />
-                <Route path="/normalization" element={<NormalizationPage />} />
+                <Route path="/normalization" element={<Navigate to="/normalization/publications" replace />} />
+                <Route path="/normalization/:tab" element={<NormalizationPage />} />
                 <Route path="/lecturers" element={<LecturersPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/audit-logs" element={<AuditLogsPage />} />

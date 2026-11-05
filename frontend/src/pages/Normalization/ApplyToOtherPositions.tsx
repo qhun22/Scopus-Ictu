@@ -151,7 +151,7 @@ export default function ApplyToOtherPositions({
           </p>
 
           {loading ? (
-            <p className="text-xs text-slate-400">{vi ? "Đang tải…" : "Loading…"}</p>
+            <p className="text-xs text-slate-400">{vi ? "Đang tải dữ liệu..." : "Loading…"}</p>
           ) : candidates.length === 0 ? (
             <p className="text-xs text-slate-400">
               {vi ? "Không còn bài nào khác cần áp dụng đơn vị này." : "No other paper needs this unit."}

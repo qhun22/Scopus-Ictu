@@ -53,7 +53,9 @@ export default function AppLayout() {
         {/* Dynamic Page Content */}
         <main
           ref={mainRef}
-          className="relative flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6"
+          className={`relative flex-1 min-h-0 min-w-0 w-full overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 lg:p-6 ${
+            location.pathname === "/normalization/publications" ? "app-main-publications" : ""
+          }`}
         >
           <PageLoadingBar isSidebarCollapsed={isSidebarCollapsed} />
           <div key={location.pathname} className="page-fade-in w-full">

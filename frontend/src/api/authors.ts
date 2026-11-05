@@ -62,11 +62,13 @@ export function getAuthors(params?: {
   q?: string;
   page?: number;
   page_size?: number;
+  ictu_related?: boolean;
 }): Promise<AuthorListResponse> {
   const sp = new URLSearchParams();
   if (params?.q) sp.set("q", params.q);
   if (params?.page) sp.set("page", String(params.page));
   if (params?.page_size) sp.set("page_size", String(params.page_size));
+  if (params?.ictu_related) sp.set("ictu_related", "true");
   const qs = sp.toString();
   return apiGet<AuthorListResponse>(
     `/api/v1/authors${qs ? `?${qs}` : ""}`,

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
+from app.models.candidate import LecturerScopusCandidate
 from app.models.governance import User
 from app.services.text_folding import fold_text, folded
 from app.models.publication import (
@@ -171,9 +172,18 @@ def list_authors(
     q: Annotated[str | None, Query(description="Search by name or Scopus ID")] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    ictu_related: Annotated[
+        bool,
+        Query(description="Only authors with at least one lecturer-matching candidate"),
+    ] = False,
 ) -> AuthorListResponse:
     """Admin-only: list and search Scopus authors."""
     base_q = db.query(ScopusAuthor)
+
+    if ictu_related:
+        base_q = base_q.filter(
+            ScopusAuthor.id.in_(db.query(LecturerScopusCandidate.scopus_author_id))
+        )
 
     if q:
         q_stripped = q.strip()

@@ -361,6 +361,7 @@ export default function NormalizationPage() {
         <div className="tab-fade-in space-y-4">
           <AuthorsTab
             scopusImports={scopusImports}
+            loading={loading}
             locale={locale}
             onRefresh={fetchImports}
             onViewDetail={handleOpenDetailModal}
@@ -441,13 +442,13 @@ export default function NormalizationPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                     <tr>
-                      <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Bản ghi" : "Records"}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
-                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">{t.normalization.table.actions}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã ghi nạp" : "Imported / Total"}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
+                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">{t.normalization.table.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -491,12 +492,12 @@ export default function NormalizationPage() {
                             key={item.id}
                             id={`import-item-${item.id}`}
                             ref={isHighlighted ? highlightedRef : null}
-                            className={`transition-colors hover:bg-slate-50/70 ${
+                            className={`transition-colors duration-300 hover:bg-slate-50/50 ${
                               isHighlighted ? "bg-blue-50/30" : ""
                             }`}
                           >
                             {/* File Name */}
-                            <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle whitespace-nowrap">
                               <div className="flex items-center gap-2.5">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0 shadow-2xs">
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -504,38 +505,38 @@ export default function NormalizationPage() {
                                   </svg>
                                 </div>
                                 <div className="min-w-0 max-w-xs sm:max-w-sm">
-                                  <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
+                                  <span className="block font-medium text-slate-800 truncate" title={item.file_name}>
                                     {item.file_name}
                                   </span>
-                                  <span className="block text-[10px] text-slate-400 truncate" title={item.id}>
+                                  <span className="block text-sm font-mono font-medium text-slate-400 truncate" title={item.id}>
                                     ID: {shortId(item.id)}
                                   </span>
                                 </div>
                               </div>
                             </td>
 
-                            {/* Data type */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
-                              <span className={basicBadgeClassName}>Scopus</span>
-                            </td>
-
-                            {/* Time */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
-                              {formatDate(item.created_at)}
-                            </td>
-
                             {/* Records */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-800">
                               {numberFormatter.format(item.processed_records || item.imported_records || item.total_records)} / {numberFormatter.format(item.total_records)}
                             </td>
 
+                            {/* Time */}
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
+                              {formatDate(item.created_at)}
+                            </td>
+
+                            {/* Data type */}
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
+                              <span className={basicBadgeClassName}>Scopus</span>
+                            </td>
+
                             {/* Performed by */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               <span className={basicBadgeClassName}>{formatPerformedBy(item.performed_by)}</span>
                             </td>
 
                             {/* Status */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               {superseded ? (
                                 <span className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-red-400 bg-white px-2.5 text-center text-sm font-bold leading-none text-red-700 hover:bg-red-50">
                                   {locale === "vi" ? "Thay thế" : "Superseded"}
@@ -548,7 +549,7 @@ export default function NormalizationPage() {
                             </td>
 
                             {/* Actions */}
-                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
+                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                               <div className="flex items-center justify-center gap-2">
                                 <button
                                   type="button"
@@ -584,10 +585,10 @@ export default function NormalizationPage() {
               </div>
 
               {/* Footer info & Pagination Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
                 <div className="flex items-center gap-3">
                   <span>
-                    {t.imports.showing} <strong>{paginatedPendingImports.length}</strong> {locale === "vi" ? "trong" : "of"} {filteredPendingImports.length} {locale === "vi" ? "đợt nhập" : "imports"}
+                    {t.imports.showing} <strong>{paginatedPendingImports.length}</strong> {locale === "vi" ? "trong" : "of"} <strong>{filteredPendingImports.length}</strong> {locale === "vi" ? "đợt nhập" : "imports"}
                   </span>
 
                   <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
@@ -709,13 +710,13 @@ export default function NormalizationPage() {
                 <table className="w-full text-left text-sm">
                   <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
                     <tr>
-                      <th className="px-2.5 py-3.5 font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Bản ghi" : "Records"}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
-                      <th className="px-2.5 py-3.5 text-center font-bold text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
-                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-bold text-slate-700">{t.normalization.table.actions}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{t.normalization.table.fileName}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Đã ghi nạp" : "Imported / Total"}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{t.normalization.table.importedAt}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Loại dữ liệu" : "Data Type"}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Người thực hiện" : "Performed by"}</th>
+                      <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{locale === "vi" ? "Trạng thái" : "Status"}</th>
+                      <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">{t.normalization.table.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -748,9 +749,9 @@ export default function NormalizationPage() {
                       paginatedHistory.map((item) => {
                         const n = item.normalization;
                         return (
-                          <tr key={item.id} className="transition-colors hover:bg-slate-50/70">
+                          <tr key={item.id} className="transition-colors duration-300 hover:bg-slate-50/50">
                             {/* File Name */}
-                            <td className="px-2.5 py-3.5 align-middle whitespace-nowrap">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle whitespace-nowrap">
                               <div className="flex items-center gap-2.5">
                                 <div className="flex h-8 w-8 items-center justify-center rounded-[5px] border border-slate-200/80 bg-slate-100 text-slate-600 shrink-0">
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -758,38 +759,38 @@ export default function NormalizationPage() {
                                   </svg>
                                 </div>
                                 <div className="min-w-0 max-w-xs sm:max-w-sm">
-                                  <span className="block font-bold text-slate-800 truncate" title={item.file_name}>
+                                  <span className="block font-medium text-slate-800 truncate" title={item.file_name}>
                                     {item.file_name}
                                   </span>
-                                  <span className="block text-[10px] text-slate-400 truncate" title={item.id}>
+                                  <span className="block text-sm font-mono font-medium text-slate-400 truncate" title={item.id}>
                                     ID: {shortId(item.id)}
                                   </span>
                                 </div>
                               </div>
                             </td>
 
-                            {/* Data type */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
-                              <span className={basicBadgeClassName}>Scopus</span>
-                            </td>
-
-                            {/* Time */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
-                              {formatDate(item.created_at)}
-                            </td>
-
                             {/* Records */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-bold text-slate-800">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-800">
                               {numberFormatter.format(item.processed_records)} / {numberFormatter.format(item.total_records)}
                             </td>
 
+                            {/* Time */}
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium text-slate-600">
+                              {formatDate(item.created_at)}
+                            </td>
+
+                            {/* Data type */}
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap font-medium">
+                              <span className={basicBadgeClassName}>Scopus</span>
+                            </td>
+
                             {/* Performed by */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               <span className={basicBadgeClassName}>{formatPerformedBy(item.performed_by)}</span>
                             </td>
 
                             {/* Result */}
-                            <td className="px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
+                            <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                               <span
                                 className={
                                   n && n.status === "COMPLETED" && !hasRowErrors(item)
@@ -812,7 +813,7 @@ export default function NormalizationPage() {
                             </td>
 
                             {/* Actions: [Chi tiết] only */}
-                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
+                            <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                               <button
                                 type="button"
                                 onClick={() => handleOpenDetailModal(item)}
@@ -830,10 +831,10 @@ export default function NormalizationPage() {
               </div>
 
               {/* Footer info & Pagination Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
                 <div className="flex items-center gap-3">
                   <span>
-                    {locale === "vi" ? "Hiển thị" : "Showing"} <strong>{paginatedHistory.length}</strong> {locale === "vi" ? "trong" : "of"} {filteredHistory.length} {locale === "vi" ? "đợt nhập" : "imports"}
+                    {locale === "vi" ? "Hiển thị" : "Showing"} <strong>{paginatedHistory.length}</strong> {locale === "vi" ? "trong" : "of"} <strong>{filteredHistory.length}</strong> {locale === "vi" ? "đợt nhập" : "imports"}
                   </span>
 
                   {/* Page Size Selector */}

@@ -93,6 +93,14 @@ export default function Header({
         return t.nav.imports;
       case "/normalization":
         return t.nav.normalization;
+      case "/normalization/publications":
+        return t.nav.normalizationPublications;
+      case "/normalization/authors":
+        return t.nav.normalizationAuthors;
+      case "/normalization/affiliations":
+        return t.nav.normalizationAffiliations;
+      case "/normalization/matching":
+        return t.nav.normalizationMatching;
       case "/lecturers":
         return t.nav.lecturers;
       case "/publications":
@@ -163,7 +171,7 @@ export default function Header({
       </div>
 
       {/* Right side: Language Switcher & User Profile Dropdown */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+      <div className="mr-2 flex shrink-0 items-center gap-2 sm:gap-3">
         {/* Language Switcher: VI | EN */}
         <div
           className="flex h-10 items-center gap-0.5 sm:gap-1 rounded-[5px] border border-slate-200 bg-white p-0.5 sm:p-1 shadow-2xs"

@@ -178,9 +178,14 @@ function OverrideForm({
           className="mt-1 w-full rounded-[5px] border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
           value={form.evidence_url}
           onChange={(e) => setForm((f) => ({ ...f, evidence_url: e.target.value }))}
-          placeholder="https://..."
+          placeholder="https://doi.org/10.xxxx/..."
           data-testid="override-input-evidence"
         />
+        <p className="mt-1 text-sm text-slate-500">
+          {vi
+            ? "Ưu tiên link DOI (https://doi.org/...) — bền hơn link trang nhà xuất bản, vẫn mở được khi họ đổi web."
+            : "Prefer a DOI link (https://doi.org/...) — it outlives publisher page URLs."}
+        </p>
       </div>
       <div>
         <label className="text-sm font-semibold text-slate-600">{vi ? "Lý do *" : "Reason *"}</label>
@@ -189,9 +194,18 @@ function OverrideForm({
           rows={2}
           value={form.reason}
           onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-          placeholder={vi ? "VD: Bổ sung theo trang đầu PDF bản in bài báo..." : "Reason..."}
+          placeholder={
+            vi
+              ? "VD: Trang đầu bài báo ghi: \"Thai Nguyen University of Information and Communication Technology\""
+              : "e.g. The paper's first page reads: \"Thai Nguyen University of Information and Communication Technology\""
+          }
           data-testid="override-input-reason"
         />
+        <p className="mt-1 text-sm text-slate-500">
+          {vi
+            ? "Nên chép nguyên văn dòng đơn vị trong bài vào đây — lỡ link hỏng vẫn còn căn cứ."
+            : "Copy the affiliation line from the paper here — it stays as evidence if the link breaks."}
+        </p>
       </div>
       {error && (
         <p className="text-sm font-medium text-rose-600" role="alert">
@@ -587,21 +601,21 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">
+            <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+              <tr>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">
                   {vi ? "Tác giả Scopus" : "Scopus Author"}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-slate-600">
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">
                   {vi ? "Bài báo / EID" : "Publication / EID"}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">
                   {vi ? "Trạng thái rà soát" : "Review Status"}
                 </th>
-                <th className="whitespace-nowrap px-4 py-3 text-center font-semibold text-slate-600">
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">
                   {vi ? "Trực thuộc" : "Affiliated Unit"}
                 </th>
-                <th className="w-44 whitespace-nowrap border-l border-slate-200/80 px-4 py-3 text-center font-semibold text-slate-600">
+                <th className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">
                   {vi ? "Thao tác" : "Actions"}
                 </th>
               </tr>
@@ -609,11 +623,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                  <td colSpan={5} className="py-12 text-center text-slate-400">
                     <div className="flex items-center justify-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
-                      <span className="text-sm font-medium">
-                        {vi ? "Đang tải dữ liệu…" : "Loading data…"}
+                      <span className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
+                      <span className="text-xs font-medium">
+                        {vi ? "Đang tải dữ liệu..." : "Loading..."}
                       </span>
                     </div>
                   </td>
@@ -640,9 +654,9 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                 items.map((item) => {
                   const activeOverrides = item.overrides.filter((o) => o.status === "ACTIVE");
                   return (
-                    <tr key={item.publication_author_id} className="hover:bg-slate-50/50 transition-colors" data-testid="review-item">
+                    <tr key={item.publication_author_id} className="transition-colors duration-300 hover:bg-slate-50/50" data-testid="review-item">
                       {/* Tác giả */}
-                      <td className="px-4 py-3">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle whitespace-nowrap">
                         <p className="font-semibold text-slate-800 text-sm line-clamp-1" title={item.preferred_name}>
                           {item.preferred_name}
                         </p>
@@ -655,7 +669,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       </td>
 
                       {/* Bài báo / EID */}
-                      <td className="px-4 py-3 max-w-[280px]">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 max-w-[280px]">
                         <p className="font-medium text-slate-700 text-sm line-clamp-2 leading-relaxed" title={item.title}>
                           {item.title}
                         </p>
@@ -665,7 +679,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       </td>
 
                       {/* Trạng thái rà soát */}
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         <div className="flex flex-col items-center gap-1">
                           {(activeOverrides.length > 0 ? [ADJUSTED_LABEL[locale]] : reasonParts(item.reason_kind, locale)).map((part) => (
                             <span
@@ -680,7 +694,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       </td>
 
                       {/* Trực thuộc */}
-                      <td className="px-4 py-3 text-center">
+                      <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle whitespace-nowrap">
                         {activeOverrides.length > 0 ? (
                           <span
                             className={`${UNIT_BADGE_BASE} ${activeOverrides.some((o) => isIctuUnit(o.affiliation_text)) ? UNIT_BADGE_ICTU : UNIT_BADGE_OTHER}`}
@@ -694,7 +708,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                       </td>
 
                       {/* Thao tác */}
-                      <td className="w-44 border-l border-slate-100 px-4 py-3 text-center">
+                      <td className="sticky right-0 z-[1] w-44 border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                         <button
                           type="button"
                           onClick={() => {
@@ -715,7 +729,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
         </div>
 
         {/* Footer info & Pagination Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-2.5 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
           <div className="flex items-center gap-3">
             <span>
               {vi ? "Hiển thị" : "Showing"} <strong>{items.length}</strong> {vi ? "trong" : "of"}{" "}
@@ -782,10 +796,10 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
       {/* Modal chi tiết & hiệu chỉnh đơn vị tác giả */}
       {selectedItem && (
         <ModalPortal>
-          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center bg-black/40 p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
-            <div className="w-full max-w-3xl max-h-[90vh] flex flex-col rounded-card border border-slate-200 bg-white shadow-2xl overflow-hidden modal-panel-in">
+          <div className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out">
+            <div className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in">
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 shrink-0">
+              <header className="flex shrink-0 items-center justify-between border-b border-blue-100 bg-blue-50 px-5 py-4">
                 <div>
                   <h2 className="text-base font-bold text-slate-800">
                     {vi ? "Chi tiết rà soát & Hiệu chỉnh đơn vị tác giả" : "Author Unit Review & Override"}
@@ -806,10 +820,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-              </div>
+              </header>
 
               {/* Scrollable Content */}
-              <div className="overflow-y-auto p-5 space-y-4 flex-1">
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <div className="space-y-4">
                 {/* Paper Context Card */}
                 <div className="rounded-[5px] border border-slate-200/80 bg-slate-50/60 p-3.5 space-y-2">
                   <span className="block text-sm font-semibold text-slate-700">
@@ -959,10 +974,11 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                     }}
                   />
                 )}
+                </div>
               </div>
 
               {/* Modal Footer */}
-              <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3 flex justify-end shrink-0">
+              <footer className="flex shrink-0 justify-end border-t border-slate-100 bg-white px-5 py-3">
                 <Button
                   type="button"
                   variant="secondary"
@@ -973,7 +989,7 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                 >
                   {vi ? "Đóng" : "Close"}
                 </Button>
-              </div>
+              </footer>
             </div>
           </div>
         </ModalPortal>
