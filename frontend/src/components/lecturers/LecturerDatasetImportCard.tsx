@@ -218,7 +218,7 @@ const LecturerDatasetImportCard = forwardRef<
           <h2 className="text-sm font-bold text-slate-800">
             {t.lecturerImport.cardTitle}
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-slate-500">
             {t.lecturerImport.cardSubtitle}
           </p>
         </div>
@@ -266,12 +266,12 @@ const LecturerDatasetImportCard = forwardRef<
               />
             </svg>
           </div>
-          <p className="text-xs font-semibold text-slate-700 sm:text-sm group-hover:text-[#3A5FC3] transition-colors">
+          <p className="text-sm font-semibold text-slate-700 group-hover:text-[#3A5FC3] transition-colors">
             {locale === "vi"
               ? "Nhấp hoặc kéo thả tệp JSON vào đây để tải lên"
               : "Click or drag and drop a JSON file here to upload"}
           </p>
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-sm text-slate-400">
             {locale === "vi"
               ? "Hỗ trợ .json - tối đa 20.0 MB"
               : "Supports .json - up to 20.0 MB"}
@@ -293,12 +293,12 @@ const LecturerDatasetImportCard = forwardRef<
               </div>
               <div className="min-w-0 flex-1">
                 <span
-                  className="block font-semibold text-slate-800 text-xs leading-snug break-all line-clamp-2"
+                  className="block font-semibold text-slate-800 text-sm leading-snug break-all line-clamp-2"
                   title={selectedFile.name}
                 >
                   {selectedFile.name}
                 </span>
-                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
                   <span>
                     {locale === "vi" ? "Dung lượng:" : "Size:"}{" "}
                     <strong className="text-slate-700">{formatBytes(selectedFile.size)}</strong>
@@ -353,7 +353,7 @@ const LecturerDatasetImportCard = forwardRef<
       {selectionError && (
         <div
           role="alert"
-          className="mt-3 flex items-center gap-2 rounded-[5px] border border-rose-200 bg-rose-50/80 p-3 text-xs font-semibold text-rose-700 animate-in fade-in duration-200"
+          className="mt-3 flex items-center gap-2 rounded-[5px] border border-rose-200 bg-rose-50/80 p-3 text-sm font-semibold text-rose-700 animate-in fade-in duration-200"
         >
           <svg
             className="h-4 w-4 shrink-0 text-rose-600"

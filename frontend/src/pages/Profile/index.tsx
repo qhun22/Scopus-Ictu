@@ -23,7 +23,7 @@ const viCopy = {
   orcid: "ORCID",
   repository: "Hồ sơ kho lưu trữ",
   notAvailable: "Chưa cập nhật",
-  loading: "Đang tải hồ sơ…",
+  loading: "Đang tải dữ liệu...",
   loadError: "Không thể tải hồ sơ giảng viên.",
   retry: "Thử lại",
   notLinkedTitle: "Tài khoản chưa được liên kết",

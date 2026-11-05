@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "normalize-loading": "node normalize-loading-copy.mjs",
     "lint": "echo \"M0: lint is scaffold-only.\" && exit 0"
   },
   "dependencies": {

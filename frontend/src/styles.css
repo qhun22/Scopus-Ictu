@@ -43,10 +43,6 @@
   background: #94a3b8;
 }
 
-html {
-  scrollbar-gutter: stable;
-}
-
 /* Prevent page shift when AntD modal locks body scroll */
 body.ant-scrolling-effect {
   overflow-y: scroll !important;
@@ -77,6 +73,19 @@ body {
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
+}
+
+.app-main-publications {
+  scrollbar-gutter: stable;
+}
+
+/* Basic focus state for form fields: the existing focus:border-* colour
+   change already shows a plain, solid stroke — the translucent Tailwind
+   ring glow layered on top of it just reads as a blurred halo. */
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: none !important;
 }
 
 /* Standardized Top-Right Page Action Group (aligned with header control width) */

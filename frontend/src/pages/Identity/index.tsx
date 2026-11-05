@@ -24,7 +24,7 @@ const viCopy = {
   emptyMessage: "Hồ sơ của bạn hiện chưa có liên kết Scopus được phê duyệt.",
   loadError: "Không thể tải các liên kết Scopus.",
   retry: "Thử lại",
-  loading: "Đang tải liên kết Scopus…",
+  loading: "Đang tải dữ liệu...",
   notLinked: "Tài khoản chưa được liên kết với hồ sơ giảng viên.",
 };
 
