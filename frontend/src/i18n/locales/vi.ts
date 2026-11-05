@@ -65,6 +65,8 @@ export const vi: TranslationSchema = {
     groupWorkflow: "Quy trình xử lý",
     groupLookup: "Tra cứu & kết quả",
     groupAdmin: "Quản trị",
+    groupHelp: "Trợ giúp",
+    guide: "Hướng dẫn",
     version: "Phiên bản",
   },
   header: {

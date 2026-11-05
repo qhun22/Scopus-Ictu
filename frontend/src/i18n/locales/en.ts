@@ -65,6 +65,8 @@ export const en: TranslationSchema = {
     groupWorkflow: "Data Workflow",
     groupLookup: "Browse & Results",
     groupAdmin: "Administration",
+    groupHelp: "Help",
+    guide: "User Guide",
     version: "Version",
   },
   header: {

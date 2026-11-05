@@ -24,6 +24,7 @@ import IdentityPage from "./pages/Identity";
 import MyPublicationsPage from "./pages/MyPublications";
 import SearchPage from "./pages/Search";
 import UsersPage from "./pages/Users";
+import GuidePage from "./pages/Guide";
 import PlaceholderPage from "./components/common/PlaceholderPage";
 
 function NotFoundPage() {
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/publications" element={<PublicationsPage />} />
             <Route path="/publications/:eid" element={<PublicationDetailPage />} />
+            <Route path="/guide" element={<GuidePage />} />
           </Route>
 
           {/* Authenticated Application Shell */}

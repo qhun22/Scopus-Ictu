@@ -66,6 +66,8 @@ export interface TranslationSchema {
     groupWorkflow: string;
     groupLookup: string;
     groupAdmin: string;
+    groupHelp: string;
+    guide: string;
     version: string;
   };
   header: {

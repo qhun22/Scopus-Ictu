@@ -120,6 +120,8 @@ export default function Header({
         return t.nav.users;
       case "/audit-logs":
         return t.nav.auditLogs;
+      case "/guide":
+        return t.nav.guide;
       case "/tasks":
         return t.nav.tasks;
       default:
