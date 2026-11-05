@@ -33,6 +33,10 @@ const RULES: Record<string, Record<Locale, string>> = {
     vi: "Trùng tên sau khi bỏ dấu tiếng Việt, dấu phẩy và gạch nối (dạng Scopus 'Họ, Tên-Đệm')",
     en: "Name match after removing Vietnamese diacritics, comma and hyphen (Scopus 'Family, First-Middle' form)",
   },
+  RULE_TOKEN_SET: {
+    vi: "Cùng các từ trong tên nhưng khác thứ tự (độ tin cậy thấp, cần kiểm tra kỹ)",
+    en: "Same words in the name but a different order (low confidence, check carefully)",
+  },
   RULE_KNOWN_PUBLICATION_DOI_EXACT: {
     vi: "Công bố đã biết của giảng viên trùng DOI",
     en: "Lecturer's known publication with the same DOI",

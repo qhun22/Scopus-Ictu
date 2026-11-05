@@ -44,6 +44,7 @@ RULE_ORDER: tuple[RuleId, ...] = (
     "RULE_N2",
     "RULE_N2_FORMAT",
     "RULE_N2_HYPHEN",
+    "RULE_TOKEN_SET",
 )
 
 _TITLE_PREFIX_PATTERN = re.compile(
@@ -78,6 +79,16 @@ def normalize_hyphen_equivalence(value: str) -> str:
     """Remove comma and hyphen separators — matches Scopus 'Last, First-Middle' to Vietnamese 'First Middle Last'."""
     n2 = normalize_name_n2(value)
     return " ".join(re.sub(r"[\s,\-]+", " ", n2).split())
+
+
+def normalize_token_set_equivalence(value: str) -> str:
+    """Hyphen/comma equivalence, then the words sorted: word order no longer matters.
+
+    "Van A Nguyen", "Nguyen, Van A" and "Nguyen Van A" all become "a nguyen van". A name with fewer
+    than two words is returned as "" because a single word is far too weak to compare on.
+    """
+    words = normalize_hyphen_equivalence(value).split()
+    return " ".join(sorted(words)) if len(words) >= 2 else ""
 
 
 def has_observed_title_prefix(value: str) -> bool:
@@ -124,6 +135,9 @@ def _lecturer_query(rule_id: RuleId, full_name: str) -> str | None:
     if rule_id == "RULE_N2_HYPHEN":
         return normalize_hyphen_equivalence(full_name)
 
+    if rule_id == "RULE_TOKEN_SET":
+        return normalize_token_set_equivalence(full_name) or None
+
     if not has_observed_title_prefix(full_name):
         return None
 
@@ -146,6 +160,8 @@ def _surface_query(rule_id: RuleId, value: str) -> str:
         return normalize_comma_equivalence(value)
     if rule_id == "RULE_N2_HYPHEN":
         return normalize_hyphen_equivalence(value)
+    if rule_id == "RULE_TOKEN_SET":
+        return normalize_token_set_equivalence(value)
     raise ValueError(f"Unknown candidate rule: {rule_id}")
 
 
@@ -225,6 +241,8 @@ def generate_candidates(
                 surface=surface,
                 comparison_value=_surface_query(rule_id, surface.surface_value),
             )
+            if rule_id == "RULE_TOKEN_SET" and not indexed.comparison_value:
+                continue  # single-word name: too weak to compare on
             index[indexed.comparison_value].append(indexed)
         indexes[rule_id] = index
 
@@ -232,6 +250,10 @@ def generate_candidates(
     author_by_pair: dict[tuple[UUID, UUID], _ScopusSurface] = {}
 
     for lecturer in lecturer_rows:
+        # Authors already found for this lecturer by an order-preserving rule.
+        # RULE_TOKEN_SET (last in RULE_ORDER) only proposes pairs outside this set,
+        # so it never changes an existing candidate.
+        ordered_authors: set[UUID] = set()
         for rule_id in RULE_ORDER:
             lecturer_comparison = _lecturer_query(rule_id, lecturer.full_name)
             if lecturer_comparison is None:
@@ -239,6 +261,10 @@ def generate_candidates(
             matching_surfaces = indexes[rule_id].get(lecturer_comparison, ())
             for indexed in matching_surfaces:
                 surface = indexed.surface
+                if rule_id == "RULE_TOKEN_SET" and surface.scopus_author_id in ordered_authors:
+                    continue
+                if rule_id != "RULE_TOKEN_SET":
+                    ordered_authors.add(surface.scopus_author_id)
                 pair = (lecturer.id, surface.scopus_author_id)
                 evidence_by_pair[pair].add(
                     CandidateEvidence(

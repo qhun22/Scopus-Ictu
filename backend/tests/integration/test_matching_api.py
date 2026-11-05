@@ -163,6 +163,64 @@ def test_rerunning_generation_is_idempotent_and_never_duplicates(client, as_role
     assert second["candidate_roots"] == 1
 
 
+def _persisted_evidence(db_session: Session) -> list[tuple[str, str, str]]:
+    rows = db_session.execute(
+        text(
+            "SELECT a.scopus_id, e.evidence_kind, e.rule_id "
+            "FROM lecturer_scopus_candidate_evidence e "
+            "JOIN lecturer_scopus_candidate_observations o ON o.id = e.observation_id "
+            "JOIN lecturer_scopus_candidates c ON c.id = o.candidate_id "
+            "JOIN scopus_authors a ON a.id = c.scopus_author_id "
+            "ORDER BY a.scopus_id, e.rule_id"
+        )
+    ).all()
+    return [(row[0], row[1], row[2]) for row in rows]
+
+
+def test_reordered_name_is_persisted_as_name_evidence_from_the_token_set_rule(
+    client, as_role, db_session
+) -> None:
+    db_session.add_all(
+        [
+            Lecturer(full_name="Tran Thi Mai", full_name_normalized="tran thi mai"),
+            ScopusAuthor(scopus_id="11111111111", preferred_name="Mai Tran Thi"),
+        ]
+    )
+    db_session.commit()
+    as_role("ADMIN")
+
+    response = client.post("/api/v1/matching/candidates/generate")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["candidate_roots"] == 1
+    assert body["name_candidates"] == 1
+    assert _persisted_evidence(db_session) == [("11111111111", "NAME", "RULE_TOKEN_SET")]
+
+
+def test_token_set_rule_only_proposes_pairs_no_ordered_rule_found(
+    client, as_role, db_session
+) -> None:
+    db_session.add_all(
+        [
+            Lecturer(full_name="Nguyen Van A", full_name_normalized="nguyen van a"),
+            ScopusAuthor(scopus_id="11111111111", preferred_name="Nguyen Van A"),
+            ScopusAuthor(scopus_id="22222222222", preferred_name="A Van Nguyen"),
+        ]
+    )
+    db_session.commit()
+    as_role("ADMIN")
+
+    response = client.post("/api/v1/matching/candidates/generate")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["candidate_roots"] == 2
+    assert _persisted_evidence(db_session) == [
+        ("11111111111", "NAME", "RULE_EXACT_N0"),
+        ("22222222222", "NAME", "RULE_TOKEN_SET"),
+    ]
+
+
 def test_five_author_publication_with_one_ictu_match_does_not_mass_generate(
     client, as_role, db_session, monkeypatch, tmp_path
 ) -> None:

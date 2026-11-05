@@ -18,6 +18,10 @@ RuleId = Literal[
     "RULE_N2",
     "RULE_N2_FORMAT",
     "RULE_N2_HYPHEN",
+    # Lowest-priority name rule: the same words in any order ("Van A Nguyen" ~ "Nguyen Van A").
+    # Only proposes a pair that no order-preserving rule above found; still NAME-kind evidence, so
+    # nothing is confirmed automatically and D-2's NAME_EVIDENCE_ONLY reason requirement applies.
+    "RULE_TOKEN_SET",
     # Not emitted by CandidateGenerator.generate_all(): an ADMIN proposed this
     # pair by hand (see manual_candidate.py) because the name rules above
     # missed it — e.g. a given/middle name that folds to the same string as

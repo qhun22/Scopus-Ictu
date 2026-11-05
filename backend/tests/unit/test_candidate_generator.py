@@ -13,6 +13,7 @@ from app.services.matching.candidate_generator import (
     has_observed_title_prefix,
     normalize_comma_equivalence,
     normalize_name_n2,
+    normalize_token_set_equivalence,
     strip_observed_title_prefix,
 )
 
@@ -118,11 +119,71 @@ def test_hyphen_is_not_silently_normalized() -> None:
     assert run([lecturer_row], [scopus_author]) == ()
 
 
-def test_arbitrary_order_is_not_allowed() -> None:
+def test_title_prefixed_lecturer_is_not_matched_in_a_different_word_order() -> None:
+    # The word-order rule does not strip academic titles, so a prefixed name never matches it.
     lecturer_row = lecturer("TS. Nguyen Van A")
     scopus_author = author("Van A Nguyen")
 
     assert run([lecturer_row], [scopus_author]) == ()
+
+
+def test_same_words_in_a_different_order_are_proposed_only_by_the_token_set_rule() -> None:
+    lecturer_row = lecturer("Nguyen Van A")
+    scopus_author = author("Van A Nguyen")
+
+    results = run([lecturer_row], [scopus_author])
+
+    assert [(item.lecturer_id, item.scopus_author_id) for item in results] == [
+        (lecturer_row.id, scopus_author.id)
+    ]
+    assert rule_ids(results[0]) == {"RULE_TOKEN_SET"}
+
+
+def test_token_set_rule_folds_diacritics_comma_and_hyphen() -> None:
+    lecturer_row = lecturer("Nguyễn Đức Bình")
+    scopus_author = author("Binh, Nguyen-Duc")
+
+    results = run([lecturer_row], [scopus_author])
+
+    assert len(results) == 1
+    assert rule_ids(results[0]) == {"RULE_TOKEN_SET"}
+    assert normalize_token_set_equivalence("Nguyễn Đức Bình") == "binh duc nguyen"
+    assert normalize_token_set_equivalence("Binh, Nguyen-Duc") == "binh duc nguyen"
+
+
+def test_token_set_rule_does_not_match_different_words() -> None:
+    assert run([lecturer("Nguyen Van A")], [author("Van B Nguyen")]) == ()
+
+
+def test_token_set_rule_ignores_single_word_names() -> None:
+    assert normalize_token_set_equivalence("Nguyen") == ""
+    assert run([lecturer("Nguyen")], [author("Nguyen", "10000000001")]) != ()
+    only_token_set = run([lecturer("Nguyen")], [author("nguyen,", "10000000002")])
+    assert all("RULE_TOKEN_SET" not in rule_ids(item) for item in only_token_set)
+
+
+def test_token_set_rule_never_adds_evidence_to_a_pair_an_ordered_rule_found() -> None:
+    lecturer_row = lecturer("Nguyen Van A")
+    scopus_author = author("Nguyen Van A")
+    reordered = variant(scopus_author.id, "AUTHOR_DISPLAY", "A Van Nguyen")
+
+    results = run([lecturer_row], [scopus_author], [reordered])
+
+    assert len(results) == 1
+    assert rule_ids(results[0]) == {"RULE_EXACT_N0"}
+
+
+def test_token_set_rule_is_the_lowest_priority_rule() -> None:
+    from app.services.matching.candidate_generator import RULE_ORDER
+
+    assert RULE_ORDER[-1] == "RULE_TOKEN_SET"
+
+
+def test_token_set_candidates_are_deterministic() -> None:
+    lecturers = [lecturer("Tran Thi Mai"), lecturer("Le Van Hung")]
+    authors = [author("Mai Tran Thi", "10000000003"), author("Hung, Le Van", "10000000004")]
+
+    assert run(lecturers, authors) == run(lecturers, authors)
 
 
 def test_scopus_collision_preserves_two_author_candidates() -> None:

@@ -42,13 +42,13 @@ from app.services.matching.candidate_types import EnrichedLecturerScopusCandidat
 
 SOURCE_STATE_SCHEMA_VERSION = 1
 CANDIDATE_RULE_SET_ID = "M2.7A_CANDIDATE_GENERATOR"
-CANDIDATE_RULE_SET_VERSION = "M2.7A-2"
+CANDIDATE_RULE_SET_VERSION = "M2.7A-3"  # -3: adds RULE_TOKEN_SET (same words, any order)
 PUBLICATION_RULE_SET_ID = "M2.7A_PUBLICATION_ENRICHMENT"
 PUBLICATION_RULE_SET_VERSION = "M2.7A-5"
 GENERATION_RULE_SET_ID = "M2.7A_CANDIDATE_EVIDENCE"
-GENERATION_RULE_SET_VERSION = "M2.7A-2+M2.7A-5"
+GENERATION_RULE_SET_VERSION = "M2.7A-3+M2.7A-5"
 
-# G16: the generator executes every rule in RULE_ORDER (seven, including RULE_N2_HYPHEN), so
+# G16: the generator executes every rule in RULE_ORDER (eight, including RULE_TOKEN_SET), so
 # run metadata is derived from it instead of a hand-kept, shorter list.
 CANDIDATE_RULE_IDS = tuple(RULE_ORDER)
 PUBLICATION_RULE_IDS = (

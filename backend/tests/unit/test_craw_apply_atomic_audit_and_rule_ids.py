@@ -75,4 +75,4 @@ def test_audit_failure_rolls_back_the_data_and_records_a_failure(patched, tmp_pa
 
 
 def test_run_metadata_lists_every_rule_the_generator_executes():
-    assert tuple(CANDIDATE_RULE_IDS) == tuple(RULE_ORDER) and len(CANDIDATE_RULE_IDS) == 7
+    assert tuple(CANDIDATE_RULE_IDS) == tuple(RULE_ORDER) and len(CANDIDATE_RULE_IDS) == 8
