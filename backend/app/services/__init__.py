@@ -1,9 +1,4 @@
-"""Application business services — M0 scaffold.
+"""Application business services.
 
-Module boundaries only. No execution logic in M0.
+Services hold the business logic and query SQLAlchemy directly; endpoints stay thin.
 """
-
-from app.services.audit_service import AuditService
-from app.services.review_service import ReviewService
-
-__all__ = ["AuditService", "ReviewService"]
