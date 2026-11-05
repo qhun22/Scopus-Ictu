@@ -93,8 +93,8 @@ export default function AffiliationCoverageChart({ data, locale }: Props) {
         </div>
         <p className="mt-1 max-w-[260px] text-[11px] leading-relaxed text-slate-400">
           {locale === "vi"
-            ? `${fmt(positions_with_affiliation)}/${fmt(total_author_positions)} vị trí tác giả có thông tin đơn vị ở mức Đã xác minh định danh hoặc Đã đối chiếu — chưa phải xác nhận đơn vị công tác. Mẫu số là số vị trí tác giả trên các công bố, không phải số tác giả Scopus duy nhất.`
-            : `${fmt(positions_with_affiliation)}/${fmt(total_author_positions)} author positions have affiliation information at the Identity verified or Cross-checked level — not a confirmed employer. The denominator is author positions across publications, not unique Scopus authors.`}
+            ? `${fmt(positions_with_affiliation)}/${fmt(total_author_positions)} vị trí tác giả có thông tin đơn vị từ nguồn ngoài (mức Đã xác minh định danh hoặc Đã đối chiếu) hoặc do quản trị viên rà soát thủ công — chưa phải xác nhận đơn vị công tác. Mẫu số là số vị trí tác giả trên các công bố, không phải số tác giả Scopus duy nhất.`
+            : `${fmt(positions_with_affiliation)}/${fmt(total_author_positions)} author positions have affiliation information from an external source (Identity verified or Cross-checked level) or entered by an administrator after manual review — not a confirmed employer. The denominator is author positions across publications, not unique Scopus authors.`}
         </p>
         <div className="mt-1 border-t border-line pt-2" data-testid="aff-link-status-breakdown">
           <p className="mb-1 text-[11px] font-semibold text-slate-500">

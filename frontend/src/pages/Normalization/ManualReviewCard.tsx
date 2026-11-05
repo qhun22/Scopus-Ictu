@@ -1080,7 +1080,9 @@ export default function ManualReviewCard({ locale }: { locale: Locale }) {
                             title={`${r.source_system}: ${r.link_status}${r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}`}
                           >
                             {r.source_system}: <strong className="text-slate-800">{r.link_status}</strong>
-                            {r.unresolved_reason ? ` (${r.unresolved_reason})` : ""}
+                            {r.unresolved_reason
+                              ? ` (${GAP_REASON_FULL[r.unresolved_reason]?.[locale] ?? r.unresolved_reason})`
+                              : ""}
                           </span>
                           {(r.raw_affiliations ?? []).length > 0 ? (
                             <ul className="ml-1 list-disc space-y-0.5 pl-4 text-sm text-slate-700">

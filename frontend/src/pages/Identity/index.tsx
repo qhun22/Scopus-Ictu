@@ -28,6 +28,21 @@ const viCopy = {
   notLinked: "Tài khoản chưa được liên kết với hồ sơ giảng viên.",
 };
 
+// The evidence and direction codes are stored in English; show the reader a plain label instead.
+const EVIDENCE_LABEL: Record<string, { vi: string; en: string }> = {
+  ORCID_EXACT: { vi: "Trùng ORCID", en: "ORCID match" },
+  DOI_EXACT: { vi: "Trùng DOI công bố", en: "Publication DOI match" },
+  PUBLICATION_OVERLAP: { vi: "Có công bố trùng", en: "Shared publications" },
+  COAUTHOR_CONFIRMED: { vi: "Đồng tác giả đã xác nhận", en: "Confirmed co-author" },
+  NAME_SIMILARITY: { vi: "Tên tương đồng", en: "Similar name" },
+  AFFILIATION_MATCH: { vi: "Trùng đơn vị công tác", en: "Affiliation match" },
+  APPROVED_ID: { vi: "Theo danh sách gộp chính thức của ICTU", en: "ICTU official merge guide" },
+};
+const DIRECTION_LABEL: Record<string, { vi: string; en: string }> = {
+  SUPPORTS: { vi: "Ủng hộ liên kết", en: "Supports the link" },
+  CONTRADICTS: { vi: "Không ủng hộ liên kết", en: "Contradicts the link" },
+};
+
 const enCopy = {
   title: "Scopus identity links",
   subtitle: "Approved Scopus identities associated with your profile.",
@@ -132,8 +147,8 @@ function IdentityCard({ identity, copy, locale }: { identity: ApprovedScopusIden
           <div className="mt-3 space-y-3">
             {identity.evidence.map((item, index) => (
               <dl key={`${item.evidence_type}-${item.created_at}-${index}`} className="grid gap-2 rounded-[5px] bg-slate-50 p-3 text-sm sm:grid-cols-3">
-                <div><dt className="text-xs text-slate-400">{copy.evidenceType}</dt><dd className="mt-1 font-medium text-slate-700">{item.evidence_type || fallback}</dd></div>
-                <div><dt className="text-xs text-slate-400">{copy.direction}</dt><dd className="mt-1 font-medium text-slate-700">{item.direction || fallback}</dd></div>
+                <div><dt className="text-xs text-slate-400">{copy.evidenceType}</dt><dd className="mt-1 font-medium text-slate-700">{(item.evidence_type && (EVIDENCE_LABEL[item.evidence_type]?.[locale === "vi" ? "vi" : "en"] ?? item.evidence_type)) || fallback}</dd></div>
+                <div><dt className="text-xs text-slate-400">{copy.direction}</dt><dd className="mt-1 font-medium text-slate-700">{(item.direction && (DIRECTION_LABEL[item.direction]?.[locale === "vi" ? "vi" : "en"] ?? item.direction)) || fallback}</dd></div>
                 <div><dt className="text-xs text-slate-400">{copy.recordedAt}</dt><dd className="mt-1 font-medium text-slate-700">{formatDate(item.created_at, locale)}</dd></div>
               </dl>
             ))}
