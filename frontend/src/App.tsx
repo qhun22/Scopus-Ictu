@@ -26,21 +26,6 @@ import SearchPage from "./pages/Search";
 import UsersPage from "./pages/Users";
 import PlaceholderPage from "./components/common/PlaceholderPage";
 
-function TasksPlaceholderPage() {
-  const { locale } = useI18n();
-  return (
-    <PlaceholderPage
-      title={locale === "vi" ? "Tác vụ hệ thống" : "System tasks"}
-      description={
-        locale === "vi"
-          ? "Chức năng đang phát triển. Trang này dành riêng cho quản lý tác vụ nền trong các phiên bản tương lai — chưa có bộ lập lịch hay công cụ thực thi nào được triển khai."
-          : "This feature is under development. This page is reserved for managing background tasks in a future release — no scheduler or execution tooling has been implemented yet."
-      }
-      icon="tasks"
-    />
-  );
-}
-
 function NotFoundPage() {
   const { locale } = useI18n();
   return (
@@ -113,7 +98,8 @@ export default function App() {
                 <Route path="/lecturers" element={<LecturersPage />} />
                 <Route path="/users" element={<UsersPage />} />
                 <Route path="/audit-logs" element={<AuditLogsPage />} />
-                <Route path="/tasks" element={<TasksPlaceholderPage />} />
+                {/* Trang tác vụ chưa phát triển: ẩn khỏi menu, link cũ chuyển về Dashboard. */}
+                <Route path="/tasks" element={<Navigate to="/dashboard" replace />} />
               </Route>
             </Route>
           </Route>

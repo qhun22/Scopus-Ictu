@@ -105,7 +105,6 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
       items: [
         { to: "/dashboard",     label: t.nav.dashboard,      icon: ICONS.dashboard },
         { to: "/audit-logs",    label: t.nav.auditLogs,      icon: ICONS.auditLogs },
-        { to: "/tasks",         label: t.nav.tasks,          icon: ICONS.tasks },
       ],
     },
   ];
