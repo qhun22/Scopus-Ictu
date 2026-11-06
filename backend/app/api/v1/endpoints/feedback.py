@@ -17,12 +17,16 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user, require_role
 from app.core.database import get_session
 from app.core.exceptions import APIError
-from app.models.feedback import FeedbackReport
+from app.models.feedback import FeedbackComment, FeedbackReport
 from app.models.governance import User
 from app.schemas.feedback_api import (
+    CreateFeedbackCommentRequest,
     CreateFeedbackReportRequest,
+    FeedbackCommentListResponse,
+    FeedbackCommentRead,
     FeedbackReportListResponse,
     FeedbackReportRead,
+    FeedbackUnreadResponse,
     ResolveFeedbackReportRequest,
 )
 from app.services import feedback_service
@@ -40,7 +44,9 @@ def _db_error(detail: str) -> APIError:
     )
 
 
-def _read(report: FeedbackReport, reporter: User | None) -> FeedbackReportRead:
+def _read(
+    report: FeedbackReport, reporter: User | None, comment_count: int = 0
+) -> FeedbackReportRead:
     return FeedbackReportRead(
         id=report.id,
         reporter_user_id=report.reporter_user_id,
@@ -54,7 +60,46 @@ def _read(report: FeedbackReport, reporter: User | None) -> FeedbackReportRead:
         resolved_at=report.resolved_at,
         created_at=report.created_at,
         updated_at=report.updated_at,
+        comment_count=comment_count,
     )
+
+
+def _comment_read(comment: FeedbackComment, author: User | None) -> FeedbackCommentRead:
+    return FeedbackCommentRead(
+        id=comment.id,
+        report_id=comment.report_id,
+        author_user_id=comment.author_user_id,
+        author_name=feedback_service.reporter_display_name(author),
+        is_staff_author=bool(author and author.role in feedback_service.STAFF_ROLES),
+        message=comment.message,
+        created_at=comment.created_at,
+    )
+
+
+@router.get(
+    "/unread",
+    response_model=FeedbackUnreadResponse,
+    summary="Whether the current user has unseen feedback activity (any logged-in role)",
+)
+def get_unread(current_user: CurrentUser, db: DatabaseSession) -> FeedbackUnreadResponse:
+    try:
+        unread = feedback_service.has_unread(db, current_user)
+    except SQLAlchemyError as exc:
+        raise _db_error("Không thể kiểm tra thông báo báo lỗi.") from exc
+    return FeedbackUnreadResponse(has_unread=unread)
+
+
+@router.post(
+    "/mark-seen",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Mark the feedback queue as seen by the current user (any logged-in role)",
+)
+def mark_seen(current_user: CurrentUser, db: DatabaseSession) -> None:
+    try:
+        feedback_service.mark_seen(db, current_user.id)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error("Không thể cập nhật trạng thái đã xem.") from exc
 
 
 @router.post(
@@ -105,15 +150,126 @@ def list_reports(
         reporters = {
             u.id: u for u in db.query(User).filter(User.id.in_(reporter_ids)).all()
         } if reporter_ids else {}
+        counts = feedback_service.comment_counts(db, [row.id for row in rows])
     except feedback_service.FeedbackError as exc:
         raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
     except SQLAlchemyError as exc:
         raise _db_error("Không thể tải danh sách báo cáo.") from exc
     return FeedbackReportListResponse(
-        items=[_read(row, reporters.get(row.reporter_user_id)) for row in rows],
+        items=[
+            _read(row, reporters.get(row.reporter_user_id), counts.get(row.id, 0))
+            for row in rows
+        ],
         total=total,
         open_count=open_count,
     )
+
+
+@router.get(
+    "/reports/mine",
+    response_model=FeedbackReportListResponse,
+    summary="List my own issue reports (any logged-in role)",
+)
+def list_my_reports(
+    current_user: CurrentUser,
+    db: DatabaseSession,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> FeedbackReportListResponse:
+    try:
+        rows, total, open_count = feedback_service.list_reports(
+            db,
+            status=status_filter,
+            reporter_user_id=current_user.id,
+            limit=limit,
+            offset=offset,
+        )
+        counts = feedback_service.comment_counts(db, [row.id for row in rows])
+    except feedback_service.FeedbackError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        raise _db_error("Không thể tải danh sách báo cáo của bạn.") from exc
+    return FeedbackReportListResponse(
+        items=[_read(row, current_user, counts.get(row.id, 0)) for row in rows],
+        total=total,
+        open_count=open_count,
+    )
+
+
+@router.get(
+    "/reports/{report_id}",
+    response_model=FeedbackReportRead,
+    summary="Get one issue report (the reporter, or ADMIN/REVIEWER)",
+)
+def get_report(
+    report_id: uuid.UUID, current_user: CurrentUser, db: DatabaseSession
+) -> FeedbackReportRead:
+    try:
+        report = feedback_service.get_report(db, report_id)
+        feedback_service.ensure_can_view_report(report, current_user)
+        reporter = (
+            current_user
+            if report.reporter_user_id == current_user.id
+            else db.get(User, report.reporter_user_id)
+        )
+        counts = feedback_service.comment_counts(db, [report.id])
+    except feedback_service.FeedbackError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        raise _db_error("Không thể tải báo cáo.") from exc
+    return _read(report, reporter, counts.get(report.id, 0))
+
+
+@router.get(
+    "/reports/{report_id}/comments",
+    response_model=FeedbackCommentListResponse,
+    summary="List the comment thread on a report (the reporter, or ADMIN/REVIEWER)",
+)
+def list_comments(
+    report_id: uuid.UUID, current_user: CurrentUser, db: DatabaseSession
+) -> FeedbackCommentListResponse:
+    try:
+        comments = feedback_service.list_comments(db, report_id, current_user)
+        author_ids = {c.author_user_id for c in comments}
+        authors = {
+            u.id: u for u in db.query(User).filter(User.id.in_(author_ids)).all()
+        } if author_ids else {}
+    except feedback_service.FeedbackError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        raise _db_error("Không thể tải nội dung trao đổi.") from exc
+    return FeedbackCommentListResponse(
+        items=[_comment_read(c, authors.get(c.author_user_id)) for c in comments]
+    )
+
+
+@router.post(
+    "/reports/{report_id}/comments",
+    response_model=FeedbackCommentRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Reply on a report's thread (the reporter, or ADMIN/REVIEWER)",
+)
+def add_comment(
+    report_id: uuid.UUID,
+    body: CreateFeedbackCommentRequest,
+    current_user: CurrentUser,
+    db: DatabaseSession,
+) -> FeedbackCommentRead:
+    try:
+        comment = feedback_service.add_comment(
+            db,
+            feedback_service.AddCommentCommand(
+                report_id=report_id, author=current_user, message=body.message
+            ),
+        )
+    except feedback_service.FeedbackError as exc:
+        db.rollback()
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error("Không thể gửi trao đổi.") from exc
+    return _comment_read(comment, current_user)
 
 
 @router.post(

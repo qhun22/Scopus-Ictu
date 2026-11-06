@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "../../components/ui/PageHeader";
 import Button from "../../components/ui/Button";
 import ModalPortal from "../../components/common/ModalPortal";
+import FeedbackThread from "../../components/feedback/FeedbackThread";
 import { useI18n } from "../../i18n";
 import { useToast } from "../../contexts/ToastContext";
+import { useFeedbackUnread } from "../../contexts/FeedbackUnreadContext";
 import {
   listFeedbackReports,
   resolveFeedbackReport,
@@ -33,6 +35,7 @@ function formatDate(iso: string): string {
 export default function FeedbackReportsPage() {
   const { t, locale } = useI18n();
   const toast = useToast();
+  const { markSeen } = useFeedbackUnread();
 
   const [items, setItems] = useState<FeedbackReport[]>([]);
   const [total, setTotal] = useState(0);
@@ -42,6 +45,7 @@ export default function FeedbackReportsPage() {
   const [target, setTarget] = useState<{ report: FeedbackReport; status: "RESOLVED" | "DISMISSED" } | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [threadFor, setThreadFor] = useState<FeedbackReport | null>(null);
 
   const categoryLabel = (c: FeedbackCategory): string =>
     c === "WRONG_AFFILIATION"
@@ -76,6 +80,11 @@ export default function FeedbackReportsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void markSeen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openResolveModal = (report: FeedbackReport, status: "RESOLVED" | "DISMISSED") => {
     setTarget({ report, status });
@@ -156,24 +165,34 @@ export default function FeedbackReportsPage() {
                         {t.feedback.adminNoteLabel}: {item.admin_note}
                       </p>
                     )}
+                    {item.comment_count > 0 && (
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {item.comment_count} {t.feedback.commentsCountSuffix}
+                      </p>
+                    )}
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <span className={statusBadgeClass(item.status)}>{statusLabel(item.status)}</span>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatDate(item.created_at)}</td>
                   <td className="px-3 py-2.5">
-                    {item.status === "OPEN" ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => openResolveModal(item, "DISMISSED")}>
-                          {t.feedback.dismissAction}
-                        </Button>
-                        <Button variant="primary" size="sm" onClick={() => openResolveModal(item, "RESOLVED")}>
-                          {t.feedback.resolveAction}
-                        </Button>
-                      </div>
-                    ) : (
-                      <p className="text-center text-xs text-slate-400">{item.resolved_at ? formatDate(item.resolved_at) : "—"}</p>
-                    )}
+                    <div className="flex flex-col items-center gap-2">
+                      <Button variant="tonal" size="sm" onClick={() => setThreadFor(item)}>
+                        {t.feedback.viewThreadAction}
+                      </Button>
+                      {item.status === "OPEN" ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <Button variant="secondary" size="sm" onClick={() => openResolveModal(item, "DISMISSED")}>
+                            {t.feedback.dismissAction}
+                          </Button>
+                          <Button variant="primary" size="sm" onClick={() => openResolveModal(item, "RESOLVED")}>
+                            {t.feedback.resolveAction}
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="text-center text-xs text-slate-400">{item.resolved_at ? formatDate(item.resolved_at) : "—"}</p>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -221,6 +240,18 @@ export default function FeedbackReportsPage() {
             </div>
           </div>
         </ModalPortal>
+      )}
+
+      {threadFor && (
+        <FeedbackThread
+          report={threadFor}
+          onClose={() => {
+            setThreadFor(null);
+            void load();
+          }}
+          categoryLabel={categoryLabel}
+          statusLabel={statusLabel}
+        />
       )}
     </div>
   );

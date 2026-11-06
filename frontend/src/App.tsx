@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { FeedbackUnreadProvider } from "./contexts/FeedbackUnreadContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { PageVisitProvider } from "./contexts/PageVisitContext";
 import { I18nProvider, useI18n } from "./i18n";
@@ -50,6 +51,7 @@ export default function App() {
       <ToastProvider>
         <AuthProvider>
           <NotificationProvider>
+          <FeedbackUnreadProvider>
             <PageVisitProvider>
             <>
             <Routes>
@@ -127,6 +129,7 @@ export default function App() {
             </button>
             </>
             </PageVisitProvider>
+          </FeedbackUnreadProvider>
           </NotificationProvider>
         </AuthProvider>
       </ToastProvider>

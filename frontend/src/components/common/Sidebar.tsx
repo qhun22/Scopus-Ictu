@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useFeedbackUnread } from "../../contexts/FeedbackUnreadContext";
 import { useI18n } from "../../i18n";
 
 interface SidebarProps {
@@ -13,6 +14,7 @@ interface NavItem {
   to: string;
   label: string;
   badge?: string;
+  dot?: boolean;
   icon: (active: boolean) => React.ReactNode;
 }
 
@@ -72,6 +74,7 @@ function GroupHeading({ label, collapsed }: { label: string; collapsed: boolean 
 
 export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: SidebarProps) {
   const { user } = useAuth();
+  const { hasUnread: feedbackUnread } = useFeedbackUnread();
   const { t } = useI18n();
   const [logoSrc, setLogoSrc] = useState("/assets/ictu.png");
 
@@ -112,7 +115,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
     {
       heading: t.nav.groupHelp,
       items: [
-        { to: "/feedback-reports", label: t.nav.feedback, icon: ICONS.feedback },
+        { to: "/feedback-reports", label: t.nav.feedback, dot: feedbackUnread, icon: ICONS.feedback },
         { to: "/guide", label: t.nav.guide, icon: ICONS.guide },
       ],
     },
@@ -140,7 +143,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
     {
       heading: t.nav.groupHelp,
       items: [
-        { to: "/feedback-reports", label: t.nav.feedback, icon: ICONS.feedback },
+        { to: "/feedback-reports", label: t.nav.feedback, dot: feedbackUnread, icon: ICONS.feedback },
         { to: "/guide", label: t.nav.guide, icon: ICONS.guide },
       ],
     },
@@ -168,7 +171,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
     {
       heading: t.nav.groupHelp,
       items: [
-        { to: "/report-issue", label: t.nav.feedback, icon: ICONS.feedback },
+        { to: "/report-issue", label: t.nav.feedback, dot: feedbackUnread, icon: ICONS.feedback },
         { to: "/guide", label: t.nav.guide, icon: ICONS.guide },
       ],
     },
@@ -198,9 +201,20 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
           {isActive && (
             <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r bg-[#3A5FC3]" />
           )}
-          {item.icon(isActive)}
+          <span className="relative inline-flex flex-shrink-0">
+            {item.icon(isActive)}
+            {item.dot && (
+              <span
+                className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"
+                aria-label="Có cập nhật mới"
+              />
+            )}
+          </span>
           {(!isCollapsed || isMobile) && (
             <span className="flex-1 truncate">{item.label}</span>
+          )}
+          {item.dot && (!isCollapsed || isMobile) && (
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" aria-hidden="true" />
           )}
         </>
       )}

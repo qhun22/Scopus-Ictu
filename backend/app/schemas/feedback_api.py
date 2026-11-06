@@ -36,9 +36,34 @@ class FeedbackReportRead(BaseModel):
     resolved_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    comment_count: int = 0
 
 
 class FeedbackReportListResponse(BaseModel):
     items: list[FeedbackReportRead]
     total: int
     open_count: int
+
+
+class CreateFeedbackCommentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=4000)
+
+
+class FeedbackCommentRead(BaseModel):
+    id: uuid.UUID
+    report_id: uuid.UUID
+    author_user_id: uuid.UUID
+    author_name: str
+    is_staff_author: bool
+    message: str
+    created_at: datetime
+
+
+class FeedbackCommentListResponse(BaseModel):
+    items: list[FeedbackCommentRead]
+
+
+class FeedbackUnreadResponse(BaseModel):
+    has_unread: bool

@@ -161,6 +161,124 @@ def test_admin_lists_and_resolves_a_report(client, as_role) -> None:
     assert again.json()["total"] == 0
 
 
+def test_reporter_can_list_own_reports_and_see_comment_count(client, as_role) -> None:
+    lecturer = as_role("LECTURER")
+    created = client.post(
+        "/api/v1/feedback/reports",
+        json={"category": "OTHER", "message": "Thiếu dữ liệu đơn vị."},
+    )
+    report_id = created.json()["id"]
+
+    mine = client.get("/api/v1/feedback/reports/mine")
+    assert mine.status_code == 200
+    body = mine.json()
+    assert body["total"] == 1
+    assert body["items"][0]["id"] == report_id
+    assert body["items"][0]["comment_count"] == 0
+
+    admin = as_role("ADMIN")
+    reply = client.post(
+        f"/api/v1/feedback/reports/{report_id}/comments",
+        json={"message": "Bạn cho mình xin mã EID của công bố được không?"},
+    )
+    assert reply.status_code == 201, reply.text
+    assert reply.json()["is_staff_author"] is True
+    assert reply.json()["author_name"] == admin.display_name
+
+    app.dependency_overrides[get_current_user] = lambda: lecturer
+    mine_again = client.get("/api/v1/feedback/reports/mine")
+    assert mine_again.json()["items"][0]["comment_count"] == 1
+
+
+def test_reporter_can_reply_on_own_thread_but_not_others(client, as_role, db_session) -> None:
+    as_role("LECTURER")
+    created = client.post(
+        "/api/v1/feedback/reports", json={"category": "OTHER", "message": "x"}
+    )
+    report_id = created.json()["id"]
+
+    own_reply = client.post(
+        f"/api/v1/feedback/reports/{report_id}/comments",
+        json={"message": "Bổ sung: EID là 2-s2.0-105036738437."},
+    )
+    assert own_reply.status_code == 201, own_reply.text
+
+    thread = client.get(f"/api/v1/feedback/reports/{report_id}/comments")
+    assert thread.status_code == 200
+    assert len(thread.json()["items"]) == 1
+    assert thread.json()["items"][0]["is_staff_author"] is False
+
+    other_lecturer = _user("LECTURER")
+    db_session.add(other_lecturer)
+    db_session.commit()
+    app.dependency_overrides[get_current_user] = lambda: other_lecturer
+    forbidden = client.get(f"/api/v1/feedback/reports/{report_id}/comments")
+    assert forbidden.status_code == 403
+    forbidden_reply = client.post(
+        f"/api/v1/feedback/reports/{report_id}/comments", json={"message": "x"}
+    )
+    assert forbidden_reply.status_code == 403
+
+
+def test_staff_can_view_and_reply_on_any_report(client, as_role) -> None:
+    as_role("LECTURER")
+    created = client.post(
+        "/api/v1/feedback/reports", json={"category": "OTHER", "message": "x"}
+    )
+    report_id = created.json()["id"]
+
+    reviewer = as_role("REVIEWER")
+    detail = client.get(f"/api/v1/feedback/reports/{report_id}")
+    assert detail.status_code == 200
+    assert detail.json()["id"] == report_id
+
+    reply = client.post(
+        f"/api/v1/feedback/reports/{report_id}/comments",
+        json={"message": "Đã kiểm tra, sẽ cập nhật đơn vị."},
+    )
+    assert reply.status_code == 201
+    assert reply.json()["author_name"] == reviewer.display_name
+
+
+def test_unread_flows_for_reporter_and_staff(client, as_role) -> None:
+    lecturer = as_role("LECTURER")
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is False
+
+    created = client.post(
+        "/api/v1/feedback/reports", json={"category": "OTHER", "message": "x"}
+    )
+    report_id = created.json()["id"]
+    # Filing your own report never counts as "unread" for you.
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is False
+
+    admin = as_role("ADMIN")
+    # A brand-new report is unread for staff until they mark it seen.
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is True
+    assert client.post("/api/v1/feedback/mark-seen").status_code == 204
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is False
+
+    client.post(
+        f"/api/v1/feedback/reports/{report_id}/comments",
+        json={"message": "Bạn cho mình thêm thông tin được không?"},
+    )
+    # Staff's own reply does not mark themselves unread.
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is False
+
+    app.dependency_overrides[get_current_user] = lambda: lecturer
+    # The reporter now has an unread staff reply.
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is True
+    client.post(
+        f"/api/v1/feedback/reports/{report_id}/comments",
+        json={"message": "Mã EID là 2-s2.0-105036738437."},
+    )
+    assert client.post("/api/v1/feedback/mark-seen").status_code == 204
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is False
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    # Staff now has an unread reply from the (non-staff) reporter.
+    assert client.get("/api/v1/feedback/unread").json()["has_unread"] is True
+
+
 def test_resolving_an_already_closed_report_is_refused(client, as_role) -> None:
     as_role("LECTURER")
     created = client.post(

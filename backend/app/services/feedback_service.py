@@ -17,11 +17,22 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models.feedback import FEEDBACK_CATEGORY_VALUES, FEEDBACK_STATUS_VALUES, FeedbackReport
+from app.models.feedback import (
+    FEEDBACK_CATEGORY_VALUES,
+    FEEDBACK_STATUS_VALUES,
+    FeedbackComment,
+    FeedbackReadState,
+    FeedbackReport,
+)
 from app.models.governance import AuditEvent, User
+
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+STAFF_ROLES = ("ADMIN", "REVIEWER")
 
 CREATED_ACTION = "FEEDBACK_REPORT_CREATED"
 RESOLVED_ACTION = "FEEDBACK_REPORT_RESOLVED"
+COMMENT_ADDED_ACTION = "FEEDBACK_COMMENT_ADDED"
 
 
 class FeedbackError(Exception):
@@ -44,6 +55,13 @@ class ResolveReportCommand:
     actor_user_id: uuid.UUID
     status: str
     admin_note: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class AddCommentCommand:
+    report_id: uuid.UUID
+    author: User
+    message: str
 
 
 def create_report(db: Session, cmd: CreateReportCommand) -> FeedbackReport:
@@ -81,22 +99,57 @@ def create_report(db: Session, cmd: CreateReportCommand) -> FeedbackReport:
 
 
 def list_reports(
-    db: Session, *, status: str | None = None, limit: int = 100, offset: int = 0
+    db: Session,
+    *,
+    status: str | None = None,
+    reporter_user_id: uuid.UUID | None = None,
+    limit: int = 100,
+    offset: int = 0,
 ) -> tuple[list[FeedbackReport], int, int]:
     query = select(FeedbackReport)
+    open_query = select(func.count()).select_from(FeedbackReport).where(
+        FeedbackReport.status == "OPEN"
+    )
+    if reporter_user_id is not None:
+        query = query.where(FeedbackReport.reporter_user_id == reporter_user_id)
+        open_query = open_query.where(FeedbackReport.reporter_user_id == reporter_user_id)
     if status is not None:
         if status not in FEEDBACK_STATUS_VALUES:
             allowed = ", ".join(FEEDBACK_STATUS_VALUES)
             raise FeedbackError("INVALID_STATUS", f"Trạng thái phải là một trong: {allowed}.")
         query = query.where(FeedbackReport.status == status)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
-    open_count = db.scalar(
-        select(func.count()).select_from(FeedbackReport).where(FeedbackReport.status == "OPEN")
-    ) or 0
+    open_count = db.scalar(open_query) or 0
     rows = db.scalars(
         query.order_by(FeedbackReport.created_at.desc()).limit(limit).offset(offset)
     ).all()
     return list(rows), int(total), int(open_count)
+
+
+def get_report(db: Session, report_id: uuid.UUID) -> FeedbackReport:
+    report = db.get(FeedbackReport, report_id)
+    if report is None:
+        raise FeedbackError("REPORT_NOT_FOUND", "Không tìm thấy báo cáo này.", status_code=404)
+    return report
+
+
+def ensure_can_view_report(report: FeedbackReport, viewer: User) -> None:
+    if viewer.role in STAFF_ROLES or viewer.id == report.reporter_user_id:
+        return
+    raise FeedbackError(
+        "REPORT_ACCESS_DENIED", "Bạn không có quyền xem báo cáo này.", status_code=403
+    )
+
+
+def comment_counts(db: Session, report_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    if not report_ids:
+        return {}
+    rows = db.execute(
+        select(FeedbackComment.report_id, func.count())
+        .where(FeedbackComment.report_id.in_(report_ids))
+        .group_by(FeedbackComment.report_id)
+    ).all()
+    return {row[0]: int(row[1]) for row in rows}
 
 
 def resolve_report(db: Session, cmd: ResolveReportCommand) -> FeedbackReport:
@@ -126,6 +179,90 @@ def resolve_report(db: Session, cmd: ResolveReportCommand) -> FeedbackReport:
     db.commit()
     db.refresh(report)
     return report
+
+
+def add_comment(db: Session, cmd: AddCommentCommand) -> FeedbackComment:
+    report = get_report(db, cmd.report_id)
+    ensure_can_view_report(report, cmd.author)
+    if not cmd.message.strip():
+        raise FeedbackError("MESSAGE_REQUIRED", "Cần nhập nội dung trao đổi.")
+    comment = FeedbackComment(
+        id=uuid.uuid4(),
+        report_id=report.id,
+        author_user_id=cmd.author.id,
+        message=cmd.message.strip(),
+    )
+    db.add(comment)
+    db.flush()
+    db.add(
+        AuditEvent(
+            entity_type="feedback_report",
+            entity_id=report.id,
+            action=COMMENT_ADDED_ACTION,
+            actor_type="USER",
+            actor_user_id=cmd.author.id,
+            event_metadata={"comment_id": str(comment.id)},
+        )
+    )
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def list_comments(db: Session, report_id: uuid.UUID, viewer: User) -> list[FeedbackComment]:
+    report = get_report(db, report_id)
+    ensure_can_view_report(report, viewer)
+    rows = db.scalars(
+        select(FeedbackComment)
+        .where(FeedbackComment.report_id == report_id)
+        .order_by(FeedbackComment.created_at.asc())
+    ).all()
+    return list(rows)
+
+
+def mark_seen(db: Session, user_id: uuid.UUID) -> None:
+    now = datetime.now(UTC)
+    state = db.get(FeedbackReadState, user_id)
+    if state is None:
+        db.add(FeedbackReadState(user_id=user_id, last_seen_at=now))
+    else:
+        state.last_seen_at = now
+    db.commit()
+
+
+def has_unread(db: Session, user: User) -> bool:
+    state = db.get(FeedbackReadState, user.id)
+    since = state.last_seen_at if state is not None else EPOCH
+
+    if user.role in STAFF_ROLES:
+        # Staff cares about every report: a brand-new one, or a reply from
+        # the (non-staff) reporter who filed it.
+        new_report = db.scalar(
+            select(FeedbackReport.id).where(FeedbackReport.created_at > since).limit(1)
+        )
+        if new_report is not None:
+            return True
+        reporter_reply = db.scalar(
+            select(FeedbackComment.id)
+            .join(User, User.id == FeedbackComment.author_user_id)
+            .where(FeedbackComment.created_at > since, User.role.notin_(STAFF_ROLES))
+            .limit(1)
+        )
+        return reporter_reply is not None
+
+    # A reporter only cares about staff replying on a report they filed.
+    staff_reply = db.scalar(
+        select(FeedbackComment.id)
+        .join(FeedbackReport, FeedbackReport.id == FeedbackComment.report_id)
+        .join(User, User.id == FeedbackComment.author_user_id)
+        .where(
+            FeedbackReport.reporter_user_id == user.id,
+            FeedbackComment.created_at > since,
+            User.role.in_(STAFF_ROLES),
+        )
+        .limit(1)
+    )
+    return staff_reply is not None
 
 
 def reporter_display_name(user: User | None) -> str:

@@ -75,4 +75,62 @@ class FeedbackReport(Base):
     )
 
 
-__all__ = ["FEEDBACK_CATEGORY_VALUES", "FEEDBACK_STATUS_VALUES", "FeedbackReport"]
+class FeedbackComment(Base):
+    """One message in the back-and-forth on a report, written by either the
+    original reporter or an ADMIN/REVIEWER. Purely conversational -- like the
+    report itself, a comment never changes publication/affiliation/identity
+    data; it only lets the two sides ask/answer "what did you mean" before a
+    staff member resolves or dismisses the report.
+    """
+
+    __tablename__ = "feedback_comments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("feedback_reports.id", ondelete="CASCADE", name="fk_feedback_comment_report"),
+        nullable=False,
+    )
+    author_user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="RESTRICT", name="fk_feedback_comment_author"),
+        nullable=False,
+    )
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    __table_args__ = (
+        CheckConstraint("btrim(message) <> ''", name="message_not_blank"),
+        Index("ix_feedback_comment_report_created_at", "report_id", "created_at"),
+    )
+
+
+class FeedbackReadState(Base):
+    """When a user last looked at the feedback intake queue (one row per
+    user, upserted). Used only to decide whether to show an unread
+    indicator -- it is not a record of what they actually read.
+    """
+
+    __tablename__ = "feedback_read_states"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE", name="fk_feedback_read_state_user"),
+        primary_key=True,
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+__all__ = [
+    "FEEDBACK_CATEGORY_VALUES",
+    "FEEDBACK_STATUS_VALUES",
+    "FeedbackComment",
+    "FeedbackReadState",
+    "FeedbackReport",
+]

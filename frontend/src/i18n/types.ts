@@ -810,5 +810,18 @@ export interface TranslationSchema {
     resolveModalCancel: string;
     adminNoteLabel: string;
     resolvedByLabel: string;
+    myReportsTitle: string;
+    myReportsSubtitle: string;
+    myReportsEmpty: string;
+    viewThreadAction: string;
+    threadTitle: string;
+    threadEmpty: string;
+    commentPlaceholder: string;
+    commentSend: string;
+    commentSending: string;
+    commentRequired: string;
+    youLabel: string;
+    staffReplyLabel: string;
+    commentsCountSuffix: string;
   };
 }
