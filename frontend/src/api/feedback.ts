@@ -17,6 +17,7 @@ export interface FeedbackReport {
   created_at: string;
   updated_at: string;
   comment_count: number;
+  has_unread: boolean;
 }
 
 export interface FeedbackReportListResponse {
@@ -113,6 +114,17 @@ export function getFeedbackUnread(
 
 export function markFeedbackSeen(options: ApiRequestOptions = {}): Promise<void> {
   return apiPost<void>("/api/v1/feedback/mark-seen", {}, options);
+}
+
+export function markFeedbackReportSeen(
+  reportId: string,
+  options: ApiRequestOptions = {},
+): Promise<void> {
+  return apiPost<void>(
+    `/api/v1/feedback/reports/${encodeURIComponent(reportId)}/mark-seen`,
+    {},
+    options,
+  );
 }
 
 export function addFeedbackComment(

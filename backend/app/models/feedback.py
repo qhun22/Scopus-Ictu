@@ -127,10 +127,37 @@ class FeedbackReadState(Base):
     )
 
 
+class FeedbackReportSeen(Base):
+    """When a user last opened one specific report's thread (one row per
+    user+report, upserted). Separate from ``FeedbackReadState``: that one
+    only drives the single global "Bao loi" nav dot, this one lets the UI
+    point out *which* report has new activity.
+    """
+
+    __tablename__ = "feedback_report_seen"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE", name="fk_feedback_report_seen_user_id"),
+        primary_key=True,
+    )
+    report_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "feedback_reports.id", ondelete="CASCADE", name="fk_feedback_report_seen_report_id"
+        ),
+        primary_key=True,
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
 __all__ = [
     "FEEDBACK_CATEGORY_VALUES",
     "FEEDBACK_STATUS_VALUES",
     "FeedbackComment",
     "FeedbackReadState",
     "FeedbackReport",
+    "FeedbackReportSeen",
 ]

@@ -771,8 +771,8 @@ export interface TranslationSchema {
   feedback: {
     navLabel: string;
     pageTitle: string;
-    pageSubtitle: string;
     categoryLabel: string;
+    categoryAll: string;
     categoryWrongAffiliation: string;
     categoryWrongAuthorLink: string;
     categoryOther: string;
@@ -787,7 +787,7 @@ export interface TranslationSchema {
     messageRequired: string;
     categoryRequired: string;
     adminPageTitle: string;
-    adminPageSubtitle: string;
+    searchPlaceholder: string;
     statusAll: string;
     statusOpen: string;
     statusResolved: string;
@@ -810,18 +810,16 @@ export interface TranslationSchema {
     resolveModalCancel: string;
     adminNoteLabel: string;
     resolvedByLabel: string;
-    myReportsTitle: string;
-    myReportsSubtitle: string;
     myReportsEmpty: string;
-    viewThreadAction: string;
+    myReportsSearchPlaceholder: string;
     threadTitle: string;
     threadEmpty: string;
     commentPlaceholder: string;
     commentSend: string;
     commentSending: string;
     commentRequired: string;
-    youLabel: string;
-    staffReplyLabel: string;
+    commentClosedResolved: string;
+    commentClosedDismissed: string;
     commentsCountSuffix: string;
   };
 }

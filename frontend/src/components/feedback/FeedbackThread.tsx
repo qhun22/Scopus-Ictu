@@ -8,6 +8,7 @@ import {
   addFeedbackComment,
   getFeedbackReport,
   listFeedbackComments,
+  markFeedbackReportSeen,
   type FeedbackCategory,
   type FeedbackComment,
   type FeedbackReport,
@@ -17,18 +18,11 @@ import { ApiError } from "../../api/client";
 
 const POLL_INTERVAL_MS = 3000;
 
-const openBadgeClassName =
-  "inline-flex h-badge shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-amber-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-amber-700";
-const resolvedBadgeClassName =
-  "inline-flex h-badge shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-emerald-400 bg-white px-2.5 text-center text-xs font-bold leading-none text-emerald-700";
-const basicBadgeClassName =
-  "inline-flex h-badge shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-200 bg-white px-2.5 text-center text-xs font-bold leading-none text-slate-700";
-
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("vi-VN", {
-      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
-    });
+    const d = new Date(iso);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
   } catch {
     return iso;
   }
@@ -43,18 +37,20 @@ export interface FeedbackThreadProps {
 }
 
 export default function FeedbackThread({
-  report, onClose, categoryLabel, statusLabel, footer,
+  report, onClose, categoryLabel, footer,
 }: FeedbackThreadProps) {
   const { t } = useI18n();
   const { user } = useAuth();
   const toast = useToast();
 
   const [comments, setComments] = useState<FeedbackComment[]>([]);
-  const [liveStatus, setLiveStatus] = useState<FeedbackStatus>(report.status);
+  const [currentStatus, setCurrentStatus] = useState<FeedbackStatus>(report.status);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const isClosed = currentStatus === "RESOLVED" || currentStatus === "DISMISSED";
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -64,7 +60,7 @@ export default function FeedbackThread({
         getFeedbackReport(report.id),
       ]);
       setComments(commentsRes.items);
-      setLiveStatus(reportRes.status);
+      setCurrentStatus(reportRes.status);
     } catch {
       if (!silent) toast.error(t.feedback.threadTitle, t.common.noData);
     } finally {
@@ -76,6 +72,13 @@ export default function FeedbackThread({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Clears this report's own unread dot in the list — separate from the
+  // global "has new feedback somewhere" marker, which the list page clears
+  // just by being visited.
+  useEffect(() => {
+    void markFeedbackReportSeen(report.id);
+  }, [report.id]);
 
   // Poll while the thread is open so a reply from the other side (admin and
   // reporter are typically two different logged-in sessions) shows up without
@@ -90,6 +93,7 @@ export default function FeedbackThread({
   }, [comments]);
 
   const send = async () => {
+    if (isClosed) return;
     if (!draft.trim()) {
       toast.error(t.feedback.threadTitle, t.feedback.commentRequired);
       return;
@@ -107,37 +111,31 @@ export default function FeedbackThread({
     }
   };
 
-  const statusBadgeClass =
-    liveStatus === "OPEN" ? openBadgeClassName
-      : liveStatus === "RESOLVED" ? resolvedBadgeClassName
-        : basicBadgeClassName;
-
   return (
     <ModalPortal>
       <div
-        className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
+        className="fixed inset-x-0 top-16 bottom-0 md:left-[var(--app-sidebar-w)] z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 modal-backdrop-in transition-[left] duration-200 ease-out"
         onClick={onClose}
       >
         <div
-          className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-card border border-slate-200 bg-white shadow-2xl modal-panel-in"
+          className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-blue-100 bg-blue-50 px-5 py-4">
             <div>
-              <h2 className="text-base font-bold text-slate-900">{t.feedback.threadTitle}</h2>
-              <p className="mt-0.5 text-xs text-slate-500">{categoryLabel(report.category)}</p>
+              <h2 className="text-base font-bold text-[#2f4ea6] sm:text-lg">{t.feedback.threadTitle}</h2>
+              <p className="mt-0.5 text-sm text-[#3A5FC3]">{categoryLabel(report.category)}</p>
             </div>
-            <span className={statusBadgeClass}>{statusLabel(liveStatus)}</span>
           </div>
 
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
             <div className="rounded-[5px] border border-slate-100 bg-slate-50/70 px-3 py-2.5 text-sm text-slate-700">
-              <p className="mb-1 text-xs font-bold text-slate-500">
+              <p className="mb-1 text-sm font-bold text-slate-500">
                 {report.reporter_name} · {formatDateTime(report.created_at)}
               </p>
               <p className="whitespace-pre-wrap break-words">{report.message}</p>
               {report.publication_eid && (
-                <p className="mt-1.5 font-mono text-xs text-slate-400">{report.publication_eid}</p>
+                <p className="mt-1.5 font-mono text-sm text-slate-400">{report.publication_eid}</p>
               )}
             </div>
 
@@ -146,7 +144,7 @@ export default function FeedbackThread({
                 <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
               </div>
             ) : comments.length === 0 ? (
-              <p className="py-4 text-center text-xs text-slate-400">{t.feedback.threadEmpty}</p>
+              <p className="py-4 text-center text-sm text-slate-400">{t.feedback.threadEmpty}</p>
             ) : (
               comments.map((c) => {
                 const mine = user?.id === c.author_user_id;
@@ -156,18 +154,10 @@ export default function FeedbackThread({
                       className={`max-w-[85%] rounded-[5px] px-3 py-2 text-sm shadow-sm ${
                         mine
                           ? "bg-[#3A5FC3] text-white"
-                          : c.is_staff_author
-                            ? "border border-emerald-200 bg-emerald-50 text-slate-800"
-                            : "border border-slate-300 bg-slate-100 text-slate-800"
+                          : "border border-blue-200 bg-blue-50 text-slate-800"
                       }`}
                     >
-                      <p className={`mb-0.5 text-[11px] font-bold ${mine ? "text-white/80" : "text-slate-500"}`}>
-                        {mine ? t.feedback.youLabel : c.is_staff_author ? t.feedback.staffReplyLabel : c.author_name}
-                      </p>
                       <p className="whitespace-pre-wrap break-words">{c.message}</p>
-                      <p className={`mt-1 text-[10px] ${mine ? "text-white/70" : "text-slate-400"}`}>
-                        {formatDateTime(c.created_at)}
-                      </p>
                     </div>
                   </div>
                 );
@@ -175,30 +165,37 @@ export default function FeedbackThread({
             )}
           </div>
 
-          <div className="space-y-2 border-t border-slate-100 px-5 py-3">
-            <div className="flex items-end gap-2">
-              <textarea
-                className="min-h-16 flex-1 resize-y rounded-[5px] border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-1 focus:ring-[#3A5FC3]"
-                placeholder={t.feedback.commentPlaceholder}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                maxLength={4000}
-              />
-              <Button variant="primary" onClick={() => void send()} loading={sending}>
-                {sending ? t.feedback.commentSending : t.feedback.commentSend}
-              </Button>
-            </div>
+          <div className="shrink-0 space-y-2 border-t border-slate-100 px-5 py-3">
+            <textarea
+              className="min-h-16 w-full resize-y rounded-[5px] border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-[#3A5FC3] focus:outline-none focus:ring-1 focus:ring-[#3A5FC3] disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+              placeholder={
+                currentStatus === "RESOLVED"
+                  ? t.feedback.commentClosedResolved
+                  : currentStatus === "DISMISSED"
+                    ? t.feedback.commentClosedDismissed
+                    : t.feedback.commentPlaceholder
+              }
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send();
+                }
+              }}
+              maxLength={4000}
+              disabled={isClosed}
+            />
             <div className="flex items-center justify-between gap-2">
               <div>{footer}</div>
-              <Button variant="secondary" size="sm" onClick={onClose}>
-                {t.common.close}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" className="font-bold" onClick={onClose}>
+                  {t.common.close}
+                </Button>
+                <Button variant="primary" onClick={() => void send()} loading={sending} disabled={isClosed}>
+                  {sending ? t.feedback.commentSending : t.feedback.commentSend}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

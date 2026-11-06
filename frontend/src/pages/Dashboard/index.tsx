@@ -289,36 +289,7 @@ export default function DashboardPage() {
 
             {charts && !chartsLoading && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                  {/* Publications by year */}
-                  <div>
-                    <h3 className="mb-1 text-sm font-semibold text-slate-700">
-                      {copy.publicationsByYearTitle}
-                    </h3>
-                    {charts.publications_by_year.length === 0 ? (
-                      <div className="flex h-64 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
-                        <p className="text-sm font-medium text-slate-500">
-                          {copy.publicationsByYearEmptyTitle}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {copy.publicationsByYearEmptySubtitle}
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <PublicationsByYearChart data={charts.publications_by_year} locale={locale} />
-                        {charts.publications_total_without_year > 0 && (
-                          <p className="mt-2 text-[11px] text-slate-400">
-                            {charts.publications_total_without_year.toLocaleString(
-                              locale === "vi" ? "vi-VN" : "en-US",
-                            )}{" "}
-                            {copy.publicationsWithoutYearNote}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-center">
                   {/* Document type breakdown */}
                   <div>
                     <h3 className="mb-1 text-sm font-semibold text-slate-700">
@@ -334,24 +305,53 @@ export default function DashboardPage() {
                       <DocumentTypeDonutChart data={charts.publications_by_document_type} locale={locale} />
                     )}
                   </div>
+
+                  {/* Affiliation coverage */}
+                  <div>
+                    <h3 className="mb-1 text-sm font-semibold text-slate-700">
+                      {copy.affiliationCoverageTitle}
+                    </h3>
+                    {charts.affiliation_coverage.total_author_positions === 0 ? (
+                      <div className="flex h-40 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
+                        <p className="text-sm font-medium text-slate-500">
+                          {copy.affiliationCoverageEmptyTitle}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {copy.affiliationCoverageEmptySubtitle}
+                        </p>
+                      </div>
+                    ) : (
+                      <AffiliationCoverageChart data={charts.affiliation_coverage} locale={locale} />
+                    )}
+                  </div>
                 </div>
 
-                {/* Affiliation coverage */}
+                {/* Publications by year */}
                 <div className="border-t border-gray-100 pt-5">
                   <h3 className="mb-1 text-sm font-semibold text-slate-700">
-                    {copy.affiliationCoverageTitle}
+                    {copy.publicationsByYearTitle}
                   </h3>
-                  {charts.affiliation_coverage.total_author_positions === 0 ? (
-                    <div className="flex h-40 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
+                  {charts.publications_by_year.length === 0 ? (
+                    <div className="flex h-64 flex-col items-center justify-center gap-1.5 rounded-[5px] border border-dashed border-slate-200 text-center">
                       <p className="text-sm font-medium text-slate-500">
-                        {copy.affiliationCoverageEmptyTitle}
+                        {copy.publicationsByYearEmptyTitle}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {copy.affiliationCoverageEmptySubtitle}
+                        {copy.publicationsByYearEmptySubtitle}
                       </p>
                     </div>
                   ) : (
-                    <AffiliationCoverageChart data={charts.affiliation_coverage} locale={locale} />
+                    <>
+                      <PublicationsByYearChart data={charts.publications_by_year} locale={locale} />
+                      {charts.publications_total_without_year > 0 && (
+                        <p className="mt-2 text-[11px] text-slate-400">
+                          {charts.publications_total_without_year.toLocaleString(
+                            locale === "vi" ? "vi-VN" : "en-US",
+                          )}{" "}
+                          {copy.publicationsWithoutYearNote}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

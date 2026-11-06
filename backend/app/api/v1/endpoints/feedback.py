@@ -45,7 +45,10 @@ def _db_error(detail: str) -> APIError:
 
 
 def _read(
-    report: FeedbackReport, reporter: User | None, comment_count: int = 0
+    report: FeedbackReport,
+    reporter: User | None,
+    comment_count: int = 0,
+    has_unread: bool = False,
 ) -> FeedbackReportRead:
     return FeedbackReportRead(
         id=report.id,
@@ -61,6 +64,7 @@ def _read(
         created_at=report.created_at,
         updated_at=report.updated_at,
         comment_count=comment_count,
+        has_unread=has_unread,
     )
 
 
@@ -97,6 +101,25 @@ def get_unread(current_user: CurrentUser, db: DatabaseSession) -> FeedbackUnread
 def mark_seen(current_user: CurrentUser, db: DatabaseSession) -> None:
     try:
         feedback_service.mark_seen(db, current_user.id)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise _db_error("Không thể cập nhật trạng thái đã xem.") from exc
+
+
+@router.post(
+    "/reports/{report_id}/mark-seen",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Mark one report's thread as seen (the reporter, or ADMIN/REVIEWER)",
+)
+def mark_report_seen(
+    report_id: uuid.UUID, current_user: CurrentUser, db: DatabaseSession
+) -> None:
+    try:
+        report = feedback_service.get_report(db, report_id)
+        feedback_service.ensure_can_view_report(report, current_user)
+        feedback_service.mark_report_seen(db, current_user.id, report_id)
+    except feedback_service.FeedbackError as exc:
+        raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
     except SQLAlchemyError as exc:
         db.rollback()
         raise _db_error("Không thể cập nhật trạng thái đã xem.") from exc
@@ -151,13 +174,19 @@ def list_reports(
             u.id: u for u in db.query(User).filter(User.id.in_(reporter_ids)).all()
         } if reporter_ids else {}
         counts = feedback_service.comment_counts(db, [row.id for row in rows])
+        unread_ids = feedback_service.unread_report_ids(db, [row.id for row in rows], _staff)
     except feedback_service.FeedbackError as exc:
         raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
     except SQLAlchemyError as exc:
         raise _db_error("Không thể tải danh sách báo cáo.") from exc
     return FeedbackReportListResponse(
         items=[
-            _read(row, reporters.get(row.reporter_user_id), counts.get(row.id, 0))
+            _read(
+                row,
+                reporters.get(row.reporter_user_id),
+                counts.get(row.id, 0),
+                row.id in unread_ids,
+            )
             for row in rows
         ],
         total=total,
@@ -186,12 +215,16 @@ def list_my_reports(
             offset=offset,
         )
         counts = feedback_service.comment_counts(db, [row.id for row in rows])
+        unread_ids = feedback_service.unread_report_ids(db, [row.id for row in rows], current_user)
     except feedback_service.FeedbackError as exc:
         raise APIError(status_code=exc.status_code, detail=exc.message, code=exc.code) from exc
     except SQLAlchemyError as exc:
         raise _db_error("Không thể tải danh sách báo cáo của bạn.") from exc
     return FeedbackReportListResponse(
-        items=[_read(row, current_user, counts.get(row.id, 0)) for row in rows],
+        items=[
+            _read(row, current_user, counts.get(row.id, 0), row.id in unread_ids)
+            for row in rows
+        ],
         total=total,
         open_count=open_count,
     )

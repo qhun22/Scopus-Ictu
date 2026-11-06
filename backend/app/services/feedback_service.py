@@ -23,6 +23,7 @@ from app.models.feedback import (
     FeedbackComment,
     FeedbackReadState,
     FeedbackReport,
+    FeedbackReportSeen,
 )
 from app.models.governance import AuditEvent, User
 
@@ -150,6 +151,69 @@ def comment_counts(db: Session, report_ids: list[uuid.UUID]) -> dict[uuid.UUID, 
         .group_by(FeedbackComment.report_id)
     ).all()
     return {row[0]: int(row[1]) for row in rows}
+
+
+def mark_report_seen(db: Session, user_id: uuid.UUID, report_id: uuid.UUID) -> None:
+    now = datetime.now(UTC)
+    state = db.get(FeedbackReportSeen, (user_id, report_id))
+    if state is None:
+        db.add(FeedbackReportSeen(user_id=user_id, report_id=report_id, last_seen_at=now))
+    else:
+        state.last_seen_at = now
+    db.commit()
+
+
+def unread_report_ids(
+    db: Session, report_ids: list[uuid.UUID], viewer: User
+) -> set[uuid.UUID]:
+    """Which of `report_ids` have activity `viewer` has not opened yet, so the
+    UI can point at the specific report instead of only a single queue-wide
+    dot. Mirrors `has_unread`'s "who counts as the other side" rule, but
+    per-report: a report never opened by this viewer defaults to epoch, so it
+    counts as unread as soon as it has qualifying activity.
+    """
+    if not report_ids:
+        return set()
+    seen_rows = db.execute(
+        select(FeedbackReportSeen.report_id, FeedbackReportSeen.last_seen_at).where(
+            FeedbackReportSeen.user_id == viewer.id,
+            FeedbackReportSeen.report_id.in_(report_ids),
+        )
+    ).all()
+    last_seen = {row[0]: row[1] for row in seen_rows}
+
+    unread: set[uuid.UUID] = set()
+    if viewer.role in STAFF_ROLES:
+        rows = db.execute(
+            select(FeedbackReport.id, FeedbackReport.created_at).where(
+                FeedbackReport.id.in_(report_ids)
+            )
+        ).all()
+        for report_id, created_at in rows:
+            if created_at > last_seen.get(report_id, EPOCH):
+                unread.add(report_id)
+        reply_rows = db.execute(
+            select(FeedbackComment.report_id, FeedbackComment.created_at)
+            .join(User, User.id == FeedbackComment.author_user_id)
+            .where(
+                FeedbackComment.report_id.in_(report_ids),
+                User.role.notin_(STAFF_ROLES),
+            )
+        ).all()
+    else:
+        reply_rows = db.execute(
+            select(FeedbackComment.report_id, FeedbackComment.created_at)
+            .join(User, User.id == FeedbackComment.author_user_id)
+            .where(
+                FeedbackComment.report_id.in_(report_ids),
+                User.role.in_(STAFF_ROLES),
+            )
+        ).all()
+
+    for report_id, created_at in reply_rows:
+        if created_at > last_seen.get(report_id, EPOCH):
+            unread.add(report_id)
+    return unread
 
 
 def resolve_report(db: Session, cmd: ResolveReportCommand) -> FeedbackReport:

@@ -37,6 +37,7 @@ class FeedbackReportRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     comment_count: int = 0
+    has_unread: bool = False
 
 
 class FeedbackReportListResponse(BaseModel):
