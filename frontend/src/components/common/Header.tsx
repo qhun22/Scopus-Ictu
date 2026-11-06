@@ -122,6 +122,9 @@ export default function Header({
         return t.nav.auditLogs;
       case "/guide":
         return t.nav.guide;
+      case "/report-issue":
+      case "/feedback-reports":
+        return t.nav.feedback;
       case "/tasks":
         return t.nav.tasks;
       default:

@@ -25,6 +25,8 @@ import MyPublicationsPage from "./pages/MyPublications";
 import SearchPage from "./pages/Search";
 import UsersPage from "./pages/Users";
 import GuidePage from "./pages/Guide";
+import ReportIssuePage from "./pages/ReportIssue";
+import FeedbackReportsPage from "./pages/FeedbackReports";
 import PlaceholderPage from "./components/common/PlaceholderPage";
 
 function NotFoundPage() {
@@ -65,6 +67,9 @@ export default function App() {
           {/* Authenticated Application Shell */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AppLayout />}>
+              {/* Any logged-in role */}
+              <Route path="/report-issue" element={<ReportIssuePage />} />
+
               {/* Lecturer Routes */}
               <Route element={<RoleRoute allowedRoles={["LECTURER"]} />}>
                 <Route
@@ -89,6 +94,7 @@ export default function App() {
                   path="/review-history"
                   element={<ReviewHistoryPage />}
                 />
+                <Route path="/feedback-reports" element={<FeedbackReportsPage />} />
               </Route>
 
               {/* Admin Routes */}

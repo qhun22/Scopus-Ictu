@@ -21,8 +21,6 @@ current tables with ``Base``. Candidate persistence remains separate from the
 identity model so importing these models cannot imply identity creation.
 """
 
-from app.models.base import Base
-
 # M1.1 model package registration — import each module for its
 # registration side effect. Candidate persistence is an additive pre-identity
 # module alongside the frozen M1 tables.
@@ -31,6 +29,7 @@ from app.models import (  # noqa: F401  (registration side effect)
     affiliation_enrichment,
     affiliation_override,
     candidate,
+    feedback,
     governance,
     identity,
     lecturer_primary_scopus,
@@ -41,5 +40,6 @@ from app.models import (  # noqa: F401  (registration side effect)
     source_claim_hybrid,
     source_staging,
 )
+from app.models.base import Base
 
 __all__ = ["Base"]

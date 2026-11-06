@@ -68,6 +68,7 @@ export interface TranslationSchema {
     groupAdmin: string;
     groupHelp: string;
     guide: string;
+    feedback: string;
     version: string;
   };
   header: {
@@ -766,5 +767,48 @@ export interface TranslationSchema {
     affiliationCoverageTitle: string;
     affiliationCoverageEmptyTitle: string;
     affiliationCoverageEmptySubtitle: string;
+  };
+  feedback: {
+    navLabel: string;
+    pageTitle: string;
+    pageSubtitle: string;
+    categoryLabel: string;
+    categoryWrongAffiliation: string;
+    categoryWrongAuthorLink: string;
+    categoryOther: string;
+    publicationEidLabel: string;
+    publicationEidPlaceholder: string;
+    messageLabel: string;
+    messagePlaceholder: string;
+    submit: string;
+    submitting: string;
+    submitSuccess: string;
+    submitAnother: string;
+    messageRequired: string;
+    categoryRequired: string;
+    adminPageTitle: string;
+    adminPageSubtitle: string;
+    statusAll: string;
+    statusOpen: string;
+    statusResolved: string;
+    statusDismissed: string;
+    columnReporter: string;
+    columnCategory: string;
+    columnPublication: string;
+    columnMessage: string;
+    columnStatus: string;
+    columnCreatedAt: string;
+    columnActions: string;
+    emptyTitle: string;
+    emptySubtitle: string;
+    resolveAction: string;
+    dismissAction: string;
+    resolveModalTitle: string;
+    resolveModalNoteLabel: string;
+    resolveModalNotePlaceholder: string;
+    resolveModalConfirm: string;
+    resolveModalCancel: string;
+    adminNoteLabel: string;
+    resolvedByLabel: string;
   };
 }

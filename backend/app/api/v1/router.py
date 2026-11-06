@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     auth,
     authors,
     dashboard,
+    feedback,
     imports,
     lecturer_scopus,
     lecturers,
@@ -55,3 +56,4 @@ router.include_router(audits.router, prefix="/audits", tags=["audits"])
 router.include_router(search.router, prefix="/search", tags=["search"])
 router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 router.include_router(system.router, prefix="/system", tags=["system"])
+router.include_router(feedback.router, prefix="/feedback", tags=["feedback"])
