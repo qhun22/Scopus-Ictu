@@ -14,8 +14,9 @@ const GROUP_LIMIT = 5;
 export default function SearchPage() {
   const { t, locale } = useI18n();
   const { user } = useAuth();
-  // The lecturer directory is not part of the read-only lookup offered to LECTURER.
-  const showLecturers = user?.role !== "LECTURER";
+  // The lecturer directory is only returned to ADMIN and REVIEWER (backend search endpoint
+  // blanks it for guests and LECTURER), so only those roles see the lecturer group.
+  const showLecturers = user?.role === "ADMIN" || user?.role === "REVIEWER";
   const [searchParams, setSearchParams] = useSearchParams();
 
   const urlQuery = searchParams.get("q") ?? "";
