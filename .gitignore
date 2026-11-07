@@ -85,7 +85,9 @@ data/diagram-skills-package/
 .env.*
 !.env.example
 
-# --- Nhat ky phoi hop Hun1/Hun2 (local only) ---
+# --- Workspace phoi hop chung Hun12 (local only) ---
+/Hun12/
+# Thu muc cu da hop nhat vao Hun12 (07/11/2026); giu de khong vo tinh day len neu bi tao lai.
 /Hun1/
 /Hun2/
 

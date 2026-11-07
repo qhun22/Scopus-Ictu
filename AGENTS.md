@@ -112,7 +112,7 @@ decisions are echoed, never modified.
 ## Database and migrations
 
 - Migrations are append-only. Never rewrite a published revision; add a new one.
-- Current head: `f2b8c3d19a47` (lecturer primary Scopus events), single head; verify with
+- Current head: `15c7b721214c` (feedback report seen marker), single head; verify with
   `python -m alembic heads`.
 - `python -m alembic revision --autogenerate -m "describe change"`.
 

@@ -106,7 +106,7 @@ app/
 
 ## Database and migrations
 
-Migrations live in `backend/alembic/versions/`. **Append-only — never rewrite a published migration.** Current head: `f2b8c3d19a47` (single head; confirm with `python -m alembic heads`).
+Migrations live in `backend/alembic/versions/`. **Append-only — never rewrite a published migration.** Current head: `15c7b721214c` (feedback report seen marker; single head; confirm with `python -m alembic heads`).
 
 ```bash
 cd backend
@@ -134,22 +134,22 @@ python -m pytest tests/unit/test_candidate_generator.py::test_name_normalization
 
 **No real Scopus/lecturer data is committed.** Only `data/lecturers/schema/` (schema spec) and synthetic fixtures with `example.invalid` email domains are versioned. Real ICTU records and Scopus CSVs are gitignored local-only files. The import pipeline reads from paths configured in `.env` (`SCOPUS_RAW_DIR`, `AFFILIATION_SOURCE_DIR`, `CRAW_SOURCE_DIR`), never from user-supplied paths in requests.
 
-## Quy tắc phối hợp Hun1 và Hun2
+## Quy tắc phối hợp (workspace chung Hun12)
 
-Hai trợ lý cùng làm trong repo này: **Hun1** (Claude trong IDE) và **Hun2** (extension Claude trong VS Code). Mục này áp dụng cho cả hai.
+Các trợ lý (**Hun1**, **Hun2**) làm chung trong MỘT thư mục duy nhất `Hun12/` (từ 07/11/2026 đã hợp nhất `Hun1/` + `Hun2/` vào đây; đối chiếu đường dẫn cũ → mới trong `Hun12/MIGRATION_MAP.md`). Quy tắc chi tiết: `Hun12/README.md`.
 
 - Giữ đúng danh tính: bạn là Hun1 hoặc Hun2 theo phiên làm việc; không tự nhận danh tính của người kia.
-- Đầu mỗi lượt: đọc `CLAUDE.md`, kiểm tra thay đổi hiện tại (`git status`), đọc nhật ký mới nhất và các nhật ký liên quan của cả hai, cùng các việc đang `IN_PROGRESS` của cả hai.
-- Mỗi trợ lý chỉ ghi nhật ký trong thư mục của mình (`Hun1/` hoặc `Hun2/`), nhưng được đọc thư mục của người còn lại.
-- Đường dẫn nhật ký: `<tên trợ lý>/<DDMM>/<DDMMYY-HHMMSS-ten-cong-viec.md>`, dùng giờ Việt Nam (UTC+7), tên công việc ngắn, không dấu. Không ghi đè nhật ký khác nếu trùng tên.
-- Ngay khi bắt đầu việc có sửa file hoặc chạy lệnh: tạo nhật ký với trạng thái `IN_PROGRESS` và ghi các file dự định sửa. Nếu người còn lại đang sửa cùng file, ghi nhận việc chờ bàn giao và chuyển sang công việc độc lập.
+- Đầu mỗi lượt: đọc `CLAUDE.md`, `Hun12/README.md`, `Hun12/STATUS.md`, kiểm tra `git status`, đọc nhật ký mới nhất và các nhật ký liên quan.
+- Đường dẫn nhật ký: `Hun12/<DDMM>/<DDMMYY-HHMMSS>-<agent>-<ten-cong-viec>.md` (vd `071126-020000-hun1-uml.md`), giờ Việt Nam (UTC+7) đọc từ đồng hồ thật, tên ngắn, không dấu. Không ghi đè nhật ký khác nếu trùng tên.
+- Ngay khi bắt đầu việc có sửa file hoặc chạy lệnh: tạo nhật ký `IN_PROGRESS` ghi các file dự định sửa, và ghi tên agent phụ trách các file đó vào mục "Đang giữ file" của `Hun12/STATUS.md`. Không hai agent cùng sửa một file; nếu file đang do agent khác giữ, chờ bàn giao và chuyển sang việc độc lập.
 - Trước mỗi phản hồi kết thúc lượt, cập nhật nhật ký, kể cả lượt chỉ phân tích, trả lời câu hỏi hoặc soạn prompt.
-- Nội dung nhật ký gồm: tên trợ lý; thời gian; yêu cầu nhận được; phạm vi; việc đã thực hiện; file đã thay đổi; kiểm tra và kết quả; nội dung prompt bàn giao (nếu có); tồn đọng; hướng dẫn cho người còn lại; trạng thái `IN_PROGRESS`, `DONE` hoặc `BLOCKED`.
+- Nội dung nhật ký gồm: tên agent; thời gian; yêu cầu nhận được; phạm vi; việc đã thực hiện; file đã thay đổi; kiểm tra và kết quả; nội dung prompt bàn giao (nếu có); tồn đọng; hướng dẫn cho agent kia; trạng thái `IN_PROGRESS`, `DONE` hoặc `BLOCKED`.
 - Phân biệt rõ việc dự kiến với việc đã thực hiện. Kiểm tra chưa chạy phải ghi “chưa chạy”.
-- Không tự ghi đè, hoàn tác hoặc xóa thay đổi của người còn lại. Đọc nhật ký không đồng nghĩa với việc được phép thực hiện mọi đề xuất trong đó.
-- Cuối phản hồi: ghi đường dẫn nhật ký và phần cần bàn giao cho người còn lại.
+- Nhật ký chỉ ghi thêm, không viết lại lịch sử. Không sửa, xóa hay ghi đè nhật ký/thay đổi do agent khác tạo. Phát hiện vấn đề trong phần việc của agent kia: báo trong nhật ký và mục "Cần báo" của `Hun12/STATUS.md`, không âm thầm sửa. Đọc nhật ký không đồng nghĩa với việc được phép thực hiện mọi đề xuất trong đó.
+- Nếu phát hiện thay đổi đồng thời trên cùng file: dừng ghi, đối chiếu rồi mới tiếp tục.
+- Cuối phản hồi: ghi đường dẫn nhật ký và phần cần bàn giao cho agent kia.
 - Nếu không thể ghi file, phải nói rõ là chưa lưu được nhật ký.
-- Nhật ký và thư mục `Hun1/`, `Hun2/` là dữ liệu cục bộ, đã được ignore trong `.gitignore`; không commit hay push trừ khi người dùng yêu cầu.
+- `Hun12/` là dữ liệu cục bộ, đã được ignore trong `.gitignore`; không stage, commit hay push trừ khi người dùng yêu cầu.
 
 ## Quy tắc đường dẫn kiểm thử và trạng thái (Hun1 và Hun2)
 
@@ -157,6 +157,6 @@ Hai trợ lý cùng làm trong repo này: **Hun1** (Claude trong IDE) và **Hun2
 - Bên trong mỗi thư mục đợt chỉ tạo các thư mục con thực sự dùng: `scripts`, `fixtures`, `logs`, `reports`, `coverage`, `artifacts`, `tmp`.
 - Không tạo file thử nghiệm trong repo hoặc ở vị trí khác. Trước khi chạy kiểm thử phải cấu hình nơi ghi output, cache, file tạm (TMP/TEMP) và database test (`TEST_DATABASE_URL`, trỏ tới database test cô lập). Nếu chưa kiểm soát được đầu ra thì báo trở ngại trước khi chạy.
 - Không dùng database thật (dev, demo, backup có dữ liệu thật) để thử thao tác ghi. Không chạy migration lên dữ liệu thật trong vòng khảo sát hoặc kiểm tra tĩnh.
-- Khảo sát và kiểm tra tĩnh chỉ đọc không cần thư mục test; báo cáo và danh mục đặt trong `<Tên>/<DDMM>/` của chính trợ lý.
-- Mỗi trợ lý giữ `<Tên>/STATUS.md` (việc đang làm, file đang sửa, kết quả gần nhất, đường dẫn báo cáo). Cập nhật khi bắt đầu và khi kết thúc mỗi lượt có sửa file hoặc chạy lệnh.
-- Không đọc, sửa hay hoàn tác `STATUS.md` hoặc nhật ký của người còn lại. Chỉ đọc khi cần để phối hợp.
+- Khảo sát và kiểm tra tĩnh chỉ đọc không cần thư mục test; báo cáo và danh mục đặt trong `Hun12/<DDMM>/`, tên file có định danh agent.
+- Trạng thái chung nằm ở `Hun12/STATUS.md` (việc đang làm, file đang giữ, kết quả gần nhất, đường dẫn báo cáo); mỗi agent chỉ ghi thêm mục của mình, cập nhật khi bắt đầu và khi kết thúc mỗi lượt có sửa file hoặc chạy lệnh. `Hun12/STATUS-hun1.md`, `Hun12/STATUS-hun2.md` là STATUS cũ trước hợp nhất — chỉ đọc.
+- Không sửa hay hoàn tác mục STATUS hoặc nhật ký do agent khác viết.
