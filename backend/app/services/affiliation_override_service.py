@@ -403,6 +403,15 @@ def revoke_override(
 _UNRESOLVED_REASONS_AS_CONFLICT = frozenset({"ID_CONFLICT", "ID_AMBIGUOUS", "POSITION_CLAIMED_BY_OTHER_ID"})
 
 
+@dataclass(frozen=True, slots=True)
+class _ResolutionSummary:
+    id: uuid.UUID
+    publication_author_id: uuid.UUID
+    source_system: str
+    link_status: str
+    unresolved_reason: str | None
+
+
 def list_needs_review(
     db: Session,
     *,
@@ -450,8 +459,14 @@ def list_needs_review(
         .order_by(Publication.eid.asc(), PublicationAuthor.author_order.asc())
     ).all()
 
-    res_by_author: dict[uuid.UUID, list[PublicationAuthorAffiliationResolution]] = {}
-    for res in db.scalars(select(PublicationAuthorAffiliationResolution)).all():
+    # Only the five columns used below — not the ``evidence`` JSON of every resolution
+    # (08/11/2026: the JSON decode alone was ~1/4 of the request time). Same rows as before.
+    res_by_author: dict[uuid.UUID, list[_ResolutionSummary]] = {}
+    R = PublicationAuthorAffiliationResolution
+    for row in db.execute(
+        select(R.id, R.publication_author_id, R.source_system, R.link_status, R.unresolved_reason)
+    ).all():
+        res = _ResolutionSummary(*row)
         res_by_author.setdefault(res.publication_author_id, []).append(res)
 
     # Verbatim affiliation text each source reported, so a reviewer can see WHERE a unit comes from.
