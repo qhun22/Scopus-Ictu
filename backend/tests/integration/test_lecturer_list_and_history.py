@@ -37,6 +37,8 @@ def _create_user(*, role: str = "ADMIN", lecturer_id: uuid.UUID | None = None, d
         is_active=True,
         version=1,
         auth_version=1,
+        has_password=True,  # Server defaults; this object is never flushed to a database.
+        google_linked=False,
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
