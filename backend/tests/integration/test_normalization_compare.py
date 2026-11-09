@@ -6,9 +6,13 @@ Synthetic rows only (``example.invalid``); nothing here is a real publication.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import uuid
+from pathlib import Path
 
 import pytest
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from sqlalchemy import text
 
 from app.models.publication import Publication, PublicationRawSource
@@ -95,3 +99,28 @@ def test_a_stored_value_that_differs_from_the_raw_text_is_flagged_as_changed(rev
 
 def test_an_unknown_eid_has_no_comparison(review_session):
     assert build_compare(review_session, "2-s2.0-999999999999") is None
+
+
+def test_the_doi_backfill_migration_rewrites_a_stored_doi_on_postgres(review_session):
+    """The unit test covers the rule on SQLite; this runs the real UPDATE by UUID on PostgreSQL."""
+    pub = _seed(review_session, raw_doi="10.1000/ABC.1", stored_doi="10.1000/ABC.1",
+                raw_title="A Synthetic Title", stored_title="A Synthetic Title")
+    path = (
+        Path(__file__).resolve().parents[2] / "alembic" / "versions"
+        / "b3d91f4c7a20_canonical_publication_doi.py"
+    )
+    spec = importlib.util.spec_from_file_location("canonical_doi_migration", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    conn = review_session.connection()
+    with Operations.context(MigrationContext.configure(conn)):
+        module.upgrade()
+    review_session.commit()
+    review_session.refresh(pub)
+
+    assert pub.doi == "10.1000/abc.1"
+    doi = _by_field(build_compare(review_session, "2-s2.0-000000000001"))["doi"]
+    assert (doi.raw, doi.stored, doi.canonical, doi.status) == (
+        "10.1000/ABC.1", "10.1000/abc.1", "10.1000/abc.1", "CLEANED",
+    )

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
+import Avatar from "./Avatar";
 
 interface HeaderProps {
   onToggleMobileMenu: () => void;
@@ -223,9 +224,11 @@ export default function Header({
             aria-expanded={dropdownOpen}
             aria-haspopup="true"
           >
-            <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-sm shrink-0">
-              {user ? safeName.charAt(0).toUpperCase() : t.home.welcomeGuest.charAt(0).toUpperCase()}
-            </div>
+            <Avatar
+              src={user?.avatar_url}
+              name={user ? safeName : t.home.welcomeGuest}
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-full text-xs shadow-sm shrink-0"
+            />
 
             <div className="hidden flex-col md:flex min-w-0 max-w-[140px] lg:max-w-[180px]">
               <span className="text-xs font-semibold text-slate-800 leading-tight truncate">

@@ -63,6 +63,23 @@ class Settings(BaseSettings):
     environment: str = Field(..., validation_alias="ENVIRONMENT")
 
     # ------------------------------------------------------------------
+    # Google Sign-In (OAuth 2.0 authorization code flow). Optional: when
+    # the client id/secret are unset, the /auth/google/* endpoints report
+    # "not configured" instead of failing at process start.
+    # ------------------------------------------------------------------
+    google_client_id: str | None = Field(None, validation_alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str | None = Field(None, validation_alias="GOOGLE_CLIENT_SECRET")
+    # Comma-separated front-end origins this backend is reachable behind
+    # (each is proxied at /api, so the redirect_uri is "<origin>/api/v1/auth/google/callback").
+    # Must exactly match the "Authorized redirect URIs" configured in Google Cloud Console.
+    google_oauth_allowed_origins: str = Field(
+        "", validation_alias="GOOGLE_OAUTH_ALLOWED_ORIGINS"
+    )
+    google_allowed_email_domain: str = Field(
+        "ictu.edu.vn", validation_alias="GOOGLE_ALLOWED_EMAIL_DOMAIN"
+    )
+
+    # ------------------------------------------------------------------
     # Offline file paths (never HTTP URLs).
     # ------------------------------------------------------------------
     dspace_snapshot_path: str = Field(
@@ -180,6 +197,16 @@ class Settings(BaseSettings):
         return [
             origin.strip()
             for origin in self.backend_cors_origins.split(",")
+            if origin.strip()
+        ]
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def google_oauth_allowed_origins_list(self) -> list[str]:
+        """Parse the comma-separated Google OAuth origin allow-list."""
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.google_oauth_allowed_origins.split(",")
             if origin.strip()
         ]
 

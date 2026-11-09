@@ -24,6 +24,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.models.publication import Publication, PublicationRawSource
 from app.models.scopus_raw import RawScopusRecord, ScopusImport
+from app.services.lecturer_dataset.known_publication_ingestion import normalize_doi_n0
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -186,6 +187,8 @@ def compare_metadata(
       - Skip None-vs-None as equal.
       - Trim whitespace for string comparisons.
       - Normalize title via the same normalize_title() used at creation.
+      - Compare DOIs in canonical form, so a publication stored before DOIs
+        were canonicalized never reports a false change.
       - Use raw_payload keys for candidate values (source headers).
     """
     changed: list[str] = []
@@ -198,7 +201,7 @@ def compare_metadata(
 
     # doi
     raw_doi = _raw_doi(candidate, raw_payload)
-    if not _nullable_str_equal(existing.doi, raw_doi):
+    if not _nullable_str_equal(normalize_doi_n0(existing.doi), raw_doi):
         changed.append("doi")
 
     # source_title
@@ -298,11 +301,13 @@ def _bounded_raw_field(raw_payload: dict, header: str, max_length: int) -> str |
 
 
 def _raw_doi(mapping: dict, raw_payload: dict) -> str | None:
-    """Extract DOI from raw payload."""
+    """Extract the DOI from the raw payload in its canonical DOI_N0 form.
+
+    The immutable raw payload keeps the DOI exactly as Scopus sent it.
+    """
     val = raw_payload.get("DOI") or mapping.get("doi_raw")
     if val:
-        stripped = str(val).strip()
-        return stripped or None
+        return normalize_doi_n0(str(val))
     return None
 
 

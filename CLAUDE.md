@@ -72,7 +72,9 @@ app/
 
 **Roles:** `ADMIN` · `REVIEWER` · `LECTURER`. LECTURER is read-only for publications; ADMIN drives all pipeline operations.
 
-**System Reset** (`POST /api/v1/system/reset`): ADMIN-only, requires `{"confirmation": "ICTU"}`. Only available when `ENVIRONMENT=local` or `ENVIRONMENT=dev`; returns 410 `SYSTEM_RESET_DISABLED` on any other environment. After a successful reset all sessions (including the caller's) are invalidated — frontend auto-redirects to login on `SESSION_REVOKED`. ADMIN accounts are preserved; other data is wiped. No public self-registration endpoint exists — accounts are created by ADMIN only.
+**System Reset** (`POST /api/v1/system/reset`): ADMIN-only, requires `{"confirmation": "ICTU"}`. Only available when `ENVIRONMENT=local` or `ENVIRONMENT=dev`; returns 410 `SYSTEM_RESET_DISABLED` on any other environment. After a successful reset all sessions (including the caller's) are invalidated — frontend auto-redirects to login on `SESSION_REVOKED`. ADMIN accounts are preserved; other data is wiped. There is no password self-registration endpoint — password accounts are created by ADMIN only.
+
+**Google Sign-In** (`GET /api/v1/auth/google/login`, `GET /api/v1/auth/google/callback`): OAuth 2.0 authorization-code flow, gated by `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (unset = feature disabled, 503 `GOOGLE_OAUTH_NOT_CONFIGURED`). Only `GOOGLE_ALLOWED_EMAIL_DOMAIN` (default `ictu.edu.vn`) emails are accepted — but the domain alone is not enough: ICTU students and lecturers share it, so an email with no existing `User` row is auto-provisioned (`role=LECTURER`, audited as `USER_PROVISIONED_GOOGLE`) only when it matches exactly one not-yet-linked `Lecturer.email` in the ADMIN-imported dataset; everything else (a student's address, or any other @ictu.edu.vn email outside that dataset) is rejected with `google_error=not_lecturer`. An email that already has a `User` row (password-based or prior Google login) just logs in — this is the one deliberate exception to "ADMIN creates accounts," scoped to the trusted email domain AND an existing lecturer record. `GOOGLE_OAUTH_ALLOWED_ORIGINS` is the front-end origin allow-list used to build the redirect URI (must exactly match the Authorized redirect URIs on the Google OAuth client, path `/api/v1/auth/google/callback`); the front end also passes its own origin explicitly (`?origin=`) since `Referer` isn't reliably sent by every browser.
 
 ### Core domain services
 
@@ -106,7 +108,7 @@ app/
 
 ## Database and migrations
 
-Migrations live in `backend/alembic/versions/`. **Append-only — never rewrite a published migration.** Current head: `15c7b721214c` (feedback report seen marker; single head; confirm with `python -m alembic heads`).
+Migrations live in `backend/alembic/versions/`. **Append-only — never rewrite a published migration.** Current head: `e8b2c6a94f17` (users.has_password / users.google_linked; single head; confirm with `python -m alembic heads`).
 
 ```bash
 cd backend

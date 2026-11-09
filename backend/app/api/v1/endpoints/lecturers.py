@@ -427,6 +427,9 @@ def list_lecturers(
                     role=linked_user.role,
                     is_active=linked_user.is_active,
                     version=linked_user.version,
+                    avatar_url=linked_user.avatar_url,
+                    has_password=linked_user.has_password,
+                    google_linked=linked_user.google_linked,
                 )
                 if linked_user
                 else None
@@ -533,11 +536,15 @@ def create_lecturer(
     current_user: User = Depends(require_role("ADMIN")),
     db: Session = Depends(get_session),
 ) -> LecturerResponse:
-    """Create a lecturer master record and its login account.
+    """Create a lecturer master record, optionally with a login account.
 
     `staff_code` is optional: blank/omitted => stored as NULL. The
     partial unique index on `lecturers.staff_code` still enforces
-    uniqueness when a value is supplied.
+    uniqueness when a value is supplied. `password` is optional too:
+    omitted => the lecturer profile is created without a `User` row (the
+    same "chưa có tài khoản" state as a bulk import); an ADMIN can grant
+    one later, or the lecturer can pick one up via Google Sign-In once
+    their email matches this record.
     """
     role = _validate_role(payload.role)
     full_name = _normalise_name(payload.full_name)
@@ -549,13 +556,13 @@ def create_lecturer(
             status_code=422,
             detail="Tên và email không được để trống.",
         )
-    if not payload.password or len(payload.password) < 8:
-        raise HTTPException(
-            status_code=422,
-            detail="Mật khẩu phải có ít nhất 8 ký tự.",
-        )
+    # Password is optional: omitted => lecturer profile only, no login account yet
+    # (grant one later via the update endpoint, or the lecturer picks one up via
+    # Google Sign-In once their email matches). Pydantic's min_length already
+    # rejects a too-short non-empty value before we get here.
+    grant_account_now = bool(payload.password)
 
-    if db.query(User).filter(func.lower(User.email) == email.lower()).first():
+    if grant_account_now and db.query(User).filter(func.lower(User.email) == email.lower()).first():
         raise HTTPException(status_code=409, detail="Email đã được sử dụng.")
     if staff_code is not None and db.query(Lecturer).filter(Lecturer.staff_code == staff_code).first():
         raise APIError(
@@ -572,20 +579,29 @@ def create_lecturer(
         staff_code=staff_code,
         academic_degree=payload.academic_degree,
         department=payload.department,
+        academic_rank=(payload.academic_rank or "").strip() or None,
+        position=(payload.position or "").strip() or None,
+        specialization=(payload.specialization or "").strip() or None,
+        gender=(payload.gender or "").strip() or None,
+        date_of_birth=payload.date_of_birth,
+        phone=(payload.phone or "").strip() or None,
     )
     db.add(lecturer)
     try:
         db.flush()
-        db.add(User(
-            email=email,
-            password_hash=password_hasher.hash(payload.password),
-            display_name=full_name,
-            role=role,
-            lecturer_id=lecturer.id,
-        ))
+        if grant_account_now:
+            db.add(User(
+                email=email,
+                password_hash=password_hasher.hash(payload.password),
+                display_name=full_name,
+                role=role,
+                lecturer_id=lecturer.id,
+                has_password=True,
+            ))
         from app.models.governance import AuditEvent
 
-        # Audit trail: who created which lecturer profile + login account (never the password).
+        # Audit trail: who created which lecturer profile (+ login account, when
+        # granted immediately — never the password itself).
         db.add(AuditEvent(
             entity_type="lecturer",
             entity_id=lecturer.id,
@@ -596,7 +612,7 @@ def create_lecturer(
                 "full_name": full_name,
                 "email": email,
                 "staff_code": staff_code,
-                "account_role": role,
+                "account_role": role if grant_account_now else None,
             },
         ))
         db.commit()
@@ -738,6 +754,7 @@ def update_lecturer(
                 display_name=lecturer.full_name,
                 role=role,
                 lecturer_id=lecturer.id,
+                has_password=True,
             )
             db.add(new_user)
             account = new_user

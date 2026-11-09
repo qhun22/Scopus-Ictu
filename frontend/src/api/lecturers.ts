@@ -6,6 +6,11 @@ export interface LecturerAccount {
   role: string;
   is_active: boolean;
   version: number;
+  avatar_url: string | null;
+  // Real login-method facts — independent, not exclusive: an account can have
+  // a real password, be Google-linked, both, or (briefly, pre-Google) neither.
+  has_password: boolean;
+  google_linked: boolean;
 }
 
 export interface LecturerStats {
@@ -35,6 +40,9 @@ export interface LecturerUser {
   updated_at?: string;
   has_warning?: boolean;
   warning_reason?: string | null;
+  avatar_url?: string | null;
+  has_password?: boolean;
+  google_linked?: boolean;
 }
 
 export interface LecturerForm {
@@ -45,7 +53,16 @@ export interface LecturerForm {
   staff_code: string | null;
   role: string;
   academic_degree: string;
-  department: string;
+  // Dropped from the "Add lecturer" form: specialization replaces it there.
+  // Still a real column used elsewhere (Search, Profile, …), so kept optional
+  // here rather than removed, in case a future create flow wants it again.
+  department?: string | null;
+  academic_rank?: string | null;
+  position?: string | null;
+  specialization?: string | null;
+  gender?: string | null;
+  date_of_birth?: string | null;
+  phone?: string | null;
 }
 
 export interface LecturerUpdatePayload {

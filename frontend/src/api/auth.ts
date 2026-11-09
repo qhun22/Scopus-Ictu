@@ -10,6 +10,7 @@ export interface User {
   display_name: string;
   role: "ADMIN" | "REVIEWER" | "LECTURER" | string;
   lecturer_id: string | null;
+  avatar_url: string | null;
 }
 
 import { safeDisplayName } from "../utils/displayName";

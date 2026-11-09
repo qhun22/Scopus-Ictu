@@ -89,6 +89,7 @@ def create_user(db: Session, *, payload: UserAdminCreate, actor: User) -> User:
         role=payload.role,
         lecturer_id=None,
         is_active=True,
+        has_password=True,
     )
     db.add(user)
     db.flush()
@@ -152,6 +153,9 @@ def to_admin_response(user: User, lecturer: Lecturer | None) -> UserAdminRespons
         version=user.version,
         created_at=user.created_at,
         updated_at=user.updated_at,
+        avatar_url=user.avatar_url,
+        has_password=user.has_password,
+        google_linked=user.google_linked,
     )
 
 
@@ -496,6 +500,7 @@ def reset_user_password(
 
     new_hash = password_hasher.hash(new_password)
     user.password_hash = new_hash
+    user.has_password = True
     user.auth_version = int(user.auth_version or 1) + 1
     user.updated_at = datetime.now(timezone.utc)
     _add_notification(

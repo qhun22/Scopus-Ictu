@@ -110,6 +110,16 @@ if ISOLATION_ENGINE is None:
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
+def reset_login_throttle():
+    """Failed logins in one test must not lock an email out in the next."""
+    from app.core.login_throttle import login_throttle
+
+    login_throttle.reset()
+    yield
+    login_throttle.reset()
+
+
+@pytest.fixture(autouse=True)
 def disable_runtime_recovery_during_tests():
     """Unit/API mocks must never recover jobs from a developer database."""
     previous = app.state.import_recovery_enabled

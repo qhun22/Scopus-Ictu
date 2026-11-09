@@ -52,13 +52,14 @@ def _text(value: object) -> str | None:
 
 
 def _status(raw: str | None, stored: str | None, canonical: str | None) -> str:
-    """MISSING (nothing), CHANGED (stored differs from the raw text), CLEANED (stored as received
-    but the canonical form used for matching differs, e.g. a DOI URL or letter case), else SAME."""
+    """MISSING (nothing), CHANGED (stored differs from the raw text and is not its canonical form),
+    CLEANED (the raw text and its canonical form differ, e.g. a DOI URL or letter case, whether
+    the stored value is already canonical or still as received), else SAME."""
 
     if raw is None and stored is None:
         return "MISSING"
     if (raw or "").strip() != (stored or ""):
-        return "CHANGED"
+        return "CLEANED" if canonical is not None and canonical == stored else "CHANGED"
     if canonical is not None and canonical != (stored or ""):
         return "CLEANED"
     return "SAME"

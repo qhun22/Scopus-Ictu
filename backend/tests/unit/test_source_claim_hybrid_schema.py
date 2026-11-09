@@ -105,9 +105,11 @@ def test_migration_is_the_single_new_head_on_top_of_the_accepted_one():
         if down:
             downs.update(re.findall(r'"([^"]+)"', down.group(1)))
     # The chain keeps growing (B2-E hardening d0b14a77c8e2, G09 e4a1b7c92d10, main-ID label
-    # f2b8c3d19a47, feedback reports d4e7c3a98f12, feedback report seen 15c7b721214c); the
+    # f2b8c3d19a47, feedback reports d4e7c3a98f12, feedback report seen 15c7b721214c,
+    # canonical publication DOI b3d91f4c7a20, users.avatar_url c4f1a7e9d203,
+    # users.has_password/google_linked e8b2c6a94f17); the
     # published revisions below the head are never rewritten.
-    assert revisions - downs == {"15c7b721214c"}, "exactly one head"
+    assert revisions - downs == {"e8b2c6a94f17"}, "exactly one head"
     assert {"e4a1b7c92d10", "d0b14a77c8e2", "c99a03e55ff3", "b88f02d44ff2"} <= downs
 
 

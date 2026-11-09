@@ -716,6 +716,7 @@ class LecturerImportService:
                         is_active=account["is_active"],
                         version=1,
                         auth_version=1,
+                        has_password=True,
                         created_at=now,
                         updated_at=now,
                     )

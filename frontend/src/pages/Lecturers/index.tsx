@@ -12,6 +12,7 @@ import {
 } from "../../api/lecturers";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
+import Avatar from "../../components/common/Avatar";
 import {
   getUser,
   lockUser,
@@ -71,7 +72,12 @@ export default function LecturersPage() {
     staff_code: "",
     role: "LECTURER",
     academic_degree: "Thạc sĩ",
-    department: "Khoa CNTT",
+    academic_rank: "",
+    position: "",
+    specialization: "",
+    gender: "",
+    date_of_birth: "",
+    phone: "",
   });
   const [addError, setAddError] = useState<string>("");
   // Track whether the user has manually edited the staff_code field so the
@@ -249,11 +255,16 @@ export default function LecturersPage() {
   // Submit Add Lecturer
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addForm.full_name.trim() || !addForm.email.trim() || !addForm.password?.trim()) {
+    if (!addForm.full_name.trim() || !addForm.email.trim()) {
       setAddError(locale === "vi" ? "Vui lòng nhập đầy đủ các thông tin bắt buộc." : "Please fill in all required fields.");
       return;
     }
-    if (addForm.password.length < 8) {
+    // Password is optional: blank means "create the profile without an account
+    // yet" (ADMIN can grant one later, or the lecturer can pick one up via
+    // Google Sign-In once their email matches). If given, it must meet the
+    // same minimum as every other password in this system.
+    const trimmedPassword = (addForm.password || "").trim();
+    if (trimmedPassword && trimmedPassword.length < 8) {
       setAddError(locale === "vi" ? "Mật khẩu phải có ít nhất 8 ký tự." : "Password must be at least 8 characters.");
       return;
     }
@@ -270,11 +281,16 @@ export default function LecturersPage() {
       await createLecturer({
         full_name: addForm.full_name.trim(),
         email: addForm.email.trim(),
-        password: addForm.password,
+        password: trimmedPassword ? trimmedPassword : undefined,
         staff_code: trimmedStaffCode ? trimmedStaffCode : null as unknown as string,
         role: addForm.role,
         academic_degree: addForm.academic_degree,
-        department: addForm.department,
+        academic_rank: (addForm.academic_rank || "").trim() || null,
+        position: (addForm.position || "").trim() || null,
+        specialization: (addForm.specialization || "").trim() || null,
+        gender: addForm.gender || null,
+        date_of_birth: addForm.date_of_birth || null,
+        phone: (addForm.phone || "").trim() || null,
       });
       toast.success(
         locale === "vi" ? "Thêm thành công" : "Success",
@@ -456,6 +472,8 @@ export default function LecturersPage() {
                 account: {
                   ...prev.account,
                   version: result.version,
+                  // The reset gives a Google-only account a password, so "Email" appears at once.
+                  has_password: true,
                 },
               }
             : prev,
@@ -896,9 +914,11 @@ export default function LecturersPage() {
                     <tr key={lec.id} className="transition-colors duration-300 hover:bg-slate-50/50">
                       <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle whitespace-nowrap">
                         <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-xs">
-                            {lec.full_name.charAt(0).toUpperCase()}
-                          </div>
+                          <Avatar
+                            src={lec.account?.avatar_url}
+                            name={lec.full_name}
+                            className="h-8 w-8 rounded-full text-xs shadow-xs"
+                          />
                           <div className="min-w-0">
                             <span className="block whitespace-normal break-words font-medium leading-tight text-slate-800" title={lec.full_name}>
                               {lec.full_name}
@@ -1080,7 +1100,7 @@ export default function LecturersPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-lecturer-title"
-              className="flex max-h-[calc(100vh-1.5rem)] w-[calc(100vw-1.5rem)] sm:w-full max-w-xl sm:max-w-2xl flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in sm:max-h-[calc(100vh-2rem)]"
+              className="flex h-full w-full flex-col overflow-hidden rounded-card border border-blue-200 bg-white shadow-2xl modal-panel-in"
             >
               {/* Header */}
               <div className="flex items-center justify-between bg-blue-50 border-b border-blue-100 px-5 py-4 shrink-0">
@@ -1151,11 +1171,13 @@ export default function LecturersPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        {locale === "vi" ? "Mật khẩu tài khoản" : "Password"} <span className="text-rose-500">*</span>
+                        {locale === "vi" ? "Mật khẩu tài khoản" : "Password"}
+                        <span className="ml-1 text-[10px] font-normal text-slate-400">
+                          {locale === "vi" ? "(có thể để trống)" : "(optional)"}
+                        </span>
                       </label>
                       <input
                         type="password"
-                        required
                         minLength={8}
                         value={addForm.password}
                         onChange={(e) => setAddForm({ ...addForm, password: e.target.value })}
@@ -1163,7 +1185,9 @@ export default function LecturersPage() {
                         className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
                       />
                       <p className="mt-1 text-[11px] text-slate-400">
-                        {locale === "vi" ? "Tối thiểu 8 ký tự" : "Minimum 8 characters"}
+                        {locale === "vi"
+                          ? "Để trống nếu chưa cấp tài khoản — giảng viên có thể tự đăng nhập bằng Google sau, hoặc bạn cấp mật khẩu sau trong trang Chi tiết. Nếu nhập, tối thiểu 8 ký tự."
+                          : "Leave blank to skip granting an account now — the lecturer can sign in with Google later, or you can grant a password afterwards from the Detail page. If entered, minimum 8 characters."}
                       </p>
                     </div>
 
@@ -1213,7 +1237,7 @@ export default function LecturersPage() {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                        {locale === "vi" ? "Học vị / Học hàm" : "Degree"}
+                        {locale === "vi" ? "Học vị" : "Degree"}
                       </label>
                       <select
                         value={addForm.academic_degree}
@@ -1230,19 +1254,95 @@ export default function LecturersPage() {
                     </div>
                   </div>
 
-                  {/* Row 4: Khoa / Bộ môn */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      {locale === "vi" ? "Khoa / Bộ môn" : "Department"}
-                    </label>
-                    <input
-                      type="text"
-                      value={addForm.department}
-                      onChange={(e) => setAddForm({ ...addForm, department: e.target.value })}
-                      placeholder={locale === "vi" ? "VD: Khoa Công nghệ Thông tin" : "e.g. Faculty of Information Technology"}
-                      className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
-                    />
+                  {/* Row 4: Học hàm & Chức vụ cán bộ */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Học hàm" : "Academic Rank"}
+                      </label>
+                      <input
+                        type="text"
+                        value={addForm.academic_rank ?? ""}
+                        onChange={(e) => setAddForm({ ...addForm, academic_rank: e.target.value })}
+                        placeholder={locale === "vi" ? "VD: Giáo sư, Phó Giáo sư" : "e.g. Professor, Associate Professor"}
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Chức vụ cán bộ" : "Position"}
+                      </label>
+                      <input
+                        type="text"
+                        value={addForm.position ?? ""}
+                        onChange={(e) => setAddForm({ ...addForm, position: e.target.value })}
+                        placeholder={locale === "vi" ? "VD: Hiệu trưởng, Trưởng khoa, Trưởng bộ môn" : "e.g. Rector, Dean, Department Head"}
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                    </div>
                   </div>
+
+                  {/* Row 5: Chuyên ngành & Giới tính */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Chuyên ngành" : "Specialization"}
+                      </label>
+                      <input
+                        type="text"
+                        value={addForm.specialization ?? ""}
+                        onChange={(e) => setAddForm({ ...addForm, specialization: e.target.value })}
+                        placeholder={locale === "vi" ? "VD: Khoa học máy tính, Kỹ thuật phần mềm" : "e.g. Computer Science, Software Engineering"}
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Giới tính" : "Gender"}
+                      </label>
+                      <select
+                        value={addForm.gender ?? ""}
+                        onChange={(e) => setAddForm({ ...addForm, gender: e.target.value })}
+                        className="h-10 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer shadow-2xs"
+                      >
+                        <option value="">{locale === "vi" ? "Chưa cập nhật" : "Not specified"}</option>
+                        <option value="Nam">{locale === "vi" ? "Nam" : "Male"}</option>
+                        <option value="Nữ">{locale === "vi" ? "Nữ" : "Female"}</option>
+                        <option value="Khác">{locale === "vi" ? "Khác" : "Other"}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Row 6: Ngày sinh & Số điện thoại */}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Ngày sinh" : "Date of Birth"}
+                      </label>
+                      <input
+                        type="date"
+                        value={addForm.date_of_birth ?? ""}
+                        onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })}
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        {locale === "vi" ? "Số điện thoại" : "Phone"}
+                      </label>
+                      <input
+                        type="tel"
+                        value={addForm.phone ?? ""}
+                        onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                        placeholder={locale === "vi" ? "VD: 0912345678" : "e.g. 0912345678"}
+                        className="h-10 w-full rounded-[5px] border border-slate-200 px-3.5 text-xs text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
                 </div>
 
                 {/* Footer */}
@@ -1564,8 +1664,17 @@ export default function LecturersPage() {
 
                         <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
                           <span className="font-semibold text-slate-600">{locale === "vi" ? "Phương thức đăng nhập" : "Login method"}</span>
-                          <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
-                            Email
+                          <span className="flex flex-wrap justify-end gap-1.5">
+                            {selectedLecturer.account?.has_password && (
+                              <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
+                                Email
+                              </span>
+                            )}
+                            {selectedLecturer.account?.google_linked && (
+                              <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
+                                Google
+                              </span>
+                            )}
                           </span>
                         </div>
 

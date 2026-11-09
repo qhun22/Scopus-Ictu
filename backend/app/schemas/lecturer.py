@@ -20,7 +20,20 @@ class LecturerBase(BaseModel):
 
 
 class LecturerCreate(LecturerBase):
-    password: str = Field(..., min_length=8, max_length=256)
+    # Optional: omitted/None creates the lecturer profile without a login account
+    # (same "chưa có tài khoản" state as a bulk-imported lecturer). An ADMIN can
+    # grant one later via LecturerUpdate.grant_account, or the lecturer can pick
+    # one up automatically on first Google Sign-In once their email matches.
+    password: str | None = Field(default=None, min_length=8, max_length=256)
+    # Same optional profile fields LecturerUpdate already supports post-creation —
+    # offered here too so ADMIN isn't forced into a second edit for a profile they
+    # already know in full at creation time.
+    academic_rank: str | None = Field(default=None, max_length=50)
+    position: str | None = Field(default=None, max_length=100)
+    specialization: str | None = Field(default=None, max_length=200)
+    gender: str | None = Field(default=None, max_length=10)
+    date_of_birth: date | None = Field(default=None)
+    phone: str | None = Field(default=None, max_length=20)
 
 
 class LecturerUpdate(BaseModel):
@@ -132,6 +145,9 @@ class LecturerAccount(BaseModel):
     role: str
     is_active: bool
     version: int
+    avatar_url: str | None = None
+    has_password: bool = True
+    google_linked: bool = False
 
 
 class LecturerStats(BaseModel):

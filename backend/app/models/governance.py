@@ -82,6 +82,20 @@ class User(Base):
     auth_version: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default=text("1")
     )
+    # Set from the Google "picture" claim on Google Sign-In (refreshed on every
+    # such login); NULL for password-only accounts, which fall back to the
+    # initials placeholder in the UI. Never set from any other source.
+    avatar_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Real login-method facts (see migration e8b2c6a94f17 for the full story):
+    # false only for a Google-provisioned account whose password_hash is an
+    # unusable random placeholder; google_linked once Google Sign-In has
+    # succeeded for this account at least once. Independent, not exclusive.
+    has_password: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("TRUE")
+    )
+    google_linked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("FALSE")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )

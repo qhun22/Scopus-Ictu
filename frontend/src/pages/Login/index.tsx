@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorCode, getApiErrorMessage } from "../../api/errors";
 import { useAuth } from "../../contexts/AuthContext";
@@ -7,11 +7,29 @@ import { useToast } from "../../contexts/ToastContext";
 import PageLoadingBar from "../../components/PageLoadingBar";
 
 const LOGIN_TRANSITION_MS = 3500;
+const API_BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+
+const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
+  denied: "Bạn đã hủy đăng nhập bằng Google.",
+  domain: "Chỉ tài khoản Google @ictu.edu.vn mới được phép đăng nhập.",
+  not_lecturer:
+    "Email này chưa có trong danh sách giảng viên của hệ thống. Vui lòng liên hệ quản trị viên.",
+  email_unverified: "Email Google chưa được xác minh.",
+  locked: "Tài khoản đang bị khóa. Vui lòng liên hệ quản trị viên.",
+  state: "Phiên đăng nhập Google đã hết hạn. Vui lòng thử lại.",
+  token_exchange: "Không thể xác thực với Google. Vui lòng thử lại.",
+  userinfo: "Không lấy được thông tin tài khoản Google. Vui lòng thử lại.",
+  network: "Không thể kết nối tới Google. Vui lòng thử lại.",
+  database: "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.",
+  conflict: "Có xung đột khi tạo tài khoản. Vui lòng thử lại.",
+  missing_code: "Thiếu thông tin xác thực từ Google. Vui lòng thử lại.",
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [form, setForm] = useState({
     email: "",
@@ -20,9 +38,21 @@ export default function LoginPage() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleNotice, setGoogleNotice] = useState(false);
   const [logoSrc, setLogoSrc] = useState("/logoictu.png");
   const [logoLoaded, setLogoLoaded] = useState(false);
+
+  useEffect(() => {
+    const googleError = searchParams.get("google_error");
+    if (!googleError) return;
+    toast.error(
+      "Không thể đăng nhập bằng Google",
+      GOOGLE_ERROR_MESSAGES[googleError] ?? "Đăng nhập bằng Google thất bại. Vui lòng thử lại.",
+    );
+    const next = new URLSearchParams(searchParams);
+    next.delete("google_error");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Redirect if already authenticated
   if (isAuthenticated && !isAuthLoading && !loading) {
@@ -94,6 +124,11 @@ export default function LoginPage() {
           );
         } else if (errorCode === "SESSION_REVOKED") {
           toast.warning("Phiên đăng nhập đã thay đổi", "Vui lòng đăng nhập lại.");
+        } else if (errorCode === "TOO_MANY_LOGIN_ATTEMPTS") {
+          toast.warning(
+            "Tạm thời chưa thể đăng nhập",
+            err.detail ?? getApiErrorMessage(err),
+          );
         } else if (errorCode === "INVALID_CREDENTIALS" || err.status === 401) {
           toast.error("Đăng nhập thất bại", "Email hoặc mật khẩu không đúng.");
         } else if (err.status === 403) {
@@ -124,7 +159,8 @@ export default function LoginPage() {
   };
 
   const handleGoogleClick = () => {
-    setGoogleNotice(true);
+    const origin = encodeURIComponent(window.location.origin);
+    window.location.href = `${API_BASE_URL}/api/v1/auth/google/login?origin=${origin}`;
   };
 
   return (
@@ -171,20 +207,6 @@ export default function LoginPage() {
             <h2 className="text-center text-2xl font-bold uppercase tracking-tight text-slate-800 md:text-[26px]">
               ĐĂNG NHẬP TÀI KHOẢN
             </h2>
-
-            {googleNotice && (
-              <div className="mt-4 flex items-center justify-between rounded-[5px] border border-blue-100 bg-blue-50/80 px-4 py-3 text-xs text-blue-800">
-                <span>Tính năng Đăng nhập bằng Google sẽ khả dụng trong phiên bản M2.2.</span>
-                <button
-                  type="button"
-                  onClick={() => setGoogleNotice(false)}
-                  className="ml-2 font-bold text-blue-600 hover:text-blue-800"
-                  aria-label="Đóng thông báo"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
 
             <form noValidate onSubmit={handleSubmit} className="mt-7 space-y-5">
               {/* Trường 1: Email */}
@@ -387,12 +409,11 @@ export default function LoginPage() {
               {/* Nút Đăng nhập bằng Google */}
               <button
                 type="button"
-                disabled
                 onClick={handleGoogleClick}
-                className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-3 rounded-[5px] border border-slate-200 bg-slate-50 text-sm font-medium text-slate-400 shadow-sm transition-all duration-200 opacity-80 sm:text-base"
+                className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-[5px] border border-slate-200 bg-white text-sm font-medium text-slate-700 shadow-sm transition-all duration-200 hover:bg-slate-50 sm:text-base"
               >
                 {/* Google Multi-Color SVG Icon */}
-                <svg className="h-5 w-5 opacity-60" viewBox="0 0 24 24">
+                <svg className="h-5 w-5" viewBox="0 0 24 24">
                   <path
                     fill="#4285F4"
                     d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"

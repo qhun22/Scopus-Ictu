@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     display_name: str
     role: str
     lecturer_id: uuid.UUID | None = None
+    avatar_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

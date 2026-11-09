@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { User } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { createUser, getUsers } from "../../api/users";
+import Avatar from "../../components/common/Avatar";
 import Button, { buttonClass } from "../../components/ui/Button";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
@@ -364,9 +365,11 @@ export default function UsersPage() {
                   <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3A5FC3] text-xs font-bold text-white shadow-xs">
-                          {u.display_name.charAt(0).toUpperCase()}
-                        </div>
+                        <Avatar
+                          src={u.avatar_url}
+                          name={u.display_name}
+                          className="h-8 w-8 rounded-full text-xs shadow-xs"
+                        />
                         <div>
                           <span className="font-bold text-slate-800">{u.display_name}</span>
                           <span className="block text-[10px] text-slate-400">

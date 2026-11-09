@@ -4,6 +4,7 @@ import { ApiError } from "./client";
 
 const CODE_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.",
+  TOO_MANY_LOGIN_ATTEMPTS: "Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.",
   ACCOUNT_LOCKED: "Tài khoản đang bị khóa.",
   PASSWORD_RESET_BY_ADMIN: "Thông tin đăng nhập đã được quản trị viên thay đổi.",
   SESSION_REVOKED: "Phiên đăng nhập đã thay đổi. Vui lòng đăng nhập lại.",

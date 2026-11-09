@@ -112,7 +112,7 @@ decisions are echoed, never modified.
 ## Database and migrations
 
 - Migrations are append-only. Never rewrite a published revision; add a new one.
-- Current head: `15c7b721214c` (feedback report seen marker), single head; verify with
+- Current head: `e8b2c6a94f17` (users.has_password / users.google_linked), single head; verify with
   `python -m alembic heads`.
 - `python -m alembic revision --autogenerate -m "describe change"`.
 

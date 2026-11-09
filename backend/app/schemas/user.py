@@ -76,6 +76,9 @@ class UserAdminResponse(BaseModel):
     updated_at: datetime
     has_warning: bool = False
     warning_reason: str | None = None
+    avatar_url: str | None = None
+    has_password: bool = True
+    google_linked: bool = False
 
 
 class PasswordResetResponse(BaseModel):
