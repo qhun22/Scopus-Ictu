@@ -1,413 +1,224 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { ApiError } from "../../api/client";
-import { getApiErrorMessage } from "../../api/errors";
-import { getMyLecturerPublications } from "../../api/lecturerScopus";
+import { useMemo, type ReactNode } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import Button from "../../components/ui/Button";
 import { useI18n } from "../../i18n";
-import Button, { buttonClass } from "../../components/ui/Button";
-import { LecturerPublication, LecturerPublicationsResponse } from "../../types/lecturerScopus";
+import type { TranslationSchema } from "../../i18n/types";
+import type { LecturerPublication } from "../../types/lecturerScopus";
+import { distinctValues, FILTER_KEYS, filterPublications, SORT_KEYS, type FilterKey, type PublicationFilters } from "./publicationFilters";
+import useMyPublications from "./useMyPublications";
+import usePublicationSearch from "./usePublicationSearch";
 
-const PAGE_SIZE = 20;
-
-const viCopy = {
-  title: "Công bố Scopus của tôi",
-  subtitle: "Các công bố được liên kết từ những định danh Scopus đã được phê duyệt.",
-  summaryTitle: "Tổng quan công bố",
-  totalPublications: "Tổng số công bố",
-  knownCitations: "Tổng lượt trích dẫn đã biết",
-  unknownCitations: "Công bố chưa có dữ liệu trích dẫn",
-  approvedIdentities: "Định danh Scopus đã duyệt",
-  yearTitle: "Phân bổ theo năm",
-  unknownYear: "Chưa rõ năm",
-  noYearData: "Chưa có dữ liệu phân bổ theo năm.",
-  publicationsTitle: "Danh sách công bố",
-  noPublicationsTitle: "Chưa có công bố Scopus",
-  noPublicationsMessage: "Chưa có công bố Scopus được liên kết với các định danh đã duyệt.",
-  year: "Năm",
-  sourceTitle: "Nguồn xuất bản",
-  documentType: "Loại tài liệu",
-  stage: "Giai đoạn công bố",
-  openAccess: "Truy cập mở",
-  eid: "EID",
-  doi: "DOI",
-  citations: "Trích dẫn",
-  viewDetail: "Xem chi tiết công bố",
-  authorPositions: "Vị trí tác giả",
-  citationUnknown: "Chưa có dữ liệu",
-  yearUnknown: "Chưa rõ năm",
-  notAvailable: "Chưa cập nhật",
-  loading: "Đang tải dữ liệu...",
-  paginationLoading: "Đang tải dữ liệu...",
-  loadError: "Không thể tải công bố Scopus.",
-  retry: "Thử lại",
-  notLinkedTitle: "Tài khoản chưa được liên kết",
-  notLinkedMessage: "Tài khoản của bạn chưa được liên kết với hồ sơ giảng viên ICTU.",
-  previous: "Trang trước",
-  next: "Trang sau",
-  pageIndicator: (page: number, totalPages: number) => `Trang ${page} / ${totalPages}`,
-};
-
-const enCopy = {
-  title: "My Scopus publications",
-  subtitle: "Publications linked from your approved Scopus identities.",
-  summaryTitle: "Publication overview",
-  totalPublications: "Total publications",
-  knownCitations: "Known citation sum",
-  unknownCitations: "Publications without citation data",
-  approvedIdentities: "Approved Scopus identities",
-  yearTitle: "Publication years",
-  unknownYear: "Unknown year",
-  noYearData: "No year breakdown is available.",
-  publicationsTitle: "Publication list",
-  noPublicationsTitle: "No Scopus publications",
-  noPublicationsMessage: "No Scopus publications are linked to your approved identities.",
-  year: "Year",
-  sourceTitle: "Source title",
-  documentType: "Document type",
-  stage: "Publication stage",
-  openAccess: "Open access",
-  eid: "EID",
-  doi: "DOI",
-  citations: "Citations",
-  viewDetail: "View publication details",
-  authorPositions: "Author positions",
-  citationUnknown: "No data",
-  yearUnknown: "Unknown year",
-  notAvailable: "Not available",
-  loading: "Loading publications…",
-  paginationLoading: "Loading publication page…",
-  loadError: "Unable to load your Scopus publications.",
-  retry: "Retry",
-  notLinkedTitle: "Account not linked",
-  notLinkedMessage: "Your account is not linked to an ICTU lecturer profile.",
-  previous: "Previous",
-  next: "Next",
-  pageIndicator: (page: number, totalPages: number) => `Page ${page} / ${totalPages}`,
-};
-
-type PublicationCopy = typeof viCopy;
-
-function formatNumber(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US").format(value);
-}
-
-function sortedYearBuckets(buckets: Record<string, number>): Array<[string, number]> {
-  return Object.entries(buckets).sort(([left], [right]) => {
-    const leftYear = Number(left);
-    const rightYear = Number(right);
-    const leftKnown = Number.isFinite(leftYear);
-    const rightKnown = Number.isFinite(rightYear);
-
-    if (leftKnown && rightKnown) return rightYear - leftYear;
-    if (leftKnown) return -1;
-    if (rightKnown) return 1;
-    return left.localeCompare(right);
-  });
-}
-
-function LoadingState({ copy }: { copy: PublicationCopy }) {
-  return (
-    <div className="space-y-6" aria-label={copy.loading}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="h-28 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />
-        ))}
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="h-72 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />
-        <div className="h-72 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />
-      </div>
-      <div className="space-y-4">
-        {[0, 1].map((item) => <div key={item} className="h-44 animate-pulse rounded-card border border-slate-200 bg-white shadow-sm" />)}
-      </div>
-    </div>
-  );
-}
-
-function StateCard({
-  title,
-  message,
-  retryLabel,
-  onRetry,
-  tone,
-}: {
-  title: string;
-  message: string;
-  retryLabel: string;
-  onRetry: () => void;
-  tone: "error" | "info";
-}) {
-  const toneClass = tone === "error"
-    ? "border-rose-200 bg-rose-50 text-rose-900"
-    : "border-blue-200 bg-blue-50 text-blue-900";
-
-  return (
-    <div className={`rounded-card border p-6 shadow-sm ${toneClass}`} role="alert">
-      <h2 className="text-base font-semibold">{title}</h2>
-      <p className="mt-2 text-sm opacity-80">{message}</p>
-      <Button variant="secondary" onClick={onRetry} className="mt-5">
-        {retryLabel}
-      </Button>
-    </div>
-  );
-}
-
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <section className="rounded-card border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
-    </section>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm text-slate-700">{value}</dd>
-    </div>
-  );
-}
-
-function PublicationCard({
-  publication,
-  copy,
-  locale,
-}: {
-  publication: LecturerPublication;
-  copy: PublicationCopy;
-  locale: string;
-}) {
-  const value = (field: string | null) => field ?? copy.notAvailable;
-  const year = publication.year === null ? copy.yearUnknown : String(publication.year);
-  const citations = publication.cited_by_count === null
-    ? copy.citationUnknown
-    : formatNumber(publication.cited_by_count, locale);
-
-  return (
-    <article className="rounded-card border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h3 className="text-base font-bold leading-6 text-slate-900">{publication.title || copy.notAvailable}</h3>
-        {/* W-02: the EID from the API is the publication route key (same as /publications). */}
-        <Link
-          to={`/publications/${encodeURIComponent(publication.eid)}`}
-          state={{ from: "/my-publications" }}
-          className={`${buttonClass("tonal", "sm")} self-start`}
-          aria-label={`${copy.viewDetail}: ${publication.title || publication.eid}`}
-          data-testid="my-publication-detail-link"
-        >
-          {copy.viewDetail}
-        </Link>
-      </div>
-      <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Detail label={copy.year} value={year} />
-        <Detail label={copy.sourceTitle} value={value(publication.source_title)} />
-        <Detail label={copy.documentType} value={value(publication.document_type)} />
-        <Detail label={copy.stage} value={value(publication.publication_stage)} />
-        <Detail label={copy.openAccess} value={value(publication.open_access_status)} />
-        <Detail label={copy.citations} value={citations} />
-        <Detail label={copy.eid} value={publication.eid} />
-        <Detail label={copy.doi} value={value(publication.doi)} />
-        {publication.linked_author_orders.length > 0 ? (
-          <Detail label={copy.authorPositions} value={publication.linked_author_orders.join(", ")} />
-        ) : null}
-      </dl>
-    </article>
-  );
-}
-
-function YearBreakdown({
-  aggregates,
-  copy,
-  locale,
-}: {
-  aggregates: LecturerPublicationsResponse["aggregates"];
-  copy: PublicationCopy;
-  locale: string;
-}) {
-  const buckets = sortedYearBuckets(aggregates.publication_count_by_year);
-  const hasUnknownYear = aggregates.unknown_year_count > 0;
-
-  return (
-    <section className="rounded-card border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-base font-semibold text-slate-900">{copy.yearTitle}</h2>
-      {buckets.length === 0 && !hasUnknownYear ? (
-        <p className="mt-4 text-sm text-slate-500">{copy.noYearData}</p>
-      ) : (
-        <ul className="mt-4 space-y-3">
-          {buckets.map(([year, count]) => (
-            <li key={year} className="flex items-center justify-between gap-4 text-sm">
-              <span className="text-slate-600">{year}</span>
-              <span className="font-semibold text-slate-900">{formatNumber(count, locale)}</span>
-            </li>
-          ))}
-          {hasUnknownYear ? (
-            <li className="flex items-center justify-between gap-4 border-t border-slate-100 pt-3 text-sm">
-              <span className="text-slate-600">{copy.unknownYear}</span>
-              <span className="font-semibold text-slate-900">{formatNumber(aggregates.unknown_year_count, locale)}</span>
-            </li>
-          ) : null}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function PaginationControls({
-  copy,
-  currentPage,
-  totalPages,
-  total,
-  disabled,
-  onPrevious,
-  onNext,
-}: {
-  copy: PublicationCopy;
-  currentPage: number;
-  totalPages: number;
-  total: number;
-  disabled: boolean;
-  onPrevious: () => void;
-  onNext: () => void;
+type Copy = TranslationSchema["myPublications"];
+const controlClass = "h-control w-full min-w-0 rounded-control border border-line bg-white px-2.5 text-sm text-ink-body focus:border-line focus:outline-none";
+const panelClass = "rounded-card border border-line bg-white shadow-sm";
+const tableHeadClass = "border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap";
+const tableCellClass = "border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle";
+const detailLinkClass = "inline-flex w-32 items-center justify-center whitespace-nowrap rounded-control border border-slate-300 bg-white px-2.5 py-0.5 text-sm font-bold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 cursor-pointer";
+function SelectField({ label, value, onChange, options, all }: {
+  label: string; value: string; onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>; all?: string;
 }) {
   return (
-    <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Publication pagination">
-      <Button variant="secondary" onClick={onPrevious} disabled={disabled || currentPage <= 1}>
-        {copy.previous}
-      </Button>
-      <span className="text-sm font-medium text-slate-600" aria-live="polite">{copy.pageIndicator(currentPage, totalPages)}</span>
-      <Button variant="secondary" onClick={onNext} disabled={disabled || total === 0 || currentPage >= totalPages}>
-        {copy.next}
-      </Button>
-    </nav>
+    <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink-muted">
+      {label}
+      <select className={controlClass} value={value} onChange={(event) => onChange(event.target.value)}>
+        {all && <option value="">{all}</option>}
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function DetailLink({ publication, copy, children, className = "" }: { publication: LecturerPublication; copy: Copy; children?: ReactNode; className?: string }) {
+  return (
+    <Link to={`/publications/${encodeURIComponent(publication.eid)}`} state={{ from: "/my-publications" }}
+      className={className} aria-label={`${copy.viewDetail}: ${publication.title || publication.eid}`} data-testid="my-publication-detail-link">
+      {children || copy.viewDetail}
+    </Link>
   );
 }
 
 export default function MyPublicationsPage() {
-  const { locale } = useI18n();
-  const copy = locale === "vi" ? viCopy : enCopy;
-  const [response, setResponse] = useState<LecturerPublicationsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [paginationLoading, setPaginationLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notLinked, setNotLinked] = useState(false);
-  const controllerRef = useRef<AbortController | null>(null);
-  const requestedPageRef = useRef(1);
-  const hasLoadedRef = useRef(false);
-
-  const loadPage = useCallback((requestedPage: number) => {
-    const page = Math.max(1, Math.trunc(requestedPage));
-    requestedPageRef.current = page;
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    const isPaginationRequest = hasLoadedRef.current;
-
-    setError(null);
-    setNotLinked(false);
-    if (isPaginationRequest) {
-      setPaginationLoading(true);
-    } else {
-      setLoading(true);
-    }
-
-    void getMyLecturerPublications({ page, page_size: PAGE_SIZE }, { signal: controller.signal })
-      .then((data) => {
-        if (!controller.signal.aborted) {
-          setResponse(data);
-          hasLoadedRef.current = true;
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (controller.signal.aborted) return;
-        setResponse(null);
-        if (requestError instanceof ApiError && requestError.code === "LECTURER_NOT_LINKED") {
-          setNotLinked(true);
-          return;
-        }
-        setError(getApiErrorMessage(requestError, copy.loadError));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          setPaginationLoading(false);
-        }
-      });
-  }, [copy.loadError]);
-
-  useEffect(() => {
-    loadPage(1);
-    return () => controllerRef.current?.abort();
-  }, [loadPage]);
-
-  const retry = () => loadPage(requestedPageRef.current);
-  const totalPages = response
-    ? Math.max(1, Math.ceil(response.total / Math.max(1, response.page_size)))
-    : 1;
+  const { t, locale } = useI18n();
+  const copy = t.myPublications;
+  const { response, loading, error, notLinked, reload } = useMyPublications(copy.loadError);
+  const [params, setParams] = useSearchParams();
+  const filters = useMemo(() => Object.fromEntries(FILTER_KEYS.map((key) => [key, params.get(key) || ""])) as PublicationFilters, [params]);
+  const sort = SORT_KEYS.find((key) => key === params.get("sort")) || "newest";
+  const pageSize = [10, 20, 50].find((size) => size === Number(params.get("size"))) || 10;
+  const number = (value: number) => new Intl.NumberFormat(locale === "vi" ? "vi-VN" : "en-US").format(value);
+  const update = (key: string, value: string) => {
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (value) next.set(key, value); else next.delete(key);
+      if (key !== "page") next.delete("page");
+      next.delete("view");
+      return next;
+    }, { replace: true });
+  };
+  const search = usePublicationSearch(filters.q, (value) => update("q", value));
+  const reset = () => {
+    search.clear();
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      FILTER_KEYS.forEach((key) => next.delete(key));
+      next.delete("page");
+      next.delete("sort");
+      next.delete("view");
+      return next;
+    }, { replace: true });
+  };
+  const activeFilters = FILTER_KEYS.filter((key) => filters[key].trim());
+  const canReset = activeFilters.length > 0 || search.draft.length > 0 || sort !== "newest";
+  const filtered = useMemo(() => filterPublications(response?.items || [], filters, sort, locale), [response, filters, sort, locale]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const requestedPage = Number(params.get("page"));
+  const page = Math.min(totalPages, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+  const visible = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const values = (field: Parameters<typeof distinctValues>[1]) => distinctValues(response?.items || [], field, locale).map((value) => ({ value, label: value }));
+  const yearBuckets = Object.entries(response?.aggregates.publication_count_by_year || {}).sort(([a], [b]) => Number(b) - Number(a));
+  const yearOptions = yearBuckets.map(([year]) => ({ value: year, label: year }));
+  if (response?.aggregates.unknown_year_count) yearOptions.push({ value: "unknown", label: copy.unknownYear });
+  const labels: Record<FilterKey, string> = { q: copy.search, year: copy.year, type: copy.documentType, source: copy.sourceTitle, stage: copy.stage, access: copy.openAccess, citations: copy.citationStatus, doi: copy.doiStatus, author: copy.authorRole };
+  const filterField = (key: FilterKey, options: Array<{ value: string; label: string }>) => <SelectField label={labels[key]} value={filters[key]} onChange={(value) => update(key, value)} options={options} all={copy.all} />;
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{copy.title}</h1>
-        <p className="mt-1 text-sm text-slate-500">{copy.subtitle}</p>
-      </header>
+    <div className="my-publications-page app-page-container min-w-0 space-y-4 sm:space-y-5">
+      {loading && <div role="status" aria-label={copy.loading} className="space-y-5">
+        <p className="text-sm text-ink-muted">{copy.loading}</p>
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">{[0, 1, 2, 3].map((key) => <div key={key} className={`${panelClass} h-28 animate-pulse`} />)}</div>
+        <div className={`${panelClass} h-44 animate-pulse`} />
+        <div className={`${panelClass} h-80 animate-pulse`} />
+      </div>}
+      {!loading && (error || notLinked) && <div className={`${panelClass} p-6`} role="alert">
+        <h2 className="font-semibold text-ink">{notLinked ? copy.notLinkedTitle : copy.loadError}</h2>
+        <p className="mt-2 text-sm text-ink-muted">{notLinked ? copy.notLinkedMessage : error}</p>
+        <Button variant="secondary" className="mt-4" onClick={() => void reload()}>{copy.retry}</Button>
+      </div>}
+      {!loading && response && <>
+        <section aria-label={copy.summaryTitle} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {([
+            [copy.totalPublications, response.aggregates.total_publications],
+            [copy.knownCitations, response.aggregates.known_citation_sum],
+            [copy.unknownCitations, response.aggregates.citation_unknown_publication_count],
+            [copy.approvedIdentities, response.aggregates.approved_identity_count],
+          ] as const).map(([label, value]) => <div key={label} className={`${panelClass} flex flex-col justify-between gap-2 p-4 sm:p-5`}>
+            <p className="text-sm font-medium leading-6 text-ink-muted">{label}</p>
+            <p className="text-2xl font-bold tabular-nums text-ink">{number(value)}</p>
+          </div>)}
+        </section>
 
-      {loading ? <LoadingState copy={copy} /> : null}
-      {!loading && notLinked ? (
-        <StateCard title={copy.notLinkedTitle} message={copy.notLinkedMessage} retryLabel={copy.retry} onRetry={retry} tone="info" />
-      ) : null}
-      {!loading && error ? (
-        <StateCard title={copy.loadError} message={error} retryLabel={copy.retry} onRetry={retry} tone="error" />
-      ) : null}
-      {!loading && !error && !notLinked && paginationLoading ? (
-        <div className="rounded-card border border-blue-200 bg-blue-50 p-5 text-sm text-blue-900" role="status" aria-live="polite">
-          {copy.paginationLoading}
-        </div>
-      ) : null}
-
-      {!loading && !error && !notLinked && !paginationLoading && response ? (
-        <div className="space-y-6">
-          <section>
-            <h2 className="mb-4 text-base font-semibold text-slate-900">{copy.summaryTitle}</h2>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard label={copy.totalPublications} value={formatNumber(response.aggregates.total_publications, locale)} />
-              <SummaryCard label={copy.knownCitations} value={formatNumber(response.aggregates.known_citation_sum, locale)} />
-              <SummaryCard label={copy.unknownCitations} value={formatNumber(response.aggregates.citation_unknown_publication_count, locale)} />
-              <SummaryCard label={copy.approvedIdentities} value={formatNumber(response.aggregates.approved_identity_count, locale)} />
+        <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[250px_minmax(0,1fr)_190px]">
+          <section className={`${panelClass} min-w-0 space-y-3.5 p-3.5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto`} aria-label={copy.filterTitle}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-ink">{copy.filterTitle}</h2>
+              <Button variant="secondary" className="!min-w-0" onClick={reset} disabled={!canReset}>{copy.reset}</Button>
+            </div>
+            <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink-muted">
+              {copy.search}
+              <input type="text" role="searchbox" {...search.inputProps}
+                placeholder={copy.searchPlaceholder} title={copy.searchPlaceholder} className={`${controlClass} bg-slate-50/60`} />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              {filterField("year", yearOptions)}
+              {filterField("type", values("document_type"))}
+              {filterField("source", values("source_title"))}
+              {filterField("stage", values("publication_stage"))}
+              {filterField("access", values("open_access_status"))}
+              {filterField("citations", [{ value: "cited", label: copy.cited }, { value: "uncited", label: copy.uncited }, { value: "unknown", label: copy.citationUnknown }])}
+              {filterField("doi", [{ value: "present", label: copy.hasDoi }, { value: "missing", label: copy.missingDoi }])}
+              {filterField("author", [{ value: "first", label: copy.firstAuthor }, { value: "other", label: copy.otherAuthor }])}
+              <SelectField label={copy.sort} value={sort} onChange={(value) => update("sort", value)} options={SORT_KEYS.map((value) => ({ value, label: copy[value] }))} />
             </div>
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-            <section className="rounded-card border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-base font-semibold text-slate-900">{copy.publicationsTitle}</h2>
-              {response.items.length === 0 ? (
-                <div className="py-12 text-center">
-                  <h3 className="text-base font-semibold text-slate-900">{copy.noPublicationsTitle}</h3>
-                  <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{copy.noPublicationsMessage}</p>
-                </div>
-              ) : (
-                <div className="mt-5 space-y-4">
-                  {response.items.map((publication) => (
-                    <PublicationCard key={publication.eid} publication={publication} copy={copy} locale={locale} />
-                  ))}
-                </div>
-              )}
-            </section>
-            <YearBreakdown aggregates={response.aggregates} copy={copy} locale={locale} />
-          </div>
+          <section className="min-w-0 overflow-hidden rounded-card border border-slate-200/80 bg-white" aria-label={copy.publicationsTitle}>
+            <div className="relative overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <caption className="sr-only">{copy.publicationsTitle}</caption>
+                <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
+                  <tr>
+                    <th scope="col" className={`${tableHeadClass} w-14`}>{copy.serialNumber}</th>
+                    <th scope="col" className={`${tableHeadClass} !text-left`}>{copy.publicationsTitle}</th>
+                    {[copy.year, copy.documentType, copy.citations].map((label) => <th key={label} scope="col" className={tableHeadClass}>{label}</th>)}
+                    <th scope="col" className="sticky right-0 z-[1] w-44 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">{t.common.actions}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.length === 0 ? <tr>
+                    <td colSpan={6} className="px-5 py-12 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-1.5" role="status">
+                        <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-control border border-slate-200/80 bg-slate-100/80 text-slate-400">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700">{response.items.length ? copy.noResultsTitle : copy.noPublicationsTitle}</h3>
+                        <p className="max-w-lg text-sm text-slate-400">{response.items.length ? copy.noResultsMessage : copy.noPublicationsMessage}</p>
+                      </div>
+                    </td>
+                  </tr> : visible.map((item, index) => <tr key={item.eid} className="transition-colors hover:bg-slate-50/50">
+                    <td className={`${tableCellClass} w-14 font-medium tabular-nums text-slate-600`}>{number((page - 1) * pageSize + index + 1)}</td>
+                    <td className="min-w-[280px] max-w-md border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
+                      <DetailLink publication={item} copy={copy} className="block break-words font-medium text-slate-800 hover:text-brand">{item.title || copy.notAvailable}</DetailLink>
+                      <p className="text-slate-500">{item.source_title || copy.notAvailable}</p>
+                      <p className="break-all text-slate-400">{copy.doi}: {item.doi || copy.notAvailable}</p>
+                      <p className="break-all font-mono text-slate-400">{copy.eid}: {item.eid}</p>
+                    </td>
+                    <td className={`${tableCellClass} whitespace-nowrap font-medium text-slate-600`}>{item.year ?? copy.unknownYear}</td>
+                    <td className={`${tableCellClass} whitespace-nowrap font-medium text-slate-700`}>{item.document_type || copy.notAvailable}</td>
+                    <td className={`${tableCellClass} font-medium tabular-nums text-slate-800`} title={item.cited_by_count === null ? copy.citationUnknown : undefined}>{item.cited_by_count === null ? "—" : number(item.cited_by_count)}</td>
+                    <td className="sticky right-0 z-[1] whitespace-nowrap border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
+                      <DetailLink publication={item} copy={copy} className={detailLinkClass} />
+                    </td>
+                  </tr>)}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-4 py-3 text-sm text-slate-500">
+              <div className="flex flex-wrap items-center gap-3">
+                <span role="status">{copy.showing.split(/(\{shown\}|\{total\})/g).map((part, index) => part === "{shown}" ? <strong key={index}>{number(visible.length)}</strong> : part === "{total}" ? <strong key={index}>{number(filtered.length)}</strong> : part)}</span>
+                <label className="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+                  {t.common.showingCount}:
+                  <select aria-label={copy.pageSize} value={pageSize} onChange={(event) => update("size", event.target.value)} className={`${controlClass} !h-7 !w-auto !px-1.5 font-semibold`}>
+                    {[10, 20, 50].map((size) => <option key={size} value={size}>{copy.perPage.replace("{count}", number(size))}</option>)}
+                  </select>
+                </label>
+              </div>
+              <nav className="flex items-center gap-1.5" aria-label={copy.pagination}>
+                <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => update("page", String(page - 1))}>{copy.previous}</Button>
+                <span className="px-0.5 text-slate-400">{copy.pageLabel}</span>
+                <input key={`${page}-${totalPages}`} type="number" aria-label={copy.goToPage} min={1} max={totalPages} defaultValue={page} disabled={filtered.length === 0}
+                  onBlur={(event) => {
+                    const requested = Number(event.currentTarget.value);
+                    const target = Number.isFinite(requested) && event.currentTarget.value.trim() ? Math.max(1, Math.min(totalPages, Math.trunc(requested))) : page;
+                    event.currentTarget.value = String(target);
+                    if (target !== page) update("page", String(target));
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") event.currentTarget.value = String(page);
+                    if (event.key === "Enter" || event.key === "Escape") event.currentTarget.blur();
+                  }}
+                  className={`${controlClass} !h-8 !w-14 text-center font-bold disabled:cursor-not-allowed disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`} />
+                <span className="whitespace-nowrap text-slate-400" aria-live="polite">/ <strong className="text-slate-600">{number(totalPages)}</strong></span>
+                <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => update("page", String(page + 1))}>{copy.next}</Button>
+              </nav>
+            </div>
+          </section>
 
-          <PaginationControls
-            copy={copy}
-            currentPage={response.page}
-            totalPages={totalPages}
-            total={response.total}
-            disabled={paginationLoading}
-            onPrevious={() => loadPage(response.page - 1)}
-            onNext={() => loadPage(response.page + 1)}
-          />
+          <aside className={`${panelClass} min-w-0 p-3 lg:col-start-2 xl:sticky xl:top-0 xl:col-start-auto`}>
+            <h2 className="text-sm font-semibold text-ink">{copy.yearTitle}</h2>
+            <div className="mt-2 space-y-0.5" role="group" aria-label={copy.yearTitle}>
+              {[...yearBuckets, ...(response.aggregates.unknown_year_count ? [["unknown", response.aggregates.unknown_year_count] as [string, number]] : [])].map(([year, count]) => <button key={year} type="button" aria-pressed={filters.year === year}
+                onClick={() => update("year", filters.year === year ? "" : year)} className={`w-full rounded-control px-1.5 py-1.5 text-left text-sm ${filters.year === year ? "bg-brand-subtle text-brand" : "text-ink-muted hover:bg-slate-50"}`}>
+                <span className="mb-1.5 flex justify-between gap-2"><span>{year === "unknown" ? copy.unknownYear : year}</span><span className="font-semibold tabular-nums text-ink">{number(count)}</span></span>
+                <span className="block h-1.5 overflow-hidden rounded-control bg-slate-100"><span className={`block h-full rounded-control ${filters.year === year ? "bg-brand" : "bg-brand/40"}`} style={{ width: `${count / Math.max(1, ...yearBuckets.map(([, value]) => value), response.aggregates.unknown_year_count) * 100}%` }} /></span>
+              </button>)}
+              {!yearOptions.length && <p className="text-sm text-ink-muted">{copy.noYearData}</p>}
+            </div>
+          </aside>
         </div>
-      ) : null}
-    </main>
+      </>}
+    </div>
   );
 }

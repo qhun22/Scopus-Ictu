@@ -1002,7 +1002,6 @@ def delete_lecturer(
         raise HTTPException(status_code=503, detail="Không thể xóa giảng viên.") from exc
 
 
-
 @router.get("/ping", summary="Lecturers healthcheck")
 def ping() -> dict[str, str]:
     return {"status": "lecturers-ready", "milestone": "M2.3"}
@@ -1130,6 +1129,7 @@ async def preview_lecturer_dataset(
             code=exc.code or "INVALID_LECTURER_DATASET",
         ) from exc
     return LecturerPreviewResponse(
+        scopus_review_items=summary.scopus_review_items,
         dataset=_lecturer_import_dataset_meta(summary.dataset),
         summary={
             "total": summary.total,
@@ -1210,6 +1210,7 @@ async def import_lecturer_dataset(
     # rolled back, because the newest import still uses the data).
     supersede_earlier_lecturer_imports(db, hashlib.sha256(content).hexdigest(), admin)
     return LecturerImportResponse(
+        scopus_review_items=result.scopus_review_items,
         dataset=_lecturer_import_dataset_meta(result.dataset),
         summary={
             "total": result.total,

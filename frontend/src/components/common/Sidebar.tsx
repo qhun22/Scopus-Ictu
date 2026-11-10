@@ -81,9 +81,12 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
   const role = user?.role?.toUpperCase() || "LECTURER";
 
   // ── ADMIN nav groups ──────────────────────────────────────────
+  // "Trang chủ" IS the Tổng quan/Dashboard page for ADMIN — there is no
+  // separate generic home screen to duplicate it, so this first slot links
+  // straight to /dashboard instead of the shared /home page other roles use.
   const adminGroups: NavGroup[] = [
     {
-      items: [{ to: "/home", label: t.nav.home, icon: ICONS.home }],
+      items: [{ to: "/dashboard", label: t.nav.home, icon: ICONS.home }],
     },
     {
       heading: t.nav.groupWorkflow,
@@ -106,17 +109,11 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
       ],
     },
     {
-      heading: t.nav.groupAdmin,
-      items: [
-        { to: "/dashboard",     label: t.nav.dashboard,      icon: ICONS.dashboard },
-        { to: "/audit-logs",    label: t.nav.auditLogs,      icon: ICONS.auditLogs },
-      ],
-    },
-    {
       heading: t.nav.groupHelp,
       items: [
         { to: "/feedback-reports", label: t.nav.feedback, dot: feedbackUnread, icon: ICONS.feedback },
         { to: "/guide", label: t.nav.guide, icon: ICONS.guide },
+        { to: "/audit-logs", label: t.nav.auditLogs, icon: ICONS.auditLogs },
       ],
     },
   ];
@@ -283,7 +280,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
           >
             {!isCollapsed && <span className="font-semibold text-slate-600">{t.nav.version}</span>}
             <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-              M2.7
+              M4
             </span>
           </div>
         </div>
@@ -332,7 +329,7 @@ export default function Sidebar({ isCollapsed, isMobileOpen, onCloseMobile }: Si
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span className="font-semibold text-slate-600">Hệ thống Scopus ICTU</span>
                 <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-bold text-slate-700">
-                  M2.7
+                  M4
                 </span>
               </div>
             </div>

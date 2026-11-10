@@ -161,6 +161,18 @@ export function AffiliationSummaryBar({
 
 function OverrideNote({ override, locale }: { override: AffiliationOverrideRead; locale: Locale }) {
   const vi = locale === "vi";
+  // Color/text follow the ADMIN's own "Mức tin cậy" choice from the review form
+  // (ManualReviewCard) exactly — CORROBORATED = "đã xác minh" (green), UNRESOLVED =
+  // "chưa xác minh" (amber) — and nothing else. This used to also check isIctuUnit()
+  // here, so an ADMIN who picked "đã xác minh" for a confirmed non-ICTU co-affiliation
+  // (e.g. a real ICTU lecturer's second university on this paper) would still see
+  // "chưa xác minh" on this read-only page — contradicting their own explicit choice.
+  // ICTU-ness has its own separate badge elsewhere (ManualReviewCard's UNIT_BADGE_ICTU);
+  // it must not also silently override what the ADMIN confirmed here.
+  const verified = override.confidence === "CORROBORATED";
+  const label = verified
+    ? (vi ? "Đã được rà soát thủ công, có đơn vị, đã xác minh" : "Manually reviewed, unit confirmed, verified")
+    : (vi ? "Đã được rà soát thủ công, có đơn vị, chưa xác minh" : "Manually reviewed, unit confirmed, not verified");
   return (
     <div className="space-y-0.5">
       <div
@@ -177,11 +189,7 @@ function OverrideNote({ override, locale }: { override: AffiliationOverrideRead;
           </p>
         )}
       </div>
-      <p className="font-medium text-emerald-700">
-        {override.confidence === "CORROBORATED"
-          ? (vi ? "Đã được rà soát thủ công, có đơn vị" : "Manually reviewed, unit available")
-          : (vi ? "Đã được rà soát thủ công" : "Manually reviewed")}
-      </p>
+      <p className={`font-medium ${verified ? "text-emerald-700" : "text-amber-700"}`}>{label}</p>
     </div>
   );
 }
@@ -223,20 +231,48 @@ export function AuthorAffiliationCell({
   // cross-checked affiliations. The original auto cross-check source and the
   // "manually reviewed AND cross-checked" wording are ADMIN-only detail — a
   // lecturer only needs to know the unit was manually reviewed.
-  const activeOverrides = overrides.filter((o) => o.confidence === "CORROBORATED");
-  const primaryAffiliation = affiliations[0];
-  const primaryVerified = primaryAffiliation?.link_status === "VERIFIED";
-  const overrideUnitLabel = vi ? "Đã được rà soát thủ công, có đơn vị" : "Manually reviewed, unit available";
+  // Every override — CORROBORATED ("đã xác minh") and UNRESOLVED ("chưa xác minh") alike
+  // — has a real typed unit (the review form requires it regardless of confidence), so
+  // both must show here; UNRESOLVED is not "no unit", it's "a unit was recorded but the
+  // ADMIN isn't fully confident in it yet" (see ManualReviewCard's "Mức tin cậy" hint).
+  const activeOverrides = overrides;
+  const unitText = (a: (typeof affiliations)[number]) =>
+    a.raw_affiliation_text ?? a.organizations[0]?.display_name ?? "";
+  const unitKey = (a: (typeof affiliations)[number]) => unitText(a).trim().toLowerCase();
+  // One row per distinct unit: sources often repeat the same wording. The API sorts the strongest
+  // source first, so the row that stays is the one with the highest confidence.
+  const distinctUnits = affiliations.filter(
+    (a, i) => unitKey(a) !== "" && affiliations.findIndex((b) => unitKey(b) === unitKey(a)) === i,
+  );
+  // Matches OverrideNote's ADMIN-facing wording and color rule exactly (see that
+  // component for the full reasoning): green + "verified" for CORROBORATED, amber +
+  // "not verified" for UNRESOLVED — driven solely by the ADMIN's own "Mức tin cậy"
+  // choice on each override, never by what the unit text says.
+  const overrideUnitLabel = (verified: boolean) => verified
+    ? (vi ? "Đã được rà soát thủ công, có đơn vị, đã xác minh" : "Manually reviewed, unit confirmed, verified")
+    : (vi ? "Đã được rà soát thủ công, có đơn vị, chưa xác minh" : "Manually reviewed, unit confirmed, not verified");
   // Cross-checked-only (not verified) must read as "not verified" in plain language and
   // not be painted green like a verified/reviewed result — amber signals "take with a grain of salt".
-  const fallbackUnitLabel = primaryVerified
+  const fallbackUnitLabel = (verified: boolean) => verified
     ? (vi ? "Đã xác minh định danh, có đơn vị" : "Identity verified, unit available")
-    : (vi ? "Đã có nguồn đối chiếu, chưa xác minh, có đơn vị" : "Cross-checked source, not verified, unit available");
-  const fallbackUnitColorClass = primaryVerified ? "text-emerald-700" : "text-amber-700";
+    : (vi ? "Đã có nguồn đối chiếu, có đơn vị, chưa xác minh" : "Cross-checked source, not verified, unit available");
+
+  // Several units with the same trust level share one label, set apart by a rule.
+  const sharedLabelClass = (unitCount: number) =>
+    `text-sm font-medium ${unitCount > 1 ? "mt-3 border-t border-slate-200 pt-3" : "mt-0.5"}`;
+  const unitsShareTrust = distinctUnits.every(
+    (a) => (a.link_status === "VERIFIED") === (distinctUnits[0].link_status === "VERIFIED"),
+  );
+  const overridesShareConfidence = activeOverrides.every(
+    (o) => o.confidence === activeOverrides[0]?.confidence,
+  );
 
   const simpleUnitBlock = activeOverrides.length > 0 ? (
-    <div className="divide-y divide-slate-200" data-testid="aff-has-unit">
-      {activeOverrides.map((o, i) => (
+    <div data-testid="aff-has-unit">
+      <div className="divide-y divide-slate-200">
+      {activeOverrides.map((o, i) => {
+        const verified = o.confidence === "CORROBORATED";
+        return (
         <div key={`override-${i}`} className={["space-y-0.5", i > 0 ? "pt-3" : "", i < activeOverrides.length - 1 ? "pb-3" : ""].join(" ")}>
           <p className="font-medium text-slate-700">
             {vi ? "Đơn vị: " : "Unit: "}
@@ -250,17 +286,46 @@ export function AuthorAffiliationCell({
               </a>
             ) : (vi ? "ADMIN xác nhận thủ công" : "Manually confirmed by ADMIN")}
           </p>
-          <p className="text-sm font-medium text-emerald-700">{overrideUnitLabel}</p>
+          {!overridesShareConfidence && (
+            <p className={`text-sm font-medium ${verified ? "text-emerald-700" : "text-amber-700"}`}>
+              {overrideUnitLabel(verified)}
+            </p>
+          )}
         </div>
-      ))}
+        );
+      })}
+      </div>
+      {overridesShareConfidence && (
+        <p className={`${sharedLabelClass(activeOverrides.length)} ${activeOverrides[0]?.confidence === "CORROBORATED" ? "text-emerald-700" : "text-amber-700"}`}>
+          {overrideUnitLabel(activeOverrides[0]?.confidence === "CORROBORATED")}
+        </p>
+      )}
     </div>
-  ) : primaryAffiliation && (primaryAffiliation.raw_affiliation_text || primaryAffiliation.organizations[0]?.display_name) ? (
-    <div className="space-y-0.5" data-testid="aff-has-unit">
-      <p className="font-medium text-slate-700">
-        {vi ? "Đơn vị: " : "Unit: "}
-        {primaryAffiliation.raw_affiliation_text ?? primaryAffiliation.organizations[0]?.display_name}
-      </p>
-      <p className={`text-sm font-medium ${fallbackUnitColorClass}`}>{fallbackUnitLabel}</p>
+  ) : distinctUnits.length > 0 ? (
+    <div data-testid="aff-has-unit">
+      <div className="divide-y divide-slate-200">
+      {distinctUnits.map((a, i) => {
+        const verified = a.link_status === "VERIFIED";
+        return (
+          <div key={`unit-${i}`} className={["space-y-0.5", i > 0 ? "pt-3" : "", i < distinctUnits.length - 1 ? "pb-3" : ""].join(" ")}>
+            <p className="font-medium text-slate-700">
+              {vi ? "Đơn vị: " : "Unit: "}
+              {unitText(a)}
+            </p>
+            {!unitsShareTrust && (
+              <p className={`text-sm font-medium ${verified ? "text-emerald-700" : "text-amber-700"}`}>
+                {fallbackUnitLabel(verified)}
+              </p>
+            )}
+          </div>
+        );
+      })}
+      </div>
+      {unitsShareTrust && (
+        <p className={`${sharedLabelClass(distinctUnits.length)} ${distinctUnits[0].link_status === "VERIFIED" ? "text-emerald-700" : "text-amber-700"}`}>
+          {fallbackUnitLabel(distinctUnits[0].link_status === "VERIFIED")}
+        </p>
+      )}
     </div>
   ) : null;
   const simpleNoUnit = (

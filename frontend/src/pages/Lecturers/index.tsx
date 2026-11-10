@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   LecturerForm,
   LecturerMasterItem,
@@ -25,7 +26,7 @@ import Button, { buttonClass } from "../../components/ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
-import ScopusIdentitiesSummary from "./ScopusIdentitiesSummary";
+import ScopusIdentitiesSummary, { type ScopusIdentitiesEditorHandle } from "./ScopusIdentitiesSummary";
 
 export default function LecturersPage() {
   const toast = useToast();
@@ -110,12 +111,16 @@ export default function LecturersPage() {
     phone: "",
   });
   const [editError, setEditError] = useState<string>("");
-  const [editStaffCodeFieldError, setEditStaffCodeFieldError] = useState<string>("");
+  const scopusEditorRef = useRef<ScopusIdentitiesEditorHandle>(null);
+  const detailFormRef = useRef<HTMLFormElement>(null);
+  const [isScopusReasonOpen, setIsScopusReasonOpen] = useState(false);
+  const [scopusSaveReason, setScopusSaveReason] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordError, setPasswordError] = useState("");
 
   // Grant Account states (for unlinked profile in Detail modal)
+  const [isAccountExpanded, setIsAccountExpanded] = useState(false);
   const [grantAccount, setGrantAccount] = useState(false);
   const [grantEmail, setGrantEmail] = useState("");
   const [grantPassword, setGrantPassword] = useState("");
@@ -183,14 +188,40 @@ export default function LecturersPage() {
     if (!isDetailModalOpen) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !isDetailBusy && confirmAction === null) {
+      if (event.key === "Escape" && !isDetailBusy && confirmAction === null && !isScopusReasonOpen) {
         setIsDetailModalOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [confirmAction, isDetailBusy, isDetailModalOpen]);
+  }, [confirmAction, isDetailBusy, isDetailModalOpen, isScopusReasonOpen]);
+
+  useLayoutEffect(() => {
+    if (!isDetailModalOpen) return;
+
+    // The app scrolls in <main>; locking only body leaves a second scrollbar
+    // behind the dialog. Preserve each container's width and restore on close.
+    const scrollContainers = [document.documentElement, document.body, document.querySelector("main")]
+      .filter((element): element is HTMLElement => element !== null);
+    const previousStyles = scrollContainers.map((element) => ({
+      element,
+      overflowY: element.style.overflowY,
+      scrollbarGutter: element.style.scrollbarGutter,
+    }));
+
+    for (const element of scrollContainers) {
+      if (element.scrollHeight > element.clientHeight) element.style.scrollbarGutter = "stable";
+      element.style.overflowY = "hidden";
+    }
+
+    return () => {
+      for (const { element, overflowY, scrollbarGutter } of previousStyles) {
+        element.style.overflowY = overflowY;
+        element.style.scrollbarGutter = scrollbarGutter;
+      }
+    };
+  }, [isDetailModalOpen]);
 
   const handleApplySearch = () => {
     if (search === appliedSearch) return;
@@ -330,12 +361,17 @@ export default function LecturersPage() {
       date_of_birth: lec.date_of_birth || "",
       phone: lec.phone || "",
     });
+    setIsAccountExpanded(false);
+    setIsScopusReasonOpen(false);
+    // Pre-filled so the reason dialog (when it appears) only needs one more
+    // click -- e.g. for an ID retained from an earlier JSON import, which is
+    // itself the evidence. Still editable; only used if there are changes.
+    setScopusSaveReason(t.lecturers.scopus.reasonDefault);
     setGrantAccount(false);
     setGrantEmail(lec.institutional_email || "");
     setGrantPassword("");
     setGrantRole(lec.account?.role || "LECTURER");
     setEditError("");
-    setEditStaffCodeFieldError("");
     setNewPassword("");
     setPasswordError("");
     setShowNewPassword(false);
@@ -357,6 +393,7 @@ export default function LecturersPage() {
     }
 
     if (grantAccount && (!grantPassword || grantPassword.length < 8)) {
+      setIsAccountExpanded(true);
       setEditError(
         locale === "vi"
           ? "Mật khẩu cấp mới phải có ít nhất 8 ký tự."
@@ -365,9 +402,15 @@ export default function LecturersPage() {
       return;
     }
 
+    const scopusEditor = scopusEditorRef.current;
+    if (!scopusEditor || !scopusEditor.validate()) return;
+    if (scopusEditor.needsReason() && !scopusSaveReason.trim()) {
+      setIsScopusReasonOpen(true);
+      return;
+    }
+
     setDetailAction("save");
     setEditError("");
-    setEditStaffCodeFieldError("");
     try {
       // staff_code update contract:
       //   * user types a value -> trimmed value is sent (non-null)
@@ -391,6 +434,42 @@ export default function LecturersPage() {
         role: selectedLecturer.account || grantAccount ? grantRole : undefined,
       };
       const updated = await updateLecturer(selectedLecturer.id, payload);
+      // The profile and Scopus review APIs commit separately. Keep the new
+      // version/account locally so a partial Scopus failure can be retried.
+      setSelectedLecturer((current) => {
+        if (!current || current.id !== selectedLecturer.id) return current;
+        const hasAccount = Boolean(current.account || grantAccount);
+        return {
+          ...current,
+          full_name: updated.display_name,
+          institutional_email: updated.email || null,
+          version: hasAccount ? current.version : updated.version,
+          has_user_account: hasAccount,
+          has_warning: updated.has_warning,
+          warning_reason: updated.warning_reason,
+          account: hasAccount ? {
+            user_id: updated.id,
+            email: updated.email,
+            role: updated.role,
+            is_active: updated.is_active,
+            version: updated.version,
+            avatar_url: updated.avatar_url ?? current.account?.avatar_url ?? null,
+            has_password: updated.has_password ?? (grantAccount || Boolean(current.account?.has_password)),
+            google_linked: updated.google_linked ?? current.account?.google_linked ?? false,
+          } : null,
+        };
+      });
+      if (grantAccount) {
+        setGrantAccount(false);
+        setGrantPassword("");
+      }
+      try {
+        await scopusEditor.save(scopusSaveReason);
+      } catch {
+        setEditError(t.lecturers.scopus.profileSavedPartial);
+        await fetchData();
+        return;
+      }
       if (updated.has_warning) {
         toast.warning(
           locale === "vi" ? "Đã lưu, nhưng hồ sơ vẫn còn cảnh báo" : "Saved with a warning",
@@ -410,7 +489,7 @@ export default function LecturersPage() {
       if (getErrorCode(error) === "VERSION_CONFLICT") {
         await handleVersionConflict();
       } else if (getErrorCode(error) === "STAFF_CODE_ALREADY_EXISTS") {
-        setEditStaffCodeFieldError(
+        setEditError(
           locale === "vi"
             ? "Mã cán bộ đã được sử dụng bởi giảng viên khác."
             : "This staff code is already in use by another lecturer.",
@@ -1393,7 +1472,7 @@ export default function LecturersPage() {
                   <h3 id="lecturer-detail-title" className="text-base font-bold text-[#2f4ea6] sm:text-lg">
                     {locale === "vi" ? "Chi tiết Hồ sơ Giảng viên" : "Lecturer Profile Details"}
                   </h3>
-                  <p className="mt-0.5 break-all text-[11px] font-mono text-slate-400">
+                  <p className="mt-0.5 break-all text-[14px] font-mono text-slate-400">
                     ID: {selectedLecturer.id}
                   </p>
                 </div>
@@ -1410,18 +1489,18 @@ export default function LecturersPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col text-xs">
-                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-6">
+              <form ref={detailFormRef} onSubmit={handleEditSubmit} className="flex min-h-0 flex-1 flex-col text-[14px]">
+                <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 py-4 [scrollbar-gutter:stable] [overflow-anchor:none] sm:px-6">
                   {/* Warning Notice Banner */}
                   {selectedLecturer.has_warning && (
-                    <div className="rounded-[5px] border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
+                    <div className="rounded-[5px] border border-amber-200 bg-amber-50 p-3.5 text-[14px] text-amber-900 flex items-start gap-2.5">
                       <svg className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <div>
                         <strong className="font-bold">{locale === "vi" ? "Hồ sơ cần được rà soát" : "Profile needs review"}:</strong>{" "}
                         <span>{selectedLecturer.warning_reason || (locale === "vi" ? "Tên giảng viên bị trùng và chưa có đủ thông tin để xác định hồ sơ." : "The lecturer name is duplicated and the profile lacks enough identifying information.")}</span>
-                        <p className="mt-1 text-[11px] text-amber-700">
+                        <p className="mt-1 text-[14px] text-amber-700">
                           {locale === "vi"
                             ? "Vui lòng kiểm tra và cập nhật email hoặc thông tin nhận diện. Cảnh báo sẽ tự động được gỡ bỏ khi dữ liệu không còn trùng."
                             : "Review and update the email or identifying information. The warning will clear automatically once the data is no longer duplicated."}
@@ -1430,14 +1509,7 @@ export default function LecturersPage() {
                     </div>
                   )}
 
-                  <section aria-labelledby="lecturer-information-heading">
-                    <h4
-                      id="lecturer-information-heading"
-                      className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      {locale === "vi" ? "Thông tin hồ sơ giảng viên" : "Lecturer Profile"}
-                    </h4>
-
+                  <section>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label htmlFor="edit-full-name" className="mb-1 block font-semibold text-slate-700">
@@ -1467,31 +1539,6 @@ export default function LecturersPage() {
                           placeholder={selectedLecturer.institutional_email || "example@ictu.edu.vn"}
                           className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
                         />
-                      </div>
-
-                      <div>
-                        <label htmlFor="edit-staff-code" className="mb-1 block font-semibold text-slate-700">
-                          {locale === "vi" ? "Mã cán bộ" : "Staff Code"}
-                          <span className="ml-1 text-[10px] font-normal text-slate-400">
-                            ({locale === "vi" ? "có thể để trống" : "may be blank"})
-                          </span>
-                        </label>
-                        <input
-                          id="edit-staff-code"
-                          type="text"
-                          disabled={isDetailBusy}
-                          value={editForm.staff_code}
-                          onChange={(e) => {
-                            setEditForm({ ...editForm, staff_code: e.target.value });
-                            setEditStaffCodeFieldError("");
-                          }}
-                          placeholder={locale === "vi" ? "VD: CB00123" : "e.g. CB00123"}
-                          className="h-9 w-full rounded-[5px] border border-slate-200 px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:bg-slate-50"
-                          aria-invalid={editStaffCodeFieldError ? "true" : "false"}
-                        />
-                        {editStaffCodeFieldError && (
-                          <p className="mt-1 text-[11px] font-medium text-rose-600">{editStaffCodeFieldError}</p>
-                        )}
                       </div>
 
                       <div>
@@ -1611,7 +1658,7 @@ export default function LecturersPage() {
                           href={selectedLecturer.profile_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-[#3A5FC3] hover:underline break-all text-xs inline-flex items-center gap-1"
+                          className="text-[#3A5FC3] hover:underline break-all text-[14px] inline-flex items-center gap-1"
                         >
                           <span>{selectedLecturer.profile_url}</span>
                           <svg className="h-3 w-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1621,172 +1668,206 @@ export default function LecturersPage() {
                       </div>
                     )}
 
-                    <ScopusIdentitiesSummary lecturerId={selectedLecturer.id} locale={locale} />
+                    <ScopusIdentitiesSummary ref={scopusEditorRef} key={selectedLecturer.id} lecturerId={selectedLecturer.id} disabled={isDetailBusy} />
 
-                    {editError && <p className="mt-2 text-[11px] font-medium text-rose-600">{editError}</p>}
+                    {editError && <p className="mt-2 text-[14px] font-medium text-rose-600">{editError}</p>}
                   </section>
 
                   <section
                     aria-labelledby="system-account-heading"
-                    className="border-t border-slate-200 pt-4"
+                    className="overflow-hidden rounded-[5px] border border-slate-200 bg-white text-[14px] leading-5"
+                    onInvalidCapture={() => {
+                      // Reveal required fields before the browser focuses an invalid input.
+                      flushSync(() => setIsAccountExpanded(true));
+                    }}
                   >
-                    <h4
-                      id="system-account-heading"
-                      className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500"
-                    >
-                      {locale === "vi" ? "Tài khoản hệ thống liên kết" : "Linked System Account"}
-                    </h4>
-
-                    {selectedLecturer.account ? (
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="rounded-[5px] bg-slate-50 p-3">
-                            <span className="font-semibold text-slate-500 block text-[11px]">{locale === "vi" ? "Email đăng nhập" : "Login email"}</span>
-                            <span className="font-bold text-slate-800 mt-0.5 block">{selectedLecturer.account.email}</span>
-                          </div>
-                          <div className="rounded-[5px] bg-slate-50 p-3">
-                            <label htmlFor="edit-account-role" className="font-semibold text-slate-500 block text-[11px]">
-                              {locale === "vi" ? "Vai trò" : "Role"}
-                            </label>
-                            <select
-                              id="edit-account-role"
-                              value={grantRole}
-                              disabled={isDetailBusy}
-                              onChange={(event) => setGrantRole(event.target.value)}
-                              className="mt-1 h-8 w-full rounded-[5px] border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:cursor-not-allowed disabled:bg-slate-100"
-                            >
-                              <option value="LECTURER">{locale === "vi" ? "Giảng viên" : "Lecturer"}</option>
-                              <option value="ADMIN">{locale === "vi" ? "Quản trị viên" : "Administrator"}</option>
-                              <option value="REVIEWER">{locale === "vi" ? "Phê duyệt viên" : "Reviewer"}</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
-                          <span className="font-semibold text-slate-600">{locale === "vi" ? "Phương thức đăng nhập" : "Login method"}</span>
-                          <span className="flex flex-wrap justify-end gap-1.5">
-                            {selectedLecturer.account?.has_password && (
-                              <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
-                                Email
-                              </span>
-                            )}
-                            {selectedLecturer.account?.google_linked && (
-                              <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-bold text-slate-500">
-                                Google
-                              </span>
-                            )}
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+                      <h4 id="system-account-heading" className="min-w-0 font-bold text-slate-700">
+                        {t.lecturers.account.title}
+                      </h4>
+                      <button
+                        type="button"
+                        aria-expanded={isAccountExpanded}
+                        aria-controls="system-account-details"
+                        onClick={() => setIsAccountExpanded((expanded) => !expanded)}
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[5px] px-2 py-1 font-semibold text-brand hover:bg-brand-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+                      >
+                        {isAccountExpanded ? t.lecturers.account.collapse : t.lecturers.account.expand}
+                        <svg aria-hidden="true" className={`h-4 w-4 transition-transform ${isAccountExpanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="px-3 pb-3 sm:px-4" aria-live="polite">
+                      {selectedLecturer.account ? (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                          <span className="min-w-0 break-all font-semibold text-slate-700">{selectedLecturer.account.email}</span>
+                          <span className="text-slate-500">{getAccountRoleLabel(selectedLecturer.account.role)}</span>
+                          <span className={`rounded-[5px] border px-2 py-0.5 font-semibold ${selectedLecturer.account.is_active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}`}>
+                            {selectedLecturer.account.is_active ? t.lecturers.active : t.lecturers.inactive}
                           </span>
                         </div>
+                      ) : (
+                        <p className={grantAccount ? "font-medium text-amber-700" : "text-slate-500"}>
+                          {grantAccount ? t.lecturers.account.pending : t.lecturers.account.empty}
+                        </p>
+                      )}
+                    </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
-                          <span className="font-semibold text-slate-600">{locale === "vi" ? "Trạng thái tài khoản" : "Account status"}</span>
-                          {/* Same status label as the "Trạng thái" column of the list. */}
-                          <span
-                            className={`inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border px-2.5 py-0.5 text-xs font-bold ${
-                              selectedLecturer.account.is_active
-                                ? "border-emerald-400 bg-white text-emerald-600"
-                                : "border-rose-300 bg-white text-rose-700"
-                            }`}
-                          >
-                            {selectedLecturer.account.is_active
-                              ? (locale === "vi" ? "Hoạt động" : "Active")
-                              : (locale === "vi" ? "Đã khóa" : "Locked")}
-                          </span>
-                        </div>
+                    <div id="system-account-details" hidden={!isAccountExpanded} className="border-t border-slate-200 px-3 py-3 sm:px-4">
+                      {selectedLecturer.account ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="rounded-[5px] bg-slate-50 p-3">
+                              <span className="font-semibold text-slate-500 block text-[14px]">{locale === "vi" ? "Email đăng nhập" : "Login email"}</span>
+                              <span className="font-bold text-slate-800 mt-0.5 block">{selectedLecturer.account.email}</span>
+                            </div>
+                            <div className="rounded-[5px] bg-slate-50 p-3">
+                              <label htmlFor="edit-account-role" className="font-semibold text-slate-500 block text-[14px]">
+                                {locale === "vi" ? "Vai trò" : "Role"}
+                              </label>
+                              <select
+                                id="edit-account-role"
+                                value={grantRole}
+                                disabled={isDetailBusy}
+                                onChange={(event) => setGrantRole(event.target.value)}
+                                className="mt-1 h-8 w-full rounded-[5px] border border-slate-200 bg-white px-2 text-[14px] font-bold text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 disabled:cursor-not-allowed disabled:bg-slate-100"
+                              >
+                                <option value="LECTURER">{locale === "vi" ? "Giảng viên" : "Lecturer"}</option>
+                                <option value="ADMIN">{locale === "vi" ? "Quản trị viên" : "Administrator"}</option>
+                                <option value="REVIEWER">{locale === "vi" ? "Phê duyệt viên" : "Reviewer"}</option>
+                              </select>
+                            </div>
+                          </div>
 
-                        <div>
-                          <label htmlFor="new-password" className="mb-1 block font-semibold text-slate-700">
-                            {locale === "vi" ? "Mật khẩu mới" : "New password"}
-                          </label>
-                          <div className="relative">
-                            <input
-                              id="new-password"
-                              type={showNewPassword ? "text" : "password"}
-                              minLength={8}
-                              autoComplete="new-password"
-                              disabled={isDetailBusy || isCurrentAccount}
-                              value={newPassword}
-                              onChange={(event) => {
-                                setNewPassword(event.target.value);
-                                if (passwordError) setPasswordError("");
-                              }}
-                              placeholder={locale === "vi" ? "Nhập mật khẩu mới" : "Enter new password"}
-                              className={`h-9 w-full rounded-[5px] border px-3 pr-10 text-slate-800 focus:outline-none focus:ring-2 disabled:bg-slate-50 ${
-                                passwordError
-                                  ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
-                                  : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
+                            <span className="font-semibold text-slate-600">{locale === "vi" ? "Phương thức đăng nhập" : "Login method"}</span>
+                            <span className="flex flex-wrap justify-end gap-1.5">
+                              {selectedLecturer.account?.has_password && (
+                                <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-[14px] font-bold text-slate-500">
+                                  Email
+                                </span>
+                              )}
+                              {selectedLecturer.account?.google_linked && (
+                                <span className="inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 py-0.5 text-[14px] font-bold text-slate-500">
+                                  Google
+                                </span>
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[5px] bg-slate-50 px-3 py-2.5">
+                            <span className="font-semibold text-slate-600">{locale === "vi" ? "Trạng thái tài khoản" : "Account status"}</span>
+                            {/* Same status label as the "Trạng thái" column of the list. */}
+                            <span
+                              className={`inline-flex w-32 items-center justify-center whitespace-nowrap rounded-[5px] border px-2.5 py-0.5 text-[14px] font-bold ${
+                                selectedLecturer.account.is_active
+                                  ? "border-emerald-400 bg-white text-emerald-600"
+                                  : "border-rose-300 bg-white text-rose-700"
                               }`}
-                            />
-                            <button
+                            >
+                              {selectedLecturer.account.is_active
+                                ? (locale === "vi" ? "Hoạt động" : "Active")
+                                : (locale === "vi" ? "Đã khóa" : "Locked")}
+                            </span>
+                          </div>
+
+                          <div>
+                            <label htmlFor="new-password" className="mb-1 block font-semibold text-slate-700">
+                              {locale === "vi" ? "Mật khẩu mới" : "New password"}
+                            </label>
+                            <div className="relative">
+                              <input
+                                id="new-password"
+                                type={showNewPassword ? "text" : "password"}
+                                minLength={8}
+                                autoComplete="new-password"
+                                disabled={isDetailBusy || isCurrentAccount}
+                                value={newPassword}
+                                onChange={(event) => {
+                                  setNewPassword(event.target.value);
+                                  if (passwordError) setPasswordError("");
+                                }}
+                                placeholder={locale === "vi" ? "Nhập mật khẩu mới" : "Enter new password"}
+                                className={`h-9 w-full rounded-[5px] border px-3 pr-10 text-slate-800 focus:outline-none focus:ring-2 disabled:bg-slate-50 ${
+                                  passwordError
+                                    ? "border-rose-400 focus:border-rose-500 focus:ring-rose-500/20"
+                                    : "border-slate-200 focus:border-[#3A5FC3] focus:ring-[#3A5FC3]/20"
+                                }`}
+                              />
+                              <button
+                                type="button"
+                                disabled={isDetailBusy || isCurrentAccount}
+                                onClick={() => setShowNewPassword((visible) => !visible)}
+                                aria-label={
+                                  showNewPassword
+                                    ? (locale === "vi" ? "Ẩn mật khẩu" : "Hide password")
+                                    : (locale === "vi" ? "Hiện mật khẩu" : "Show password")
+                                }
+                                className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                              >
+                                {showNewPassword ? (
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 4.2A10.7 10.7 0 0112 4c5 0 9 4 10 8a11.8 11.8 0 01-2.1 4.1M6.2 6.2A11.8 11.8 0 002 12c1 4 5 8 10 8a10.7 10.7 0 005.1-1.3" />
+                                  </svg>
+                                ) : (
+                                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M2.5 12S6 5 12 5s9.5 7 9.5 7S18 19 12 19s-9.5-7-9.5-7z" />
+                                    <circle cx="12" cy="12" r="3" strokeWidth="1.8" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                            {passwordError && (
+                              <p className="mt-1 text-[14px] font-medium text-rose-600">{passwordError}</p>
+                            )}
+                          </div>
+
+                          {isCurrentAccount && (
+                            <p className="mt-2 text-[14px] font-medium text-amber-700">
+                              {locale === "vi"
+                                ? "Không thể khóa hoặc đặt lại mật khẩu tài khoản đang sử dụng."
+                                : "The account currently signed in cannot be locked or have its password reset."}
+                            </p>
+                          )}
+
+                          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                            <Button
                               type="button"
                               disabled={isDetailBusy || isCurrentAccount}
-                              onClick={() => setShowNewPassword((visible) => !visible)}
-                              aria-label={
-                                showNewPassword
-                                  ? (locale === "vi" ? "Ẩn mật khẩu" : "Hide password")
-                                  : (locale === "vi" ? "Hiện mật khẩu" : "Show password")
-                              }
-                              className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                              onClick={requestPasswordReset}
+                              variant="secondary"
+                              className="!text-[14px]"
                             >
-                              {showNewPassword ? (
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 4.2A10.7 10.7 0 0112 4c5 0 9 4 10 8a11.8 11.8 0 01-2.1 4.1M6.2 6.2A11.8 11.8 0 002 12c1 4 5 8 10 8a10.7 10.7 0 005.1-1.3" />
-                                </svg>
-                              ) : (
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M2.5 12S6 5 12 5s9.5 7 9.5 7S18 19 12 19s-9.5-7-9.5-7z" />
-                                  <circle cx="12" cy="12" r="3" strokeWidth="1.8" />
-                                </svg>
-                              )}
-                            </button>
+                              {locale === "vi" ? "Đặt lại mật khẩu" : "Reset password"}
+                            </Button>
                           </div>
-                          {passwordError && (
-                            <p className="mt-1 text-[11px] font-medium text-rose-600">{passwordError}</p>
-                          )}
                         </div>
-
-                        {isCurrentAccount && (
-                          <p className="mt-2 text-[11px] font-medium text-amber-700">
-                            {locale === "vi"
-                              ? "Không thể khóa hoặc đặt lại mật khẩu tài khoản đang sử dụng."
-                              : "The account currently signed in cannot be locked or have its password reset."}
-                          </p>
-                        )}
-
-                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                          <Button
-                            type="button"
-                            disabled={isDetailBusy || isCurrentAccount}
-                            onClick={requestPasswordReset}
-                            variant="secondary"
-                          >
-                            {locale === "vi" ? "Đặt lại mật khẩu" : "Reset password"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="rounded-[5px] border border-violet-200/80 bg-violet-50/40 p-4">
-                          <label className="flex items-center gap-2 cursor-pointer font-bold text-violet-900">
+                      ) : (
+                        <div className="space-y-3">
+                          <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
                             <input
                               type="checkbox"
                               checked={grantAccount}
                               onChange={(e) => setGrantAccount(e.target.checked)}
+                              disabled={isDetailBusy}
                               className="h-4 w-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500 cursor-pointer"
                             />
-                            <span>{locale === "vi" ? "Cấp tài khoản đăng nhập hệ thống cho giảng viên này" : "Grant System Login Account"}</span>
+                            <span>{t.lecturers.account.enableGrant}</span>
                           </label>
 
                           {grantAccount && (
-                            <div className="mt-3 space-y-3 pt-3 border-t border-violet-200/60 animate-in fade-in duration-200">
+                            <div className="space-y-3">
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
-                                  <label className="block font-semibold text-slate-700 mb-1">
-                                    {locale === "vi" ? "Email đăng nhập" : "Login Email"} <span className="text-rose-500">*</span>
+                                  <label htmlFor="grant-account-email" className="block font-semibold text-slate-700 mb-1">
+                                    {t.lecturers.account.loginEmail} <span className="text-rose-500">*</span>
                                   </label>
                                   <input
+                                    id="grant-account-email"
                                     type="email"
                                     required={grantAccount}
+                                    disabled={isDetailBusy}
                                     value={grantEmail}
                                     onChange={(e) => setGrantEmail(e.target.value)}
                                     placeholder="example@ictu.edu.vn"
@@ -1794,26 +1875,31 @@ export default function LecturersPage() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="block font-semibold text-slate-700 mb-1">
-                                    {locale === "vi" ? "Mật khẩu khởi tạo" : "Initial Password"} <span className="text-rose-500">*</span>
+                                  <label htmlFor="grant-account-password" className="block font-semibold text-slate-700 mb-1">
+                                    {t.lecturers.account.initialPassword} <span className="text-rose-500">*</span>
                                   </label>
                                   <input
+                                    id="grant-account-password"
                                     type="password"
+                                    autoComplete="new-password"
                                     required={grantAccount}
+                                    disabled={isDetailBusy}
                                     minLength={8}
                                     value={grantPassword}
                                     onChange={(e) => setGrantPassword(e.target.value)}
-                                    placeholder={locale === "vi" ? "Tối thiểu 8 ký tự" : "Minimum 8 characters"}
+                                    placeholder={t.lecturers.account.passwordPlaceholder}
                                     className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-3 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
                                   />
                                 </div>
                               </div>
                               <div>
-                                <label className="block font-semibold text-slate-700 mb-1">
-                                  {locale === "vi" ? "Vai trò tài khoản" : "Role"}
+                                <label htmlFor="grant-account-role" className="block font-semibold text-slate-700 mb-1">
+                                  {t.lecturers.account.role}
                                 </label>
                                 <select
+                                  id="grant-account-role"
                                   value={grantRole}
+                                  disabled={isDetailBusy}
                                   onChange={(e) => setGrantRole(e.target.value)}
                                   className="h-9 w-full rounded-[5px] border border-slate-200 bg-white px-2.5 text-slate-800 focus:border-[#3A5FC3] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 cursor-pointer"
                                 >
@@ -1825,16 +1911,8 @@ export default function LecturersPage() {
                             </div>
                           )}
                         </div>
-
-                        {!grantAccount && (
-                          <p className="text-[11px] text-slate-400">
-                            {locale === "vi"
-                              ? "Hồ sơ chưa có tài khoản đăng nhập. Tích chọn ô trên để tạo tài khoản mới cho cán bộ này."
-                              : "This profile has no linked account. Check the box above to grant one."}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </section>
                 </div>
 
@@ -1844,7 +1922,7 @@ export default function LecturersPage() {
                       type="button"
                       disabled={isDetailBusy}
                       onClick={() => setIsDeleteModalOpen(true)}
-                      className={buttonClass("danger")}
+                      className={`${buttonClass("danger")} !text-[14px]`}
                     >
                       {locale === "vi" ? "Xóa giảng viên" : "Delete"}
                     </button>
@@ -1854,6 +1932,7 @@ export default function LecturersPage() {
                         disabled={isDetailBusy}
                         onClick={() => setConfirmAction(selectedLecturer.account?.is_active ? "lock" : "unlock")}
                         variant={selectedLecturer.account.is_active ? "danger" : "primary"}
+                        className="!text-[14px]"
                       >
                         {selectedLecturer.account.is_active
                           ? (locale === "vi" ? "Khóa tài khoản" : "Lock account")
@@ -1866,14 +1945,14 @@ export default function LecturersPage() {
                       type="button"
                       disabled={isDetailBusy}
                       onClick={() => setIsDetailModalOpen(false)}
-                      className={buttonClass("secondary")}
+                      className={`${buttonClass("secondary")} !text-[14px]`}
                     >
-                      {t.common.cancel}
+                      {t.common.close}
                     </button>
                     <button
                       type="submit"
                       disabled={isDetailBusy}
-                      className={buttonClass("primary")}
+                      className={`${buttonClass("primary")} !text-[14px]`}
                     >
                       {detailAction === "save" && (
                         <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
@@ -1887,6 +1966,42 @@ export default function LecturersPage() {
           </div>
         </ModalPortal>
       )}
+
+      <ConfirmModal
+        open={isScopusReasonOpen && isDetailModalOpen}
+        title={t.lecturers.scopus.reasonDialogTitle}
+        autoFocusConfirm={false}
+        variant="primary"
+        confirmLabel={t.common.save}
+        cancelLabel={t.common.close}
+        confirmDisabled={!scopusSaveReason.trim()}
+        description={
+          <div className="space-y-2 text-[14px]">
+            <label htmlFor="scopus-save-reason" className="block font-semibold text-slate-700">
+              {t.lecturers.scopus.reasonLabel}
+            </label>
+            <textarea
+              id="scopus-save-reason"
+              autoFocus
+              aria-required="true"
+              rows={3}
+              maxLength={4000}
+              value={scopusSaveReason}
+              onChange={(event) => setScopusSaveReason(event.target.value)}
+              placeholder={t.lecturers.scopus.reasonPlaceholder}
+              className="block w-full resize-y rounded-[5px] border border-slate-200 bg-white px-3 py-2 text-slate-800 focus:border-brand focus:outline-none"
+            />
+          </div>
+        }
+        onCancel={() => {
+          setIsScopusReasonOpen(false);
+          requestAnimationFrame(() => detailFormRef.current?.querySelector<HTMLButtonElement>('button[type="submit"]')?.focus());
+        }}
+        onConfirm={() => {
+          setIsScopusReasonOpen(false);
+          detailFormRef.current?.requestSubmit();
+        }}
+      />
 
       <ConfirmModal
         open={confirmAction !== null}

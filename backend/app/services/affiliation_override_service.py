@@ -403,6 +403,17 @@ def revoke_override(
 _UNRESOLVED_REASONS_AS_CONFLICT = frozenset({"ID_CONFLICT", "ID_AMBIGUOUS", "POSITION_CLAIMED_BY_OTHER_ID"})
 
 
+def _needs_review_kind(statuses: set[str], reasons: set[str]) -> str:
+    """Why a position needs review. VERIFIED next to CORROBORATED is agreement, not a conflict."""
+
+    verified_but_unresolved = "VERIFIED" in statuses and "UNRESOLVED" in statuses
+    if verified_but_unresolved or reasons & _UNRESOLVED_REASONS_AS_CONFLICT:
+        return "CONFLICTING_SOURCES"
+    if statuses == {"UNRESOLVED"}:
+        return "UNRESOLVED"
+    return "LOW_CONFIDENCE"
+
+
 @dataclass(frozen=True, slots=True)
 class _ResolutionSummary:
     id: uuid.UUID
@@ -422,8 +433,9 @@ def list_needs_review(
     ictu_only: bool = False,
 ) -> tuple[list[NeedsReviewItem], int]:
     """Publication-author positions that are UNRESOLVED, have conflicting
-    sources (different link_status per source, or a conflict-type reason),
-    or are CORROBORATED only (reconciled but not independently verified)."""
+    sources (one verified and another unresolved, or a conflict-type reason),
+    or still rest on a CORROBORATED unit. Only each source's current resolution
+    counts, so an older import of the same position cannot raise a false conflict."""
 
     # Scope: Scopus authors already tied to an ICTU lecturer, either an approved identity or a
     # candidate still awaiting / past review. Nothing here confirms any link.
@@ -461,12 +473,16 @@ def list_needs_review(
 
     # Only the five columns used below — not the ``evidence`` JSON of every resolution
     # (08/11/2026: the JSON decode alone was ~1/4 of the request time). Same rows as before.
-    res_by_author: dict[uuid.UUID, list[_ResolutionSummary]] = {}
+    current: dict[tuple[uuid.UUID, str], _ResolutionSummary] = {}
     R = PublicationAuthorAffiliationResolution
     for row in db.execute(
         select(R.id, R.publication_author_id, R.source_system, R.link_status, R.unresolved_reason)
+        .order_by(R.created_at.desc(), R.id.asc())
     ).all():
         res = _ResolutionSummary(*row)
+        current.setdefault((res.publication_author_id, res.source_system), res)
+    res_by_author: dict[uuid.UUID, list[_ResolutionSummary]] = {}
+    for res in current.values():
         res_by_author.setdefault(res.publication_author_id, []).append(res)
 
     # Verbatim affiliation text each source reported, so a reviewer can see WHERE a unit comes from.
@@ -500,14 +516,7 @@ def list_needs_review(
         reasons = {r.unresolved_reason for r in resolutions if r.unresolved_reason}
         if statuses == {"VERIFIED"}:
             continue  # already independently verified by identifier, nothing to review
-        if "VERIFIED" in statuses and len(statuses) > 1:
-            kind = "CONFLICTING_SOURCES"
-        elif reasons & _UNRESOLVED_REASONS_AS_CONFLICT:
-            kind = "CONFLICTING_SOURCES"
-        elif statuses == {"UNRESOLVED"}:
-            kind = "UNRESOLVED"
-        else:
-            kind = "LOW_CONFIDENCE"  # CORROBORATED (possibly mixed with UNRESOLVED), no VERIFIED
+        kind = _needs_review_kind(statuses, reasons)
         overrides = overrides_by_author.get(author_id, [])
         items.append(
             NeedsReviewItem(

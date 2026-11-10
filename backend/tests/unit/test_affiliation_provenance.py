@@ -137,6 +137,20 @@ def test_withholding_assignment_retains_original_source_observation(tmp_path):
     assert planned[0].evidence["conflicting_sources"] == ["crossref"]
 
 
+@pytest.mark.parametrize("publisher,status,reason", [
+    (True, "CORROBORATED", None),
+    (False, "UNRESOLVED", "OPENALEX_ENTITY_NAME_CONFLICT"),
+])
+def test_publisher_orcid_reaches_the_openalex_alignment(tmp_path, publisher, status, reason):
+    # "Ann Zeta" is not a form of "Ann Alpha"; only the publisher's matching ORCID clears it.
+    data = sources.build_inputs(
+        bundle(tmp_path / "source", entity_name="Ann Zeta", publisher=publisher), ROWS
+    )
+
+    openalex = next(i for i in data.inputs if i.source_system == "openalex")
+    assert (openalex.link_status, openalex.unresolved_reason) == (status, reason)
+
+
 def test_policy_version_distinguishes_new_resolution_from_legacy_payload(tmp_path, monkeypatch):
     directory = bundle(tmp_path / "source", publisher=True)
     first = sources.build_inputs(directory, ROWS)

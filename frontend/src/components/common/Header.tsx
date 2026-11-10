@@ -63,7 +63,6 @@ export default function Header({
           ? "Bạn đã đăng xuất khỏi hệ thống."
           : "You have been logged out of the system.",
       );
-      navigate("/home", { replace: true });
     } catch {
       toast.error(
         locale === "vi" ? "Lỗi đăng xuất" : "Logout error",
@@ -71,7 +70,6 @@ export default function Header({
           ? "Không thể hoàn tất đăng xuất trên máy chủ."
           : "Could not complete logout on the server.",
       );
-      navigate("/home", { replace: true });
     } finally {
       setIsLoggingOut(false);
     }

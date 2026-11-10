@@ -14,7 +14,6 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
-from typing import Any
 
 ALLOWED_DEGREES: frozenset[str | None] = frozenset({
     "TS", "ThS", "KS", "CN", "DH", "ĐH", "BS", "PGS", "GS",
@@ -66,12 +65,56 @@ def normalise_full_name(value: str) -> str:
     return re.sub(r"\s+", " ", (value or "")).strip()
 
 
+def _profile_text(
+    record: dict, key: str, legacy_value: object, *, max_length: int, location: str,
+) -> str | None:
+    """Map published legacy fields without overriding explicit canonical nulls.
+
+    Source provenance stays intact; imports also persist these directly published
+    profile values so the profile projection can read them from the lecturer.
+    """
+    value = record[key] if key in record else legacy_value
+    _require(value is None or isinstance(value, str), "INVALID_LECTURER_DATASET",
+             f"{location}.{key} phải là chuỗi hoặc null.", location=f"{location}.{key}")
+    value = value.strip() or None if isinstance(value, str) else None
+    _require(value is None or len(value) <= max_length, "INVALID_LECTURER_DATASET",
+             f"{location}.{key} không được vượt quá {max_length} ký tự.",
+             location=f"{location}.{key}")
+    return value
+
+
 def hash_payload(payload: dict | list | bytes) -> str:
     if isinstance(payload, (dict, list)):
         body = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
     else:
         body = payload
     return hashlib.sha256(body).hexdigest()
+
+
+def _parse_scopus_ids(record: dict, location: str) -> dict:
+    """Preserve import references; parsing never approves an identity link."""
+    if "scopus_ids" not in record and "primary_scopus_id" not in record:
+        return {}
+    ids = record.get("scopus_ids", [])
+    _require(isinstance(ids, list), "INVALID_LECTURER_DATASET",
+             f"{location}.scopus_ids phải là danh sách.", location=f"{location}.scopus_ids")
+    normalized = []
+    for value in ids:
+        _require(isinstance(value, str) and re.fullmatch(r"[0-9]{1,50}", value.strip()),
+                 "INVALID_LECTURER_DATASET", f"{location}.scopus_ids chứa ID không hợp lệ.",
+                 location=f"{location}.scopus_ids")
+        value = value.strip()
+        _require(value not in normalized, "INVALID_LECTURER_DATASET",
+                 f"{location}.scopus_ids chứa ID trùng lặp.", location=f"{location}.scopus_ids")
+        normalized.append(value)
+    primary = record.get("primary_scopus_id")
+    if primary is not None:
+        _require(isinstance(primary, str) and primary.strip() in normalized,
+                 "INVALID_LECTURER_DATASET",
+                 f"{location}.primary_scopus_id phải thuộc scopus_ids.",
+                 location=f"{location}.primary_scopus_id")
+        primary = primary.strip()
+    return {"scopus_ids": normalized, "primary_scopus_id": primary}
 
 
 def _parse_account(
@@ -317,7 +360,8 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
             if source_id in seen_source_ids:
                 raise DatasetValidationError(
                     "DUPLICATE_LECTURER_IDENTITY",
-                    f"source_id bị trùng giữa các bản ghi (vị trí {seen_source_ids[source_id]} và {idx}).",
+                    "source_id bị trùng giữa các bản ghi "
+                    f"(vị trí {seen_source_ids[source_id]} và {idx}).",
                     location=location,
                 )
             seen_source_ids[source_id] = idx
@@ -336,6 +380,7 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
             source_provenance["export"] = provenance["export"]
 
         records.append({
+            **_parse_scopus_ids(rec, location),
             "source_id": source_id,
             "staff_code": staff_code,
             "full_name": full_name,
@@ -347,10 +392,15 @@ def parse_and_validate(raw_bytes: bytes, *, filename: str | None = None) -> dict
             "position": rec.get("position"),
             "faculty": faculty,
             "department": department,
-            "specialization": (str(rec.get("specialization") or "").strip()) or None,
+            "specialization": _profile_text(
+                rec, "specialization", provenance.get("known_specialisation"),
+                max_length=200, location=location,
+            ),
             "gender": (str(rec.get("gender") or "").strip()) or None,
             "date_of_birth": rec.get("date_of_birth"),
-            "phone": (str(rec.get("phone") or "").strip()) or None,
+            "phone": _profile_text(
+                rec, "phone", rec.get("tel"), max_length=20, location=location,
+            ),
             "profile_url": rec.get("profile_url"),
             "orcid": orcid,
             "is_active": bool(rec.get("is_active", True)),

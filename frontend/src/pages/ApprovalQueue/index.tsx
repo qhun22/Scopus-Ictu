@@ -5,7 +5,6 @@ import {
   ConfigProvider,
   Empty,
   Input,
-  Select,
   Space,
 } from "antd";
 // Design system tokens scoped to this page's AntD usage.
@@ -33,8 +32,6 @@ import {
   revokeReviewCandidate,
 } from "../../api/reviews";
 import type { LecturerWithoutCandidateItem } from "../../types/review";
-import { createManualCandidate, generateCandidates } from "../../api/matching";
-import { getLecturers } from "../../api/lecturers";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import { useToast } from "../../contexts/ToastContext";
@@ -46,7 +43,6 @@ import ModalPortal from "../../components/common/ModalPortal";
 import FullModal from "../../components/common/FullModal";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import FitBadge, { fitLevelLabel, fitReasonText } from "./FitBadge";
-import GroupReviewPanel from "./GroupReviewPanel";
 import PrimaryIdPanel from "./PrimaryIdPanel";
 import { CANDIDATE_STATUS_TONE } from "../../components/ui/reviewTones";
 
@@ -359,22 +355,6 @@ export default function ApprovalQueuePage() {
   const [gapsItems, setGapsItems] = useState<LecturerWithoutCandidateItem[]>([]);
   const [gapsTotal, setGapsTotal] = useState(0);
 
-  const [generateConfirmOpen, setGenerateConfirmOpen] = useState(false);
-  const [groupOpen, setGroupOpen] = useState(false);
-  const [groupCount, setGroupCount] = useState(0);
-  const [generating, setGenerating] = useState(false);
-
-  const [manualOpen, setManualOpen] = useState(false);
-  const [manualLecturerQuery, setManualLecturerQuery] = useState("");
-  const [manualLecturerOptions, setManualLecturerOptions] = useState<
-    { value: string; label: string }[]
-  >([]);
-  const [manualLecturerSearching, setManualLecturerSearching] = useState(false);
-  const [manualLecturerId, setManualLecturerId] = useState<string | null>(null);
-  const [manualScopusId, setManualScopusId] = useState("");
-  const [manualNote, setManualNote] = useState("");
-  const [manualSubmitting, setManualSubmitting] = useState(false);
-  const [manualError, setManualError] = useState<string | null>(null);
 
   const loadQueue = useCallback(async () => {
     setQueueLoading(true);
@@ -445,115 +425,6 @@ export default function ApprovalQueuePage() {
     if (!selectedCandidateId) return;
     void loadDetail(selectedCandidateId);
   }, [loadDetail, selectedCandidateId]);
-
-  const handleGenerate = useCallback(async () => {
-    setGenerating(true);
-    setGenerateConfirmOpen(false);
-    try {
-      const result = await generateCandidates();
-      const msg = format(t.generateSuccessMessage, { count: String(result.candidate_roots) });
-      toast.success(t.generateSuccessTitle, msg);
-      await loadQueue();
-    } catch (error) {
-      toast.error(t.generateErrorTitle, getApiErrorMessage(error, t.generateErrorTitle));
-    } finally {
-      setGenerating(false);
-    }
-  }, [loadQueue, t, toast]);
-
-  useEffect(() => {
-    if (!manualOpen) return;
-    const q = manualLecturerQuery.trim();
-    if (q.length < 2) {
-      setManualLecturerOptions([]);
-      return;
-    }
-    let cancelled = false;
-    setManualLecturerSearching(true);
-    const timer = setTimeout(() => {
-      getLecturers({ search: q, page_size: 20 })
-        .then((res) => {
-          if (cancelled) return;
-          setManualLecturerOptions(
-            res.items.map((it) => ({
-              value: it.id,
-              label: `${it.full_name}${it.staff_code ? ` (${it.staff_code})` : ""}`,
-            })),
-          );
-        })
-        .catch(() => {
-          if (!cancelled) setManualLecturerOptions([]);
-        })
-        .finally(() => {
-          if (!cancelled) setManualLecturerSearching(false);
-        });
-    }, 300);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [manualLecturerQuery, manualOpen]);
-
-  const closeManual = () => {
-    if (manualSubmitting) return;
-    setManualOpen(false);
-    setManualLecturerQuery("");
-    setManualLecturerOptions([]);
-    setManualLecturerId(null);
-    setManualScopusId("");
-    setManualNote("");
-    setManualError(null);
-  };
-
-  const openManualFor = (lecturer: LecturerWithoutCandidateItem) => {
-    setGapsOpen(false);
-    setManualLecturerOptions([
-      { value: lecturer.id, label: `${lecturer.full_name}${lecturer.staff_code ? ` (${lecturer.staff_code})` : ""}` },
-    ]);
-    setManualLecturerId(lecturer.id);
-    setManualLecturerQuery(lecturer.full_name);
-    setManualScopusId("");
-    setManualNote("");
-    setManualError(null);
-    setManualOpen(true);
-  };
-
-  const submitManualCandidate = async () => {
-    if (manualSubmitting) return;
-    if (!manualLecturerId) {
-      setManualError(locale === "en" ? "Pick a lecturer first." : "Cần chọn giảng viên.");
-      return;
-    }
-    const scopusId = manualScopusId.trim();
-    if (!scopusId) {
-      setManualError(locale === "en" ? "Enter a Scopus ID." : "Cần nhập Scopus ID.");
-      return;
-    }
-    const note = manualNote.trim();
-    if (!note) {
-      setManualError(
-        locale === "en" ? "Enter a reason/evidence note." : "Cần ghi lý do/căn cứ.",
-      );
-      return;
-    }
-    setManualSubmitting(true);
-    setManualError(null);
-    try {
-      await createManualCandidate({ lecturer_id: manualLecturerId, scopus_id: scopusId, note });
-      toast.success(
-        locale === "en" ? "Pair added" : "Đã thêm cặp đề xuất",
-        locale === "en"
-          ? "The pair is now pending review. Review it like any other."
-          : "Cặp này đang ở trạng thái Chờ duyệt. Duyệt như bình thường.",
-      );
-      closeManual();
-      await loadQueue();
-    } catch (error) {
-      setManualError(getApiErrorMessage(error, locale === "en" ? "Could not add the pair." : "Không thêm được cặp đề xuất."));
-    } finally {
-      setManualSubmitting(false);
-    }
-  };
 
   const openDetail = (candidateId: string) => {
     setConflictMessage(null);
@@ -775,45 +646,13 @@ export default function ApprovalQueuePage() {
         <div className="flex flex-wrap items-center justify-end gap-3">
           {/* No "Tổng số" here: the table footer already reads "Hiển thị X trong Y cặp đề xuất". */}
           <div className="flex flex-wrap items-center justify-end gap-3">
-          {status === "PENDING" && groupCount > 0 && (
-            <UiButton
-              variant="secondary"
-              size="md"
-              onClick={() => setGroupOpen((v) => !v)}
-              aria-expanded={groupOpen}
-              data-testid="review-group-toggle"
-            >
-              <span className="truncate">
-                {locale === "en" ? "Review by lecturer group" : "Duyệt theo nhóm giảng viên"} ({groupCount})
-              </span>
-            </UiButton>
-          )}
           {(user?.role === "ADMIN" || user?.role === "REVIEWER") && (
             <UiButton
               variant="secondary"
               size="md"
               onClick={() => setGapsOpen(true)}
             >
-              <span className="truncate">{locale === "en" ? "Lecturers without proposals" : "Giảng viên chưa có đề xuất"}</span>
-            </UiButton>
-          )}
-          {user?.role === "ADMIN" && (
-            <UiButton
-              variant="secondary"
-              size="md"
-              onClick={() => setManualOpen(true)}
-            >
-              <span className="truncate">{locale === "en" ? "Add pair manually" : "Thêm cặp thủ công"}</span>
-            </UiButton>
-          )}
-          {user?.role === "ADMIN" && (
-            <UiButton
-              variant="primary"
-              size="md"
-              loading={generating}
-              onClick={() => setGenerateConfirmOpen(true)}
-            >
-              <span className="truncate">{t.generateBtn}</span>
+              <span className="truncate">{locale === "en" ? "Lecturers the system missed" : "Giảng viên bị hệ thống bỏ sót"}</span>
             </UiButton>
           )}
           </div>
@@ -822,11 +661,11 @@ export default function ApprovalQueuePage() {
 
       <FullModal
         open={gapsOpen}
-        title={locale === "en" ? "Lecturers without proposals" : "Giảng viên chưa có đề xuất"}
+        title={locale === "en" ? "Lecturers the system missed" : "Giảng viên bị hệ thống bỏ sót"}
         description={
           locale === "en"
-            ? "The system has never proposed a Scopus account for these lecturers (not even one that was later rejected). Use \"Add pair\" if you find their Scopus ID yourself."
-            : "Hệ thống chưa từng đề xuất tài khoản Scopus nào cho các giảng viên này (kể cả đề xuất đã bị từ chối). Bấm \"Thêm cặp\" nếu bạn tự tìm được Scopus ID của họ."
+            ? "The system has never proposed a Scopus account for these lecturers (not even one that was later rejected). If you find their Scopus ID yourself, add it from their profile in \"Hồ sơ giảng viên\"."
+            : "Hệ thống chưa từng đề xuất tài khoản Scopus nào cho các giảng viên này (kể cả đề xuất đã bị từ chối). Nếu bạn tự tìm được Scopus ID của họ, vào \"Hồ sơ giảng viên\" của người đó để gán trực tiếp."
         }
         onClose={() => setGapsOpen(false)}
         footerStart={
@@ -861,16 +700,13 @@ export default function ApprovalQueuePage() {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {gapsItems.map((lec) => (
-                  <li key={lec.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <li key={lec.id} className="px-3 py-2.5">
                     <div className="min-w-0">
                       <div className="truncate font-medium text-slate-800">{lec.full_name}</div>
                       <div className="truncate text-sm text-slate-500">
                         {[lec.staff_code, lec.department, lec.email].filter(Boolean).join(" · ") || "—"}
                       </div>
                     </div>
-                    <UiButton variant="secondary" size="sm" onClick={() => openManualFor(lec)}>
-                      {locale === "en" ? "Add pair" : "Thêm cặp"}
-                    </UiButton>
                   </li>
                 ))}
               </ul>
@@ -878,101 +714,6 @@ export default function ApprovalQueuePage() {
           </div>
         </div>
       </FullModal>
-
-      <FullModal
-        open={manualOpen}
-        title={locale === "en" ? "Add pair manually" : "Thêm cặp thủ công"}
-        description={
-          locale === "en"
-            ? "Use this only when the system missed a pair you know is correct (e.g. the name words are in a different order). The pair is added as pending and still goes through normal review."
-            : "Chỉ dùng khi hệ thống bỏ sót một cặp bạn biết chắc là đúng (vd. tên bị đảo thứ tự từ). Cặp được thêm ở trạng thái Chờ duyệt và vẫn phải qua duyệt bình thường."
-        }
-        onClose={closeManual}
-        closeDisabled={manualSubmitting}
-        footerActions={
-          <>
-            <UiButton variant="primary" loading={manualSubmitting} onClick={() => void submitManualCandidate()}>
-              {locale === "en" ? "Add (Pending)" : "Thêm (Chờ duyệt)"}
-            </UiButton>
-            <UiButton variant="secondary" onClick={closeManual} disabled={manualSubmitting}>
-              {t.cancel}
-            </UiButton>
-          </>
-        }
-      >
-        <div className="max-w-3xl space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              {locale === "en" ? "Lecturer" : "Giảng viên ICTU"}
-            </label>
-            <Select
-              showSearch
-              allowClear
-              value={manualLecturerId}
-              placeholder={locale === "en" ? "Search by name…" : "Tìm theo tên…"}
-              filterOption={false}
-              loading={manualLecturerSearching}
-              options={manualLecturerOptions}
-              onSearch={setManualLecturerQuery}
-              onChange={(value) => setManualLecturerId(value ?? null)}
-              className="w-full"
-              notFoundContent={
-                manualLecturerQuery.trim().length < 2
-                  ? (locale === "en" ? "Type at least 2 characters" : "Gõ ít nhất 2 ký tự")
-                  : (locale === "en" ? "No lecturer found" : "Không tìm thấy giảng viên")
-              }
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Scopus ID</label>
-            <Input
-              value={manualScopusId}
-              onChange={(e) => setManualScopusId(e.target.value)}
-              placeholder={locale === "en" ? "e.g. 60024922300" : "VD: 60024922300"}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              {locale === "en" ? "Reason / evidence" : "Lý do / căn cứ"}
-            </label>
-            <Input.TextArea
-              value={manualNote}
-              onChange={(e) => setManualNote(e.target.value)}
-              rows={4}
-              placeholder={
-                locale === "en"
-                  ? "e.g. ORCID 0009-... lists this employment at ICTU and this exact paper"
-                  : "VD: ORCID 0009-... ghi công tác tại ICTU và chính bài báo này"
-              }
-            />
-          </div>
-          {manualError && <Alert type="error" showIcon message={manualError} />}
-        </div>
-      </FullModal>
-
-      <ConfirmModal
-        open={generateConfirmOpen}
-        variant="primary"
-        title={t.generateConfirmTitle}
-        description={<p>{t.generateConfirmText}</p>}
-        confirmLabel={t.generateConfirmOk}
-        cancelLabel={t.cancel}
-        loading={generating}
-        onConfirm={() => void handleGenerate()}
-        onCancel={() => setGenerateConfirmOpen(false)}
-      />
-
-      {/* ── Review by lecturer group (lecturers with 2+ pending Scopus IDs) ───── */}
-      {status === "PENDING" && (
-        <GroupReviewPanel
-          locale={locale === "en" ? "en" : "vi"}
-          refreshKey={total}
-          open={groupOpen}
-          onClose={() => setGroupOpen(false)}
-          onCountChange={setGroupCount}
-          onChanged={() => void loadQueue()}
-        />
-      )}
 
       {/* ── Filter Bar ──────────────────────────────────────────────────── */}
       <div className="rounded-[5px] border border-slate-200/80 bg-white p-3.5 shadow-xs">

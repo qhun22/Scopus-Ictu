@@ -97,3 +97,6 @@ scripts/
 !backend/scripts/
 *.bat
 !scopus-ictu-qhun22.bat
+
+# --- Claude Code local tool config (per-machine, not shared) ---
+/.claude/

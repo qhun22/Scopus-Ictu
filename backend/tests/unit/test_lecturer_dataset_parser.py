@@ -13,8 +13,9 @@ from app.services.lecturer_dataset.parser import (
     parse_and_validate,
 )
 
-
-FIXTURE_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "ictu_lecturers_fixture.json"
+FIXTURE_PATH = (
+    Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "ictu_lecturers_fixture.json"
+)
 
 
 def _load_fixture_bytes() -> bytes:
@@ -54,6 +55,40 @@ def test_parse_lowercases_institutional_email() -> None:
     raw = json.dumps(payload).encode("utf-8")
     envelope = parse_and_validate(raw)
     assert envelope["lecturers"][0]["institutional_email"] == "test.a@example.invalid"
+
+
+def test_parse_maps_legacy_profile_fields_and_preserves_source() -> None:
+    payload = _fixture_envelope()
+    record = payload["lecturers"][0]
+    record["provenance"]["known_specialisation"] = "  Computer science  "
+    result = parse_and_validate(json.dumps(payload).encode("utf-8"))["lecturers"][0]
+    assert result["phone"] == record["tel"]
+    assert result["specialization"] == "Computer science"
+    assert result["provenance"]["known_specialisation"] == "  Computer science  "
+
+
+@pytest.mark.parametrize("value", [None, "", "  ", "  Updated value  "])
+def test_parse_canonical_profile_fields_take_precedence(value) -> None:
+    payload = _fixture_envelope()
+    record = payload["lecturers"][0]
+    record["phone"] = record["specialization"] = value
+    record["provenance"]["known_specialisation"] = "Legacy specialization"
+    result = parse_and_validate(json.dumps(payload).encode("utf-8"))["lecturers"][0]
+    expected = value.strip() or None if isinstance(value, str) else None
+    assert result["phone"] == result["specialization"] == expected
+
+
+@pytest.mark.parametrize("key,value", [
+    ("phone", "1" * 21), ("specialization", "a" * 201),
+    ("phone", ["123"]), ("specialization", {"value": "invalid"}),
+])
+def test_parse_rejects_unusable_profile_fields(key, value) -> None:
+    payload = _fixture_envelope()
+    payload["lecturers"][0][key] = value
+    with pytest.raises(DatasetValidationError) as exc:
+        parse_and_validate(json.dumps(payload).encode("utf-8"))
+    assert exc.value.code == "INVALID_LECTURER_DATASET"
+    assert exc.value.location == f"lecturers[0].{key}"
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +254,9 @@ def test_account_must_be_an_object() -> None:
 def test_duplicate_account_email_between_records_is_rejected() -> None:
     payload = _fixture_envelope()
     for record in payload["lecturers"][:2]:
-        record["account"] = {"email": "same@ictu.edu.vn", "role": "LECTURER", "password_hash": _HASH}
+        record["account"] = {
+            "email": "same@ictu.edu.vn", "role": "LECTURER", "password_hash": _HASH,
+        }
     with pytest.raises(DatasetValidationError) as exc_info:
         parse_and_validate(json.dumps(payload).encode("utf-8"))
     assert exc_info.value.code == "DUPLICATE_LECTURER_IDENTITY"

@@ -182,6 +182,17 @@ def inspect_bundle(directory: Path | None) -> BundleStatus:
 
 
 # ----------------------------------------------------------------------------
+def _publisher_orcids(crossref_record: dict | None, author_count: int) -> dict[int, str]:
+    """ORCID per author position from Crossref; only comparable for equally long lists."""
+    work = (crossref_record or {}).get("work")
+    if not work:
+        return {}
+    authors = parse_crossref_authors(work)
+    if len(authors) != author_count:
+        return {}
+    return {a.position: a.orcid for a in authors if a.orcid}
+
+
 def build_inputs(
     bundle_dir: Path,
     rows: Sequence[Mapping[str, str]],
@@ -270,13 +281,24 @@ def build_inputs(
                 externals = (
                     parse_openalex_authorships(work) if source == "openalex" else parse_crossref_authors(work)
                 )
-                links = align_paper(slots, externals, bridge, source=source)
+                publisher_orcids = (
+                    _publisher_orcids(works["crossref"].get(doi), len(externals))
+                    if source == "openalex" else {}
+                )
+                links = align_paper(
+                    slots, externals, bridge, source=source, publisher_orcids=publisher_orcids
+                )
                 orcids = sorted({e.orcid for e in externals if e.orcid})
                 payload = {
                     "source": source,
                     "work": work,
                     "orcid_scopus_ids": {o: sorted(bridge.get(o, ())) for o in orcids},
                 }
+                if publisher_orcids:
+                    # The OpenAlex outcome also depends on these, so they version it too.
+                    payload["publisher_orcids"] = {
+                        str(p): o for p, o in sorted(publisher_orcids.items())
+                    }
                 retrieved = datetime.fromisoformat(record["retrieved_at"])
                 work_id = work.get("id") if source == "openalex" else work.get("DOI")
             # Identical raw metadata under a changed trust policy is a new

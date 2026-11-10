@@ -19,7 +19,9 @@ import {
   isSupersededByNewerConfirmedDuplicate,
 } from "../../api/imports";
 import { ApiError } from "../../api/client";
-import { cancelLecturerDatasetImport, importLecturerDataset } from "../../api/lecturerImport";
+import { cancelLecturerDatasetImport, importLecturerDataset, type ScopusImportItem } from "../../api/lecturerImport";
+import { applyReviewedScopusImport, getPendingScopusImportReview, type ScopusImportFailure } from "../../api/lecturerScopusImport";
+import ScopusImportReview from "../../components/lecturers/ScopusImportReview";
 import ConfirmModal from "../../components/common/ConfirmModal";
 import ModalPortal from "../../components/common/ModalPortal";
 import LecturerDatasetImportCard, {
@@ -131,6 +133,50 @@ export default function ImportsPage() {
   // Scopus CSV needs the school's lecturer data first.
   const [lecturerCount, setLecturerCount] = useState<number | null>(null);
   const [lecturerImporting, setLecturerImporting] = useState(false);
+  const [approveScopusImport, setApproveScopusImport] = useState(false);
+  const [scopusImportReason, setScopusImportReason] = useState("");
+  const [scopusReviewBusy, setScopusReviewBusy] = useState(false);
+  const scopusReviewBusyRef = useRef(false);
+  const [scopusReviewProgress, setScopusReviewProgress] = useState(0);
+  const [retainedScopusItems, setRetainedScopusItems] = useState<ScopusImportItem[]>([]);
+  const [approveRetainedScopus, setApproveRetainedScopus] = useState(false);
+  const [retainedScopusReason, setRetainedScopusReason] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    getPendingScopusImportReview(undefined, { signal: controller.signal })
+      .then((items) => {
+        if (controller.signal.aborted) return;
+        setRetainedScopusItems(items);
+        // Pre-fill so one click on "Xác nhận ID Scopus" is enough -- these IDs
+        // were already declared in a JSON file the ADMIN uploaded earlier.
+        if (items.length) {
+          setApproveRetainedScopus(true);
+          setRetainedScopusReason((prev) => prev || t.lecturerImport.scopusReviewDefaultReasonRetained);
+        }
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) toast.error(t.lecturerImport.scopusReviewTitle,
+          error instanceof Error ? error.message : t.lecturerImport.scopusRestoreError);
+      });
+    return () => controller.abort();
+  }, []);
+  const [scopusRetry, setScopusRetry] = useState<{
+    items: ScopusImportItem[]; reason: string; failures: ScopusImportFailure[];
+  } | null>(null);
+  useEffect(() => {
+    // Default ON with an auto-filled reason (citing the uploaded file): a
+    // JSON file the ADMIN chose to upload already IS the evidence, so the
+    // Scopus IDs in it apply in the same action as the lecturer import
+    // itself -- no separate manual confirm step needed by default. The ADMIN
+    // can still untick this or edit the reason before confirming the import.
+    const hasScopusIds = Boolean(lecturerPreview?.preview.scopus_review_items?.length);
+    setApproveScopusImport(hasScopusIds);
+    setScopusImportReason(
+      hasScopusIds && lecturerPreview
+        ? t.lecturerImport.scopusReviewDefaultReason.replace("{file}", lecturerPreview.preview.filename)
+        : "",
+    );
+  }, [lecturerPreview, t.lecturerImport.scopusReviewDefaultReason]);
   const [lecturerCancelling, setLecturerCancelling] = useState(false);
   const [activeResultPanel, setActiveResultPanel] = useState<"scopus_checked" | "lecturer_preview" | null>(null);
   const [isScopusFileExiting, setIsScopusFileExiting] = useState(false);
@@ -769,8 +815,42 @@ export default function ImportsPage() {
     }
   };
 
+  const runScopusImportReview = async (items: ScopusImportItem[], reason: string) => {
+    if (scopusReviewBusyRef.current || !items.length || !reason.trim()) return;
+    scopusReviewBusyRef.current = true;
+    setScopusReviewBusy(true);
+    setScopusReviewProgress(0);
+    setScopusRetry({ items, reason, failures: [] });
+    try {
+      const failures = await applyReviewedScopusImport(
+        items, reason, t.lecturerImport.scopusRestoreError, setScopusReviewProgress,
+      );
+      setRetainedScopusItems(await getPendingScopusImportReview()
+        .catch(() => failures.map((failure) => failure.item)));
+      if (failures.length) {
+        setScopusRetry({ items: failures.map((failure) => failure.item), reason, failures });
+        toast.warning(t.lecturerImport.scopusRestorePending,
+          t.lecturerImport.scopusRestorePartial.replace("{count}", String(failures.length)));
+      } else {
+        setScopusRetry(null);
+        toast.success(t.lecturerImport.scopusReviewTitle,
+          t.lecturerImport.scopusRestoreSuccess.replace("{count}", String(items.length)));
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t.lecturerImport.scopusRestoreError;
+      setScopusRetry({ items, reason, failures: items.map((item) => ({ item, message })) });
+      toast.error(t.lecturerImport.scopusRestorePending, message);
+    } finally {
+      scopusReviewBusyRef.current = false;
+      setScopusReviewBusy(false);
+    }
+  };
+
   const handleConfirmLecturerImport = async () => {
-    if (!lecturerPreview?.file || lecturerImporting) return;
+    if (!lecturerPreview?.file || lecturerImporting || scopusReviewBusyRef.current) return;
+    const reviewScopus = approveScopusImport && Boolean(lecturerPreview.preview.scopus_review_items?.length);
+    const reviewReason = scopusImportReason.trim();
+    if (reviewScopus && !reviewReason) return;
     // Đóng box chi tiết ngay lập tức để người dùng quan sát hiệu ứng ngoài bảng
     setDetailOpen(false);
     setConfirmingImportId(LECTURER_PREVIEW_ID);
@@ -799,6 +879,15 @@ export default function ImportsPage() {
           t.lecturerImport.accountsSkipped,
           t.lecturerImport.accountsSkippedWarning.replace("{count}", String(result.summary.accounts_skipped)),
         );
+      }
+      if (result.scopus_review_items?.length) {
+        if (reviewScopus) {
+          await runScopusImportReview(result.scopus_review_items, reviewReason);
+        } else {
+          setRetainedScopusItems(await getPendingScopusImportReview()
+            .catch(() => result.scopus_review_items ?? []));
+          toast.info(t.lecturerImport.scopusReviewTitle, t.lecturerImport.scopusReviewSkipped);
+        }
       }
       await fetchData();
       // fetchData() only refreshes config + history; lecturerCount (used to
@@ -1303,6 +1392,35 @@ export default function ImportsPage() {
       />
 
       <div className="app-page-container space-y-4 sm:space-y-5">
+      {retainedScopusItems.length > 0 && !scopusRetry && (
+        <div className="space-y-3 rounded-[5px] border border-slate-200 bg-white p-4">
+          <ScopusImportReview items={retainedScopusItems} checked={approveRetainedScopus}
+            reason={retainedScopusReason} disabled={scopusReviewBusy || lecturerImporting}
+            onChecked={setApproveRetainedScopus} onReason={setRetainedScopusReason} />
+          <button type="button" className={buttonClass("primary")}
+            disabled={!approveRetainedScopus || !retainedScopusReason.trim() || scopusReviewBusy || lecturerImporting}
+            onClick={() => void runScopusImportReview(retainedScopusItems, retainedScopusReason.trim())}>
+            {t.lecturerImport.scopusRestoreConfirm}
+          </button>
+        </div>
+      )}
+      {scopusRetry && (
+        <section aria-live="polite" className="space-y-3 rounded-[5px] border border-slate-200 bg-white p-4 text-sm">
+          <h3 className="font-bold">{t.lecturerImport.scopusRestorePending}</h3>
+          {scopusReviewBusy ? (
+            <p>{t.lecturerImport.scopusRestoreProgress.replace("{done}", String(scopusReviewProgress)).replace("{total}", String(scopusRetry.items.length))}</p>
+          ) : (
+            <>
+              <ul className="max-h-60 space-y-1 overflow-y-auto">
+                {scopusRetry.failures.map(({ item, message }, index) => <li key={index}><strong>{item.full_name}</strong>: {message}</li>)}
+              </ul>
+              <button type="button" className={buttonClass("secondary")} onClick={() => void runScopusImportReview(scopusRetry.items, scopusRetry.reason)}>
+                {t.lecturerImport.scopusRestoreRetry}
+              </button>
+            </>
+          )}
+        </section>
+      )}
 
       {/* Import Boxes Grid: 1 row, 2 boxes (1:1 ratio) - Left: Scopus CSV, Right: Lecturer JSON */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-stretch">
@@ -1899,6 +2017,14 @@ export default function ImportsPage() {
                         )}
                       </div>
                     )}
+                    {lecturerPreview && detail.id === LECTURER_PREVIEW_ID && (
+                      <ScopusImportReview
+                        items={lecturerPreview.preview.scopus_review_items ?? []}
+                        checked={approveScopusImport} reason={scopusImportReason}
+                        disabled={lecturerImporting || scopusReviewBusy}
+                        onChecked={setApproveScopusImport} onReason={setScopusImportReason}
+                      />
+                    )}
                     {lecturerPreview && detail.id === LECTURER_PREVIEW_ID && lecturerPreview.preview.conflicts.length > 0 ? (
                       <div className="rounded-[5px] border border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-900 shadow-2xs">
                         <div className="flex items-center gap-2 font-bold text-amber-900">
@@ -2219,6 +2345,8 @@ export default function ImportsPage() {
                         disabled={
                           detailLoading ||
                           lecturerImporting ||
+                          scopusReviewBusy ||
+                          (approveScopusImport && !scopusImportReason.trim()) ||
                           lecturerCancelling ||
                           !lecturerPreview ||
                           lecturerPreview.preview.summary.valid === 0

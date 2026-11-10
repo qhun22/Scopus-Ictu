@@ -17,6 +17,7 @@ import ModalPortal from "../../components/common/ModalPortal";
 import { useSingleFlight } from "../../components/common/useSingleFlight";
 import { useToast } from "../../contexts/ToastContext";
 import { saveBlob } from "../../utils/saveBlob";
+import { isIctuUnit } from "../../utils/ictu";
 import ApplyToOtherPositions from "./ApplyToOtherPositions";
 
 type Locale = "vi" | "en";
@@ -130,17 +131,6 @@ const UNIT_BADGE_BASE =
 const UNIT_BADGE_ICTU = "border-[#3A5FC3] bg-white text-[#3A5FC3] hover:bg-blue-50";
 const UNIT_BADGE_OTHER = "border-slate-400 bg-white text-slate-700 hover:bg-slate-50";
 
-// The university itself (name or acronym), ignoring case and Vietnamese diacritics.
-const isIctuUnit = (text: string): boolean => {
-  const plain = text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/gi, "d")
-    .toLowerCase();
-  return (plain.includes("cong nghe thong tin") && plain.includes("truyen thong")) ||
-    (plain.includes("information and communication technology") && plain.includes("thai nguyen")) ||
-    /ictu/.test(plain);
-};
 // Unlike the fixed-width status badges above, this one shows a variable-length
 // sentence ("crossref: CORROBORATED (SOURCE_HAS_NO_AFFILIATION)") — a fixed
 // w-32 + truncate cut it off mid-word, so this wraps instead of truncating.
@@ -247,9 +237,14 @@ function OverrideForm({
           onChange={(e) => setForm((f) => ({ ...f, confidence: e.target.value as EditForm["confidence"] }))}
           data-testid="override-input-confidence"
         >
-          <option value="CORROBORATED">{vi ? "Đã đối chiếu · Chưa xác minh" : "Corroborated · Not verified"}</option>
-          <option value="UNRESOLVED">{vi ? "Vẫn chưa xác định" : "Still unresolved"}</option>
+          <option value="CORROBORATED">{vi ? "Đã rà soát, có đơn vị, đã xác minh" : "Reviewed, unit confirmed, verified"}</option>
+          <option value="UNRESOLVED">{vi ? "Đã rà soát, có đơn vị, chưa xác minh" : "Reviewed, unit confirmed, not verified"}</option>
         </select>
+        <p className="mt-1 text-sm text-slate-500">
+          {vi
+            ? "Chọn \"đã xác minh\" khi bạn chắc chắn đúng tên đơn vị (dù là ICTU hay nơi khác) — hệ thống tự nhận ra khi tên khớp ICTU và tô xanh. Chọn \"chưa xác minh\" khi đã ghi tạm nhưng chưa đủ chắc chắn, cần xem lại sau."
+            : "Pick \"verified\" once you're sure of the unit name (ICTU or otherwise) — the system highlights it green on its own when the name matches ICTU. Pick \"not verified\" when you've recorded something tentative that still needs a second look."}
+        </p>
       </div>
       <div>
         <label className="text-sm font-semibold text-slate-600">
@@ -365,11 +360,11 @@ function OverrideRow({
             <span className="font-semibold text-slate-700">
               {o.confidence === "CORROBORATED"
                 ? vi
-                  ? "Đã đối chiếu · Chưa xác minh"
-                  : "Corroborated · Not verified"
+                  ? "Đã rà soát, có đơn vị, đã xác minh"
+                  : "Reviewed, unit confirmed, verified"
                 : vi
-                  ? "Vẫn chưa xác định"
-                  : "Still unresolved"}
+                  ? "Đã rà soát, có đơn vị, chưa xác minh"
+                  : "Reviewed, unit confirmed, not verified"}
             </span>
           </p>
           <p className="text-sm text-slate-600 break-all">

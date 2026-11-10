@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigationType, useSearchParams } from "react-router-dom";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../api/errors";
 import {
@@ -18,6 +18,7 @@ import PublicationDetailModal from "./PublicationDetailModal";
 
 const DEFAULT_PAGE_SIZE = 20;
 const FILTER_DELAY_MS = 350;
+const LIST_STATE_KEY = "pub-list-state";
 
 const NULL_YEAR: Record<"vi" | "en", string> = { vi: "Chưa rõ", en: "Unknown" };
 const NULL_STRING: Record<"vi" | "en", string> = { vi: "Chưa cập nhật", en: "Not available" };
@@ -30,7 +31,31 @@ interface AppliedFilters {
   missing_doi: boolean;
 }
 
+interface SavedListState {
+  scrollTop: number;
+  q: string;
+  yearInput: string;
+  appliedFilters: AppliedFilters;
+  page: number;
+  pageSize: number;
+}
+
+function readSavedListState(): SavedListState | null {
+  try {
+    const raw = sessionStorage.getItem(LIST_STATE_KEY);
+    return raw ? (JSON.parse(raw) as SavedListState) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The app scrolls inside <main> (see AppLayout), never the window. */
+const scrollArea = () => document.querySelector("main");
+
 export default function PublicationsPage() {
+  const navigationType = useNavigationType();
+  // Coming back from a publication: resume the list exactly as it was left.
+  const [saved] = useState(() => (navigationType === "POP" ? readSavedListState() : null));
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedEid, setSelectedEid] = useState<string | null>(null);
   const rawScopusId = searchParams.get("scopus_id") ?? "";
@@ -46,8 +71,8 @@ export default function PublicationsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   // ── Search state (one box: title, EID, DOI, journal, author name, Scopus ID) ───
-  const [q, setQ] = useState("");
-  const [qDebounced, setQDebounced] = useState("");
+  const [q, setQ] = useState(saved?.q ?? "");
+  const [qDebounced, setQDebounced] = useState(saved?.q ?? "");
 
   // When the search box contains only digits (>=8), treat it as a Scopus Author ID
   // and route to the dedicated scopus_id param (exact match) instead of q (substring).
@@ -56,22 +81,24 @@ export default function PublicationsPage() {
   const effectiveScopusId = scopusIdFilter ?? (qIsScopusId ? qDebounced.trim() : undefined);
 
   // ── Year: free-text, debounced live filter (same pattern as the search box) ──
-  const [yearInput, setYearInput] = useState("");
+  const [yearInput, setYearInput] = useState(saved?.yearInput ?? "");
 
   // ── Applied filter state (each control writes here directly — filtering is
   //     live, no separate "Apply" step) ──────────────────────────────────
 
-  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>({
+  const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(saved?.appliedFilters ?? {
     year: undefined,
     document_type: undefined,
     publication_stage: undefined,
     open_access_status: undefined,
     missing_doi: false,
   });
+  const appliedYearRef = useRef(appliedFilters.year);
+  appliedYearRef.current = appliedFilters.year;
 
   // ── Pagination state ─────────────────────────────────────────────────────
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(saved?.page ?? 1);
+  const [pageSize, setPageSize] = useState(saved?.pageSize ?? DEFAULT_PAGE_SIZE);
 
   // ── Error state ──────────────────────────────────────────────────────────
   const [error, setError] = useState<string | null>(null);
@@ -107,10 +134,20 @@ export default function PublicationsPage() {
   const abortRef = useRef<AbortController | null>(null);
   const genRef = useRef(0);
 
-  // ── Scroll restoration: save position before navigating to detail page,
-  //     restore it after the first data load completes on return. ─────────
-  const SCROLL_KEY = "pub-list-scroll-y";
+  // ── Return to the list: save it before opening a publication, put the
+  //     scroll back once the first data load has rendered the rows. ───────
   const scrollRestoredRef = useRef(false);
+  const saveListState = () => {
+    const state: SavedListState = {
+      scrollTop: scrollArea()?.scrollTop ?? 0,
+      q,
+      yearInput,
+      appliedFilters,
+      page,
+      pageSize,
+    };
+    try { sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(state)); } catch {}
+  };
 
   const fetchPublications = useCallback(
     async (currentPage: number, currentPageSize: number, currentGen: number) => {
@@ -173,22 +210,17 @@ export default function PublicationsPage() {
     [qForApi, effectiveScopusId, appliedFilters],
   );
 
-  // Restore scroll once, after the first successful data load on mount.
+  // Restore scroll once, after the first data load on mount (a page other than
+  // the first reports loadingMore, not loading, while its rows are on the way).
   useEffect(() => {
-    if (loading || scrollRestoredRef.current) return;
+    if (loading || loadingMore || scrollRestoredRef.current) return;
     scrollRestoredRef.current = true;
-    try {
-      const saved = sessionStorage.getItem(SCROLL_KEY);
-      if (saved !== null) {
-        sessionStorage.removeItem(SCROLL_KEY);
-        const y = Number(saved);
-        if (Number.isFinite(y) && y > 0) {
-          requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "instant" }));
-        }
-      }
-    } catch {}
+    try { sessionStorage.removeItem(LIST_STATE_KEY); } catch {}
+    if (saved && saved.scrollTop > 0) {
+      scrollArea()?.scrollTo({ top: saved.scrollTop, behavior: "instant" });
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [loading, loadingMore]);
 
   // ── Single trigger: appliedFilters + page + pageSize + qDebounced ────────
   useEffect(() => {
@@ -221,7 +253,8 @@ export default function PublicationsPage() {
     const trimmed = yearInput.trim();
     const timer = window.setTimeout(() => {
       const parsed = /^\d{4}$/.test(trimmed) ? Number(trimmed) : undefined;
-      setAppliedFilters((prev) => (prev.year === parsed ? prev : { ...prev, year: parsed }));
+      if (parsed === appliedYearRef.current) return; // nothing changed: keep the current page
+      setAppliedFilters((prev) => ({ ...prev, year: parsed }));
       setPage(1);
     }, FILTER_DELAY_MS);
     return () => window.clearTimeout(timer);
@@ -276,6 +309,7 @@ export default function PublicationsPage() {
     v && v.trim() ? v.trim() : NULL_STRING[locale];
 
   // ── Labels ────────────────────────────────────────────────────────────
+  const colStt = "STT";
   const colTitle = locale === "vi" ? "Công bố" : "Publication";
   const colEid = "EID";
   const colYear = locale === "vi" ? "Năm" : "Year";
@@ -512,19 +546,15 @@ export default function PublicationsPage() {
       {/* ── Table ───────────────────────────────────────────────────────── */}
       <div className="overflow-hidden rounded-[5px] border border-slate-200/80 bg-white shadow-xs">
         <div className="relative overflow-x-auto">
-          <table className="w-full table-fixed text-left text-sm" aria-busy={isFiltering}>
-            <colgroup>
-              <col style={{ width: 200 }} />
-              <col style={{ width: 165 }} />
-              <col style={{ width: 66 }} />
-              <col style={{ width: 180 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 88 }} />
-              <col style={{ width: 105 }} />
-              <col style={{ width: 164 }} />
-            </colgroup>
+          {/* No table-fixed/colgroup: columns size to content (whitespace-nowrap keeps the
+              short ones tight) and the actions column pins to the right edge at a fixed
+              width — the same pattern already proven on the Imports history table (UI-10),
+              so it can never get scrolled out of view regardless of window width. Only the
+              long free-text columns (title, source, open access) wrap within a max-width. */}
+          <table className="w-full text-left text-sm" aria-busy={isFiltering}>
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-slate-600">
               <tr>
+                <th className="border-r border-slate-200/80 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{colStt}</th>
                 <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colTitle}</th>
                 <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colEid}</th>
                 <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colYear}</th>
@@ -532,14 +562,14 @@ export default function PublicationsPage() {
                 <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colDocType}</th>
                 <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colStage}</th>
                 <th className="border-r border-slate-200/80 px-2.5 py-3.5 font-medium text-slate-700 whitespace-nowrap">{colOa}</th>
-                <th className="sticky right-0 z-[1] border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700 whitespace-nowrap">{colAction}</th>
+                <th className="sticky right-0 z-[1] w-40 whitespace-nowrap border-l border-slate-200/80 bg-slate-50 px-2.5 py-3.5 text-center font-medium text-slate-700">{colAction}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {/* ── Initial loading / error — on error just keep spinning ── */}
               {(loading && items.length === 0) || error ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <div className="flex items-center justify-center gap-2">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-[#3A5FC3]" />
                       {!error && <span className="text-xs font-medium">{loadingLabel}</span>}
@@ -549,7 +579,7 @@ export default function PublicationsPage() {
               ) : /* ── Empty state ── */
               !loading && items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={9} className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-1">
                       <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -560,9 +590,12 @@ export default function PublicationsPage() {
                   </td>
                 </tr>
               ) : /* ── Data rows ── */
-                items.map((pub) => (
+                items.map((pub, index) => (
                   <tr key={pub.eid} className="transition-colors duration-300 hover:bg-slate-50/50">
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
+                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 text-center align-middle text-slate-500">
+                      {(page - 1) * pageSize + index + 1}
+                    </td>
+                    <td className="max-w-[320px] border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
                       <span
                         className="block line-clamp-2 break-words font-medium text-slate-800"
                         title={pub.title}
@@ -570,27 +603,29 @@ export default function PublicationsPage() {
                         {pub.title}
                       </span>
                     </td>
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-500 align-middle">
+                    <td className="whitespace-nowrap border-r border-b border-slate-100 px-2.5 py-3.5 font-medium text-slate-500 align-middle">
                       {pub.eid}
                     </td>
                     <td className="border-r border-b border-slate-100 px-2.5 py-3.5 whitespace-nowrap font-medium text-slate-800 align-middle">
                       {fmtYear(pub.year)}
                     </td>
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
+                    <td className="max-w-[220px] border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
                       <span className="block line-clamp-2 break-words font-medium text-slate-700" title={pub.source_title ?? ""}>
                         {fmtField(pub.source_title)}
                       </span>
                     </td>
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-700 align-middle">
+                    <td className="whitespace-nowrap border-r border-b border-slate-100 px-2.5 py-3.5 font-medium text-slate-700 align-middle">
                       {fmtField(pub.document_type)}
                     </td>
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-700 align-middle">
+                    <td className="whitespace-nowrap border-r border-b border-slate-100 px-2.5 py-3.5 font-medium text-slate-700 align-middle">
                       {fmtField(pub.publication_stage)}
                     </td>
-                    <td className="border-r border-b border-slate-100 px-2.5 py-3.5 break-words font-medium text-slate-700 align-middle">
-                      {fmtField(pub.open_access_status)}
+                    <td className="max-w-[160px] border-r border-b border-slate-100 px-2.5 py-3.5 align-middle">
+                      <span className="block line-clamp-2 break-words font-medium text-slate-700">
+                        {fmtField(pub.open_access_status)}
+                      </span>
                     </td>
-                    <td className="sticky right-0 z-[1] border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
+                    <td className="sticky right-0 z-[1] w-40 border-l border-b border-slate-100 bg-white px-2.5 py-3.5 text-center align-middle">
                       {isAdmin ? (
                         <button
                           type="button"
@@ -602,9 +637,7 @@ export default function PublicationsPage() {
                       ) : (
                         <Link
                           to={`/publications/${encodeURIComponent(pub.eid)}`}
-                          onClick={() => {
-                            try { sessionStorage.setItem(SCROLL_KEY, String(window.scrollY)); } catch {}
-                          }}
+                          onClick={saveListState}
                           className="inline-flex h-badge w-32 shrink-0 items-center justify-center whitespace-nowrap rounded-[5px] border border-slate-300 bg-white px-2.5 text-center text-sm font-bold leading-none text-slate-700 hover:bg-slate-50 hover:border-slate-400 hover:text-slate-900 transition-colors"
                         >
                           {viewDetailLabel}

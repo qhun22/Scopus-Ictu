@@ -1,220 +1,151 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { ApiError } from "../../api/client";
-import { getMyLecturerProfile } from "../../api/lecturerScopus";
 import { getApiErrorMessage } from "../../api/errors";
+import Avatar from "../../components/common/Avatar";
+import Button, { buttonClass } from "../../components/ui/Button";
+import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n";
-import { LecturerScopusProfile } from "../../types/lecturerScopus";
+import type { TranslationSchema } from "../../i18n/types";
+import { orcidProfileUrl, webProfileUrl } from "./profileLinks";
+import useProfileData from "./useProfileData";
+import ProfileEditForm from "./ProfileEditForm";
 
-const viCopy = {
-  title: "Hồ sơ giảng viên",
-  subtitle: "Thông tin hồ sơ được liên kết với tài khoản ICTU của bạn.",
-  basic: "Thông tin cơ bản",
-  academic: "Thông tin học thuật",
-  organization: "Đơn vị công tác",
-  research: "Thông tin nghiên cứu",
-  fullName: "Họ và tên",
-  staffCode: "Mã cán bộ",
-  email: "Email",
-  academicRank: "Học hàm",
-  academicDegree: "Học vị",
-  position: "Chức vụ",
-  department: "Bộ môn",
-  faculty: "Khoa / đơn vị",
-  orcid: "ORCID",
-  repository: "Hồ sơ kho lưu trữ",
-  notAvailable: "Chưa cập nhật",
-  loading: "Đang tải dữ liệu...",
-  loadError: "Không thể tải hồ sơ giảng viên.",
-  retry: "Thử lại",
-  notLinkedTitle: "Tài khoản chưa được liên kết",
-  notLinkedMessage: "Tài khoản của bạn chưa được liên kết với hồ sơ giảng viên ICTU.",
-};
+type ProfileCopy = TranslationSchema["personalProfile"];
+const panelClass = "min-w-0 overflow-hidden rounded-card border border-slate-200/80 bg-white";
+const badgeClass = "inline-flex h-badge shrink-0 items-center justify-center whitespace-nowrap rounded-control border bg-white px-2.5 text-sm font-bold leading-none";
 
-const enCopy = {
-  title: "Lecturer profile",
-  subtitle: "Profile information linked to your ICTU account.",
-  basic: "Basic information",
-  academic: "Academic information",
-  organization: "Organization",
-  research: "Research information",
-  fullName: "Full name",
-  staffCode: "Staff code",
-  email: "Email",
-  academicRank: "Academic rank",
-  academicDegree: "Academic degree",
-  position: "Position",
-  department: "Department",
-  faculty: "Faculty / unit",
-  orcid: "ORCID",
-  repository: "Repository profile",
-  notAvailable: "Not available",
-  loading: "Loading profile…",
-  loadError: "Unable to load your lecturer profile.",
-  retry: "Retry",
-  notLinkedTitle: "Account not linked",
-  notLinkedMessage: "Your account is not linked to an ICTU lecturer profile.",
-};
-
-type ProfileCopy = typeof viCopy;
-
-function ProfileSkeleton({ copy }: { copy: ProfileCopy }) {
+function ProfileSection({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="space-y-6" aria-label={copy.loading}>
-      {[copy.basic, copy.academic, copy.organization].map((section) => (
-        <section key={section} className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-5 h-5 w-44 animate-pulse rounded bg-slate-100" />
-          <div className="grid gap-5 sm:grid-cols-2">
-            {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="space-y-2">
-                <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
-                <div className="h-5 w-48 animate-pulse rounded bg-slate-100" />
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
-}
-
-function StateCard({
-  title,
-  message,
-  actionLabel,
-  onAction,
-  tone,
-}: {
-  title: string;
-  message: string;
-  actionLabel: string;
-  onAction: () => void;
-  tone: "error" | "info";
-}) {
-  const toneClass = tone === "error"
-    ? "border-rose-200 bg-rose-50 text-rose-900"
-    : "border-blue-200 bg-blue-50 text-blue-900";
-
-  return (
-    <div className={`rounded-[5px] border p-6 shadow-sm ${toneClass}`} role="alert">
-      <h2 className="text-base font-semibold">{title}</h2>
-      <p className="mt-2 text-sm opacity-80">{message}</p>
-      <button
-        type="button"
-        onClick={onAction}
-        className="mt-5 rounded-[5px] bg-white px-4 py-2 text-sm font-semibold shadow-sm ring-1 ring-inset ring-current/20 transition hover:bg-slate-50"
-      >
-        {actionLabel}
-      </button>
-    </div>
+    <section className={panelClass}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 bg-slate-50/50 px-4 py-3.5">
+        <h2 className="text-sm font-semibold text-slate-800">{title}</h2>{action}
+      </div>
+      <div className="p-4 sm:p-5">{children}</div>
+    </section>
   );
 }
 
 function Field({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-1 break-words text-sm font-medium text-slate-800">{value}</dd>
-    </div>
-  );
+  return <div className="min-w-0"><dt className="text-sm text-slate-500">{label}</dt><dd className="mt-1 break-words text-sm font-medium text-slate-800">{value}</dd></div>;
+}
+
+function ProfileLink({ value, href, fallback }: { value: string | null | undefined; href: string | null; fallback: string }) {
+  if (!value?.trim()) return <span className="text-slate-400">{fallback}</span>;
+  return href ? <a href={href} target="_blank" rel="noopener noreferrer" className="break-all text-brand hover:underline">{value.trim()}</a> : <>{value.trim()}</>;
+}
+
+function ProfileSkeleton({ copy }: { copy: ProfileCopy }) {
+  return <div className="space-y-4" role="status" aria-label={copy.loading}>
+    <p className="text-sm text-slate-500">{copy.loading}</p>
+    {[0, 1, 2].map((key) => <div key={key} className={`${panelClass} p-5`}>
+      <div className="mb-5 h-4 w-40 animate-pulse rounded-control bg-slate-100" />
+      <div className="grid gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((field) => <div key={field} className="h-10 animate-pulse rounded-control bg-slate-100" />)}</div>
+    </div>)}
+  </div>;
 }
 
 export default function ProfilePage() {
-  const { locale } = useI18n();
-  const copy = locale === "vi" ? viCopy : enCopy;
-  const [profile, setProfile] = useState<LecturerScopusProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notLinked, setNotLinked] = useState(false);
-  const controllerRef = useRef<AbortController | null>(null);
-
-  const loadProfile = useCallback(() => {
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setLoading(true);
-    setError(null);
-    setNotLinked(false);
-
-    void getMyLecturerProfile({ signal: controller.signal })
-      .then((data) => {
-        if (!controller.signal.aborted) setProfile(data);
-      })
-      .catch((requestError: unknown) => {
-        if (controller.signal.aborted) return;
-        if (requestError instanceof ApiError && requestError.code === "LECTURER_NOT_LINKED") {
-          setProfile(null);
-          setNotLinked(true);
-          return;
-        }
-        setError(getApiErrorMessage(requestError, copy.loadError));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-  }, [copy.loadError]);
-
-  useEffect(() => {
-    loadProfile();
-    return () => controllerRef.current?.abort();
-  }, [loadProfile]);
-
-  const value = (field: string | null | undefined) => field ?? copy.notAvailable;
-  const linkValue = (field: string | null) => field
-    ? <a className="text-[#3A5FC3] hover:underline" href={field} target="_blank" rel="noreferrer">{field}</a>
-    : copy.notAvailable;
+  const { user } = useAuth();
+  const { t, locale, getRoleLabel } = useI18n();
+  const copy = t.personalProfile;
+  const { profile, loading, error, identities, identitiesLoading, identitiesError, loadProfile, loadIdentities, applyProfile } = useProfileData();
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const notLinked = error instanceof ApiError && error.code === "LECTURER_NOT_LINKED";
+  const name = profile?.full_name?.trim() || user?.display_name?.trim() || copy.notAvailable;
+  const fieldValue = (value: string | null | undefined): ReactNode => value?.trim() || <span className="text-slate-400">{copy.notAvailable}</span>;
+  const role = getRoleLabel(user?.role) || copy.notAvailable;
+  const linkStatus = loading ? copy.loading : notLinked ? copy.notLinked : profile ? copy.linked : copy.unverified;
+  const linkTone = loading || (!profile && !notLinked) ? "border-slate-300 text-slate-600" : notLinked ? "border-amber-400 text-amber-700" : "border-emerald-400 text-emerald-700";
+  const reload = () => { setSaved(false); loadProfile(); loadIdentities(); };
+  const mainIdentity = identities.find((identity) => identity.is_primary && identity.status === "APPROVED");
+  const primaryIdValue = identitiesLoading ? <span role="status">{copy.identityLoading}</span> : identitiesError ? <div className="space-y-2">
+    <p className="text-rose-700">{copy.identityError}</p><Button variant="secondary" size="sm" onClick={loadIdentities}>{copy.retry}</Button>
+  </div> : mainIdentity ? <Link to={`/identity?q=${encodeURIComponent(mainIdentity.scopus_id)}`} className="font-mono text-brand hover:underline">{mainIdentity.scopus_id}</Link> : <span className="text-slate-400">{copy.noPrimaryScopusId}</span>;
+  const genderLabel = (value: string | null) => value === "Nam" ? copy.genderMale : value === "Nữ" ? copy.genderFemale : value === "Khác" ? copy.genderOther : fieldValue(value);
 
   return (
-    <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">{copy.title}</h1>
-        <p className="mt-1 text-sm text-slate-500">{copy.subtitle}</p>
-      </header>
-
-      {loading ? <ProfileSkeleton copy={copy} /> : null}
-      {!loading && notLinked ? (
-        <StateCard title={copy.notLinkedTitle} message={copy.notLinkedMessage} actionLabel={copy.retry} onAction={loadProfile} tone="info" />
-      ) : null}
-      {!loading && error ? (
-        <StateCard title={copy.loadError} message={error} actionLabel={copy.retry} onAction={loadProfile} tone="error" />
-      ) : null}
-
-      {!loading && !error && !notLinked && profile ? (
-        <div className="space-y-6">
-          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">{copy.basic}</h2>
-            <dl className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label={copy.fullName} value={value(profile.full_name)} />
-              <Field label={copy.staffCode} value={value(profile.staff_code)} />
-              <Field label={copy.email} value={value(profile.email)} />
+    <div className="personal-profile-page app-page-container min-w-0">
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-0">
+          <section className={`${panelClass} p-4 sm:p-5`} aria-label={copy.account}>
+            <p className="mb-4 text-sm font-semibold text-slate-800">{copy.account}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar src={user?.avatar_url} name={name} className="h-16 w-16 shrink-0 rounded-control text-2xl" />
+              <h1 className="min-w-0 break-words text-lg font-bold leading-6 text-slate-800">{name}</h1>
+            </div>
+            <dl className="mt-5 space-y-4 border-t border-slate-100 pt-4">
+              <Field label={copy.accountName} value={fieldValue(user?.display_name)} />
+              <Field label={copy.accountEmail} value={fieldValue(user?.email)} />
+              <Field label={copy.accountRole} value={<span className={`${badgeClass} border-slate-300 text-slate-700`}>{role}</span>} />
+              <Field label={copy.profileLink} value={<span className={`${badgeClass} ${linkTone}`}>{linkStatus}</span>} />
             </dl>
+            <Button variant="secondary" fullWidth className="mt-5" onClick={reload} disabled={loading || identitiesLoading || editing}>{copy.refresh}</Button>
           </section>
 
-          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">{copy.academic}</h2>
-            <dl className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <Field label={copy.academicRank} value={value(profile.academic_rank)} />
-              <Field label={copy.academicDegree} value={value(profile.academic_degree)} />
-              <Field label={copy.position} value={value(profile.position)} />
-            </dl>
+          <section className={panelClass}>
+            <h2 className="border-b border-slate-200/80 bg-slate-50/50 px-4 py-3.5 text-sm font-semibold text-slate-800">{copy.quickLinks}</h2>
+            <nav aria-label={copy.quickLinks} className="divide-y divide-slate-100">
+              <Link to="/my-publications" className="block px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-brand">{t.nav.myPublications}</Link>
+              <Link to="/identity" className="block px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-brand">{t.nav.identity}</Link>
+            </nav>
           </section>
+        </aside>
 
-          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">{copy.organization}</h2>
-            <dl className="mt-5 grid gap-5 sm:grid-cols-2">
-              <Field label={copy.department} value={value(profile.department)} />
-              <Field label={copy.faculty} value={value(profile.faculty)} />
-            </dl>
-          </section>
+        <div className="min-w-0 space-y-4">
+          {loading ? <ProfileSkeleton copy={copy} /> : error || !profile ? (
+            <section className={`rounded-card border p-5 ${notLinked ? "border-amber-200 bg-amber-50 text-amber-900" : "border-rose-200 bg-rose-50 text-rose-900"}`} role="alert">
+              <h2 className="text-sm font-semibold">{notLinked ? copy.notLinkedTitle : copy.loadError}</h2>
+              <p className="mt-2 text-sm leading-6">{notLinked ? copy.notLinkedMessage : getApiErrorMessage(error, copy.loadError)}</p>
+              <Button variant="secondary" className="mt-4" onClick={loadProfile}>{copy.retry}</Button>
+            </section>
+          ) : <>
+            <ProfileSection title={copy.basic} action={!editing && <Button variant="secondary" size="sm" onClick={() => { setSaved(false); setEditing(true); }}>{copy.edit}</Button>}>
+              <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 2xl:grid-cols-3">
+                <Field label={copy.fullName} value={fieldValue(profile.full_name)} />
+                <Field label={copy.primaryScopusId} value={primaryIdValue} />
+                <Field label={copy.email} value={fieldValue(profile.email)} />
+              </dl>
+            </ProfileSection>
 
-          <section className="rounded-[5px] border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-base font-semibold text-slate-900">{copy.research}</h2>
-            <dl className="mt-5 grid gap-5 sm:grid-cols-2">
-              <Field label={copy.orcid} value={value(profile.orcid)} />
-              <Field label={copy.repository} value={linkValue(profile.repository_profile_url)} />
-            </dl>
-          </section>
+            {saved && <p className="rounded-control border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{copy.saved}</p>}
+            {editing ? <ProfileEditForm profile={profile} onCancel={() => setEditing(false)} onSaved={(updated) => { applyProfile(updated); setEditing(false); setSaved(true); }} /> : <>
+                <ProfileSection title={copy.academic}>
+                  <dl className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
+                    <Field label={copy.academicRank} value={fieldValue(profile.academic_rank)} />
+                    <Field label={copy.academicDegree} value={fieldValue(profile.academic_degree)} />
+                    <Field label={copy.position} value={fieldValue(profile.position)} />
+                    <Field label={copy.specialization} value={fieldValue(profile.specialization)} />
+                  </dl>
+                </ProfileSection>
+
+              <ProfileSection title={copy.contact}>
+                <dl className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                  <Field label={copy.phone} value={fieldValue(profile.phone)} />
+                  <Field label={copy.dateOfBirth} value={profile.date_of_birth ? new Date(`${profile.date_of_birth}T00:00:00`).toLocaleDateString(locale === "vi" ? "vi-VN" : "en-US") : fieldValue(null)} />
+                  <Field label={copy.gender} value={genderLabel(profile.gender)} />
+                </dl>
+              </ProfileSection>
+
+              <ProfileSection title={copy.research}>
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <Field label={copy.orcid} value={<ProfileLink value={profile.orcid} href={orcidProfileUrl(profile.orcid)} fallback={copy.notAvailable} />} />
+                  <Field label={copy.repository} value={<ProfileLink value={profile.repository_profile_url} href={webProfileUrl(profile.repository_profile_url)} fallback={copy.notAvailable} />} />
+                </dl>
+              </ProfileSection>
+            </>}
+          </>}
+
+          {!loading && !editing && <section className={`${panelClass} flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5`}>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-slate-800">{copy.updateTitle}</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">{copy.updateMessage}</p>
+            </div>
+            <Link to="/report-issue" className={buttonClass("secondary")}>{copy.requestUpdate}</Link>
+          </section>}
         </div>
-      ) : null}
-    </main>
+      </div>
+    </div>
   );
 }

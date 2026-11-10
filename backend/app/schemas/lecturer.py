@@ -8,6 +8,8 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.common import TimestampMixin
+
+
 class LecturerBase(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     email: str = Field(..., min_length=3, max_length=255)
@@ -118,6 +120,14 @@ class LecturerDatasetMetadata(BaseModel):
     record_count: int
 
 
+class LecturerScopusImportItem(BaseModel):
+    lecturer_id: uuid.UUID | None = None
+    full_name: str
+    institutional_email: str | None = None
+    scopus_ids: list[str]
+    primary_scopus_id: str | None = None
+
+
 class LecturerPreviewResponse(BaseModel):
     """Read-only diff between an uploaded dataset and the database."""
 
@@ -126,6 +136,7 @@ class LecturerPreviewResponse(BaseModel):
     conflicts: list[LecturerDatasetConflict]
     filename: str
     parser_version: str
+    scopus_review_items: list[LecturerScopusImportItem] = Field(default_factory=list)
 
 
 class LecturerImportResponse(BaseModel):
@@ -137,6 +148,7 @@ class LecturerImportResponse(BaseModel):
     snapshot_ids: list[str]
     filename: str
     parser_version: str
+    scopus_review_items: list[LecturerScopusImportItem] = Field(default_factory=list)
 
 
 class LecturerAccount(BaseModel):

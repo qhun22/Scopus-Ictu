@@ -16,7 +16,10 @@ Link status (how sure we are that external authorship == Scopus slot)
 ``CORROBORATED`` no shared identifier, but the author lists have the same
                  length, the external authorship sits at the same position and
                  its name tokens equal the Scopus name tokens, and nothing
-                 contradicts it.  Reported separately - NOT verified.
+                 contradicts it.  Reported separately - NOT verified.  An OpenAlex
+                 author profile contradicts only when its name cannot be the name
+                 on the paper (see ``names_compatible``) and the publisher's ORCID
+                 for that position does not back it up.
 ``UNRESOLVED``   everything else.  The reason is recorded and no affiliation is
                  assigned.
 
@@ -38,7 +41,7 @@ from dataclasses import dataclass, field
 VERIFIED = "VERIFIED"
 CORROBORATED = "CORROBORATED"
 UNRESOLVED = "UNRESOLVED"
-ALIGNMENT_POLICY_VERSION = "author-affiliation/2"
+ALIGNMENT_POLICY_VERSION = "author-affiliation/3"
 
 R_NO_EXTERNAL_WORK = "NO_EXTERNAL_WORK"
 R_NO_AUTHOR_LIST = "NO_EXTERNAL_AUTHOR_LIST"
@@ -53,6 +56,12 @@ R_ENTITY_NAME_CONFLICT = "OPENALEX_ENTITY_NAME_CONFLICT"
 
 _SCOPUS_ID_RE = re.compile(r"(?:authorId=|authid/detail\.uri\?authorId=)?(\d{6,13})")
 _ORCID_RE = re.compile(r"(\d{4}-\d{4}-\d{4}-\d{3}[\dX])")
+_CYRILLIC_TO_LATIN = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z",
+    "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
+    "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts", "ч": "ch", "ш": "sh",
+    "щ": "shch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
 
 
 # --------------------------------------------------------------------------- types
@@ -143,6 +152,40 @@ def names_match(left: str | None, right: str | None) -> bool:
     """
     a, b = name_tokens(left), name_tokens(right)
     return bool(a) and a == b
+
+
+def _romanize_cyrillic(value: str) -> str:
+    return "".join(_CYRILLIC_TO_LATIN.get(ch, ch) for ch in value.casefold())
+
+
+def names_compatible(written: str | None, profile: str | None) -> bool:
+    """Whether two forms of a name can be the same person, one possibly using initials.
+
+    Used only to decide that an OpenAlex author profile does not contradict the name printed on
+    the paper ("A. A. Moldovyan" / "Alexander Andreevich Moldovyan"); it never replaces
+    ``names_match`` for attributing an authorship to a Scopus slot. Fail-closed: the word counts
+    must be equal, at least one full word must be identical, and every remaining pair must be an
+    initial and a word starting with it. Names in a script we cannot compare do not match.
+    """
+    a = Counter(name_tokens(_romanize_cyrillic(written or "")))
+    b = Counter(name_tokens(_romanize_cyrillic(profile or "")))
+    if not a or sum(a.values()) != sum(b.values()):
+        return False
+    # Only full words are paired off here: a shared initial may belong to different full words.
+    shared = Counter({token: count for token, count in (a & b).items() if len(token) >= 2})
+    if not shared:
+        return False
+    left, right = list((a - shared).elements()), list((b - shared).elements())
+    for letter in {token[0] for token in left} | {token[0] for token in right}:
+        group_a = [token for token in left if token[0] == letter]
+        group_b = [token for token in right if token[0] == letter]
+        if len(group_a) != len(group_b):
+            return False
+        # Each pair may hold at most one full word: two different full words are two names.
+        full_words = sum(len(token) >= 2 for token in group_a + group_b)
+        if full_words > len(group_a):
+            return False
+    return True
 
 
 # --------------------------------------------------------------------------- parsers
@@ -269,6 +312,21 @@ def parse_orcid_scopus_ids(external_identifiers: Iterable[Mapping] | None) -> fr
 
 
 # --------------------------------------------------------------------------- alignment
+def _entity_contradicts_paper(ext: ExternalAuthorship, publisher_orcids: Mapping[int, str]) -> bool:
+    """Whether OpenAlex's author profile looks like someone other than the name on the paper.
+
+    A publisher ORCID equal to the profile's ORCID only clears a difference in how the name is
+    written, so the two names must still share a full word. It is never identity proof.
+    """
+    if names_compatible(ext.display_name, ext.entity_display_name):
+        return False
+    entity_orcid = _orcid(ext.entity_orcid)
+    same_orcid = entity_orcid is not None and publisher_orcids.get(ext.position) == entity_orcid
+    written = {t for t in name_tokens(_romanize_cyrillic(ext.display_name)) if len(t) >= 2}
+    profile = set(name_tokens(_romanize_cyrillic(ext.entity_display_name or "")))
+    return not (same_orcid and written & profile)
+
+
 def _link(slot: ScopusAuthorSlot, ext: ExternalAuthorship | None, status: str, **kw) -> AuthorAffiliationLink:
     source = kw.pop("source")
     observation = {
@@ -311,6 +369,7 @@ def align_paper(
     scopus_ids_by_orcid: Mapping[str, Iterable[str]] | None = None,
     *,
     source: str,
+    publisher_orcids: Mapping[int, str] | None = None,
 ) -> list[AuthorAffiliationLink]:
     """Attribute external authorships to Scopus slots for ONE paper and ONE source."""
     bridge = {k: frozenset(v) for k, v in (scopus_ids_by_orcid or {}).items()}
@@ -372,7 +431,7 @@ def align_paper(
             links.append(_link(slot, ext, UNRESOLVED, source=source, reason=R_NO_RAW_NAME))
         elif (
             ext.source == "openalex" and ext.entity_display_name
-            and not names_match(ext.display_name, ext.entity_display_name)
+            and _entity_contradicts_paper(ext, publisher_orcids or {})
         ):
             links.append(_link(slot, ext, UNRESOLVED, source=source, reason=R_ENTITY_NAME_CONFLICT))
         elif ext.position in ambiguous_external:

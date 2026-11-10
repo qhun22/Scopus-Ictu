@@ -8,12 +8,17 @@ source identity are therefore not part of the dataset.
 
 ``source_id`` is read back from the snapshot that recorded it — it is never
 the internal ``lecturers.id`` and it is never synthesised from it. Nothing
-that is not stored in PostgreSQL is invented: ``tel`` and the Google Scholar
-profile are not persisted, so they are omitted and listed in
+that is not stored in PostgreSQL is invented: legacy ``tel`` values are imported
+into ``phone`` and exported under that canonical key. The raw ``tel`` key and
+the unpersisted Google Scholar profile are omitted and listed in
 ``dataset.export.not_preserved_fields``.
 
 The output is accepted by :func:`parse_and_validate` and by the import
 service (round trip).
+
+Each record also includes all currently APPROVED ``scopus_ids`` and the
+valid human-selected ``primary_scopus_id`` (or null). These export fields
+are a reference: the lecturer importer does not recreate review decisions.
 
 A lecturer that has a login account is exported together with it (``account``:
 email, role, display name, and active flag). ``password_hash`` and other
@@ -29,28 +34,33 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.governance import User
+from app.models.identity import LecturerScopusIdentity
+from app.models.lecturer_primary_scopus import LecturerPrimaryScopusEvent
 from app.models.master_lecturer import (
     Lecturer,
     LecturerKnownPublication,
     LecturerSourceSnapshot,
 )
+from app.models.publication import ScopusAuthor
 from app.services.lecturer_dataset.parser import UUID_RE
 
 ICTU_SOURCE_SYSTEM = "ictu_dspace_archive"
-EXPORTER_VERSION = "scopus_ictu_lecturer_export/1.0"
+EXPORTER_VERSION = "scopus_ictu_lecturer_export/1.1"
 SCHEMA_VERSION = "1.1"
 NOT_PRESERVED_FIELDS: tuple[str, ...] = ("tel", "google_scholar")
 RECOVERABILITY_NOTE = (
     "Bản xuất khôi phục tất cả các trường canonical đang được PostgreSQL lưu, "
     "bao gồm specialization, gender, date_of_birth và phone (thêm từ migration e1a2b3c4d5f6). "
-    "Các trường tel và Google Scholar chưa được lưu nên không có trong bản xuất; "
+    "Khi nhập, tel được chuẩn hóa thành phone; bản xuất chỉ có khóa phone. "
+    "Google Scholar chưa được lưu nên không có trong bản xuất; "
     "JSON nguồn gốc (v1), Craw và sidecar vẫn là nguồn lưu trữ cho các trường này. "
     "Giảng viên có tài khoản đăng nhập được xuất kèm khối account (email, vai trò, "
-    "display_name, is_active, mã băm Argon2id); bí mật xác thực và phiên đăng nhập không có trong tệp xuất."
+    "display_name, is_active, mã băm Argon2id); bí mật xác thực và phiên đăng nhập "
+    "không có trong tệp xuất."
 )
 
 
@@ -72,6 +82,47 @@ def _source_id_of(payload: dict) -> str | None:
         if isinstance(value, str) and value.strip() and not UUID_RE.match(value.strip()):
             return value.strip()
     return None
+
+
+def _scopus_ids_for_export(
+    db: Session, lecturer_ids: list[uuid.UUID],
+) -> tuple[dict[uuid.UUID, list[str]], dict[uuid.UUID, str]]:
+    """Read every saved identity, including authors without imported publications.
+
+    Only the latest, still-valid human primary selection is exported. Source
+    hints, revoked links and automatically suggested primary IDs are excluded.
+    """
+    ids: dict[uuid.UUID, list[str]] = {}
+    primary: dict[uuid.UUID, str] = {}
+    if not lecturer_ids:
+        return ids, primary
+
+    identity = LecturerScopusIdentity
+    event = LecturerPrimaryScopusEvent
+    latest = (
+        select(event.lecturer_id, func.max(event.seq).label("seq"))
+        .where(event.lecturer_id.in_(lecturer_ids))
+        .group_by(event.lecturer_id)
+        .subquery()
+    )
+    rows = db.execute(
+        select(
+            identity.lecturer_id,
+            ScopusAuthor.scopus_id,
+            ((event.action == "SET") & (event.identity_id == identity.id)).label("is_primary"),
+        )
+        .select_from(identity)
+        .join(ScopusAuthor, ScopusAuthor.id == identity.scopus_author_id)
+        .outerjoin(latest, latest.c.lecturer_id == identity.lecturer_id)
+        .outerjoin(event, event.seq == latest.c.seq)
+        .where(identity.lecturer_id.in_(lecturer_ids), identity.status == "APPROVED")
+        .order_by(ScopusAuthor.scopus_id.asc())
+    ).all()
+    for lecturer_id, scopus_id, is_primary in rows:
+        ids.setdefault(lecturer_id, []).append(scopus_id)
+        if is_primary:
+            primary[lecturer_id] = scopus_id
+    return ids, primary
 
 
 def build_lecturer_export(
@@ -116,6 +167,7 @@ def build_lecturer_export(
         else []
     )
     by_id = {row.id: row for row in lecturers}
+    scopus_ids, primary_scopus_ids = _scopus_ids_for_export(db, list(by_id))
 
     publications: dict[uuid.UUID, list[dict]] = {}
     if origin:
@@ -137,7 +189,9 @@ def build_lecturer_export(
         ).scalars().all()
         seen: set[tuple[uuid.UUID, str, str, int | None]] = set()
         for pub in pub_rows:
-            key = (pub.lecturer_id, pub.title_normalized, pub.doi_normalized or "", pub.published_year)
+            key = (
+                pub.lecturer_id, pub.title_normalized, pub.doi_normalized or "", pub.published_year,
+            )
             if key in seen:
                 continue
             seen.add(key)
@@ -189,6 +243,8 @@ def build_lecturer_export(
             "phone": row.phone,
             "profile_url": row.repository_profile_url,
             "orcid": row.orcid,
+            "scopus_ids": scopus_ids.get(lecturer_id, []),
+            "primary_scopus_id": primary_scopus_ids.get(lecturer_id),
             "is_active": row.is_active,
             "provenance": provenance,
             "known_publications": publications.get(lecturer_id, []),
@@ -227,6 +283,14 @@ def build_lecturer_export(
             "recoverability_note": RECOVERABILITY_NOTE,
             "excluded_without_source_id": excluded,
             "includes_accounts": True,
+            "includes_scopus_ids": True,
+            "scopus_identity_count": sum(len(r["scopus_ids"]) for r in records),
+            "primary_scopus_id_count": sum(r["primary_scopus_id"] is not None for r in records),
+            "scopus_note": (
+                "scopus_ids chứa tất cả ID đã được duyệt và lưu cho giảng viên; "
+                "primary_scopus_id là ID chính đã được người dùng chọn, hoặc null. "
+                "Nhập lại JSON không tự xác nhận liên kết Scopus hoặc lựa chọn ID chính."
+            ),
             "accounts_note": (
                 "Tệp chứa thông tin tài khoản (email, vai trò, display_name, is_active). "
                 "Bí mật xác thực và phiên đăng nhập không có trong tệp xuất."

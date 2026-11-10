@@ -3,6 +3,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, type ChartOptions } from "chart.
 import type { PublicationsByDocumentTypeItem } from "../../../types/dashboard";
 
 ChartJS.register(ArcElement, Tooltip);
+ChartJS.defaults.font.family = "Saira, Arial, sans-serif";
 
 // Colour is bound to the document type (not to its rank in the data), so a type keeps its colour as counts change.
 // The first seven keep the colours already shown on the Dashboard; the rest are distinct additions.
@@ -101,12 +102,22 @@ export default function DocumentTypeDonutChart({ data, locale }: Props) {
     plugins: {
       legend: { display: false },
       tooltip: {
+        titleFont: { size: 14 },
+        bodyFont: { size: 14 },
         callbacks: {
           label: (ctx) => {
             const value = ctx.parsed as number;
             const pct = total > 0 ? ((value / total) * 100).toFixed(1) : "0";
             return ` ${ctx.label}: ${value.toLocaleString(locale === "vi" ? "vi-VN" : "en-US")} (${pct}%)`;
           },
+          // The dataset's own borderColor ("#fff", the gap between slices) would
+          // otherwise bleed into this swatch too, making it look near-white —
+          // override it so the tooltip swatch is a solid fill of the slice's colour.
+          labelColor: (ctx) => ({
+            backgroundColor: colors[ctx.dataIndex],
+            borderColor: colors[ctx.dataIndex],
+            borderWidth: 0,
+          }),
         },
       },
     },
@@ -122,7 +133,7 @@ export default function DocumentTypeDonutChart({ data, locale }: Props) {
       <div style={{ position: "relative", height: 220, width: 220 }} className="shrink-0 mx-auto sm:mx-0">
         <Doughnut data={chartData} options={options} aria-label={ariaLabel} role="img" />
       </div>
-      <div className="flex flex-col gap-1.5 text-xs">
+      <div className="flex flex-col gap-1.5 text-sm">
         {data.map((item, i) => {
           const pct = total > 0 ? ((item.count / total) * 100).toFixed(1) : "0";
           return (

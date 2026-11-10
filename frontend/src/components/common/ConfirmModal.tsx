@@ -20,6 +20,8 @@ export interface ConfirmModalProps {
   loading?: boolean;
   /** Keeps the confirm button disabled (e.g. a required reason is still empty). */
   confirmDisabled?: boolean;
+  /** Disable when the dialog contains an autofocus input. */
+  autoFocusConfirm?: boolean;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -35,6 +37,7 @@ export default function ConfirmModal({
   confirmClassName,
   loading = false,
   confirmDisabled = false,
+  autoFocusConfirm = true,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -59,12 +62,10 @@ export default function ConfirmModal({
 
   // Focus confirmation button on open
   useEffect(() => {
-    if (open) {
-      setTimeout(() => {
-        confirmBtnRef.current?.focus();
-      }, 50);
-    }
-  }, [open]);
+    if (!open || !autoFocusConfirm) return;
+    const timer = window.setTimeout(() => confirmBtnRef.current?.focus(), 50);
+    return () => window.clearTimeout(timer);
+  }, [open, autoFocusConfirm]);
 
   if (!open) return null;
 

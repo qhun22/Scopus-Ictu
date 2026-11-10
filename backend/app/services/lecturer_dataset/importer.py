@@ -38,6 +38,11 @@ preview and rejected by the import **before** anything is written:
 * a new ORCID / profile URL already belongs to another lecturer.
 
 A lecturer that is absent from the file is never deleted or deactivated.
+
+Scopus IDs and the primary choice in a JSON file are retained as snapshot
+references and returned as a review plan with resolved lecturer UUIDs. This
+service never approves a Scopus link: the UI must obtain explicit reviewer
+confirmation and a reason before calling the normal identity-review APIs.
 """
 
 from __future__ import annotations
@@ -96,6 +101,7 @@ class LecturerPreviewSummary:
     parser_version: str
     blocking_conflicts: int = 0
     absent_from_file: int = 0
+    scopus_review_items: list[dict] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -115,6 +121,7 @@ class LecturerImportSummary:
     accounts_created: int = 0
     accounts_skipped: int = 0
     account_warnings: list[dict] = dataclasses.field(default_factory=list)
+    scopus_review_items: list[dict] = dataclasses.field(default_factory=list)
 
 
 def _email_key(value: str | None) -> str:
@@ -371,7 +378,9 @@ def _resolve(index: _Index, record: dict, canonical: dict) -> tuple[Lecturer | N
             ))
     profile_url = canonical["profile_url"]
     if profile_url:
-        holders = index.by_profile_url.get(profile_url, set()) - ({target_id} if target_id else set())
+        holders = index.by_profile_url.get(profile_url, set()) - (
+            {target_id} if target_id else set()
+        )
         if holders:
             blocking.append(_conflict(
                 record, "profile_url_conflict", rows(sorted(holders, key=str)[0]),
@@ -457,8 +466,12 @@ def _plan(index: _Index, envelope: dict) -> list[_Decision]:
                 "record_full_name": record["full_name"],
                 "matched_by": "name_department",
                 "existing_id": str(collision_id),
-                "existing_full_name": existing.full_name if existing is not None else record["full_name"],
-                "existing_email": existing.email if existing is not None else record.get("institutional_email"),
+                "existing_full_name": (
+                    existing.full_name if existing is not None else record["full_name"]
+                ),
+                "existing_email": (
+                    existing.email if existing is not None else record.get("institutional_email")
+                ),
                 "blocking": False,
                 "reason": "Trùng họ tên và đơn vị — chỉ cảnh báo, không gộp hồ sơ.",
                 "source_id": record.get("source_id"),
@@ -527,6 +540,17 @@ def _source_systems(envelope: dict) -> set[str]:
     return {r["provenance"]["source_system"] for r in envelope["lecturers"]}
 
 
+def _scopus_review_item(record: dict, lecturer_id: uuid.UUID | None) -> dict:
+    """An explicit reviewer may apply this plan via the normal review APIs."""
+    return {
+        "lecturer_id": str(lecturer_id) if lecturer_id else None,
+        "full_name": record["full_name"],
+        "institutional_email": record.get("institutional_email"),
+        "scopus_ids": record.get("scopus_ids", []),
+        "primary_scopus_id": record.get("primary_scopus_id"),
+    }
+
+
 class LecturerPreviewService:
     """Compute the diff between an uploaded dataset and current DB state.
 
@@ -563,6 +587,10 @@ class LecturerPreviewService:
             parser_version=envelope["dataset"].get("parser_version") or "unknown",
             blocking_conflicts=s["blocking_conflicts"],
             absent_from_file=s["absent_from_file"],
+            scopus_review_items=[
+                _scopus_review_item(d.record, d.existing.id if d.existing else None)
+                for d in decisions if d.record.get("scopus_ids")
+            ],
         )
 
 
@@ -614,6 +642,7 @@ class LecturerImportService:
         created_user_ids: list[str] = []
         accounts_skipped = 0
         account_warnings_list: list[dict] = []
+        scopus_review_items: list[dict] = []
         dataset_provenance = _dataset_provenance(envelope["dataset"])
 
         try:
@@ -622,7 +651,9 @@ class LecturerImportService:
                 canonical = decision.canonical
                 existing = decision.existing
                 provenance = record["provenance"]
-                source_url = provenance["source_urls"][0] if provenance["source_urls"] else "unknown"
+                source_url = (
+                    provenance["source_urls"][0] if provenance["source_urls"] else "unknown"
+                )
                 email = canonical["institutional_email"] or None
                 if decision.action == "create":
                     lecturer = Lecturer(
@@ -689,6 +720,8 @@ class LecturerImportService:
                     source_url=source_url,
                     snapshot_hash=_hash_payload(canonical),
                     raw_payload={
+                        **{key: record[key] for key in ("scopus_ids", "primary_scopus_id")
+                           if key in record},
                         "canonical": canonical,
                         "provenance": provenance,
                         "source_id": record.get("source_id"),
@@ -703,6 +736,8 @@ class LecturerImportService:
                 db.add(snapshot)
                 db.flush()
                 created_snapshot_ids.append(str(snapshot.id))
+                if record.get("scopus_ids"):
+                    scopus_review_items.append(_scopus_review_item(record, lecturer_id))
 
                 if decision.account_action == "create":
                     account = record["account"]
@@ -820,6 +855,7 @@ class LecturerImportService:
             accounts_created=len(created_user_ids),
             accounts_skipped=accounts_skipped,
             account_warnings=account_warnings_list,
+            scopus_review_items=scopus_review_items,
         )
 
 
@@ -831,7 +867,9 @@ def _publication_key(pub: dict) -> tuple[str, str, int | None]:
     )
 
 
-def _known_publication_keys(db: Session, lecturer_id: uuid.UUID) -> set[tuple[str, str, int | None]]:
+def _known_publication_keys(
+    db: Session, lecturer_id: uuid.UUID,
+) -> set[tuple[str, str, int | None]]:
     """Known publications already stored for the lecturer (avoids re-import duplicates)."""
     stmt = select(
         LecturerKnownPublication.title_normalized,

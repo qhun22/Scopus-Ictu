@@ -102,6 +102,22 @@
           "type": ["string", "null"],
           "maxLength": 100
         },
+        "specialization": {
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "phone": {
+          "type": ["string", "null"],
+          "maxLength": 20
+        },
+        "gender": {
+          "type": ["string", "null"],
+          "enum": ["Nam", "Nữ", "Khác", null]
+        },
+        "date_of_birth": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
         "faculty": {
           "type": "string",
           "minLength": 1,
@@ -134,11 +150,26 @@
               "items": { "type": "string", "format": "uri" }
             },
             "source_record_id": { "type": ["string", "null"] },
+            "known_specialisation": {
+              "type": ["string", "null"],
+              "description": "Legacy published specialization, mapped to specialization on import when that canonical key is absent."
+            },
             "retrieved_at": {
               "type": ["string", "null"],
               "format": "date-time"
             }
           }
+        },
+        "scopus_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[0-9]{1,50}$" },
+          "description": "All currently approved Scopus Author IDs saved for this lecturer. Export reference only; importing this field does not approve identity links."
+        },
+        "primary_scopus_id": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{1,50}$",
+          "description": "The current human-selected primary ID from scopus_ids, or null when none is selected."
         },
         "known_publications": {
           "type": "array",

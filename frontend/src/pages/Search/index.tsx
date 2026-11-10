@@ -7,6 +7,7 @@ import { getSearch } from "../../api/search";
 import { SearchResponse } from "../../types/search";
 import { useAuth } from "../../contexts/AuthContext";
 import { useI18n } from "../../i18n";
+import Button from "../../components/ui/Button";
 
 const MIN_QUERY_LENGTH = 2;
 const GROUP_LIMIT = 5;
@@ -123,12 +124,12 @@ export default function SearchPage() {
       results.scopus_authors.length > 0);
 
   return (
-    <div className="app-page-container space-y-4 p-4 sm:p-6 lg:p-8">
+    <div className="app-page-container space-y-4 sm:space-y-5">
       <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
-        <h1 className="text-lg font-bold text-slate-800 sm:text-xl">
+        <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">
           {t.search.title}
         </h1>
-        <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+        <p className="mt-1 text-sm text-slate-500">
           {t.search.subtitle}
         </p>
 
@@ -145,19 +146,15 @@ export default function SearchPage() {
                 value={inputValue}
                 onChange={handleChange}
                 placeholder={t.search.placeholder}
-                className="h-10 w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20 sm:text-sm"
+                className="h-control w-full rounded-[5px] border border-slate-200 bg-slate-50/50 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:border-[#3A5FC3] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/20"
               />
             </div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[5px] bg-[#3A5FC3] px-5 text-xs font-bold text-white shadow-xs transition-all duration-150 hover:bg-[#2f4ea6] focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/30 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm"
-            >
-              <span>{t.search.button}</span>
-            </button>
+            <Button type="submit" variant="primary" disabled={isLoading} className="!text-sm">
+              {t.search.button}
+            </Button>
           </div>
           {validationError && (
-            <p className="mt-1 text-xs font-medium text-rose-500">{validationError}</p>
+            <p className="mt-1 text-sm font-medium text-rose-500">{validationError}</p>
           )}
         </form>
       </section>
@@ -171,27 +168,23 @@ export default function SearchPage() {
       {!isLoading && errorMessage && (
         <div className="rounded-[5px] border border-rose-200 bg-rose-50 p-6 text-center">
           <p className="text-sm font-medium text-rose-600">{errorMessage}</p>
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="mt-3 inline-flex cursor-pointer items-center justify-center rounded-[5px] border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-600 transition-all hover:bg-rose-100"
-          >
+          <Button type="button" variant="secondary" onClick={handleRetry} className="!mt-3 !border-rose-300 !text-rose-600 hover:!bg-rose-100">
             {t.search.errorRetry}
-          </button>
+          </Button>
         </div>
       )}
 
       {!isLoading && !errorMessage && !activeQuery && (
         <div className="rounded-[5px] border border-slate-200/80 bg-white p-8 text-center">
           <h2 className="text-sm font-bold text-slate-700">{t.search.promptTitle}</h2>
-          <p className="mt-1 text-xs text-slate-500">{t.search.promptSubtitle}</p>
+          <p className="mt-1 text-sm text-slate-500">{t.search.promptSubtitle}</p>
         </div>
       )}
 
       {!isLoading && !errorMessage && activeQuery && results && !hasAnyResult && (
         <div className="rounded-[5px] border border-slate-200/80 bg-white p-8 text-center">
           <h2 className="text-sm font-bold text-slate-700">{t.search.emptyTitle}</h2>
-          <p className="mt-1 text-xs text-slate-500">{t.search.emptySubtitle}</p>
+          <p className="mt-1 text-sm text-slate-500">{t.search.emptySubtitle}</p>
         </div>
       )}
 
@@ -203,7 +196,7 @@ export default function SearchPage() {
                 {results.lecturers.map((item, idx) => (
                   <li key={`${item.full_name}|${item.staff_code ?? ""}|${item.orcid ?? ""}|${item.department ?? ""}|${item.faculty ?? ""}|${idx}`} className="py-2.5">
                     <p className="text-sm font-semibold text-slate-800">{item.full_name}</p>
-                    <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+                    <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-slate-500">
                       {item.staff_code && <Meta label={t.search.staffCode} value={item.staff_code} />}
                       {item.department && <Meta label={t.search.department} value={item.department} />}
                       {item.faculty && <Meta label={t.search.faculty} value={item.faculty} />}
@@ -225,7 +218,7 @@ export default function SearchPage() {
                   >
                     {item.title}
                   </Link>
-                  <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+                  <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-slate-500">
                     <Meta label="EID" value={item.eid} />
                     {item.year !== null && <Meta label={t.search.year} value={String(item.year)} />}
                     {item.source_title && <Meta label={t.search.source} value={item.source_title} />}
@@ -252,7 +245,7 @@ export default function SearchPage() {
                   >
                     {item.preferred_name}
                   </Link>
-                  <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+                  <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-slate-500">
                     <Meta label={t.search.scopusId} value={item.scopus_id} />
                     <Meta
                       label={locale === "vi" ? "Công bố" : "Publications"}
@@ -292,13 +285,13 @@ function ResultSection({
   return (
     <section className="rounded-[5px] border border-slate-200/80 bg-white p-4 shadow-xs sm:p-5">
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-800">{title}</h2>
+        <h2 className="text-base font-semibold text-slate-800">{title}</h2>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
           {count}
         </span>
       </div>
       {count === 0 ? (
-        <p className="py-2 text-xs text-slate-400">{empty}</p>
+        <p className="py-2 text-sm text-slate-400">{empty}</p>
       ) : (
         children
       )}

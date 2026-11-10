@@ -4,6 +4,7 @@ import type { AffiliationCoverage } from "../../../types/dashboard";
 import { statusLabel } from "../../Publications/AuthorAffiliations";
 
 ChartJS.register(ArcElement, Tooltip);
+ChartJS.defaults.font.family = "Saira, Arial, sans-serif";
 
 interface Props {
   data: AffiliationCoverage;
@@ -42,6 +43,8 @@ export default function AffiliationCoverageChart({ data, locale }: Props) {
     plugins: {
       legend: { display: false },
       tooltip: {
+        titleFont: { size: 14 },
+        bodyFont: { size: 14 },
         callbacks: {
           label: (ctx) => {
             const value = ctx.parsed as number;
@@ -49,6 +52,14 @@ export default function AffiliationCoverageChart({ data, locale }: Props) {
               total_author_positions > 0 ? ((value / total_author_positions) * 100).toFixed(1) : "0";
             return ` ${ctx.label}: ${value.toLocaleString(locale === "vi" ? "vi-VN" : "en-US")} (${pct}%)`;
           },
+          // The dataset's own borderColor ("#fff", the gap between slices) would
+          // otherwise bleed into this swatch too, making it look near-white —
+          // override it so the tooltip swatch is a solid fill of the slice's colour.
+          labelColor: (ctx) => ({
+            backgroundColor: colors[ctx.dataIndex],
+            borderColor: colors[ctx.dataIndex],
+            borderWidth: 0,
+          }),
         },
       },
     },
@@ -73,10 +84,10 @@ export default function AffiliationCoverageChart({ data, locale }: Props) {
         <Doughnut data={chartData} options={options} aria-label={ariaLabel} role="img" />
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-2xl font-black text-slate-800">{pctWith}%</span>
-          <span className="text-[10px] text-slate-400">{locale === "vi" ? "có thông tin" : "covered"}</span>
+          <span className="text-sm text-slate-400">{locale === "vi" ? "có thông tin" : "covered"}</span>
         </div>
       </div>
-      <div className="flex flex-col gap-2 text-xs">
+      <div className="flex flex-col gap-2 text-sm">
         <div className="flex items-center gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: colors[0] }} aria-hidden="true" />
           <span className="text-slate-600">{labels[0]}</span>
@@ -91,23 +102,23 @@ export default function AffiliationCoverageChart({ data, locale }: Props) {
             {positions_without_affiliation.toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}
           </span>
         </div>
-        <p className="mt-1 max-w-[260px] text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-1 max-w-[260px] text-sm leading-relaxed text-slate-400">
           {locale === "vi"
             ? `${fmt(positions_with_affiliation)}/${fmt(total_author_positions)} vị trí tác giả có thông tin đơn vị từ nguồn ngoài (mức Đã xác minh định danh hoặc Đã đối chiếu) hoặc do quản trị viên rà soát thủ công — chưa phải xác nhận đơn vị công tác. Mẫu số là số vị trí tác giả trên các công bố, không phải số tác giả Scopus duy nhất.`
             : `${fmt(positions_with_affiliation)}/${fmt(total_author_positions)} author positions have affiliation information from an external source (Identity verified or Cross-checked level) or entered by an administrator after manual review — not a confirmed employer. The denominator is author positions across publications, not unique Scopus authors.`}
         </p>
         <div className="mt-1 border-t border-line pt-2" data-testid="aff-link-status-breakdown">
-          <p className="mb-1 text-[11px] font-semibold text-slate-500">
+          <p className="mb-1 text-sm font-semibold text-slate-500">
             {locale === "vi" ? "Mức đối chiếu theo vị trí tác giả" : "Reconciliation level per author position"}
           </p>
           {(["VERIFIED", "CORROBORATED", "UNRESOLVED"] as const).map((s) => (
-            <div key={s} className="flex items-center gap-2 text-[11px]">
+            <div key={s} className="flex items-center gap-2 text-sm">
               <span className="text-slate-600">{statusLabel(s, locale)}</span>
               <span className="ml-auto font-semibold text-slate-800">{fmt(by_link_status[s])}</span>
             </div>
           ))}
           {notReconciled > 0 && (
-            <div className="flex items-center gap-2 text-[11px]">
+            <div className="flex items-center gap-2 text-sm">
               <span className="text-slate-600">{statusLabel("NOT_RECONCILED", locale)}</span>
               <span className="ml-auto font-semibold text-slate-800">{fmt(notReconciled)}</span>
             </div>

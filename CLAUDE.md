@@ -70,7 +70,7 @@ app/
 
 **Error contract:** All errors raise `APIError` (from `app/core/exceptions.py`) with `status_code`, `detail`, and `code`. The frontend keys on `code` for typed error handling.
 
-**Roles:** `ADMIN` · `REVIEWER` · `LECTURER`. LECTURER is read-only for publications; ADMIN drives all pipeline operations.
+**Roles:** `ADMIN` · `REVIEWER` · `LECTURER`. LECTURER is read-only for publications and identities, and may update allowlisted personal, academic and research fields through `PATCH /lecturers/me/profile`. Identity keys, account roles, faculty/department and verified Scopus links remain staff-managed. ADMIN drives all pipeline operations.
 
 **System Reset** (`POST /api/v1/system/reset`): ADMIN-only, requires `{"confirmation": "ICTU"}`. Only available when `ENVIRONMENT=local` or `ENVIRONMENT=dev`; returns 410 `SYSTEM_RESET_DISABLED` on any other environment. After a successful reset all sessions (including the caller's) are invalidated — frontend auto-redirects to login on `SESSION_REVOKED`. ADMIN accounts are preserved; other data is wiped. There is no password self-registration endpoint — password accounts are created by ADMIN only.
 

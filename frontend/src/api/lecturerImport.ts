@@ -20,7 +20,16 @@ export interface LecturerDatasetConflict {
   existing_email: string | null;
 }
 
+export interface ScopusImportItem {
+  lecturer_id: string | null;
+  full_name: string;
+  institutional_email: string | null;
+  scopus_ids: string[];
+  primary_scopus_id: string | null;
+}
+
 export interface LecturerPreviewResponse {
+  scopus_review_items?: ScopusImportItem[];
   dataset: LecturerDatasetMeta;
   summary: {
     total: number;
@@ -46,6 +55,7 @@ export interface AccountWarningItem {
 }
 
 export interface LecturerImportResponse {
+  scopus_review_items?: ScopusImportItem[];
   dataset: LecturerDatasetMeta;
   summary: {
     total: number;

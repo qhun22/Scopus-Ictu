@@ -88,7 +88,9 @@ Docker: `docker compose -f compose.yaml -f compose.local.yaml up --build`.
 - Errors: always raise `APIError` (`app/core/exceptions.py`) carrying `status_code`,
   `detail`, `code`. The frontend branches on `code`, so codes are part of the contract.
 - Roles: `ADMIN` (all pipeline operations), `REVIEWER` (review queue), `LECTURER`
-  (read-only: `/my-publications`, `/identity`, `/profile`).
+  (read-only publications/identities; self-service updates to allowlisted personal,
+  academic and research fields through `PATCH /lecturers/me/profile`). Identity keys,
+  account roles, faculty/department and verified Scopus links remain staff-managed.
 - Startup recovers interrupted import/enrichment jobs (`app/main.py` lifespan).
 
 ## Domain services (backend/app/services/)

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Button, { buttonClass } from "../../components/ui/Button";
 import FeedbackThread from "../../components/feedback/FeedbackThread";
 import { useI18n } from "../../i18n";
@@ -42,6 +42,8 @@ export default function ReportIssuePage() {
   const [publicationEid, setPublicationEid] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
+  const categoryMenuRef = useRef<HTMLDivElement>(null);
 
   const [myReports, setMyReports] = useState<FeedbackReport[]>([]);
   const [loadingMine, setLoadingMine] = useState(true);
@@ -69,6 +71,21 @@ export default function ReportIssuePage() {
 
   const statusLabel = (s: FeedbackStatus): string =>
     s === "OPEN" ? t.feedback.statusOpen : s === "RESOLVED" ? t.feedback.statusResolved : t.feedback.statusDismissed;
+
+  // Click-outside close for the custom "Loại vấn đề" dropdown below — kept as a
+  // div-based listbox (not a native <select>) because the native option popup
+  // renders as an OS-level window that ignores page CSS; on displays with
+  // non-100% Windows scaling, Chromium mispositions that popup and clips the
+  // left edge of every option's text.
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(event.target as Node)) {
+        setCategoryMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const openCount = myReports.filter((r) => r.status === "OPEN").length;
 
@@ -139,24 +156,50 @@ export default function ReportIssuePage() {
     <div className="app-page-container space-y-5">
       <section className="rounded-[5px] border border-slate-200/80 bg-white p-5 shadow-xs">
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+            <div ref={categoryMenuRef} className="relative">
+              <label id="feedback-category-label" className="mb-1.5 block text-sm font-medium text-slate-700">
                 {t.feedback.categoryLabel}
               </label>
-              <select
-                className={basicFieldClassName}
-                value={category}
-                onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={categoryMenuOpen}
+                aria-labelledby="feedback-category-label"
+                onClick={() => setCategoryMenuOpen((open) => !open)}
+                className={`${basicFieldClassName} flex cursor-pointer items-center justify-between gap-2 text-left ${category ? "" : "text-slate-400"}`}
               >
-                <option value="" disabled>
-                  {t.feedback.categoryAll}
-                </option>
-                {categoryOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                <span className="truncate">{category ? categoryLabel(category) : t.feedback.categoryAll}</span>
+                <svg aria-hidden="true" className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${categoryMenuOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              {categoryMenuOpen && (
+                <ul
+                  role="listbox"
+                  aria-labelledby="feedback-category-label"
+                  className="absolute z-20 mt-1.5 w-full overflow-hidden rounded-[5px] border border-slate-200 bg-white py-1 text-sm shadow-lg"
+                >
+                  {categoryOptions.map((opt) => (
+                    <li key={opt.value}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={category === opt.value}
+                        onClick={() => {
+                          setCategory(opt.value);
+                          setCategoryMenuOpen(false);
+                        }}
+                        className={`block w-full cursor-pointer px-3 py-2 text-left transition-colors hover:bg-slate-50 ${
+                          category === opt.value ? "font-semibold text-[#3A5FC3]" : "text-slate-800"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div>

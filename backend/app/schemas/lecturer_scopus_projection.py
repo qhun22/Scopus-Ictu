@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,11 @@ class LecturerProfileRead(BaseModel):
     faculty: str | None = None
     repository_profile_url: str | None = None
     orcid: str | None = None
+    specialization: str | None = None
+    phone: str | None = None
+    gender: str | None = None
+    date_of_birth: date | None = None
+    version: int = Field(default=1, ge=1)
 
 
 class IdentityEvidenceSummaryRead(BaseModel):

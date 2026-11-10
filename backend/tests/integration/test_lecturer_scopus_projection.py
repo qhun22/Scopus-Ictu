@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import func, select, text
@@ -144,7 +144,7 @@ def _link(
 
 def _evidence(identity: LecturerScopusIdentity, evidence_type: str) -> IdentityEvidence:
     fingerprint = hashlib.sha256(
-        f"{identity.id}:{evidence_type}".encode("utf-8")
+        f"{identity.id}:{evidence_type}".encode()
     ).hexdigest()
     return IdentityEvidence(
         id=uuid.uuid4(),
@@ -162,6 +162,10 @@ def _evidence(identity: LecturerScopusIdentity, evidence_type: str) -> IdentityE
 
 def test_t01_existing_lecturer_profile(projection_session: Session) -> None:
     lecturer = _lecturer(full_name="Profile Lecturer")
+    lecturer.specialization = "Computer science"
+    lecturer.phone = "0900000001"
+    lecturer.gender = "Nữ"
+    lecturer.date_of_birth = date(1990, 1, 2)
     projection_session.add(lecturer)
     projection_session.flush()
 
@@ -182,6 +186,11 @@ def test_t01_existing_lecturer_profile(projection_session: Session) -> None:
         "faculty": "Information Technology",
         "repository_profile_url": lecturer.repository_profile_url,
         "orcid": lecturer.orcid,
+        "specialization": lecturer.specialization,
+        "phone": lecturer.phone,
+        "gender": lecturer.gender,
+        "date_of_birth": lecturer.date_of_birth,
+        "version": lecturer.version,
     }
 
 
@@ -213,7 +222,7 @@ def test_t03_non_approved_identities_excluded(projection_session: Session) -> No
     authors = [_author(name=f"Author {status}") for status in ("CANDIDATE", "REJECTED", "REVOKED")]
     identities = [
         _identity(lecturer, author, status=status)
-        for author, status in zip(authors, ("CANDIDATE", "REJECTED", "REVOKED"))
+        for author, status in zip(authors, ("CANDIDATE", "REJECTED", "REVOKED"), strict=True)
     ]
     projection_session.add(lecturer)
     projection_session.add_all(authors)

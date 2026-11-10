@@ -62,6 +62,11 @@ class LecturerScopusProjectionService:
             faculty=lecturer.faculty,
             repository_profile_url=lecturer.repository_profile_url,
             orcid=lecturer.orcid,
+            specialization=lecturer.specialization,
+            phone=lecturer.phone,
+            gender=lecturer.gender,
+            date_of_birth=lecturer.date_of_birth,
+            version=lecturer.version,
         )
 
     def get_approved_identity_summaries(

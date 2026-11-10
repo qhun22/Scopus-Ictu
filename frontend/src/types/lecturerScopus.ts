@@ -10,6 +10,24 @@ export interface LecturerScopusProfile {
   faculty: string | null;
   repository_profile_url: string | null;
   orcid: string | null;
+  specialization: string | null;
+  phone: string | null;
+  gender: string | null;
+  date_of_birth: string | null;
+  version: number;
+}
+
+export interface LecturerProfileUpdate {
+  version: number;
+  academic_rank?: string | null;
+  academic_degree?: string | null;
+  position?: string | null;
+  specialization?: string | null;
+  phone?: string | null;
+  gender?: "Nam" | "Nữ" | "Khác" | null;
+  date_of_birth?: string | null;
+  orcid?: string | null;
+  repository_profile_url?: string | null;
 }
 
 export interface IdentityEvidenceSummary {

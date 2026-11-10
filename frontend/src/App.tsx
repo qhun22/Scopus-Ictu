@@ -1,11 +1,12 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useMatch } from "react-router-dom";
+import { Bot } from "lucide-react";
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { FeedbackUnreadProvider } from "./contexts/FeedbackUnreadContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { PageVisitProvider } from "./contexts/PageVisitContext";
-import { I18nProvider, useI18n } from "./i18n";
+import { I18nProvider } from "./i18n";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRoute from "./components/auth/RoleRoute";
 import AppLayout from "./layouts/AppLayout";
@@ -28,24 +29,11 @@ import UsersPage from "./pages/Users";
 import GuidePage from "./pages/Guide";
 import ReportIssuePage from "./pages/ReportIssue";
 import FeedbackReportsPage from "./pages/FeedbackReports";
-import PlaceholderPage from "./components/common/PlaceholderPage";
-
-function NotFoundPage() {
-  const { locale } = useI18n();
-  return (
-    <PlaceholderPage
-      title={locale === "vi" ? "404 - Không tìm thấy trang" : "404 - Page not found"}
-      description={
-        locale === "vi"
-          ? "Đường dẫn này không tồn tại hoặc đã được thay đổi. Hãy kiểm tra lại địa chỉ, hoặc quay về trang chủ."
-          : "This page doesn't exist or has moved. Check the address, or head back to the home page."
-      }
-      icon="default"
-    />
-  );
-}
+import NotFoundPage from "./pages/NotFound";
 
 export default function App() {
+  const isLoginPage = useMatch("/login");
+
   return (
     <I18nProvider>
       <ToastProvider>
@@ -120,13 +108,14 @@ export default function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Route>
             </Routes>
-            <button
-              type="button"
-              className="fixed bottom-6 right-6 z-50 h-10 w-10 overflow-hidden rounded-full focus:outline-none"
-              aria-label="Chat bot"
+            {!isLoginPage && <Link
+              to="/report-issue"
+              className="fixed bottom-6 right-6 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-[#3A5FC3] text-white shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-[#3A5FC3]/40 focus:ring-offset-2"
+              aria-label="Báo lỗi / hỗ trợ"
+              title="Báo lỗi / hỗ trợ"
             >
-              <img src="/assets/gatchan.png" alt="Gatchan chat bot" className="h-full w-full object-cover" />
-            </button>
+              <Bot className="h-5 w-5" strokeWidth={1.8} />
+            </Link>}
             </>
             </PageVisitProvider>
           </FeedbackUnreadProvider>

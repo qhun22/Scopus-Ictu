@@ -88,6 +88,16 @@ textarea:focus {
   box-shadow: none !important;
 }
 
+/* These pages use neutral keyboard focus; pointer clicks have no outline. */
+:is(.my-publications-page, .scopus-identity-page, .personal-profile-page, .home-page) :is(input, select, button, a):focus {
+  outline: none !important;
+}
+
+:is(.my-publications-page, .scopus-identity-page, .personal-profile-page, .home-page) :is(input, select, button, a):focus-visible {
+  outline: 2px solid #94a3b8 !important;
+  outline-offset: 2px;
+}
+
 /* Standardized Top-Right Page Action Group (aligned with header control width) */
 .page-action-group {
   display: grid;

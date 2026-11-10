@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const mountedRef = useRef(true);
   const authenticatedRef = useRef(false);
+  const logoutInProgressRef = useRef(false);
   const sessionGenerationRef = useRef(0);
   const refreshPromiseRef = useRef<Promise<User | null> | null>(null);
   const handledSessionErrorRef = useRef(false);
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscribeToSessionAuthErrors((error) => {
         // Anonymous bootstrap requests can legitimately receive an old-cookie
         // SESSION_REVOKED response; there is no active session to interrupt.
-        if (!authenticatedRef.current) return;
+        if (!authenticatedRef.current || logoutInProgressRef.current) return;
 
         // The client only publishes the three SessionAuthErrorCode values.
         forceLogout(error.code as SessionAuthErrorCode);
@@ -165,12 +166,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async (): Promise<void> => {
+    logoutInProgressRef.current = true;
     try {
       await apiLogout();
     } finally {
       clearAuthState();
+      // Navigate in the same update as clearing the user, before protected
+      // routes can redirect the now-anonymous session to the login page.
+      navigate("/home", { replace: true });
+      logoutInProgressRef.current = false;
     }
-  }, [clearAuthState]);
+  }, [clearAuthState, navigate]);
 
   const value = useMemo<AuthContextType>(
     () => ({

@@ -32,6 +32,7 @@ from app.models.candidate import (
 )
 from app.models.governance import User
 from app.models.identity import IdentityEvidence, LecturerScopusIdentity
+from app.models.master_lecturer import Lecturer
 from app.models.publication import ScopusAuthor
 from app.services.candidate_review_queries import current_reviewable_observation
 from app.services.review_reason_policy import accept_reason_policy, normalize_reason
@@ -492,10 +493,17 @@ class CandidateReviewService:
             .with_for_update()
         )
         if existing is not None and existing.lecturer_id != lecturer_id:
-            raise ScopusAuthorAlreadyApprovedError(
-                f"Scopus author {scopus_author_id} is already APPROVED "
-                f"for lecturer {existing.lecturer_id}"
+            other_lecturer = self._session.get(Lecturer, existing.lecturer_id)
+            other_label = (
+                other_lecturer.full_name
+                if other_lecturer is not None
+                else str(existing.lecturer_id)
             )
+            error = ScopusAuthorAlreadyApprovedError(
+                f"ID Scopus này đã được duyệt (APPROVED) cho giảng viên khác: {other_label}."
+            )
+            error.existing_lecturer_id = existing.lecturer_id
+            raise error
 
     def _build_evidence_snapshot(
         self,

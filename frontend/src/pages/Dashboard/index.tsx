@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { getDashboardCharts, getDashboardSummary } from "../../api/dashboard";
 import { getApiErrorMessage } from "../../api/errors";
 import { resetSystem } from "../../api/system";
-import Badge, { type BadgeTone } from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import TextConfirmModal from "../../components/common/TextConfirmModal";
 import { useAuth } from "../../contexts/AuthContext";
@@ -247,14 +246,14 @@ export default function DashboardPage() {
             <h2 className="text-base font-semibold text-gray-800">
               {copy.identityTitle}
             </h2>
-            <p className="mb-4 mt-1 text-xs text-gray-500">{copy.identityHint}</p>
+            <p className="mb-4 mt-1 text-sm text-gray-500">{copy.identityHint}</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {IDENTITY_STATUSES.map((status) => (
                 <div
                   key={status}
                   className={`rounded-[5px] border px-4 py-3 ${IDENTITY_COLORS[status]}`}
                 >
-                  <div className="text-xs font-medium uppercase tracking-wide opacity-75">
+                  <div className="text-sm font-medium uppercase tracking-wide opacity-75">
                     {copy[IDENTITY_LABEL_KEYS[status]]}
                   </div>
                   <div className="mt-1 text-2xl font-bold">
@@ -316,7 +315,7 @@ export default function DashboardPage() {
                         <p className="text-sm font-medium text-slate-500">
                           {copy.affiliationCoverageEmptyTitle}
                         </p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-sm text-slate-400">
                           {copy.affiliationCoverageEmptySubtitle}
                         </p>
                       </div>
@@ -336,15 +335,15 @@ export default function DashboardPage() {
                       <p className="text-sm font-medium text-slate-500">
                         {copy.publicationsByYearEmptyTitle}
                       </p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-sm text-slate-400">
                         {copy.publicationsByYearEmptySubtitle}
                       </p>
                     </div>
                   ) : (
                     <>
-                      <PublicationsByYearChart data={charts.publications_by_year} locale={locale} />
+                      <PublicationsByYearChart data={charts.publications_by_year} locale={locale} fontSize={14} />
                       {charts.publications_total_without_year > 0 && (
-                        <p className="mt-2 text-[11px] text-slate-400">
+                        <p className="mt-2 text-sm text-slate-400">
                           {charts.publications_total_without_year.toLocaleString(
                             locale === "vi" ? "vi-VN" : "en-US",
                           )}{" "}
@@ -374,7 +373,7 @@ export default function DashboardPage() {
             {summary.latest_scopus_import === null ? (
               <div className="py-6 text-center">
                 <p className="text-sm font-medium text-gray-600">{copy.noImportTitle}</p>
-                <p className="mt-1 text-xs text-gray-400">{copy.noImportSubtitle}</p>
+                <p className="mt-1 text-sm text-gray-400">{copy.noImportSubtitle}</p>
               </div>
             ) : (
               <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-4">
@@ -382,12 +381,6 @@ export default function DashboardPage() {
                   <dt className="font-medium text-gray-500">{copy.fileName}</dt>
                   <dd className="mt-0.5 break-all text-gray-900">
                     {summary.latest_scopus_import.file_name}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-gray-500">{copy.status}</dt>
-                  <dd className="mt-0.5">
-                    <ImportStatusBadge status={summary.latest_scopus_import.status} locale={locale} />
                   </dd>
                 </div>
                 <div>
@@ -440,13 +433,13 @@ export default function DashboardPage() {
             {summary.recent_audit_actions.length === 0 ? (
               <div className="py-6 text-center">
                 <p className="text-sm font-medium text-gray-600">{copy.noRecentAudit}</p>
-                <p className="mt-1 text-xs text-gray-400">{copy.noRecentAuditSubtitle}</p>
+                <p className="mt-1 text-sm text-gray-400">{copy.noRecentAuditSubtitle}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                    <tr className="border-b border-gray-200 text-left text-sm font-medium uppercase tracking-wide text-gray-500">
                       <th className="pb-2 pr-4">{copy.time}</th>
                       <th className="pb-2 pr-4">{copy.entityType}</th>
                       <th className="pb-2 pr-4">{copy.action}</th>
@@ -522,7 +515,7 @@ function SummaryCard({
           : "border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50"
       }`}
     >
-      <div className="text-xs font-medium text-gray-500">{label}</div>
+      <div className="text-sm font-medium text-gray-500">{label}</div>
       <div
         className={`mt-1 text-[28px] font-bold leading-none ${
           highlight ? "text-amber-700" : "text-gray-900"
@@ -543,27 +536,3 @@ function SummaryCard({
   return inner;
 }
 
-const IMPORT_STATUS_TONE: Record<string, BadgeTone> = {
-  RECEIVED: "brand",
-  PARSING: "indigo",
-  VALIDATED: "info",
-  STAGED: "warning",
-  APPLIED: "success",
-  FAILED: "danger",
-  CANCELLED: "neutral",
-};
-
-const IMPORT_STATUS_LABEL: Record<string, Record<"vi" | "en", string>> = {
-  RECEIVED: { vi: "Đã tiếp nhận", en: "Received" },
-  PARSING: { vi: "Đang phân tích", en: "Parsing" },
-  VALIDATED: { vi: "Đã kiểm tra", en: "Validated" },
-  STAGED: { vi: "Chờ áp dụng", en: "Awaiting apply" },
-  APPLIED: { vi: "Đã áp dụng", en: "Applied" },
-  FAILED: { vi: "Thất bại", en: "Failed" },
-  CANCELLED: { vi: "Đã hủy", en: "Cancelled" },
-};
-
-function ImportStatusBadge({ status, locale }: { status: string; locale: "vi" | "en" }) {
-  const label = IMPORT_STATUS_LABEL[status]?.[locale] ?? status;
-  return <Badge tone={IMPORT_STATUS_TONE[status] ?? "neutral"} className="!rounded-[5px]">{label}</Badge>;
-}

@@ -12,6 +12,7 @@ from app.services.author_affiliation import (
     ScopusAuthorSlot,
     align_paper,
     name_tokens,
+    names_compatible,
     names_match,
     parse_crossref_authors,
     parse_openalex_authorships,
@@ -322,3 +323,94 @@ class TestOpenAlexTrustBoundary:
         link = align_paper(slots("Alpha, Ann"), parse_openalex_authorships({}),
                            {}, source="openalex")[0]
         assert link.status == UNRESOLVED and link.reason == "NO_EXTERNAL_AUTHOR_LIST"
+
+
+# --- how far an OpenAlex author profile may differ from the name printed on the paper --------
+
+@pytest.mark.parametrize("written,profile", [
+    ("A. A. Moldovyan", "Alexander Andreevich Moldovyan"),
+    ("T.-T. Nguyen", "Thanh-Tung Nguyen"),
+    ("Alexander A. Moldovyan", "A. Andreevich Moldovyan"),
+    ("A. A. Kostina", "Костина Анна Александровна"),
+    ("Thanh-Tung Nguyen", "Nguyen, Thanh Tung"),
+])
+def test_names_compatible_accepts_initials_of_the_same_name(written, profile) -> None:
+    assert names_compatible(written, profile)
+
+
+@pytest.mark.parametrize("written,profile", [
+    ("The-Vinh Nguyen", "Thanh-Danh Nguyen"),  # same surname, different given names
+    ("N. T. Dung", "N. V. Dung"),  # different initial
+    ("Anna Alpha", "Alexandra Alpha"),  # two full words that merely start alike
+    ("A. A. B.", "Ann Alice Bert"),  # no full word to anchor on
+    ("Le Hoan", "Le Thanh Hoan"),  # different number of words
+    ("Ann Alpha", "Bert Birch"),
+    ("Ann Alpha", "李明"),  # a script we cannot compare
+    ("", ""),
+    (None, "Ann Alpha"),
+])
+def test_names_compatible_rejects_anything_else(written, profile) -> None:
+    assert not names_compatible(written, profile)
+
+
+def _align_openalex(slot_name, raw_name, profile_name, **kwargs):
+    work = {"authorships": [{
+        "raw_author_name": raw_name,
+        "author": {"id": "https://openalex.org/A-SYNTHETIC", "display_name": profile_name,
+                   "orcid": "https://orcid.org/0000-0001-0000-0042"},
+        "raw_affiliation_strings": ["Synthetic Faculty"],
+    }]}
+    parsed = parse_openalex_authorships(work)
+    return align_paper(slots(slot_name), parsed, {}, source="openalex", **kwargs)[0]
+
+
+def test_abbreviated_paper_name_keeps_the_unit_but_is_not_verified() -> None:
+    link = _align_openalex("Moldovyan, A.A.", "A. A. Moldovyan", "Alexander Andreevich Moldovyan")
+
+    assert link.status == CORROBORATED
+    assert link.reason is None
+    assert link.raw_affiliations == ("Synthetic Faculty",) and link.has_affiliation
+
+
+def test_profile_of_someone_else_still_withholds_the_unit() -> None:
+    link = _align_openalex("Nguyen, The-Vinh", "The-Vinh Nguyen", "Thanh-Danh Nguyen")
+
+    assert link.status == UNRESOLVED and link.reason == "OPENALEX_ENTITY_NAME_CONFLICT"
+    assert not link.has_affiliation
+
+
+def test_paper_name_must_still_match_the_scopus_slot() -> None:
+    link = _align_openalex("Birch, Bert", "A. A. Moldovyan", "Alexander Andreevich Moldovyan")
+
+    assert link.status == UNRESOLVED and link.reason == "NAME_MISMATCH"
+
+
+def test_same_publisher_orcid_clears_a_name_written_differently() -> None:
+    orcids = {1: "0000-0001-0000-0042"}
+
+    link = _align_openalex(
+        "Nguyen, Dung", "Dung Nguyen", "Dung The Nguyen", publisher_orcids=orcids
+    )
+
+    assert link.status == CORROBORATED and link.has_affiliation
+    assert not (link.evidence or "").startswith("ORCID:")
+
+
+@pytest.mark.parametrize("orcids", [
+    {},
+    {1: "0000-0001-0000-0099"},  # a different person according to the publisher
+    {2: "0000-0001-0000-0042"},  # the same ORCID, but on another position
+])
+def test_without_the_same_orcid_at_that_position_the_conflict_stands(orcids) -> None:
+    link = _align_openalex(
+        "Nguyen, Dung", "Dung Nguyen", "Dung The Nguyen", publisher_orcids=orcids
+    )
+
+    assert link.reason == "OPENALEX_ENTITY_NAME_CONFLICT"
+
+
+def test_same_orcid_does_not_clear_names_with_no_word_in_common() -> None:
+    link = _align_openalex("Alpha, Ann", "Ann Alpha", "Bert Birch",
+                           publisher_orcids={1: "0000-0001-0000-0042"})
+
+    assert link.reason == "OPENALEX_ENTITY_NAME_CONFLICT"

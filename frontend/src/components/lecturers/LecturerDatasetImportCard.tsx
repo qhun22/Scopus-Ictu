@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
-import { previewLecturerDataset } from "../../api/lecturerImport";
+import { previewLecturerDataset, type ScopusImportItem } from "../../api/lecturerImport";
 import { useToast } from "../../contexts/ToastContext";
 import { useI18n } from "../../i18n";
 import { buttonClass } from "../ui/Button";
@@ -35,6 +35,7 @@ export interface PreviewConflict {
 }
 
 export interface PreviewResponse {
+  scopus_review_items?: ScopusImportItem[];
   dataset: DatasetMeta;
   summary: PreviewSummary;
   conflicts: PreviewConflict[];

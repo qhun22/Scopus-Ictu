@@ -486,6 +486,13 @@ class AuthorNormalizer:
         ).first()
 
         if existing is not None:
+            # A manual ID reference has no claimed author name. Fill it only
+            # from an actual imported occurrence, without changing its identity.
+            if not existing.preferred_name or existing.preferred_name == existing.scopus_id:
+                imported_name = occ.full_name or occ.display_name
+                if imported_name:
+                    existing.preferred_name = imported_name
+                    existing.updated_at = datetime.now(UTC)
             self.counters.authors_existing += 1
             return existing
 
@@ -513,6 +520,9 @@ class AuthorNormalizer:
         ).first()
         if existing is None:
             raise conflict
+        if not existing.preferred_name or existing.preferred_name == existing.scopus_id:
+            existing.preferred_name = preferred
+            existing.updated_at = datetime.now(UTC)
         self.counters.authors_existing += 1
         return existing
 

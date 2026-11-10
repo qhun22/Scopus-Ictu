@@ -10,10 +10,13 @@ import {
 import type { PublicationsByYearItem } from "../../../types/dashboard";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
+ChartJS.defaults.font.family = "Saira, Arial, sans-serif";
 
 interface Props {
   data: PublicationsByYearItem[];
   locale: "vi" | "en";
+  fontSize?: number;
+  height?: number;
 }
 
 // The only specified year rule is the database constraint ck_publications_year_range (1000–9999).
@@ -34,7 +37,7 @@ export function buildYearSeries(data: PublicationsByYearItem[]) {
   return { points, outliers };
 }
 
-export default function PublicationsByYearChart({ data, locale }: Props) {
+export default function PublicationsByYearChart({ data, locale, fontSize = 11, height = 260 }: Props) {
   const { points, outliers } = buildYearSeries(data);
   const labels = points.map((d) => String(d.year));
   const values = points.map((d) => d.count);
@@ -59,6 +62,7 @@ export default function PublicationsByYearChart({ data, locale }: Props) {
     plugins: {
       legend: { display: false },
       tooltip: {
+        ...(fontSize !== 11 ? { titleFont: { size: fontSize }, bodyFont: { size: fontSize } } : {}),
         callbacks: {
           label: (ctx) =>
             `${locale === "vi" ? "Số công bố" : "Publications"}: ${(ctx.parsed.y ?? 0).toLocaleString(
@@ -70,13 +74,13 @@ export default function PublicationsByYearChart({ data, locale }: Props) {
     scales: {
       x: {
         grid: { display: false },
-        ticks: { color: "#64748b", font: { size: 11 }, autoSkip: true, maxRotation: 45 },
+        ticks: { color: "#64748b", font: { size: fontSize }, autoSkip: true, maxRotation: 45 },
       },
       y: {
         beginAtZero: true,
         ticks: {
           color: "#94a3b8",
-          font: { size: 11 },
+          font: { size: fontSize },
           precision: 0,
         },
         grid: { color: "#e2e8f0" },
@@ -91,7 +95,7 @@ export default function PublicationsByYearChart({ data, locale }: Props) {
 
   return (
     <div>
-      <div style={{ position: "relative", height: 260 }}>
+      <div style={{ position: "relative", height }}>
         <Bar
           data={chartData}
           options={options}
@@ -100,7 +104,7 @@ export default function PublicationsByYearChart({ data, locale }: Props) {
         />
       </div>
       {outlierCount > 0 && (
-        <p className="mt-2 text-xs text-amber-700" data-testid="year-outliers-note">
+        <p className="mt-2 text-xs text-amber-700" style={fontSize !== 11 ? { fontSize } : undefined} data-testid="year-outliers-note">
           {locale === "vi"
             ? `${outlierCount.toLocaleString("vi-VN")} công bố có năm không hợp lệ (${outliers.map((d) => d.year).join(", ")}; hợp lệ: ${MIN_VALID_YEAR}–${MAX_VALID_YEAR}) nên không được vẽ trên trục năm.`
             : `${outlierCount.toLocaleString("en-US")} publications have an invalid year (${outliers.map((d) => d.year).join(", ")}; valid: ${MIN_VALID_YEAR}–${MAX_VALID_YEAR}) and are not plotted on the year axis.`}
